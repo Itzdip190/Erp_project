@@ -54,23 +54,25 @@ class DatabaseSeeder extends Seeder
         $plans = [$basicPlan, $standardPlan, $premiumPlan];
 
         // 3. Create SuperAdmin User
+        $superAdminPassword = env('SUPERADMIN_PASSWORD', 'SuperAdminSecurePass2026!');
         $superAdmin = User::create([
             'name' => 'Super Admin',
             'email' => 'superadmin@schoolcloud.com',
             'mobile' => '9999999999',
-            'password' => Hash::make('Sam123'),
+            'password' => Hash::make($superAdminPassword),
             'role' => 'superadmin',
             'school_id' => null,
         ]);
         $superAdmin->assignRole('superadmin');
 
         // Create a test Student User for Admission ID login demo
+        $studentPassword = env('STUDENT_PASSWORD', 'StudentSecurePass2026!');
         $testStudent = User::create([
             'name' => 'John Doe',
             'email' => 'student@schoolcloud.com',
             'mobile' => '9876543210',
             'admission_id' => 'ADM-2026-001',
-            'password' => Hash::make('password'),
+            'password' => Hash::make($studentPassword),
             'role' => 'student',
             'school_id' => null,
         ]);
@@ -112,10 +114,11 @@ class DatabaseSeeder extends Seeder
 
             // Create School Admin
             $schoolAdminEmail = strtolower(str_replace([' ', '\''], '', $name)) . '@schoolcloud.com';
+            $schoolAdminPassword = env('SCHOOL_ADMIN_PASSWORD', 'SchoolAdminSecurePass2026!');
             $admin = User::create([
                 'name' => $name . ' Admin',
                 'email' => $schoolAdminEmail,
-                'password' => Hash::make('password'),
+                'password' => Hash::make($schoolAdminPassword),
                 'role' => 'school_admin',
                 'school_id' => $school->id,
                 'created_at' => $createdAt,
