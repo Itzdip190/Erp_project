@@ -218,9 +218,10 @@
 
         /* Inner Page container */
         .container {
-            padding: 3rem;
+            padding: 48px 3rem;
             flex: 1;
             animation: fadeIn 0.4s ease-out;
+            overflow-x: hidden;
         }
 
         @keyframes fadeIn {

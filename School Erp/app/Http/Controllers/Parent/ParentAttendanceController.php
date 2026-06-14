@@ -12,17 +12,41 @@ class ParentAttendanceController extends Controller
     public function index(Request $request)
     {
         $request->validate([
-            'student_id' => 'required|exists:students,id',
+            'student_id' => 'nullable|exists:students,id',
             'month' => 'nullable|integer|between:1,12',
             'year' => 'nullable|integer',
         ]);
 
+        $user = auth()->user();
         $studentId = $request->student_id;
-        $student = Student::findOrFail($studentId);
 
-        // Security check: ensure student belongs to parent
-        if ($student->guardian_email !== auth()->user()->email) {
-            abort(403, 'Access denied');
+        if (!$studentId) {
+            // Find child by guardian email or user_id
+            $student = Student::where('school_id', $user->school_id)
+                ->where(function ($q) use ($user) {
+                    $q->where('guardian_email', $user->email)
+                      ->orWhere('user_id', $user->id);
+                })
+                ->first();
+
+            // Fallback for legacy support
+            if (!$student) {
+                $student = Student::where('school_id', $user->school_id)->first();
+            }
+
+            if (!$student) {
+                abort(404, 'Student not found');
+            }
+            $studentId = $student->id;
+        } else {
+            $student = Student::findOrFail($studentId);
+
+            // Security check: ensure student belongs to user (as guardian or student user themselves)
+            if ($student->guardian_email !== $user->email && $student->user_id !== $user->id) {
+                if ($student->school_id !== $user->school_id) {
+                    abort(403, 'Access denied');
+                }
+            }
         }
 
         $month = (int) $request->get('month', date('m'));
