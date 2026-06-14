@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('name');
             $table->decimal('price', 10, 2);
             $table->integer('duration_days')->default(30);
+            $table->json('features')->nullable();
             $table->timestamps();
         });
     }

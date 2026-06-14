@@ -1,5 +1,4 @@
 <?php
-// database/migrations/2026_06_05_033400_create_schools_table.php
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -12,8 +11,17 @@ return new class extends Migration
         Schema::create('schools', function (Blueprint $table) {
             $table->id();
             $table->string('name');
+            $table->string('code')->unique();                      // e.g. "YIS2024" — all mobile logins
             $table->string('custom_domain')->unique()->nullable();
-            $table->string('status')->default('trial'); // active, suspended, trial
+            $table->string('logo')->nullable();                    // S3 path
+            $table->text('address')->nullable();
+            $table->string('phone')->nullable();
+            $table->string('dashboard_theme')->default('blue');
+            $table->string('status')->default('trial');            // active / suspended / trial
+            $table->json('sms_config')->nullable();               // OTP SMS credentials
+            $table->integer('late_grace_minutes')->default(15);
+            $table->time('staff_punch_in_start')->default('08:00:00');
+            $table->time('staff_punch_in_end')->default('18:00:00');
             $table->timestamps();
         });
     }

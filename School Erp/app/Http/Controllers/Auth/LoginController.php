@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\LoginRequest;
+use App\Models\LoginLog;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -24,41 +27,42 @@ class LoginController extends Controller
     /**
      * Handle authentication attempt.
      */
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $request->validate([
-            'username' => ['required', 'string'],
-            'password' => ['required', 'string'],
-            'login_type' => ['required', 'in:email_mobile,admission_id'],
-        ]);
-
-        $username = $request->input('username');
-        $password = $request->input('password');
-        $loginType = $request->input('login_type');
+        $credentials = $request->only('email', 'password');
         $remember = $request->has('remember');
-
-        $credentials = [];
-
-        if ($loginType === 'admission_id') {
-            $credentials = ['admission_id' => $username, 'password' => $password];
-        } else {
-            // Check if input is email or mobile number
-            if (filter_var($username, FILTER_VALIDATE_EMAIL)) {
-                $credentials = ['email' => $username, 'password' => $password];
-            } else {
-                $credentials = ['mobile' => $username, 'password' => $password];
-            }
-        }
 
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
-
             $user = Auth::user();
+            
+            // Update last login timestamp
+            $user->update(['last_login_at' => now()]);
+
+            // Log successful attempt
+            LoginLog::create([
+                'user_id' => $user->id,
+                'email_attempted' => $request->email,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'status' => 'success',
+            ]);
+
             return $this->redirectBasedOnRole($user);
         }
 
+        // Log failed attempt
+        $failedUser = User::where('email', $request->email)->first();
+        LoginLog::create([
+            'user_id' => $failedUser?->id,
+            'email_attempted' => $request->email,
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'status' => 'failed',
+        ]);
+
         throw ValidationException::withMessages([
-            'username' => [__('auth.failed')],
+            'email' => [__('auth.failed')],
         ]);
     }
 
@@ -67,18 +71,16 @@ class LoginController extends Controller
      */
     protected function redirectBasedOnRole($user)
     {
-        if ($user->hasRole('superadmin') || $user->role === 'superadmin') {
-            return redirect()->intended(route('superadmin.dashboard'));
-        } elseif ($user->hasRole('school_admin') || $user->role === 'school_admin' || $user->hasRole('teacher') || $user->role === 'teacher') {
-            return redirect()->intended(route('school.dashboard'));
-        } elseif ($user->hasRole('parent') || $user->role === 'parent') {
-            return redirect()->intended(route('parent.dashboard'));
-        } elseif ($user->hasRole('student') || $user->role === 'student') {
-            return redirect()->intended(route('student.dashboard'));
+        if ($user->hasRole('superadmin')) {
+            return redirect()->intended('/superadmin/dashboard');
+        } elseif ($user->hasRole('school_admin') || $user->hasRole('teacher') || $user->hasRole('accountant')) {
+            return redirect()->intended('/school/dashboard');
+        } elseif ($user->hasRole('parent') || $user->hasRole('student')) {
+            return redirect()->intended('/parent/dashboard');
         }
 
         Auth::logout();
-        return redirect()->route('login')->withErrors(['username' => 'Unauthorized access. Unknown role.']);
+        return redirect()->route('login')->withErrors(['email' => 'Unauthorized access. Unknown role.']);
     }
 
     /**
@@ -94,3 +96,4 @@ class LoginController extends Controller
         return redirect()->route('login');
     }
 }
+

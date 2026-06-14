@@ -11,8 +11,22 @@ class School extends Model
 
     protected $fillable = [
         'name',
+        'code',
         'custom_domain',
+        'logo',
+        'address',
+        'phone',
+        'dashboard_theme',
         'status',
+        'sms_config',
+        'late_grace_minutes',
+        'staff_punch_in_start',
+        'staff_punch_in_end',
+    ];
+
+    protected $casts = [
+        'sms_config' => 'array',
+        'late_grace_minutes' => 'integer',
     ];
 
     public function users()
@@ -30,12 +44,13 @@ class School extends Model
         return $this->hasMany(Subscription::class);
     }
 
-    public function activeSubscription()
+    public function activeSubscription(): ?Subscription
     {
-        return $this->hasOne(Subscription::class)
-            ->where('subscription_ends_at', '>', now())
+        return $this->subscriptions()
             ->where('status', 'active')
-            ->latestOfMany();
+            ->where('subscription_ends_at', '>', now())
+            ->latest()
+            ->first();
     }
 
     public function subscriptionOrders()
@@ -43,3 +58,4 @@ class School extends Model
         return $this->hasMany(SubscriptionOrder::class);
     }
 }
+

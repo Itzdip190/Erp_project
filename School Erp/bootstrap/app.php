@@ -14,6 +14,16 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware(['web', 'auth', 'role:superadmin'])
                 ->prefix('superadmin')
                 ->group(base_path('routes/superadmin.php'));
+
+            Route::middleware(['web', 'auth', 'school', 'subscription'])
+                ->prefix('school')
+                ->group(base_path('routes/school.php'));
+
+            Route::middleware(['web', 'auth', 'role:parent|student'])
+                ->prefix('parent')
+                ->group(base_path('routes/parent.php'));
+
+            Route::group([], base_path('routes/api_v1.php'));
         }
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -22,8 +32,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'school'       => \App\Http\Middleware\IdentifySchoolByDomain::class,
+            'subscription' => \App\Http\Middleware\CheckSubscriptionStatus::class,
+            'check.module' => \App\Http\Middleware\CheckModuleAccess::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();
+
