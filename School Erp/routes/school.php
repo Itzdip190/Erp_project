@@ -58,7 +58,42 @@ Route::middleware(['check.module:attendance'])->group(function () {
     Route::get('/attendance/staff/report', [StaffAttendanceController::class, 'report'])->name('school.attendance.staff.report');
 });
 
-// Settings
+// Settings & Profile
 Route::get('/settings', [SettingsController::class, 'index'])->name('school.settings.index');
 Route::put('/settings/profile', [SettingsController::class, 'updateProfile'])->name('school.settings.profile');
 Route::put('/settings/password', [SettingsController::class, 'changePassword'])->name('school.settings.password');
+
+// Overview Features
+Route::get('/dashboard/mis-report', [SchoolDashboardController::class, 'misReport'])->name('school.dashboard.mis-report');
+
+// Settings & Institute Info
+Route::get('/settings/institute-info', [SettingsController::class, 'instituteInfo'])->name('school.settings.institute-info');
+Route::put('/settings/institute-info', [SettingsController::class, 'updateInstituteInfo'])->name('school.settings.institute-info.update');
+Route::get('/settings/implementation', [SettingsController::class, 'implementationProcess'])->name('school.settings.implementation');
+Route::get('/settings/udise', [SettingsController::class, 'udise'])->name('school.settings.udise');
+Route::put('/settings/udise', [SettingsController::class, 'updateUdise'])->name('school.settings.udise.update');
+Route::get('/settings/reset-password', [SettingsController::class, 'resetPasswordPage'])->name('school.settings.reset-password');
+Route::post('/settings/reset-password', [SettingsController::class, 'resetPassword'])->name('school.settings.reset-password.post');
+
+// Role Management Features
+Route::get('/role-management/roles', [\App\Http\Controllers\School\RoleController::class, 'index'])->name('school.roles.index');
+Route::get('/role-management/staff-access', [\App\Http\Controllers\School\RoleController::class, 'staffAccess'])->name('school.roles.staff-access');
+Route::put('/role-management/staff-access/{user}', [\App\Http\Controllers\School\RoleController::class, 'updateStaffAccess'])->name('school.roles.staff-access.update');
+
+// Staff Management CRUD & Additional Features
+Route::get('/staff/import', [\App\Http\Controllers\School\StaffController::class, 'importForm'])->name('school.staff.import');
+Route::post('/staff/import', [\App\Http\Controllers\School\StaffController::class, 'bulkImport'])->name('school.staff.import.post');
+Route::get('/staff/bulk-photo', [\App\Http\Controllers\School\StaffController::class, 'bulkPhotoForm'])->name('school.staff.bulk-photo');
+Route::post('/staff/bulk-photo', [\App\Http\Controllers\School\StaffController::class, 'bulkPhotoUpload'])->name('school.staff.bulk-photo.post');
+Route::get('/staff/bulk-attendance', [\App\Http\Controllers\School\StaffController::class, 'bulkAttendance'])->name('school.staff.bulk-attendance');
+Route::post('/staff/bulk-attendance', [\App\Http\Controllers\School\StaffController::class, 'saveBulkAttendance'])->name('school.staff.bulk-attendance.post');
+
+Route::resource('staff', \App\Http\Controllers\School\StaffController::class)->names([
+    'index' => 'school.staff.index',
+    'create' => 'school.staff.create',
+    'store' => 'school.staff.store',
+    'show' => 'school.staff.show',
+    'edit' => 'school.staff.edit',
+    'update' => 'school.staff.update',
+    'destroy' => 'school.staff.destroy',
+]);
