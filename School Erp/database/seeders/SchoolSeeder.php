@@ -13,7 +13,7 @@ class SchoolSeeder extends Seeder
             ['code' => 'YIS2024'],
             [
                 'name' => 'Yash International School',
-                'custom_domain' => 'yis.schoolcloud.com',
+                'custom_domain' => env('SCHOOL_CUSTOM_DOMAIN', 'orchid-chicken-193400.hostingersite.com'),
                 'logo' => null,
                 'address' => '123 Academic Block, Education City',
                 'phone' => '9876543210',

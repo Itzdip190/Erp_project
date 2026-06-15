@@ -232,6 +232,7 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 .stats-row{
     display:grid;grid-template-columns:repeat(6,1fr);
     gap:12px;margin-bottom:18px;
+    align-items:start;
 }
 .stat{
     background:var(--white);border:1px solid var(--border);
@@ -239,28 +240,31 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
     box-shadow:var(--shadow);
     transition:transform .2s,box-shadow .2s;
     display:flex;flex-direction:column;
+    height:140px;overflow:hidden;
 }
 .stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
-.stat-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;}
+.stat-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px;flex-shrink:0;}
 .stat-ico{
-    width:44px;height:44px;border-radius:11px;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;font-size:18px;
+    width:40px;height:40px;border-radius:11px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:17px;
 }
 .stat-info{flex:1;min-width:0;}
-.stat-lbl{font-size:10px;color:var(--t2);font-weight:500;margin-bottom:2px;white-space:nowrap;}
+.stat-lbl{font-size:10px;color:var(--t2);font-weight:500;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .stat-val{
-    font-size:21px;font-weight:800;color:var(--t1);
+    font-size:20px;font-weight:800;color:var(--t1);
     font-family:'Plus Jakarta Sans',sans-serif;line-height:1.1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .stat-trnd{
     display:inline-flex;align-items:center;gap:3px;
-    font-size:10px;font-weight:600;margin-top:4px;
+    font-size:10px;font-weight:600;margin-top:3px;
+    white-space:nowrap;
 }
 .stat-trnd span{color:var(--t3);font-weight:400;margin-left:2px;}
 .up{color:var(--green);}
 .dn{color:var(--red);}
 .neu{color:var(--t3);}
-.stat-spark{width:100%;height:38px;margin-top:4px;}
+.stat-spark{width:100%;height:34px;margin-top:auto;flex-shrink:0;display:block;}
 
 /* ─── CHARTS + AI ROW ────────────────────────────────────── */
 .charts-ai{
@@ -578,18 +582,18 @@ $monthShort = Carbon::create($year,$month)->format('M');
     <ul class="sb-nav">
         <li class="active"><a href="{{ route('school.dashboard') }}"><i class="fas fa-th-large"></i><span>Dashboard</span></a></li>
         <li class="{{ request()->is('school/students*')?'active':'' }}"><a href="{{ route('school.students.index') }}"><i class="fas fa-user-graduate"></i><span>Students</span></a></li>
-        <li class="{{ request()->is('school/attendance*')?'active':'' }}"><a href="{{ route('school.attendance.students.index') }}"><i class="fas fa-calendar-check"></i><span>Attendance</span></a></li>
-        <li><a href="#"><i class="fas fa-dollar-sign"></i><span>Fees</span></a></li>
-        <li><a href="#"><i class="fas fa-book"></i><span>Academics</span></a></li>
-        <li><a href="#"><i class="fas fa-file-alt"></i><span>Exams</span></a></li>
-        <li><a href="#"><i class="fas fa-bus"></i><span>Transport</span></a></li>
-        <li><a href="#"><i class="fas fa-comment-dots"></i><span>Communication</span></a></li>
-        <li><a href="#"><i class="fas fa-book-open"></i><span>Library</span></a></li>
-        <li><a href="#"><i class="fas fa-chart-bar"></i><span>Reports</span></a></li>
+        <li class="{{ request()->is('school/attendance*') && !request()->is('school/attendance/staff*')?'active':'' }}"><a href="{{ route('school.attendance.students.index') }}"><i class="fas fa-calendar-check"></i><span>Attendance</span></a></li>
+        <li><a href="javascript:void(0)" onclick="showComingSoon('Fees')"><i class="fas fa-indian-rupee-sign"></i><span>Fees</span></a></li>
+        <li><a href="javascript:void(0)" onclick="showComingSoon('Academics')"><i class="fas fa-book"></i><span>Academics</span></a></li>
+        <li><a href="javascript:void(0)" onclick="showComingSoon('Exams')"><i class="fas fa-file-alt"></i><span>Exams</span></a></li>
+        <li><a href="javascript:void(0)" onclick="showComingSoon('Transport')"><i class="fas fa-bus"></i><span>Transport</span></a></li>
+        <li><a href="javascript:void(0)" onclick="showComingSoon('Communication')"><i class="fas fa-comment-dots"></i><span>Communication</span></a></li>
+        <li><a href="javascript:void(0)" onclick="showComingSoon('Library')"><i class="fas fa-book-open"></i><span>Library</span></a></li>
+        <li><a href="{{ route('school.attendance.students.report') }}" class="{{ request()->is('school/attendance/students/report*')?'active':'' }}"><i class="fas fa-chart-bar"></i><span>Reports</span></a></li>
         <li class="{{ request()->is('school/attendance/staff*')?'active':'' }}"><a href="{{ route('school.attendance.staff.index') }}"><i class="fas fa-users"></i><span>Staff</span></a></li>
-        <li><a href="#"><i class="fas fa-boxes-stacked"></i><span>Inventory</span></a></li>
-        <li><a href="#"><i class="fas fa-robot"></i><span>AI Assistant</span></a></li>
-        <li><a href="#"><i class="fas fa-gear"></i><span>Settings</span></a></li>
+        <li><a href="javascript:void(0)" onclick="showComingSoon('Inventory')"><i class="fas fa-boxes-stacked"></i><span>Inventory</span></a></li>
+        <li><a href="javascript:void(0)" onclick="scrollToAI()"><i class="fas fa-robot"></i><span>AI Assistant</span></a></li>
+        <li><a href="javascript:void(0)" onclick="showComingSoon('Settings')"><i class="fas fa-gear"></i><span>Settings</span></a></li>
     </ul>
 
     <div class="sb-bottom">
@@ -1126,6 +1130,17 @@ document.addEventListener('click',e=>{
     if(!e.target.closest('.user-wrap'))document.getElementById('userDrop').classList.remove('open');
 });
 
+// ── COMING SOON TOAST ─────────────────────────────────────────────────────────
+function showComingSoon(name){
+    const t=document.getElementById('toastMsg');
+    t.textContent='🚧 '+name+' module coming soon!';
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),3000);
+}
+function scrollToAI(){
+    document.querySelector('.ai-panel').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
 // ── AI CHAT ───────────────────────────────────────────────────────────────────
 async function sendAI(){
     const inp=document.getElementById('aiIn'),msg=inp.value.trim();
@@ -1150,5 +1165,19 @@ function refreshSnap(){
 }
 setInterval(refreshSnap,60000);
 </script>
+
+<!-- COMING SOON TOAST -->
+<style>
+#toastMsg{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--navy);color:#fff;font-size:12.5px;font-weight:600;
+    padding:11px 22px;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);
+    z-index:9999;opacity:0;transition:all .3s ease;pointer-events:none;
+    border-left:3px solid var(--gold);
+}
+#toastMsg.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+<div id="toastMsg"></div>
+
 </body>
 </html>

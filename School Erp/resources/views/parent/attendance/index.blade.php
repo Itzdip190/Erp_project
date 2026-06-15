@@ -1,131 +1,715 @@
-@extends('layouts.app')
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Attendance Calendar — SchoolCloud ERP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        :root{
+            --navy:#1a1f3c;--navy2:#12172e;
+            --gold:#f59e0b;--gold-bg:rgba(245,158,11,.15);
+            --green:#10b981;--red:#ef4444;--purple:#8b5cf6;--blue:#3b82f6;
+            --page:#f8f7f4;--white:#fff;
+            --t1:#111827;--t2:#6b7280;--t3:#9ca3af;
+            --border:#e5e7eb;
+            --shadow:0 1px 4px rgba(0,0,0,.07);
+            --shadow-lg:0 8px 32px rgba(0,0,0,.12);
+        }
+        body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);display:flex;min-height:100vh;overflow-x:hidden;}
 
-@section('title', 'Attendance Record')
+        /* ─── SIDEBAR ─────────────────────────────────────────────── */
+        .sidebar{
+            width:220px;min-width:220px;background:var(--navy);
+            height:100vh;position:fixed;left:0;top:0;
+            display:flex;flex-direction:column;z-index:200;
+            overflow-y:auto;overflow-x:hidden;transition:width .3s;
+        }
+        .sidebar::-webkit-scrollbar{width:3px;}
+        .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:4px;}
+        .sb-logo{
+            padding:18px 14px 14px;display:flex;align-items:center;gap:9px;
+            border-bottom:1px solid rgba(255,255,255,.08);text-decoration:none;flex-shrink:0;
+        }
+        .sb-logo-icon{
+            width:34px;height:34px;border-radius:9px;background:var(--gold);
+            display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--navy);flex-shrink:0;
+        }
+        .sb-logo-text strong{display:block;color:#fff;font-size:13px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;line-height:1.15;}
+        .sb-logo-text span{color:var(--gold);font-size:9.5px;font-weight:500;}
 
-@section('content')
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-    <h2 style="font-family: 'Syne', sans-serif;">{{ $student->full_name }}'s Attendance Calendar</h2>
-    <a href="{{ route('parent.dashboard') }}" class="btn-accent" style="background-color: #4B5563;">
-        <i class="fa fa-arrow-left"></i> Back to Dashboard
-    </a>
-</div>
+        /* Student profile card */
+        .sb-student{
+            margin:12px 10px;
+            background:rgba(255,255,255,.07);
+            border:1px solid rgba(255,255,255,.1);
+            border-radius:10px;padding:12px;flex-shrink:0;
+            text-align:center;
+        }
+        .sb-stu-avatar{
+            width:50px;height:50px;border-radius:50%;
+            background:linear-gradient(135deg,var(--gold),#f97316);
+            display:flex;align-items:center;justify-content:center;
+            color:var(--navy);font-size:18px;font-weight:800;
+            margin:0 auto 8px;overflow:hidden;
+        }
+        .sb-stu-avatar img{width:100%;height:100%;object-fit:cover;}
+        .sb-stu-name{color:#fff;font-size:12px;font-weight:700;margin-bottom:2px;}
+        .sb-stu-class{color:rgba(255,255,255,.5);font-size:10px;}
+        .sb-admit{
+            display:inline-flex;align-items:center;gap:4px;
+            background:var(--gold-bg);color:var(--gold);
+            font-size:9.5px;font-weight:700;border-radius:20px;padding:2px 8px;margin-top:6px;
+        }
 
-<!-- Parameters selection filter -->
-<div class="glass-card">
-    <h3 style="font-family: 'Syne', sans-serif; margin-bottom: 1.5rem;">Select Calendar Month</h3>
-    <form action="{{ route('parent.attendance.index') }}" method="GET" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.5rem; align-items: end;">
-        <input type="hidden" name="student_id" value="{{ $student->id }}">
+        /* Nav */
+        .sb-nav{list-style:none;padding:6px 8px;flex:1;}
+        .sb-nav li{margin-bottom:1px;}
+        .sb-nav a{
+            display:flex;align-items:center;gap:9px;
+            padding:8px 9px;border-radius:7px;
+            color:rgba(255,255,255,.55);font-size:12px;font-weight:500;
+            text-decoration:none;transition:.18s;
+            border-left:2.5px solid transparent;white-space:nowrap;
+        }
+        .sb-nav a i{width:15px;text-align:center;font-size:12px;flex-shrink:0;}
+        .sb-nav a:hover{background:rgba(255,255,255,.08);color:#fff;}
+        .sb-nav li.active a{background:var(--gold-bg);color:#fff;border-left-color:var(--gold);}
+        .sb-nav li.active a i{color:var(--gold);}
+
+        .sb-bottom{padding:10px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0;}
+        .sb-help{
+            background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(245,158,11,.04));
+            border:1px solid rgba(245,158,11,.22);border-radius:9px;padding:11px;margin-bottom:8px;
+        }
+        .sb-help p{color:rgba(255,255,255,.5);font-size:10px;margin-bottom:5px;}
+        .sb-help strong{display:block;color:#fff;font-size:11.5px;margin-bottom:8px;}
+        .btn-support{
+            display:block;text-align:center;background:var(--gold);color:var(--navy);
+            font-size:11px;font-weight:700;border-radius:6px;padding:7px;text-decoration:none;transition:.2s;
+        }
+        .btn-support:hover{background:#d97706;}
+        .sb-logout{
+            display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.4);
+            font-size:11.5px;padding:7px 9px;border-radius:7px;text-decoration:none;transition:.2s;
+        }
+        .sb-logout:hover{background:rgba(239,68,68,.12);color:#ef4444;}
+
+        /* ─── MAIN ────────────────────────────────────────────────── */
+        .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+
+        /* ─── TOPBAR ─────────────────────────────────────────────── */
+        .topbar{
+            background:#fff;border-bottom:1px solid var(--border);
+            height:62px;padding:0 22px;
+            display:flex;align-items:center;justify-content:space-between;
+            position:sticky;top:0;z-index:100;
+            box-shadow:0 1px 3px rgba(0,0,0,.05);
+        }
+        .topbar-left{display:flex;align-items:center;gap:13px;}
+        .hamburger{background:none;border:none;color:var(--t2);font-size:17px;cursor:pointer;padding:4px;display:none;}
+        .greeting h2{font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;font-weight:700;color:var(--t1);line-height:1.2;}
+        .greeting p{font-size:11.5px;color:var(--t2);}
+        .greeting a{color:var(--gold);text-decoration:none;font-weight:600;}
+        .topbar-right{display:flex;align-items:center;gap:10px;}
+        .date-pill{
+            display:flex;align-items:center;gap:6px;background:var(--page);
+            border:1px solid var(--border);border-radius:8px;padding:6px 11px;
+            font-size:11.5px;color:var(--t2);
+        }
+        .date-pill i{color:var(--gold);}
         
-        <div>
-            <label class="form-label" style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">Month</label>
-            <select name="month" class="form-input" required>
-                @for($m = 1; $m <= 12; $m++)
-                    <option value="{{ sprintf('%02d', $m) }}" {{ $month == $m ? 'selected' : '' }}>{{ date('F', mktime(0, 0, 0, $m, 1)) }}</option>
-                @endfor
-            </select>
-        </div>
+        .user-wrap{position:relative;}
+        .user-btn{
+            display:flex;align-items:center;gap:7px;cursor:pointer;
+            padding:4px 7px;border-radius:9px;border:1px solid transparent;transition:.2s;
+        }
+        .user-btn:hover{background:var(--page);border-color:var(--border);}
+        .avatar{
+            width:34px;height:34px;border-radius:9px;
+            background:linear-gradient(135deg,var(--gold),#f97316);
+            display:flex;align-items:center;justify-content:center;
+            color:var(--navy);font-size:12px;font-weight:800;overflow:hidden;flex-shrink:0;
+        }
+        .avatar img{width:100%;height:100%;object-fit:cover;}
+        .user-info strong{display:block;font-size:11.5px;font-weight:700;color:var(--t1);}
+        .user-info span{font-size:10px;color:var(--t2);}
+        
+        .user-drop{
+            position:absolute;top:calc(100% + 8px);right:0;width:170px;
+            background:#fff;border:1px solid var(--border);border-radius:11px;
+            box-shadow:var(--shadow-lg);display:none;z-index:300;overflow:hidden;
+        }
+        .user-drop.open{display:block;}
+        .user-drop a{display:flex;align-items:center;gap:9px;padding:10px 13px;font-size:12.5px;color:var(--t1);text-decoration:none;transition:.15s;}
+        .user-drop a:hover{background:var(--page);}
+        .user-drop a.danger{color:var(--red);}
+        .user-drop a i{width:13px;text-align:center;color:var(--t2);font-size:12px;}
+        .user-drop a.danger i{color:var(--red);}
 
-        <div>
-            <label class="form-label" style="display: block; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 700; color: var(--text-muted);">Year</label>
-            <select name="year" class="form-input" required>
-                @for($y = date('Y') - 2; $y <= date('Y') + 1; $y++)
-                    <option value="{{ $y }}" {{ $year == $y ? 'selected' : '' }}>{{ $y }}</option>
-                @endfor
-            </select>
-        </div>
+        /* ─── PAGE CONTENT ────────────────────────────────────────── */
+        .pg{padding:20px 22px;}
 
-        <div>
-            <button type="submit" class="btn-accent" style="width: 100%; justify-content: center;">
-                <i class="fa fa-calendar-alt"></i> Refresh Calendar
+        /* Header Row */
+        .page-hdr-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+        .page-hdr-row h2 {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--t1);
+        }
+        .btn-back {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background-color: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 7px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--t2);
+            text-decoration: none;
+            transition: .2s;
+            box-shadow: var(--shadow);
+        }
+        .btn-back:hover {
+            color: var(--t1);
+            background-color: var(--page);
+        }
+
+        /* Card styles */
+        .card{
+            background:#white;background-color:#fff;border:1px solid var(--border);
+            border-radius:13px;box-shadow:var(--shadow);overflow:hidden;
+            margin-bottom: 18px;
+        }
+        .card-hdr{
+            padding:14px 17px 0;
+            display:flex;align-items:center;justify-content:space-between;
+        }
+        .card-title{font-size:13.5px;font-weight:700;color:var(--t1);font-family:'Plus Jakarta Sans',sans-serif;}
+        .card-body{padding:12px 17px 15px;}
+
+        /* Filters */
+        .filter-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            align-items: end;
+        }
+        .form-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--t2);
+            margin-bottom: 4px;
+        }
+        .form-select {
+            width: 100%;
+            height: 38px;
+            padding: 0 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background-color: var(--page);
+            font-size: 12.5px;
+            outline: none;
+            color: var(--t1);
+            cursor: pointer;
+        }
+        .btn-refresh {
+            height: 38px;
+            background-color: var(--navy);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: .2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-refresh:hover {
+            background-color: var(--navy2);
+        }
+
+        /* Summary Cards */
+        .summary-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        .sum-card {
+            background-color: #fff;
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            padding: 15px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sum-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+        .sum-val {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--t1);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            line-height: 1.1;
+        }
+        .sum-lbl {
+            font-size: 10px;
+            color: var(--t2);
+            font-weight: 500;
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Calendar grid */
+        .cal-header-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        .cal-header-day {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--t2);
+            text-transform: uppercase;
+            padding: 6px 0;
+        }
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            text-align: center;
+        }
+        .cal-cell-pad {
+            aspect-ratio: 1.1;
+            background-color: transparent;
+        }
+        .cal-cell {
+            aspect-ratio: 1.1;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-weight: 700;
+            font-size: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .cal-cell:hover {
+            transform: scale(1.02);
+            box-shadow: var(--shadow);
+            z-index: 2;
+        }
+        .cal-cell-num {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .cal-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            position: absolute;
+            bottom: 6px;
+        }
+
+        /* Color schemes */
+        .c-none {
+            background-color: var(--page);
+            border-color: var(--border);
+            color: var(--t2);
+        }
+        .c-present {
+            background-color: #e6f4ea;
+            border-color: #ceead6;
+            color: #137333;
+        }
+        .c-present .cal-dot { background-color: #137333; }
+        
+        .c-absent {
+            background-color: #fce8e6;
+            border-color: #fad2cf;
+            color: #c5221f;
+        }
+        .c-absent .cal-dot { background-color: #c5221f; }
+
+        .c-late {
+            background-color: #fef7e0;
+            border-color: #feebc8;
+            color: #b06000;
+        }
+        .c-late .cal-dot { background-color: #b06000; }
+
+        .c-leave {
+            background-color: #e8f0fe;
+            border-color: #d2e3fc;
+            color: #1a73e8;
+        }
+        .c-leave .cal-dot { background-color: #1a73e8; }
+
+        /* Legend key */
+        .legend-keys {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 18px;
+            justify-content: center;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+        }
+        .legend-key {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            color: var(--t2);
+        }
+        .legend-color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        /* Footer */
+        .footer{display:flex;align-items:center;justify-content:space-between;padding:14px 0 6px;border-top:1px solid var(--border);font-size:10.5px;color:var(--t3);}
+
+        /* Responsive */
+        @media(max-width:1024px){
+            .sidebar{width:54px;}
+            .sb-logo-text,.sb-student,.sb-nav a span,.sb-bottom{display:none;}
+            .sb-nav a{justify-content:center;padding:10px 0;}
+            .sb-nav a i{width:100%;font-size:15px;}
+            .main{margin-left:54px;}
+            .hamburger{display:flex;}
+        }
+        @media(max-width:768px){
+            .sidebar{transform:translateX(-220px);width:220px;}
+            .sidebar.open{transform:translateX(0);}
+            .sb-logo-text,.sb-student,.sb-nav a span,.sb-bottom{display:block!important;}
+            .sb-nav a{justify-content:flex-start!important;padding:8px 9px!important;}
+            .sb-nav a i{width:15px!important;font-size:12px!important;}
+            .main{margin-left:0;}
+            .summary-row {grid-template-columns: 1fr;}
+        }
+    </style>
+</head>
+<body>
+
+@php
+use Carbon\Carbon;
+$user   = auth()->user();
+$hour   = now()->hour;
+$greet  = $hour<12 ? 'Good Morning' : ($hour<17 ? 'Good Afternoon' : 'Good Evening');
+$stuName   = $student ? $student->full_name : $user->name;
+$stuInitials = strtoupper(substr($stuName,0,1).(str_contains($stuName,' ') ? substr($stuName,strrpos($stuName,' ')+1,1) : ''));
+
+// Resolve quick stats for student sidebar
+$classDisplay   = optional($student?->class)->name ?? 'N/A';
+$sectionDisplay = optional($student?->section)->name ?? 'N/A';
+$sessionDisplay = optional($student?->academicSession)->name ?? 'N/A';
+$school = $user->school;
+@endphp
+
+<!-- ══════════ SIDEBAR ══════════ -->
+<aside class="sidebar" id="sidebar">
+    <a href="{{ route('parent.dashboard') }}" class="sb-logo">
+        <div class="sb-logo-icon"><i class="fas fa-shield-halved"></i></div>
+        <div class="sb-logo-text">
+            <strong>SchoolCloud ERP</strong>
+            <span>Smart School ERP</span>
+        </div>
+    </a>
+
+    <!-- Student Profile Card -->
+    <div class="sb-student">
+        <div class="sb-stu-avatar">
+            @if($student?->photo)
+                <img src="{{ $student->photo_url }}" alt="">
+            @else
+                {{ $stuInitials }}
+            @endif
+        </div>
+        <div class="sb-stu-name">{{ $stuName }}</div>
+        <div class="sb-stu-class">{{ $classDisplay }} – Sec {{ $sectionDisplay }}</div>
+        @if($student)
+            <span class="sb-admit">
+                <i class="fas fa-id-card" style="font-size:8px;"></i>
+                {{ $student->admission_number }}
+            </span>
+        @endif
+    </div>
+
+    <ul class="sb-nav">
+        <li><a href="{{ route('parent.dashboard') }}"><i class="fas fa-th-large"></i><span>Dashboard</span></a></li>
+        <li class="active"><a href="{{ route('parent.attendance.index') }}"><i class="fas fa-calendar-check"></i><span>Attendance</span></a></li>
+        <li><a href="#"><i class="fas fa-dollar-sign"></i><span>Fee Details</span></a></li>
+        <li><a href="#"><i class="fas fa-book"></i><span>Academics</span></a></li>
+        <li><a href="#"><i class="fas fa-file-alt"></i><span>Exams</span></a></li>
+        <li><a href="#"><i class="fas fa-chart-bar"></i><span>Reports</span></a></li>
+        <li><a href="#"><i class="fas fa-calendar-alt"></i><span>Timetable</span></a></li>
+        <li><a href="#"><i class="fas fa-bullhorn"></i><span>Notices</span></a></li>
+        <li><a href="#"><i class="fas fa-comment-dots"></i><span>Messages</span></a></li>
+        <li><a href="#"><i class="fas fa-robot"></i><span>AI Assistant</span></a></li>
+        <li><a href="#"><i class="fas fa-gear"></i><span>Settings</span></a></li>
+    </ul>
+
+    <div class="sb-bottom">
+        <div class="sb-help">
+            <strong>Need Help?</strong>
+            <p>We're here to support you</p>
+            <a href="#" class="btn-support"><i class="fas fa-headset"></i> Contact Support</a>
+        </div>
+        <a href="{{ route('logout') }}" class="sb-logout">
+            <i class="fas fa-right-from-bracket"></i><span>Logout</span>
+        </a>
+    </div>
+</aside>
+
+<!-- ══════════ MAIN ══════════ -->
+<div class="main">
+
+    <!-- TOPBAR -->
+    <nav class="topbar">
+        <div class="topbar-left">
+            <button class="hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')">
+                <i class="fas fa-bars"></i>
             </button>
-        </div>
-    </form>
-</div>
-
-<!-- Attendance summary counters -->
-<div class="grid-3" style="margin-top: 2rem; margin-bottom: 2rem;">
-    <div class="glass-card" style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 0;">
-        <div style="width: 50px; height: 50px; border-radius: 12px; background-color: rgba(16,185,129,0.1); display: flex; align-items: center; justify-content: center; color: var(--success); font-size: 1.5rem;">
-            <i class="fa fa-calendar-check"></i>
-        </div>
-        <div>
-            <div style="font-size: 1.8rem; font-weight: 800;">{{ $summary['present'] }}</div>
-            <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Present Days</div>
-        </div>
-    </div>
-
-    <div class="glass-card" style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 0;">
-        <div style="width: 50px; height: 50px; border-radius: 12px; background-color: rgba(239,68,68,0.1); display: flex; align-items: center; justify-content: center; color: var(--danger); font-size: 1.5rem;">
-            <i class="fa fa-calendar-times"></i>
-        </div>
-        <div>
-            <div style="font-size: 1.8rem; font-weight: 800;">{{ $summary['absent'] }}</div>
-            <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Absent Days</div>
-        </div>
-    </div>
-
-    <div class="glass-card" style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 0;">
-        <div style="width: 50px; height: 50px; border-radius: 12px; background-color: rgba(59,130,246,0.1); display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 1.5rem;">
-            <i class="fa fa-percentage"></i>
-        </div>
-        <div>
-            <div style="font-size: 1.8rem; font-weight: 800;">{{ $summary['percentage'] }}%</div>
-            <div style="color: var(--text-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Attendance Rate</div>
-        </div>
-    </div>
-</div>
-
-<!-- Calendar Grid -->
-<div class="glass-card">
-    <h3 style="font-family: 'Syne', sans-serif; margin-bottom: 1.5rem;">Day-by-Day Calendar</h3>
-    
-    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 1rem; text-align: center;">
-        <!-- Day names -->
-        @foreach(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $dayName)
-            <div style="font-weight: 700; color: var(--text-muted); padding: 0.5rem;">{{ $dayName }}</div>
-        @endforeach
-
-        <!-- Padding blocks for starting weekday offset -->
-        @php
-            $firstDayWeekday = (int) date('w', mktime(0, 0, 0, $month, 1, $year));
-        @endphp
-        @for($p = 0; $p < $firstDayWeekday; $p++)
-            <div style="padding: 1.5rem; background-color: transparent;"></div>
-        @endfor
-
-        <!-- Calendar Days -->
-        @foreach($calendar as $dayNum => $info)
-            @php
-                $status = $info['status'];
-                $bgColor = 'rgba(255, 255, 255, 0.03)';
-                $color = 'var(--text-main)';
-                $borderColor = 'var(--border)';
-
-                if ($status === 'present') {
-                    $bgColor = 'rgba(16, 185, 129, 0.1)';
-                    $color = 'var(--success)';
-                    $borderColor = 'rgba(16, 185, 129, 0.3)';
-                } elseif ($status === 'absent') {
-                    $bgColor = 'rgba(239, 68, 68, 0.1)';
-                    $color = 'var(--danger)';
-                    $borderColor = 'rgba(239, 68, 68, 0.3)';
-                } elseif ($status === 'late') {
-                    $bgColor = 'rgba(245, 158, 11, 0.1)';
-                    $color = 'var(--warning)';
-                    $borderColor = 'rgba(245, 158, 11, 0.3)';
-                } elseif ($status === 'leave') {
-                    $bgColor = 'rgba(96, 165, 250, 0.1)';
-                    $color = '#60A5FA';
-                    $borderColor = 'rgba(96, 165, 250, 0.3)';
-                }
-            @endphp
-            <div style="padding: 1.25rem 0.5rem; background-color: {{ $bgColor }}; border: 1px solid {{ $borderColor }}; border-radius: 12px; color: {{ $color }}; position: relative; font-weight: 700;" title="{{ $info['remark'] ?? 'No notes' }}">
-                {{ $dayNum }}
-                @if($status !== 'none')
-                    <div style="width: 6px; height: 6px; border-radius: 50%; background-color: {{ $color }}; position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);"></div>
-                @endif
+            <div class="greeting">
+                <h2>Attendance Calendar 👋</h2>
+                <p>Track your attendance, present days, and monthly reports.</p>
             </div>
-        @endforeach
+        </div>
+        <div class="topbar-right">
+            <div class="date-pill">
+                <i class="fas fa-calendar-days"></i>
+                {{ Carbon::now()->format('M j, Y') }}
+            </div>
+            
+            <!-- User -->
+            <div class="user-wrap">
+                <div class="user-btn" id="userBtn" onclick="document.getElementById('userDrop').classList.toggle('open')">
+                    <div class="avatar">{{ $stuInitials }}</div>
+                    <div class="user-info">
+                        <strong>{{ explode(' ',$stuName)[0] }}</strong>
+                        <span>Student</span>
+                    </div>
+                    <i class="fas fa-chevron-down" style="font-size:9px;color:var(--t2);margin-left:4px;"></i>
+                </div>
+                <div class="user-drop" id="userDrop">
+                    <a href="#"><i class="fas fa-user"></i> Profile</a>
+                    <a href="#"><i class="fas fa-gear"></i> Settings</a>
+                    <a href="{{ route('logout') }}" class="danger"><i class="fas fa-right-from-bracket"></i> Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- PAGE CONTENT -->
+    <div class="pg">
+
+        <!-- Header Row -->
+        <div class="page-hdr-row">
+            <h2>{{ $student->full_name }}'s Attendance Calendar</h2>
+            <a href="{{ route('parent.dashboard') }}" class="btn-back">
+                <i class="fa fa-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+
+        <!-- Filter Card -->
+        <div class="card">
+            <div class="card-hdr">
+                <span class="card-title">Select Calendar Month</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ route('parent.attendance.index') }}" method="GET" class="filter-form">
+                    <input type="hidden" name="student_id" value="{{ $student->id }}">
+                    
+                    <div>
+                        <label class="form-label">Month</label>
+                        <select name="month" class="form-select" required>
+                            @for($m = 1; $m <= 12; $m++)
+                                <option value="{{ sprintf('%02d', $m) }}" {{ $month == $m ? 'selected' : '' }}>{{ date('F', mktime(0, 0, 0, $m, 1)) }}</option>
+                            @endfor
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Year</label>
+                        <select name="year" class="form-select" required>
+                            @for($y = date('Y') - 2; $y <= date('Y') + 1; $y++)
+                                <option value="{{ $y }}" {{ $year == $y ? 'selected' : '' }}>{{ $y }}</option>
+                            @endfor
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-refresh">
+                        <i class="fa fa-calendar-alt"></i> Refresh Calendar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-row">
+            <!-- Present -->
+            <div class="sum-card">
+                <div class="sum-icon" style="background-color: rgba(16,185,129,0.1); color: var(--green);">
+                    <i class="fa-solid fa-calendar-check"></i>
+                </div>
+                <div>
+                    <div class="sum-val">{{ $summary['present'] }}</div>
+                    <div class="sum-lbl">Present Days</div>
+                </div>
+            </div>
+
+            <!-- Absent -->
+            <div class="sum-card">
+                <div class="sum-icon" style="background-color: rgba(239,68,68,0.1); color: var(--red);">
+                    <i class="fa-solid fa-calendar-xmark"></i>
+                </div>
+                <div>
+                    <div class="sum-val">{{ $summary['absent'] }}</div>
+                    <div class="sum-lbl">Absent Days</div>
+                </div>
+            </div>
+
+            <!-- Rate -->
+            <div class="sum-card">
+                <div class="sum-icon" style="background-color: rgba(139,92,246,0.1); color: var(--purple);">
+                    <i class="fa-solid fa-percentage"></i>
+                </div>
+                <div>
+                    <div class="sum-val">{{ $summary['percentage'] }}%</div>
+                    <div class="sum-lbl">Attendance Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Day-by-Day Calendar -->
+        <div class="card">
+            <div class="card-hdr">
+                <span class="card-title">Day-by-Day Calendar — {{ date('F Y', mktime(0, 0, 0, $month, 1, $year)) }}</span>
+            </div>
+            <div class="card-body">
+                
+                <!-- Weekday Headers -->
+                <div class="cal-header-row">
+                    @foreach(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $dayName)
+                        <div class="cal-header-day">{{ $dayName }}</div>
+                    @endforeach
+                </div>
+
+                <!-- Days grid -->
+                <div class="cal-grid">
+                    <!-- Day Offset padding -->
+                    @php
+                        $firstDayWeekday = (int) date('w', mktime(0, 0, 0, $month, 1, $year));
+                    @endphp
+                    @for($p = 0; $p < $firstDayWeekday; $p++)
+                        <div class="cal-cell-pad"></div>
+                    @endfor
+
+                    <!-- Active Days -->
+                    @foreach($calendar as $dayNum => $info)
+                        @php
+                            $status = $info['status'];
+                            $cellClass = 'c-none';
+
+                            if ($status === 'present') {
+                                $cellClass = 'c-present';
+                            } elseif ($status === 'absent') {
+                                $cellClass = 'c-absent';
+                            } elseif ($status === 'late') {
+                                $cellClass = 'c-late';
+                            } elseif ($status === 'leave') {
+                                $cellClass = 'c-leave';
+                            }
+                        @endphp
+                        
+                        <div class="cal-cell {{ $cellClass }}" title="{{ $info['remark'] ?? 'No notes' }}">
+                            <span class="cal-cell-num">{{ $dayNum }}</span>
+                            @if($status !== 'none')
+                                <div class="cal-dot"></div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+
+                <!-- Legend -->
+                <div class="legend-keys">
+                    <div class="legend-key">
+                        <span class="legend-color-dot" style="background-color: #137333;"></span>
+                        <span>Present</span>
+                    </div>
+                    <div class="legend-key">
+                        <span class="legend-color-dot" style="background-color: #c5221f;"></span>
+                        <span>Absent</span>
+                    </div>
+                    <div class="legend-key">
+                        <span class="legend-color-dot" style="background-color: #b06000;"></span>
+                        <span>Late</span>
+                    </div>
+                    <div class="legend-key">
+                        <span class="legend-color-dot" style="background-color: #1a73e8;"></span>
+                        <span>Leave</span>
+                    </div>
+                    <div class="legend-key">
+                        <span class="legend-color-dot" style="background-color: var(--t2);"></span>
+                        <span>Unmarked / Weekend</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <span>© 2026 SchoolCloud ERP. All rights reserved.</span>
+            <span>Version 2.0.0 &nbsp;|&nbsp; 🔒 Secure & Trusted</span>
+        </div>
+
     </div>
 </div>
-@endsection
+
+<script>
+    // Close user dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#userBtn')) {
+            document.getElementById('userDrop').classList.remove('open');
+        }
+    });
+</script>
+</body>
+</html>

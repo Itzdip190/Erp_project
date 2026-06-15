@@ -100,6 +100,10 @@ class ParentDashboardController extends Controller
         $pendingFee  = 0;
         $feeRate     = 0;
 
+        $documents = $student
+            ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
+            : collect();
+
         return view('parent.dashboard', compact(
             'user',
             'student',
@@ -121,7 +125,127 @@ class ParentDashboardController extends Controller
             'feeRate',
             'presentSparkline',
             'absentSparkline',
-            'lateSparkline'
+            'lateSparkline',
+            'documents'
         ));
+    }
+
+    public function documents()
+    {
+        $user = auth()->user();
+
+        // Find child by guardian email or user_id
+        $student = Student::where('school_id', $user->school_id)
+            ->where(function ($q) use ($user) {
+                $q->where('guardian_email', $user->email)
+                  ->orWhere('user_id', $user->id);
+            })
+            ->with(['class', 'section', 'academicSession', 'school'])
+            ->first();
+
+        if (!$student) {
+            $student = Student::where('school_id', $user->school_id)->first();
+        }
+
+        $school = $user->school;
+        $classDisplay   = optional($student?->class)->name ?? 'N/A';
+        $sectionDisplay = optional($student?->section)->name ?? 'N/A';
+
+        $documents = $student
+            ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
+            : collect();
+
+        $stuName = $student ? $student->full_name : $user->name;
+        $stuInitials = strtoupper(substr($stuName,0,1).(str_contains($stuName,' ') ? substr($stuName,strrpos($stuName,' ')+1,1) : ''));
+
+        return view('parent.documents', compact('user', 'student', 'school', 'documents', 'classDisplay', 'sectionDisplay', 'stuName', 'stuInitials'));
+    }
+
+    public function downloadDocument(\Illuminate\Http\Request $request, \App\Models\StudentDocument $document)
+    {
+        $user = auth()->user();
+
+        // Find child by guardian email or user_id
+        $student = Student::where('school_id', $user->school_id)
+            ->where(function ($q) use ($user) {
+                $q->where('guardian_email', $user->email)
+                  ->orWhere('user_id', $user->id);
+            })
+            ->first();
+
+        if (!$student) {
+            $student = Student::where('school_id', $user->school_id)->first();
+        }
+
+        if (!$student || $document->student_id !== $student->id) {
+            abort(403, 'Unauthorized access to this document.');
+        }
+
+        $defaultDisk = config('filesystems.default');
+        $disk = \Illuminate\Support\Facades\Storage::disk($defaultDisk);
+        
+        $filePathOnDisk = null;
+        
+        if ($disk->exists($document->file_path)) {
+            try {
+                $filePathOnDisk = $disk->path($document->file_path);
+            } catch (\Exception $e) {
+                $filePathOnDisk = null;
+            }
+        }
+        
+        if (!$filePathOnDisk) {
+            $fallbackDiskName = ($defaultDisk === 'local') ? 'public' : 'local';
+            $fallbackDisk = \Illuminate\Support\Facades\Storage::disk($fallbackDiskName);
+            
+            if ($fallbackDisk->exists($document->file_path)) {
+                try {
+                    $filePathOnDisk = $fallbackDisk->path($document->file_path);
+                } catch (\Exception $e) {
+                    $filePathOnDisk = null;
+                }
+            }
+        }
+        
+        if (!$filePathOnDisk) {
+            $pathsToCheck = [
+                storage_path($document->file_path),
+                storage_path('app/' . $document->file_path),
+                storage_path('app/private/' . $document->file_path),
+                storage_path('app/public/' . $document->file_path),
+            ];
+
+            foreach ($pathsToCheck as $path) {
+                if (file_exists($path) && is_file($path)) {
+                    $filePathOnDisk = $path;
+                    break;
+                }
+            }
+        }
+
+        $action = $request->query('action', 'download');
+
+        if ($filePathOnDisk) {
+            if ($action === 'view') {
+                return response()->file($filePathOnDisk, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="' . $document->original_name . '"'
+                ]);
+            }
+            return response()->download($filePathOnDisk, $document->original_name);
+        } else {
+            // Cloud filesystem fallback streaming (if path() is not supported)
+            if (!$disk->exists($document->file_path)) {
+                abort(404, 'Document file not found in storage.');
+            }
+            $fileStream = $disk->readStream($document->file_path);
+            $headers = [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => ($action === 'view' ? 'inline' : 'attachment') . '; filename="' . $document->original_name . '"'
+            ];
+            return response()->stream(function () use ($fileStream) {
+                fpassthru($fileStream);
+            }, 200, $headers);
+        }
     }
 }

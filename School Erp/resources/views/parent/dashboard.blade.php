@@ -530,6 +530,7 @@ $aiInsights = [
     <ul class="sb-nav">
         <li class="active"><a href="{{ route('parent.dashboard') }}"><i class="fas fa-th-large"></i><span>Dashboard</span></a></li>
         <li><a href="{{ route('parent.attendance.index') }}"><i class="fas fa-calendar-check"></i><span>Attendance</span></a></li>
+        <li><a href="{{ route('parent.documents.index') }}"><i class="fas fa-file-pdf"></i><span>Documents</span></a></li>
         <li><a href="#"><i class="fas fa-dollar-sign"></i><span>Fee Details</span></a></li>
         <li><a href="#"><i class="fas fa-book"></i><span>Academics</span></a></li>
         <li><a href="#"><i class="fas fa-file-alt"></i><span>Exams</span></a></li>
@@ -576,13 +577,31 @@ $aiInsights = [
             <div class="notif-wrap">
                 <div class="notif-btn" onclick="toggleDrop('notifDrop')">
                     <i class="fas fa-bell"></i>
+                    @if($documents->count() > 0)
+                        <span class="notif-badge">{{ $documents->count() }}</span>
+                    @endif
                 </div>
                 <div class="notif-drop" id="notifDrop">
                     <div class="nd-hdr">
                         <strong>Notifications</strong>
                         <span class="nd-mark" onclick="document.getElementById('notifDrop').classList.remove('open')">Dismiss</span>
                     </div>
-                    <div class="nd-empty"><i class="fas fa-bell-slash" style="font-size:22px;color:var(--border);display:block;margin-bottom:8px;"></i>No new notifications</div>
+                    <div style="max-height: 250px; overflow-y: auto;">
+                        @forelse($documents as $doc)
+                        <a href="{{ route('parent.documents.download', ['document' => $doc->id, 'action' => 'view']) }}" target="_blank" class="nd-item" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);text-decoration:none;color:var(--t1);">
+                            <div style="width:28px;height:28px;border-radius:50%;background:var(--gold-bg);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">
+                                <i class="fas fa-file-pdf"></i>
+                            </div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">New Document Issued</div>
+                                <div style="font-size:10.5px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ $doc->original_name }}</div>
+                            </div>
+                            <div style="font-size:9.5px;color:var(--t3);white-space:nowrap;">{{ $doc->created_at->diffForHumans() }}</div>
+                        </a>
+                        @empty
+                        <div class="nd-empty"><i class="fas fa-bell-slash" style="font-size:22px;color:var(--border);display:block;margin-bottom:8px;"></i>No new notifications</div>
+                        @endforelse
+                    </div>
                 </div>
             </div>
             <!-- User -->
@@ -868,9 +887,9 @@ $aiInsights = [
                             <div class="qa-ico" style="background:rgba(139,92,246,.12);color:#8b5cf6;"><i class="fas fa-calendar-check"></i></div>
                             <span class="qa-lbl">Attendance</span>
                         </a>
-                        <a href="#" class="qa-btn">
-                            <div class="qa-ico" style="background:rgba(245,158,11,.12);color:#f59e0b;"><i class="fas fa-dollar-sign"></i></div>
-                            <span class="qa-lbl">Pay Fee</span>
+                        <a href="{{ route('parent.documents.index') }}" class="qa-btn">
+                            <div class="qa-ico" style="background:rgba(16,185,129,.12);color:#10b981;"><i class="fas fa-file-pdf"></i></div>
+                            <span class="qa-lbl">Documents</span>
                         </a>
                         <a href="#" class="qa-btn">
                             <div class="qa-ico" style="background:rgba(59,130,246,.12);color:#3b82f6;"><i class="fas fa-calendar-alt"></i></div>
@@ -889,6 +908,39 @@ $aiInsights = [
                             <span class="qa-lbl">Messages</span>
                         </a>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Issued Certificates Card -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-hdr">
+                <span class="card-title"><i class="fas fa-award" style="color:var(--gold);margin-right:8px;"></i>Issued Certificates & Documents</span>
+                <a href="{{ route('parent.documents.index') }}" class="view-all">View All</a>
+            </div>
+            <div class="card-body">
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    @forelse($documents->take(3) as $doc)
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--page);border:1px solid var(--border);border-radius:10px;">
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <div style="width:34px;height:34px;border-radius:8px;background:rgba(245,158,11,.15);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:15px;">
+                                <i class="fas fa-file-pdf"></i>
+                            </div>
+                            <div>
+                                <strong style="display:block;font-size:13px;color:var(--t1);">{{ $doc->original_name }}</strong>
+                                <span style="font-size:11px;color:var(--t3);">Issued on {{ $doc->created_at->format('M d, Y') }}</span>
+                            </div>
+                        </div>
+                        <a href="{{ route('parent.documents.download', ['document' => $doc->id, 'action' => 'download']) }}" class="btn btn-outline" style="padding:5px 10px;font-size:11px;">
+                            <i class="fas fa-download"></i> Download
+                        </a>
+                    </div>
+                    @empty
+                    <div style="text-align:center;padding:24px;color:var(--t3);font-size:12px;">
+                        <i class="fas fa-folder-open" style="font-size:24px;display:block;margin-bottom:6px;color:var(--border);"></i>
+                        No certificates or documents have been issued yet.
+                    </div>
+                    @endforelse
                 </div>
             </div>
         </div>

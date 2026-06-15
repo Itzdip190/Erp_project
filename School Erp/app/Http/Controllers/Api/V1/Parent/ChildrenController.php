@@ -66,8 +66,8 @@ class ChildrenController extends Controller
             try {
                 $url = $disk->temporaryUrl($doc->file_path, now()->addMinutes(60));
             } catch (\RuntimeException $e) {
-                // Fallback for local filesystems which do not support S3 temporary URLs
-                $url = $disk->url($doc->file_path);
+                // Fallback for local filesystems: return the secure web download/view route
+                $url = route('parent.documents.download', ['document' => $doc->id, 'action' => 'view']);
             }
 
             return [

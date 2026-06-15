@@ -24,3 +24,7 @@ Homestead.yaml
 Thumbs.db
 /database/*.sqlite
 *.sqlite
+scratch_*
+downloaded_log.txt
+downloaded_log_full.txt
+

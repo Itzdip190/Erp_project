@@ -48,8 +48,9 @@ class StudentController extends Controller
 
         $cacheKey = 'students_list_' . $schoolId . '_' . md5(json_encode($filters) . '_' . $page);
 
-        $students = Cache::tags(['students_' . $schoolId])->remember($cacheKey, 120, function () use ($filters) {
-            $query = Student::with(['class', 'section', 'academicSession']);
+        $students = Cache::remember($cacheKey, 120, function () use ($schoolId, $filters) {
+            $query = Student::with(['class', 'section', 'academicSession'])
+                            ->where('school_id', $schoolId);
 
             if ($filters['class_id']) {
                 $query->where('class_id', $filters['class_id']);
@@ -79,6 +80,13 @@ class StudentController extends Controller
         $classes = SchoolClass::all();
         $sections = Section::all();
         $academicSessions = AcademicSession::all();
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'data' => $students->items(),
+            ]);
+        }
 
         return view('school.student.index', compact('students', 'classes', 'sections', 'academicSessions', 'filters'));
     }
@@ -146,7 +154,9 @@ class StudentController extends Controller
             return $student;
         });
 
-        Cache::tags(['students_' . $schoolId])->flush();
+        // Flush student list cache keys for this school
+        Cache::forget('students_list_version_' . $schoolId);
+        Cache::put('students_list_version_' . $schoolId, time(), 86400);
 
         event(new StudentAdmitted($student));
 
@@ -181,7 +191,30 @@ class StudentController extends Controller
             $data['photo'] = $request->file('photo')->store('students/photos', config('filesystems.default'));
         }
 
-        DB::transaction(function () use ($student, $data) {
+        DB::transaction(function () use ($schoolId, $student, $data) {
+            if (!empty($data['guardian_email'])) {
+                $user = User::where('email', $data['guardian_email'])
+                    ->where('school_id', $schoolId)
+                    ->first();
+
+                if (!$user) {
+                    $user = User::create([
+                        'school_id' => $schoolId,
+                        'name' => $data['guardian_name'],
+                        'email' => $data['guardian_email'],
+                        'phone' => $data['guardian_phone'],
+                        'password' => Hash::make('schoolcloud123'),
+                        'is_active' => true,
+                    ]);
+                    $user->assignRole('parent');
+                }
+                
+                // If student has no user account, associate with the parent account
+                if (empty($student->user_id)) {
+                    $data['user_id'] = $user->id;
+                }
+            }
+
             $student->update($data);
 
             // Update or create student session for current academic year
@@ -199,7 +232,8 @@ class StudentController extends Controller
             );
         });
 
-        Cache::tags(['students_' . $schoolId])->flush();
+        Cache::forget('students_list_version_' . $schoolId);
+        Cache::put('students_list_version_' . $schoolId, time(), 86400);
 
         return redirect()->route('school.students.index')->with('success', 'Student updated successfully.');
     }
@@ -209,7 +243,8 @@ class StudentController extends Controller
         $schoolId = auth()->user()->school_id;
         $student->delete();
 
-        Cache::tags(['students_' . $schoolId])->flush();
+        Cache::forget('students_list_version_' . $schoolId);
+        Cache::put('students_list_version_' . $schoolId, time(), 86400);
 
         return redirect()->route('school.students.index')->with('success', 'Student deleted successfully.');
     }
@@ -349,8 +384,151 @@ class StudentController extends Controller
             }
         });
 
-        Cache::tags(['students_' . $schoolId])->flush();
+        Cache::forget('students_list_version_' . $schoolId);
+        Cache::put('students_list_version_' . $schoolId, time(), 86400);
 
         return redirect()->route('school.students.index')->with('success', 'Students promoted successfully.');
+    }
+
+    public function issueDocument(Request $request, Student $student)
+    {
+        $request->validate([
+            'type' => 'required|string|in:id_card,admit_card,character,dob,bonafide,transfer,appreciation,achievement',
+        ]);
+
+        $type = $request->type;
+        $schoolId = auth()->user()->school_id;
+
+        // 1. Generate PDF content depending on the type
+        $pdf = null;
+        if ($type === 'id_card') {
+            $qrCode = base64_encode(
+                \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')
+                    ->size(150)
+                    ->errorCorrection('H')
+                    ->generate($student->admission_number)
+            );
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.student.id-card-pdf', compact('student', 'qrCode'))
+                ->setPaper('a5', 'portrait');
+        } elseif ($type === 'admit_card') {
+            $timetable = [
+                ['date' => '2026-06-15', 'subject' => 'English', 'time' => '09:00 AM - 12:00 PM', 'room' => '101'],
+                ['date' => '2026-06-17', 'subject' => 'Mathematics', 'time' => '09:00 AM - 12:00 PM', 'room' => '102'],
+                ['date' => '2026-06-19', 'subject' => 'Science', 'time' => '09:00 AM - 12:00 PM', 'room' => '103'],
+                ['date' => '2026-06-22', 'subject' => 'History', 'time' => '09:00 AM - 12:00 PM', 'room' => '101'],
+                ['date' => '2026-06-24', 'subject' => 'Computer Science', 'time' => '09:00 AM - 12:00 PM', 'room' => 'Lab B'],
+            ];
+            $examName = 'First Term Examination 2026';
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.student.admit-card-pdf', compact('student', 'timetable', 'examName'))
+                ->setPaper('a4', 'portrait');
+        } else {
+            // Certificates
+            $title = ucwords(str_replace('_', ' ', $type)) . ' Certificate';
+            $date = now()->format('d M Y');
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView("school.student.certificates.{$type}", compact('student', 'title', 'date'))
+                ->setPaper('a4', 'landscape');
+        }
+
+        $content = $pdf->output();
+
+        // 2. Save file to storage
+        $filename = "{$type}_" . time() . ".pdf";
+        $filePath = "students/documents/{$student->id}/{$filename}";
+        Storage::disk(config('filesystems.default'))->put($filePath, $content);
+
+        // 3. Save entry to database
+        $displayName = ucwords(str_replace('_', ' ', $type)) . ' Certificate';
+        if ($type === 'id_card') {
+            $displayName = 'Student ID Card';
+        } elseif ($type === 'admit_card') {
+            $displayName = 'Exam Admit Card';
+        }
+
+        \App\Models\StudentDocument::create([
+            'school_id' => $schoolId,
+            'student_id' => $student->id,
+            'document_type' => $type,
+            'file_path' => $filePath,
+            'original_name' => $displayName . '.pdf',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Document issued successfully to student dashboard!',
+        ]);
+    }
+
+    public function bulkIssueDocuments(Request $request)
+    {
+        $request->validate([
+            'student_ids' => 'required|array',
+            'student_ids.*' => 'required|integer',
+            'type' => 'required|string|in:id_card,admit_card,character,dob,bonafide,transfer,appreciation,achievement',
+        ]);
+
+        $type = $request->type;
+        $studentIds = $request->student_ids;
+        $schoolId = auth()->user()->school_id;
+
+        $count = 0;
+        foreach ($studentIds as $id) {
+            $student = Student::where('school_id', $schoolId)->find($id);
+            if (!$student) continue;
+
+            $pdf = null;
+            if ($type === 'id_card') {
+                $qrCode = base64_encode(
+                    \SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')
+                        ->size(150)
+                        ->errorCorrection('H')
+                        ->generate($student->admission_number)
+                );
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.student.id-card-pdf', compact('student', 'qrCode'))
+                    ->setPaper('a5', 'portrait');
+            } elseif ($type === 'admit_card') {
+                $timetable = [
+                    ['date' => '2026-06-15', 'subject' => 'English', 'time' => '09:00 AM - 12:00 PM', 'room' => '101'],
+                    ['date' => '2026-06-17', 'subject' => 'Mathematics', 'time' => '09:00 AM - 12:00 PM', 'room' => '102'],
+                    ['date' => '2026-06-19', 'subject' => 'Science', 'time' => '09:00 AM - 12:00 PM', 'room' => '103'],
+                    ['date' => '2026-06-22', 'subject' => 'History', 'time' => '09:00 AM - 12:00 PM', 'room' => '101'],
+                    ['date' => '2026-06-24', 'subject' => 'Computer Science', 'time' => '09:00 AM - 12:00 PM', 'room' => 'Lab B'],
+                ];
+                $examName = 'First Term Examination 2026';
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.student.admit-card-pdf', compact('student', 'timetable', 'examName'))
+                    ->setPaper('a4', 'portrait');
+            } else {
+                $title = ucwords(str_replace('_', ' ', $type)) . ' Certificate';
+                $date = now()->format('d M Y');
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView("school.student.certificates.{$type}", compact('student', 'title', 'date'))
+                    ->setPaper('a4', 'landscape');
+            }
+
+            $content = $pdf->output();
+
+            $filename = "{$type}_" . time() . ".pdf";
+            $filePath = "students/documents/{$student->id}/{$filename}";
+            Storage::disk(config('filesystems.default'))->put($filePath, $content);
+
+            $displayName = ucwords(str_replace('_', ' ', $type)) . ' Certificate';
+            if ($type === 'id_card') {
+                $displayName = 'Student ID Card';
+            } elseif ($type === 'admit_card') {
+                $displayName = 'Exam Admit Card';
+            }
+
+            \App\Models\StudentDocument::create([
+                'school_id' => $schoolId,
+                'student_id' => $student->id,
+                'document_type' => $type,
+                'file_path' => $filePath,
+                'original_name' => $displayName . '.pdf',
+            ]);
+            $count++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully issued {$count} documents to student dashboards!",
+        ]);
     }
 }

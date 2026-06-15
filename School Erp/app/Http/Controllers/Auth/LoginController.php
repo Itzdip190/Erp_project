@@ -29,8 +29,28 @@ class LoginController extends Controller
      */
     public function login(LoginRequest $request)
     {
-        $credentials = $request->only('email', 'password');
+        $loginInput = $request->email;
+        $password = $request->password;
         $remember = $request->has('remember');
+
+        $email = $loginInput;
+
+        // If it's not a valid email, check if it's an Admission Number or a Phone Number
+        if (!filter_var($loginInput, FILTER_VALIDATE_EMAIL)) {
+            // Check student admission number
+            $student = \App\Models\Student::where('admission_number', $loginInput)->first();
+            if ($student && $student->user) {
+                $email = $student->user->email;
+            } else {
+                // Check user phone number
+                $userByPhone = User::where('phone', $loginInput)->first();
+                if ($userByPhone) {
+                    $email = $userByPhone->email;
+                }
+            }
+        }
+
+        $credentials = ['email' => $email, 'password' => $password];
 
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
@@ -42,7 +62,7 @@ class LoginController extends Controller
             // Log successful attempt
             LoginLog::create([
                 'user_id' => $user->id,
-                'email_attempted' => $request->email,
+                'email_attempted' => $loginInput,
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent(),
                 'status' => 'success',
@@ -52,10 +72,10 @@ class LoginController extends Controller
         }
 
         // Log failed attempt
-        $failedUser = User::where('email', $request->email)->first();
+        $failedUser = User::where('email', $email)->first();
         LoginLog::create([
             'user_id' => $failedUser?->id,
-            'email_attempted' => $request->email,
+            'email_attempted' => $loginInput,
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'status' => 'failed',

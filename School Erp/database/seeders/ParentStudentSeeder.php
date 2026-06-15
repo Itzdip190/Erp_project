@@ -34,6 +34,19 @@ class ParentStudentSeeder extends Seeder
         );
         $parentUser->assignRole('parent');
 
+        // 1b. Create Student User
+        $studentUser = User::firstOrCreate(
+            ['email' => 'jane.student@yis.com'],
+            [
+                'name' => 'Jane Doe',
+                'password' => Hash::make('Student@2026!'),
+                'phone' => '9876543210',
+                'school_id' => $school->id,
+                'is_active' => true,
+            ]
+        );
+        $studentUser->assignRole('student');
+
         // 2. Create Student Jane Doe
         $admissionYear = (int) date('Y');
         $admissionNumber = "YIS/{$admissionYear}/00001";
@@ -44,7 +57,7 @@ class ParentStudentSeeder extends Seeder
                 'admission_number' => $admissionNumber,
             ],
             [
-                'user_id' => $parentUser->id,
+                'user_id' => $studentUser->id,
                 'admission_sequence' => 1,
                 'admission_year' => $admissionYear,
                 'roll_number' => '1',

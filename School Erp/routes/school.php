@@ -7,6 +7,7 @@ use App\Http\Controllers\School\Student\CertificateController;
 use App\Http\Controllers\School\Attendance\StudentAttendanceController;
 use App\Http\Controllers\School\Attendance\StaffAttendanceController;
 use App\Http\Controllers\School\SchoolDashboardController;
+use App\Http\Controllers\School\SettingsController;
 use Illuminate\Support\Facades\Route;
 
 // Dashboard
@@ -37,6 +38,8 @@ Route::middleware(['check.module:students'])->group(function () {
     Route::get('/students/{student}/id-card', [StudentIdCardController::class, 'generate'])->name('school.students.id-card');
     Route::get('/students/{student}/admit-card', [AdmitCardController::class, 'generate'])->name('school.students.admit-card');
     Route::get('/students/{student}/certificate/{type}', [CertificateController::class, 'generate'])->name('school.students.certificate');
+    Route::post('/students/{student}/issue-document', [StudentController::class, 'issueDocument'])->name('school.students.issue-document');
+    Route::post('/students/bulk-issue-document', [StudentController::class, 'bulkIssueDocuments'])->name('school.students.bulk-issue-document');
 });
 
 // Attendance Module
@@ -54,3 +57,8 @@ Route::middleware(['check.module:attendance'])->group(function () {
     Route::post('/attendance/staff', [StaffAttendanceController::class, 'store'])->name('school.attendance.staff.store');
     Route::get('/attendance/staff/report', [StaffAttendanceController::class, 'report'])->name('school.attendance.staff.report');
 });
+
+// Settings
+Route::get('/settings', [SettingsController::class, 'index'])->name('school.settings.index');
+Route::put('/settings/profile', [SettingsController::class, 'updateProfile'])->name('school.settings.profile');
+Route::put('/settings/password', [SettingsController::class, 'changePassword'])->name('school.settings.password');
