@@ -8,6 +8,7 @@ use App\Http\Controllers\School\Attendance\StudentAttendanceController;
 use App\Http\Controllers\School\Attendance\StaffAttendanceController;
 use App\Http\Controllers\School\SchoolDashboardController;
 use App\Http\Controllers\School\SettingsController;
+use App\Http\Controllers\School\ClassAssignmentController;
 use Illuminate\Support\Facades\Route;
 
 // Dashboard
@@ -97,3 +98,21 @@ Route::resource('staff', \App\Http\Controllers\School\StaffController::class)->n
     'update' => 'school.staff.update',
     'destroy' => 'school.staff.destroy',
 ]);
+
+// Class, Subject & Teacher Assignment Module Routes
+Route::get('/assignments/class-overview', [ClassAssignmentController::class, 'classOverview'])->name('school.assignments.class-overview');
+Route::get('/assignments/classes', [ClassAssignmentController::class, 'classesForm'])->name('school.assignments.classes');
+Route::post('/assignments/classes', [ClassAssignmentController::class, 'storeClass'])->name('school.assignments.classes.store');
+Route::post('/assignments/sections', [ClassAssignmentController::class, 'storeSection'])->name('school.assignments.sections.store');
+Route::delete('/assignments/classes/{class}', [ClassAssignmentController::class, 'destroyClass'])->name('school.assignments.classes.destroy');
+Route::delete('/assignments/sections/{section}', [ClassAssignmentController::class, 'destroySection'])->name('school.assignments.sections.destroy');
+
+Route::get('/assignments/subjects', [ClassAssignmentController::class, 'subjectsForm'])->name('school.assignments.subjects');
+Route::post('/assignments/subjects', [ClassAssignmentController::class, 'storeSubject'])->name('school.assignments.subjects.store');
+Route::delete('/assignments/subjects/{subject}', [ClassAssignmentController::class, 'destroySubject'])->name('school.assignments.subjects.destroy');
+
+Route::get('/assignments/teachers', [ClassAssignmentController::class, 'teachersForm'])->name('school.assignments.teachers');
+Route::post('/assignments/teachers', [ClassAssignmentController::class, 'storeAssignment'])->name('school.assignments.teachers.store');
+Route::post('/assignments/sections/{section}/class-teacher', [ClassAssignmentController::class, 'updateClassTeacher'])->name('school.assignments.class-teacher.update');
+Route::delete('/assignments/teachers/{assignment}', [ClassAssignmentController::class, 'destroyAssignment'])->name('school.assignments.teachers.destroy');
+

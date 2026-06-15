@@ -360,232 +360,112 @@ table.tbl tr:last-child td{border-bottom:none;}
     @endif
 
     <div class="sb-nav">
-        <!-- 1. Dashboard -->
+        <!-- 1. Overview -->
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-th-large"></i></div>
-                    <span class="sb-hdr-title">Dashboard</span>
+                    <div class="sb-hdr-icon"><i class="fas fa-house"></i></div>
+                    <span class="sb-hdr-title">1. Overview</span>
                 </div>
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
             <ul class="sb-submenu">
-                <li class="{{ request()->is('school/dashboard') ? 'active' : '' }}">
-                    <a href="{{ route('school.dashboard') }}">
-                        <span class="sb-submenu-label">Admin Dashboard</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
                 <li class="{{ request()->is('school/dashboard/mis-report') ? 'active' : '' }}">
                     <a href="{{ route('school.dashboard.mis-report') }}">
                         <span class="sb-submenu-label">Daily MIS Report</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
+                <li class="{{ request()->is('school/dashboard') ? 'active' : '' }}">
+                    <a href="{{ route('school.dashboard') }}">
+                        <span class="sb-submenu-label">Admin Dashboard</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
             </ul>
         </div>
 
-        <!-- 2. Students -->
+        <!-- 2. Institute Info -->
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-user-graduate"></i></div>
-                    <span class="sb-hdr-title">Students</span>
+                    <div class="sb-hdr-icon"><i class="fas fa-building"></i></div>
+                    <span class="sb-hdr-title">2. Institute Info</span>
                 </div>
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
             <ul class="sb-submenu">
-                <li class="{{ request()->is('school/students') || (request()->is('school/students/*') && !request()->is('school/students/create') && !request()->is('school/students/promote')) ? 'active' : '' }}">
-                    <a href="{{ route('school.students.index') }}">
-                        <span class="sb-submenu-label">Student Directory</span>
+                <li class="{{ request()->is('school/settings/institute-info') ? 'active' : '' }}">
+                    <a href="{{ route('school.settings.institute-info') }}">
+                        <span class="sb-submenu-label">Basic Institute Info</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/students/create') ? 'active' : '' }}">
-                    <a href="{{ route('school.students.create') }}">
-                        <span class="sb-submenu-label">New Admission</span>
+                <li class="{{ request()->is('school/settings/implementation') ? 'active' : '' }}">
+                    <a href="{{ route('school.settings.implementation') }}">
+                        <span class="sb-submenu-label">Implementation Process</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/students/promote') ? 'active' : '' }}">
-                    <a href="{{ route('school.students.promote-form') }}">
-                        <span class="sb-submenu-label">Promote Students</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- 3. Attendance -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-calendar-check"></i></div>
-                    <span class="sb-hdr-title">Attendance</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li class="{{ request()->is('school/attendance/students') ? 'active' : '' }}">
-                    <a href="{{ route('school.attendance.students.index') }}">
-                        <span class="sb-submenu-label">Student Attendance</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li class="{{ request()->is('school/attendance/students/daily') ? 'active' : '' }}">
-                    <a href="{{ route('school.attendance.students.daily') }}">
-                        <span class="sb-submenu-label">Daily Attendance Report</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li class="{{ request()->is('school/attendance/students/stats') ? 'active' : '' }}">
-                    <a href="{{ route('school.attendance.students.stats') }}">
-                        <span class="sb-submenu-label">Attendance Analytics</span>
+                <li class="{{ request()->is('school/settings/udise') ? 'active' : '' }}">
+                    <a href="{{ route('school.settings.udise') }}">
+                        <span class="sb-submenu-label">UDISE</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
             </ul>
         </div>
 
-        <!-- 4. Fees -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-indian-rupee-sign"></i></div>
-                    <span class="sb-hdr-title">Fees</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li>
-                    <a href="javascript:void(0)" onclick="showToast('🚧 Fees module coming soon!')">
-                        <span class="sb-submenu-label">Fees</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- 5. Academics -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-book"></i></div>
-                    <span class="sb-hdr-title">Academics</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li>
-                    <a href="javascript:void(0)" onclick="showToast('🚧 Academics module coming soon!')">
-                        <span class="sb-submenu-label">Academics</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- 6. Exams -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-file-alt"></i></div>
-                    <span class="sb-hdr-title">Exams</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li>
-                    <a href="javascript:void(0)" onclick="showToast('🚧 Exams module coming soon!')">
-                        <span class="sb-submenu-label">Exams</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- 7. Transport -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-bus"></i></div>
-                    <span class="sb-hdr-title">Transport</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li>
-                    <a href="javascript:void(0)" onclick="showToast('🚧 Transport module coming soon!')">
-                        <span class="sb-submenu-label">Transport</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- 8. Communication -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-comment-dots"></i></div>
-                    <span class="sb-hdr-title">Communication</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li>
-                    <a href="javascript:void(0)" onclick="showToast('🚧 Communication module coming soon!')">
-                        <span class="sb-submenu-label">Communication</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- 9. Library -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-book-open"></i></div>
-                    <span class="sb-hdr-title">Library</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li>
-                    <a href="javascript:void(0)" onclick="showToast('🚧 Library module coming soon!')">
-                        <span class="sb-submenu-label">Library</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- 10. Reports -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-chart-bar"></i></div>
-                    <span class="sb-hdr-title">Reports</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li class="{{ request()->is('school/attendance/students/report') ? 'active' : '' }}">
-                    <a href="{{ route('school.attendance.students.report') }}">
-                        <span class="sb-submenu-label">Attendance Marking Report</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-            </ul>
-        </div>
-
-        <!-- 11. Staff -->
+        <!-- 3. Admin Role Management -->
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
                     <div class="sb-hdr-icon"><i class="fas fa-users"></i></div>
-                    <span class="sb-hdr-title">Staff</span>
+                    <span class="sb-hdr-title">3. Admin Role Management</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li class="{{ request()->is('school/role-management/roles') ? 'active' : '' }}">
+                    <a href="{{ route('school.roles.index') }}">
+                        <span class="sb-submenu-label">Role Category</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/role-management/staff-access') ? 'active' : '' }}">
+                    <a href="{{ route('school.roles.staff-access') }}">
+                        <span class="sb-submenu-label">Staff Access Control</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 4. Password Management -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-lock"></i></div>
+                    <span class="sb-hdr-title">4. Password Management</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li class="{{ request()->is('school/settings/reset-password') ? 'active' : '' }}">
+                    <a href="{{ route('school.settings.reset-password') }}">
+                        <span class="sb-submenu-label">Reset Password</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 6. Staff Management -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-user-cog"></i></div>
+                    <span class="sb-hdr-title">6. Staff Management</span>
                 </div>
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
@@ -626,96 +506,46 @@ table.tbl tr:last-child td{border-bottom:none;}
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-            </ul>
-        </div>
-
-        <!-- 12. Inventory -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-boxes-stacked"></i></div>
-                    <span class="sb-hdr-title">Inventory</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li>
-                    <a href="javascript:void(0)" onclick="showToast('🚧 Inventory module coming soon!')">
-                        <span class="sb-submenu-label">Inventory</span>
+                <li class="{{ request()->is('school/attendance/students/report') ? 'active' : '' }}">
+                    <a href="{{ route('school.attendance.students.report') }}">
+                        <span class="sb-submenu-label">Student Attendance Marking Report</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
             </ul>
         </div>
 
-        <!-- 13. AI Assistant -->
+        <!-- 7. Class, Subject & Teacher Assignment -->
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-robot"></i></div>
-                    <span class="sb-hdr-title">AI Assistant</span>
+                    <div class="sb-hdr-icon"><i class="fas fa-book"></i></div>
+                    <span class="sb-hdr-title">7. Class, Subject & Teacher Assignment</span>
                 </div>
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
             <ul class="sb-submenu">
-                <li>
-                    <a href="{{ route('school.dashboard') }}#ai-chatbot" onclick="if(window.location.pathname.endsWith('/school/dashboard')){event.preventDefault();scrollToAI();}">
-                        <span class="sb-submenu-label">AI Assistant</span>
+                <li class="{{ request()->is('school/assignments/class-overview') ? 'active' : '' }}">
+                    <a href="{{ route('school.assignments.class-overview') }}">
+                        <span class="sb-submenu-label">Class Overview</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-            </ul>
-        </div>
-
-        <!-- 14. Settings -->
-        <div class="sb-group">
-            <div class="sb-hdr">
-                <div class="sb-hdr-left">
-                    <div class="sb-hdr-icon"><i class="fas fa-gear"></i></div>
-                    <span class="sb-hdr-title">Settings</span>
-                </div>
-                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
-            </div>
-            <ul class="sb-submenu">
-                <li class="{{ request()->is('school/settings') && !request()->is('school/settings/institute-info') && !request()->is('school/settings/implementation') && !request()->is('school/settings/udise') && !request()->is('school/role-management/roles') && !request()->is('school/role-management/staff-access') && !request()->is('school/settings/reset-password') ? 'active' : '' }}">
-                    <a href="{{ route('school.settings.index') }}">
-                        <span class="sb-submenu-label">General Settings</span>
+                <li class="{{ request()->is('school/assignments/classes') ? 'active' : '' }}">
+                    <a href="{{ route('school.assignments.classes') }}">
+                        <span class="sb-submenu-label">Add/modify class</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/settings/institute-info') ? 'active' : '' }}">
-                    <a href="{{ route('school.settings.institute-info') }}">
-                        <span class="sb-submenu-label">Basic Institute Info</span>
+                <li class="{{ request()->is('school/assignments/subjects') ? 'active' : '' }}">
+                    <a href="{{ route('school.assignments.subjects') }}">
+                        <span class="sb-submenu-label">Add/modify subjects</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/settings/implementation') ? 'active' : '' }}">
-                    <a href="{{ route('school.settings.implementation') }}">
-                        <span class="sb-submenu-label">Implementation Process</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li class="{{ request()->is('school/settings/udise') ? 'active' : '' }}">
-                    <a href="{{ route('school.settings.udise') }}">
-                        <span class="sb-submenu-label">UDISE</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li class="{{ request()->is('school/role-management/roles') ? 'active' : '' }}">
-                    <a href="{{ route('school.roles.index') }}">
-                        <span class="sb-submenu-label">Role Category</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li class="{{ request()->is('school/role-management/staff-access') ? 'active' : '' }}">
-                    <a href="{{ route('school.roles.staff-access') }}">
-                        <span class="sb-submenu-label">Staff Access Control</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li class="{{ request()->is('school/settings/reset-password') ? 'active' : '' }}">
-                    <a href="{{ route('school.settings.reset-password') }}">
-                        <span class="sb-submenu-label">Reset Password</span>
+                <li class="{{ request()->is('school/assignments/teachers') ? 'active' : '' }}">
+                    <a href="{{ route('school.assignments.teachers') }}">
+                        <span class="sb-submenu-label">Assign teachers</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
