@@ -68,19 +68,39 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 }
 
 /* Nav */
-.sb-nav{list-style:none;padding:6px 8px;flex:1;}
-.sb-nav li{margin-bottom:1px;}
-.sb-nav a{
-    display:flex;align-items:center;gap:9px;
-    padding:8px 9px;border-radius:7px;
-    color:rgba(255,255,255,.55);font-size:12px;font-weight:500;
-    text-decoration:none;transition:.18s;
-    border-left:2.5px solid transparent;white-space:nowrap;
+.sb-nav{list-style:none;padding:6px 0;flex:1;overflow-y:auto;overflow-x:hidden;}
+.sb-group{margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.03);padding-bottom:8px;}
+.sb-group:last-child{border-bottom:none;}
+.sb-hdr{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:8px 10px;cursor:pointer;user-select:none;
+    color:rgba(255,255,255,.75);transition:all .2s;border-radius:6px;
+    margin:0 6px;
 }
-.sb-nav a i{width:15px;text-align:center;font-size:12px;flex-shrink:0;}
-.sb-nav a:hover{background:rgba(255,255,255,.08);color:#fff;}
-.sb-nav li.active a{background:var(--gold-bg);color:#fff;border-left-color:var(--gold);}
-.sb-nav li.active a i{color:var(--gold);}
+.sb-hdr:hover{background:rgba(255,255,255,.05);color:#fff;}
+.sb-hdr-left{display:flex;align-items:center;gap:6px;}
+.sb-hdr-icon{
+    width:22px;height:22px;border-radius:50%;background:#f59e0b;
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-size:9.5px;flex-shrink:0;
+}
+.sb-hdr-title{font-family:'Plus Jakarta Sans',sans-serif;color:#fff;font-size:11px;font-weight:700;letter-spacing:0.2px;}
+.sb-hdr-arrow{font-size:9px;color:rgba(255,255,255,.3);transition:transform .2s;}
+.sb-hdr.open .sb-hdr-arrow{transform:rotate(180deg);}
+
+.sb-submenu{list-style:none;padding:2px 6px 2px 20px;display:none;}
+.sb-submenu.open{display:block;}
+.sb-submenu li{margin-bottom:1px;}
+.sb-submenu a{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:6px 8px;border-radius:6px;
+    color:rgba(255,255,255,.55);font-size:11px;font-weight:500;
+    text-decoration:none;transition:all .18s;
+}
+.sb-submenu a:hover{color:#fff;background:rgba(255,255,255,.05);}
+.sb-submenu li.active a{color:#f59e0b;font-weight:700;}
+.sb-submenu-label{display:flex;align-items:center;gap:6px;}
+.sb-submenu-icon{font-size:9px;color:#f59e0b;flex-shrink:0;opacity:0.85;}
 
 .sb-bottom{padding:10px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0;}
 .sb-logout{
@@ -190,18 +210,20 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 
 @media(max-width:1024px){
     .sidebar{width:54px;}
-    .sb-logo-text,.sb-student,.sb-nav a span,.sb-bottom{display:none;}
-    .sb-nav a{justify-content:center;padding:10px 0;}
-    .sb-nav a i{width:100%;font-size:15px;}
+    .sb-logo-text,.sb-student,.sb-hdr-title,.sb-hdr-arrow,.sb-submenu,.sb-bottom{display:none!important;}
+    .sb-hdr{justify-content:center;padding:10px 0;margin:0;}
+    .sb-hdr-icon{width:24px;height:24px;font-size:11px;}
     .main{margin-left:54px;}
     .hamburger{display:flex;}
 }
 @media(max-width:768px){
     .sidebar{transform:translateX(-220px);width:220px;}
     .sidebar.open{transform:translateX(0);}
-    .sb-logo-text,.sb-student,.sb-nav a span,.sb-bottom{display:block!important;}
-    .sb-nav a{justify-content:flex-start!important;padding:8px 9px!important;}
-    .sb-nav a i{width:15px!important;font-size:12px!important;}
+    .sb-logo-text,.sb-student,.sb-hdr-title,.sb-hdr-arrow,.sb-bottom{display:block!important;}
+    .sb-submenu{display:none;}
+    .sb-submenu.open{display:block!important;}
+    .sb-hdr{justify-content:space-between!important;padding:8px 10px!important;margin:0 6px!important;}
+    .sb-hdr-icon{width:22px!important;height:22px!important;font-size:9.5px!important;}
     .main{margin-left:0;}
 }
 </style>
@@ -237,20 +259,157 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
         @endif
     </div>
 
-    <ul class="sb-nav">
-        <li><a href="{{ route('parent.dashboard') }}"><i class="fas fa-th-large"></i><span>Dashboard</span></a></li>
-        <li><a href="{{ route('parent.attendance.index') }}"><i class="fas fa-calendar-check"></i><span>Attendance</span></a></li>
-        <li class="active"><a href="{{ route('parent.documents.index') }}"><i class="fas fa-file-pdf"></i><span>Documents</span></a></li>
-        <li><a href="#"><i class="fas fa-dollar-sign"></i><span>Fee Details</span></a></li>
-        <li><a href="#"><i class="fas fa-book"></i><span>Academics</span></a></li>
-        <li><a href="#"><i class="fas fa-file-alt"></i><span>Exams</span></a></li>
-        <li><a href="#"><i class="fas fa-chart-bar"></i><span>Reports</span></a></li>
-        <li><a href="#"><i class="fas fa-calendar-alt"></i><span>Timetable</span></a></li>
-        <li><a href="#"><i class="fas fa-bullhorn"></i><span>Notices</span></a></li>
-        <li><a href="#"><i class="fas fa-comment-dots"></i><span>Messages</span></a></li>
-        <li><a href="#"><i class="fas fa-robot"></i><span>AI Assistant</span></a></li>
-        <li><a href="#"><i class="fas fa-gear"></i><span>Settings</span></a></li>
-    </ul>
+    <div class="sb-nav">
+        <!-- 1. Overview -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-house"></i></div>
+                    <span class="sb-hdr-title">1. Overview</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li>
+                    <a href="{{ route('parent.dashboard') }}">
+                        <span class="sb-submenu-label">Dashboard</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 2. Attendance & Academics -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-graduation-cap"></i></div>
+                    <span class="sb-hdr-title">2. Attendance & Academics</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li>
+                    <a href="{{ route('parent.attendance.index') }}">
+                        <span class="sb-submenu-label">Attendance Logs</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="#">
+                        <span class="sb-submenu-label">Academics</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="#">
+                        <span class="sb-submenu-label">Timetable</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 3. Documents & Reports -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-file-pdf"></i></div>
+                    <span class="sb-hdr-title">3. Documents & Reports</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li class="active">
+                    <a href="{{ route('parent.documents.index') }}">
+                        <span class="sb-submenu-label">My Documents</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="#">
+                        <span class="sb-submenu-label">Exams</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="#">
+                        <span class="sb-submenu-label">Reports</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 4. Finance & Fees -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-indian-rupee-sign"></i></div>
+                    <span class="sb-hdr-title">4. Finance & Fees</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li>
+                    <a href="#">
+                        <span class="sb-submenu-label">Fee Details</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 5. Communication -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-comment-dots"></i></div>
+                    <span class="sb-hdr-title">5. Communication</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li>
+                    <a href="#">
+                        <span class="sb-submenu-label">Notices</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="#">
+                        <span class="sb-submenu-label">Messages</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="#">
+                        <span class="sb-submenu-label">AI Assistant</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 6. Settings -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-gear"></i></div>
+                    <span class="sb-hdr-title">6. Settings</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li>
+                    <a href="#">
+                        <span class="sb-submenu-label">Settings</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
 
     <div class="sb-bottom">
         <a href="{{ route('logout') }}" class="sb-logout">
@@ -372,6 +531,30 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Accordion toggle
+    document.querySelectorAll('.sb-hdr').forEach(hdr => {
+        hdr.addEventListener('click', () => {
+            const submenu = hdr.nextElementSibling;
+            if (submenu && submenu.classList.contains('sb-submenu')) {
+                hdr.classList.toggle('open');
+                submenu.classList.toggle('open');
+            }
+        });
+    });
+
+    // Auto-expand current active menu
+    document.querySelectorAll('.sb-submenu').forEach(submenu => {
+        if (submenu.querySelector('li.active')) {
+            submenu.classList.add('open');
+            const hdr = submenu.previousElementSibling;
+            if (hdr && hdr.classList.contains('sb-hdr')) {
+                hdr.classList.add('open');
+            }
+        }
+    });
+});
+
 function toggleDrop(id){
     ['notifDrop','userDrop'].forEach(d=>{if(d!==id)document.getElementById(d).classList.remove('open');});
     document.getElementById(id).classList.toggle('open');
