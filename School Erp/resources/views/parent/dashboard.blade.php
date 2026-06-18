@@ -500,14 +500,16 @@ for($d=0;$d<5;$d++){
 }
 
 // Timetable stubs
-$timetable = [
-    ['time'=>'9:00 AM','subject'=>'Mathematics','teacher'=>'Mr. Kapoor','color'=>'#3b82f6'],
-    ['time'=>'10:00 AM','subject'=>'Physics','teacher'=>'Ms. Sharma','color'=>'#8b5cf6'],
-    ['time'=>'11:00 AM','subject'=>'Chemistry','teacher'=>'Mr. Verma','color'=>'#10b981'],
-    ['time'=>'12:00 PM','subject'=>'Lunch Break','teacher'=>'—','color'=>'#f59e0b'],
-    ['time'=>'1:00 PM','subject'=>'English','teacher'=>'Ms. Patel','color'=>'#ef4444'],
-    ['time'=>'2:00 PM','subject'=>'History','teacher'=>'Mr. Singh','color'=>'#f97316'],
-];
+if (!isset($timetable) || empty($timetable)) {
+    $timetable = [
+        ['time'=>'9:00 AM','subject'=>'Mathematics','teacher'=>'Mr. Kapoor','color'=>'#3b82f6'],
+        ['time'=>'10:00 AM','subject'=>'Physics','teacher'=>'Ms. Sharma','color'=>'#8b5cf6'],
+        ['time'=>'11:00 AM','subject'=>'Chemistry','teacher'=>'Mr. Verma','color'=>'#10b981'],
+        ['time'=>'12:00 PM','subject'=>'Lunch Break','teacher'=>'—','color'=>'#f59e0b'],
+        ['time'=>'1:00 PM','subject'=>'English','teacher'=>'Ms. Patel','color'=>'#ef4444'],
+        ['time'=>'2:00 PM','subject'=>'History','teacher'=>'Mr. Singh','color'=>'#f97316'],
+    ];
+}
 
 // AI insights for student
 $aiInsights = [
@@ -586,14 +588,20 @@ $aiInsights = [
                     </a>
                 </li>
                 <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Academics</span>
+                    <a href="{{ route('parent.diary.index') }}">
+                        <span class="sb-submenu-label">Digital Diary</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
                 <li>
-                    <a href="#">
+                    <a href="{{ route('parent.dashboard') }}#timetable">
                         <span class="sb-submenu-label">Timetable</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('parent.cards.index') }}">
+                        <span class="sb-submenu-label">ID Cards & Passes</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
@@ -617,14 +625,8 @@ $aiInsights = [
                     </a>
                 </li>
                 <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Exams</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Reports</span>
+                    <a href="{{ route('parent.certificates.index') }}">
+                        <span class="sb-submenu-label">My Certificates</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
@@ -661,20 +663,8 @@ $aiInsights = [
             </div>
             <ul class="sb-submenu">
                 <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Notices</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Messages</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">AI Assistant</span>
+                    <a href="{{ route('parent.events.index') }}">
+                        <span class="sb-submenu-label">Events & Calendar</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
@@ -917,7 +907,7 @@ $aiInsights = [
             </div>
 
             <!-- Today's Timetable -->
-            <div class="card">
+            <div class="card" id="timetable">
                 <div class="card-hdr">
                     <span class="card-title">Today's Timetable</span>
                     <span style="font-size:10.5px;color:var(--t3);">{{ Carbon::now()->format('l') }}</span>

@@ -121,16 +121,30 @@ class ProcessStudentImport implements ShouldQueue
                     // 1. Generate admission number atomically
                     $admissionNumber = $studentNumberService->generateAdmissionNumber($this->schoolId);
                     
-                    // 2. Create User account for student if email is supplied, otherwise user_id is null
-                    $userId = null;
+                    // 2. Create student user account
+                    $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $rowData['first_name']));
+                    $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $rowData['last_name']));
+                    $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $admissionNumber));
+                    $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
+
+                    $studentUser = User::create([
+                        'school_id' => $this->schoolId,
+                        'name' => trim($rowData['first_name'] . ' ' . $rowData['last_name']),
+                        'email' => $studentEmail,
+                        'phone' => $rowData['guardian_phone'] ?? null,
+                        'password' => Hash::make('Student@2026!'), // Default student password
+                        'is_active' => true,
+                    ]);
+                    $studentUser->assignRole('student');
+
+                    // 3. Create parent user account if guardian email is provided
                     if (!empty($rowData['guardian_email'])) {
-                        // Check if guardian user exists, otherwise create it
-                        $user = User::where('email', $rowData['guardian_email'])
+                        $parentUser = User::where('email', $rowData['guardian_email'])
                             ->where('school_id', $this->schoolId)
                             ->first();
                             
-                        if (!$user) {
-                            $user = User::create([
+                        if (!$parentUser) {
+                            $parentUser = User::create([
                                 'school_id' => $this->schoolId,
                                 'name' => $rowData['guardian_name'],
                                 'email' => $rowData['guardian_email'],
@@ -138,15 +152,14 @@ class ProcessStudentImport implements ShouldQueue
                                 'password' => Hash::make('schoolcloud123'), // default password
                                 'is_active' => true,
                             ]);
-                            $user->assignRole('parent');
+                            $parentUser->assignRole('parent');
                         }
-                        $userId = $user->id;
                     }
 
-                    // 3. Create Student
+                    // 4. Create Student
                     $student = Student::create([
                         'school_id' => $this->schoolId,
-                        'user_id' => $userId,
+                        'user_id' => $studentUser->id,
                         'admission_number' => $admissionNumber,
                         'admission_sequence' => (int) explode('/', $admissionNumber)[2],
                         'admission_year' => (int) date('Y'),

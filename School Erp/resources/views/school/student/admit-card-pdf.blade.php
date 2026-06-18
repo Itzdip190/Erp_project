@@ -84,7 +84,7 @@
         <tr>
             <td class="label">Student Name:</td>
             <td style="font-weight: bold;">{{ $student->full_name }}</td>
-            <td class="label">Admission No:</td>
+            <td class="label">Admission ID:</td>
             <td style="font-weight: bold;">{{ $student->admission_number }}</td>
         </tr>
         <tr>

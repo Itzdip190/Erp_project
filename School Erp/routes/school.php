@@ -9,6 +9,14 @@ use App\Http\Controllers\School\Attendance\StaffAttendanceController;
 use App\Http\Controllers\School\SchoolDashboardController;
 use App\Http\Controllers\School\SettingsController;
 use App\Http\Controllers\School\ClassAssignmentController;
+use App\Http\Controllers\School\TimetableController;
+use App\Http\Controllers\School\StudentManagementController;
+use App\Http\Controllers\School\DownloadStatisticsController;
+use App\Http\Controllers\School\FeeManagementController;
+use App\Http\Controllers\School\CardManagementController;
+use App\Http\Controllers\School\DigitalDiaryController;
+use App\Http\Controllers\School\EventHolidayController;
+use App\Http\Controllers\School\CertificateManagementController;
 use Illuminate\Support\Facades\Route;
 
 // Dashboard
@@ -115,4 +123,98 @@ Route::get('/assignments/teachers', [ClassAssignmentController::class, 'teachers
 Route::post('/assignments/teachers', [ClassAssignmentController::class, 'storeAssignment'])->name('school.assignments.teachers.store');
 Route::post('/assignments/sections/{section}/class-teacher', [ClassAssignmentController::class, 'updateClassTeacher'])->name('school.assignments.class-teacher.update');
 Route::delete('/assignments/teachers/{assignment}', [ClassAssignmentController::class, 'destroyAssignment'])->name('school.assignments.teachers.destroy');
+
+// Timetable Administration Routes
+Route::get('/timetable/class', [TimetableController::class, 'classTimetable'])->name('school.timetable.class');
+Route::post('/timetable/class', [TimetableController::class, 'storeClassTimetable'])->name('school.timetable.class.store');
+Route::delete('/timetable/class/{timetable}', [TimetableController::class, 'destroyClassTimetable'])->name('school.timetable.class.destroy');
+Route::get('/timetable/group', [TimetableController::class, 'groupTimetable'])->name('school.timetable.group');
+Route::get('/timetable/teacher', [TimetableController::class, 'teacherTimetable'])->name('school.timetable.teacher');
+Route::get('/timetable/substitution', [TimetableController::class, 'teacherSubstitution'])->name('school.timetable.substitution');
+Route::post('/timetable/substitution', [TimetableController::class, 'storeSubstitution'])->name('school.timetable.substitution.store');
+Route::delete('/timetable/substitution/{substitution}', [TimetableController::class, 'destroySubstitution'])->name('school.timetable.substitution.destroy');
+Route::get('/timetable/workload', [TimetableController::class, 'teacherWorkload'])->name('school.timetable.workload');
+
+// Student Management Extension Routes
+Route::get('/student-mgmt/import', [StudentManagementController::class, 'bulkImport'])->name('school.student-mgmt.import');
+Route::get('/student-mgmt/bulk-photo', [StudentManagementController::class, 'bulkPhoto'])->name('school.student-mgmt.bulk-photo');
+Route::get('/student-mgmt/optional-subject', [StudentManagementController::class, 'optionalSubject'])->name('school.student-mgmt.optional-subject');
+Route::post('/student-mgmt/optional-subject', [StudentManagementController::class, 'saveOptionalSubject']);
+Route::get('/student-mgmt/admission-report', [StudentManagementController::class, 'admissionReport'])->name('school.student-mgmt.admission-report');
+Route::get('/student-mgmt/siblings', [StudentManagementController::class, 'siblings'])->name('school.student-mgmt.siblings');
+Route::get('/student-mgmt/bulk-attendance', [StudentManagementController::class, 'bulkAttendance'])->name('school.student-mgmt.bulk-attendance');
+Route::post('/student-mgmt/bulk-attendance', [\App\Http\Controllers\School\Attendance\StudentAttendanceController::class, 'store']);
+Route::get('/student-mgmt/report', [StudentManagementController::class, 'studentReport'])->name('school.student-mgmt.report');
+Route::get('/student-mgmt/app-settings', [StudentManagementController::class, 'appSettings'])->name('school.student-mgmt.app-settings');
+Route::post('/student-mgmt/app-settings', [StudentManagementController::class, 'saveAppSettings']);
+Route::get('/student-mgmt/bulk-admission-number', [StudentManagementController::class, 'bulkAdmissionNumber'])->name('school.student-mgmt.bulk-admission-number');
+Route::post('/student-mgmt/bulk-admission-number', [StudentManagementController::class, 'saveBulkAdmissionNumber']);
+Route::get('/student-mgmt/attendance-report', [StudentManagementController::class, 'attendanceReport'])->name('school.student-mgmt.attendance-report');
+Route::get('/student-mgmt/discipline', [StudentManagementController::class, 'discipline'])->name('school.student-mgmt.discipline');
+Route::post('/student-mgmt/discipline', [StudentManagementController::class, 'saveDiscipline']);
+Route::get('/student-mgmt/bulk-operation', [StudentManagementController::class, 'bulkOperation'])->name('school.student-mgmt.bulk-operation');
+Route::post('/student-mgmt/bulk-operation', [StudentManagementController::class, 'saveBulkOperation']);
+Route::get('/student-mgmt/ptm', [StudentManagementController::class, 'ptm'])->name('school.student-mgmt.ptm');
+Route::post('/student-mgmt/ptm', [StudentManagementController::class, 'savePtm']);
+Route::get('/student-mgmt/cca', [StudentManagementController::class, 'cca'])->name('school.student-mgmt.cca');
+Route::post('/student-mgmt/cca', [StudentManagementController::class, 'saveCca']);
+
+// Download Statistics Routes
+Route::get('/downloads/status', [DownloadStatisticsController::class, 'downloadStatus'])->name('school.downloads.status');
+Route::get('/downloads/activity', [DownloadStatisticsController::class, 'userActivity'])->name('school.downloads.activity');
+
+// Fee Management Routes
+Route::get('/fees/configuration', [FeeManagementController::class, 'feeConfiguration'])->name('school.fees.configuration');
+Route::post('/fees/configuration', [FeeManagementController::class, 'feeConfiguration']);
+Route::get('/fees/basics', [FeeManagementController::class, 'feeBasics'])->name('school.fees.basics');
+Route::get('/fees/class-wise', [FeeManagementController::class, 'classWiseFee'])->name('school.fees.class-wise');
+Route::post('/fees/class-wise', [FeeManagementController::class, 'classWiseFee']);
+Route::get('/fees/student-wise', [FeeManagementController::class, 'studentWiseFee'])->name('school.fees.student-wise');
+Route::post('/fees/student-wise', [FeeManagementController::class, 'studentWiseFee']);
+Route::get('/fees/optional-mapping', [FeeManagementController::class, 'optionalFeeMapping'])->name('school.fees.optional-mapping');
+Route::post('/fees/optional-mapping', [FeeManagementController::class, 'optionalFeeMapping']);
+Route::get('/fees/payment-links', [FeeManagementController::class, 'paymentLinks'])->name('school.fees.payment-links');
+Route::post('/fees/payment-links', [FeeManagementController::class, 'paymentLinks']);
+Route::get('/fees/collection-followup', [FeeManagementController::class, 'collectionFollowup'])->name('school.fees.collection-followup');
+Route::post('/fees/collection-followup', [FeeManagementController::class, 'collectionFollowup']);
+Route::get('/fees/schedule-mapper', [FeeManagementController::class, 'scheduleMapper'])->name('school.fees.schedule-mapper');
+Route::post('/fees/schedule-mapper', [FeeManagementController::class, 'scheduleMapper']);
+Route::get('/fees/refund', [FeeManagementController::class, 'refundFee'])->name('school.fees.refund');
+Route::post('/fees/refund', [FeeManagementController::class, 'refundFee']);
+Route::get('/fees/receipts', [FeeManagementController::class, 'feeReceipts'])->name('school.fees.receipts');
+Route::get('/fees/pending-cheques', [FeeManagementController::class, 'pendingCheques'])->name('school.fees.pending-cheques');
+Route::post('/fees/pending-cheques', [FeeManagementController::class, 'pendingCheques']);
+Route::get('/fees/reports', [FeeManagementController::class, 'feeReports'])->name('school.fees.reports');
+Route::get('/fees/invoice', [FeeManagementController::class, 'feeInvoice'])->name('school.fees.invoice');
+Route::get('/fees/invoice1', [FeeManagementController::class, 'feeInvoice1'])->name('school.fees.invoice1');
+Route::get('/fees/bulk-upload', [FeeManagementController::class, 'feeBulkUpload'])->name('school.fees.bulk-upload');
+Route::post('/fees/bulk-upload', [FeeManagementController::class, 'feeBulkUpload']);
+Route::get('/fees/statement-of-account', [FeeManagementController::class, 'statementOfAccount'])->name('school.fees.statement-of-account');
+Route::get('/fees/xero-integration', [FeeManagementController::class, 'xeroIntegration'])->name('school.fees.xero-integration');
+Route::post('/fees/xero-integration', [FeeManagementController::class, 'xeroIntegration']);
+
+// I Card / Bus Pass / Admit Card Routes
+Route::get('/cards/template-creator', [CardManagementController::class, 'templateCreator'])->name('school.cards.template-creator');
+Route::post('/cards/template-creator', [CardManagementController::class, 'templateCreator']);
+Route::get('/cards/generate-card', [CardManagementController::class, 'generateCard'])->name('school.cards.generate-card');
+Route::post('/cards/generate-card', [CardManagementController::class, 'generateCard']);
+
+// Digital Diary Routes
+Route::get('/diary/create', [DigitalDiaryController::class, 'createDiary'])->name('school.diary.create');
+Route::post('/diary/create', [DigitalDiaryController::class, 'createDiary']);
+Route::get('/diary/report', [DigitalDiaryController::class, 'diaryReport'])->name('school.diary.report');
+
+// Event & Holiday Management Routes
+Route::get('/events', [EventHolidayController::class, 'eventManagement'])->name('school.events.index');
+Route::post('/events', [EventHolidayController::class, 'eventManagement']);
+
+// Certificate Management Routes
+Route::get('/certificates/template-creator', [CertificateManagementController::class, 'templateCreator'])->name('school.certificates.template-creator');
+Route::post('/certificates/template-creator', [CertificateManagementController::class, 'templateCreator']);
+Route::get('/certificates/manage', [CertificateManagementController::class, 'manageCertificates'])->name('school.certificates.manage');
+Route::post('/certificates/manage', [CertificateManagementController::class, 'manageCertificates']);
+Route::get('/certificates/class-wise', [CertificateManagementController::class, 'classWiseStudentCertificate'])->name('school.certificates.class-wise');
+Route::get('/certificates/report', [CertificateManagementController::class, 'certificatesReport'])->name('school.certificates.report');
+
+
 

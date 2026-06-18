@@ -3,7 +3,7 @@
         <thead>
             <tr>
                 <th style="width: 15%;">Roll No</th>
-                <th style="width: 15%;">Admission No</th>
+                <th style="width: 15%;">Admission ID</th>
                 <th style="width: 25%;">Student Name</th>
                 <th style="width: 30%; text-align: center;">Attendance Status</th>
                 <th style="width: 15%;">Remark / Note</th>

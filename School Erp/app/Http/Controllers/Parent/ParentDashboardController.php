@@ -104,6 +104,46 @@ class ParentDashboardController extends Controller
             ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
             : collect();
 
+        // Database-driven timetable with mock fallback
+        $dayOfWeek = now()->format('l'); // Monday, Tuesday, etc.
+        $dbTimetable = collect();
+        if ($student) {
+            $dbTimetable = \App\Models\Timetable::where('class_id', $student->class_id)
+                ->where('section_id', $student->section_id)
+                ->where('day_of_week', $dayOfWeek)
+                ->with(['subject', 'teacher'])
+                ->get();
+        }
+
+        $timetable = [];
+        if ($dbTimetable->isNotEmpty()) {
+            $colors = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#f97316', '#ec4899'];
+            foreach ($dbTimetable as $index => $slot) {
+                // Check if there is a substitution for this slot on this date
+                $substitute = \App\Models\TimetableSubstitution::where('timetable_id', $slot->id)
+                    ->whereDate('date', today())
+                    ->with('substituteTeacher.user')
+                    ->first();
+                
+                $teacherName = $substitute ? ($substitute->substituteTeacher->user->name . ' (Sub)') : ($slot->teacher ? $slot->teacher->user->name : 'N/A');
+                $timetable[] = [
+                    'time' => $slot->start_time,
+                    'subject' => $slot->subject ? $slot->subject->name : 'N/A',
+                    'teacher' => $teacherName,
+                    'color' => $colors[$index % count($colors)]
+                ];
+            }
+        } else {
+            $timetable = [
+                ['time'=>'9:00 AM','subject'=>'Mathematics','teacher'=>'Mr. Kapoor','color'=>'#3b82f6'],
+                ['time'=>'10:00 AM','subject'=>'Physics','teacher'=>'Ms. Sharma','color'=>'#8b5cf6'],
+                ['time'=>'11:00 AM','subject'=>'Chemistry','teacher'=>'Mr. Verma','color'=>'#10b981'],
+                ['time'=>'12:00 PM','subject'=>'Lunch Break','teacher'=>'—','color'=>'#f59e0b'],
+                ['time'=>'1:00 PM','subject'=>'English','teacher'=>'Ms. Patel','color'=>'#ef4444'],
+                ['time'=>'2:00 PM','subject'=>'History','teacher'=>'Mr. Singh','color'=>'#f97316'],
+            ];
+        }
+
         return view('parent.dashboard', compact(
             'user',
             'student',
@@ -126,7 +166,8 @@ class ParentDashboardController extends Controller
             'presentSparkline',
             'absentSparkline',
             'lateSparkline',
-            'documents'
+            'documents',
+            'timetable'
         ));
     }
 
@@ -150,6 +191,7 @@ class ParentDashboardController extends Controller
         $school = $user->school;
         $classDisplay   = optional($student?->class)->name ?? 'N/A';
         $sectionDisplay = optional($student?->section)->name ?? 'N/A';
+        $sessionDisplay = optional($student?->academicSession)->name ?? 'N/A';
 
         $documents = $student
             ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
@@ -158,7 +200,7 @@ class ParentDashboardController extends Controller
         $stuName = $student ? $student->full_name : $user->name;
         $stuInitials = strtoupper(substr($stuName,0,1).(str_contains($stuName,' ') ? substr($stuName,strrpos($stuName,' ')+1,1) : ''));
 
-        return view('parent.documents', compact('user', 'student', 'school', 'documents', 'classDisplay', 'sectionDisplay', 'stuName', 'stuInitials'));
+        return view('parent.documents', compact('user', 'student', 'school', 'documents', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials'));
     }
 
     public function downloadDocument(\Illuminate\Http\Request $request, \App\Models\StudentDocument $document)
@@ -247,5 +289,146 @@ class ParentDashboardController extends Controller
                 fpassthru($fileStream);
             }, 200, $headers);
         }
+    }
+
+    public function diary()
+    {
+        $user = auth()->user();
+        $student = Student::where('school_id', $user->school_id)
+            ->where(function ($q) use ($user) {
+                $q->where('guardian_email', $user->email)
+                  ->orWhere('user_id', $user->id);
+            })
+            ->with(['class', 'section', 'academicSession', 'school'])
+            ->first();
+
+        if (!$student) {
+            $student = Student::where('school_id', $user->school_id)->first();
+        }
+
+        $school = $user->school;
+        $classDisplay   = optional($student?->class)->name ?? 'N/A';
+        $sectionDisplay = optional($student?->section)->name ?? 'N/A';
+        $sessionDisplay = optional($student?->academicSession)->name ?? 'N/A';
+        $stuName = $student ? $student->full_name : $user->name;
+        $stuInitials = strtoupper(substr($stuName,0,1).(str_contains($stuName,' ') ? substr($stuName,strrpos($stuName,' ')+1,1) : ''));
+
+        $diaries = $student
+            ? \App\Models\DigitalDiary::where('class_id', $student->class_id)
+                ->where('section_id', $student->section_id)
+                ->with('teacher')
+                ->orderBy('diary_date', 'desc')
+                ->get()
+            : collect();
+
+        $documents = $student
+            ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
+            : collect();
+
+        return view('parent.diary', compact('user', 'student', 'school', 'diaries', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials', 'documents'));
+    }
+
+    public function events()
+    {
+        $user = auth()->user();
+        $student = Student::where('school_id', $user->school_id)
+            ->where(function ($q) use ($user) {
+                $q->where('guardian_email', $user->email)
+                  ->orWhere('user_id', $user->id);
+            })
+            ->with(['class', 'section', 'academicSession', 'school'])
+            ->first();
+
+        if (!$student) {
+            $student = Student::where('school_id', $user->school_id)->first();
+        }
+
+        $school = $user->school;
+        $classDisplay   = optional($student?->class)->name ?? 'N/A';
+        $sectionDisplay = optional($student?->section)->name ?? 'N/A';
+        $sessionDisplay = optional($student?->academicSession)->name ?? 'N/A';
+        $stuName = $student ? $student->full_name : $user->name;
+        $stuInitials = strtoupper(substr($stuName,0,1).(str_contains($stuName,' ') ? substr($stuName,strrpos($stuName,' ')+1,1) : ''));
+
+        $events = \App\Models\Event::where('school_id', $user->school_id)
+            ->orderBy('start_date', 'asc')
+            ->get();
+
+        $documents = $student
+            ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
+            : collect();
+
+        return view('parent.events', compact('user', 'student', 'school', 'events', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials', 'documents'));
+    }
+
+    public function cards()
+    {
+        $user = auth()->user();
+        $student = Student::where('school_id', $user->school_id)
+            ->where(function ($q) use ($user) {
+                $q->where('guardian_email', $user->email)
+                  ->orWhere('user_id', $user->id);
+            })
+            ->with(['class', 'section', 'academicSession', 'school'])
+            ->first();
+
+        if (!$student) {
+            $student = Student::where('school_id', $user->school_id)->first();
+        }
+
+        $school = $user->school;
+        $classDisplay   = optional($student?->class)->name ?? 'N/A';
+        $sectionDisplay = optional($student?->section)->name ?? 'N/A';
+        $sessionDisplay = optional($student?->academicSession)->name ?? 'N/A';
+        $stuName = $student ? $student->full_name : $user->name;
+        $stuInitials = strtoupper(substr($stuName,0,1).(str_contains($stuName,' ') ? substr($stuName,strrpos($stuName,' ')+1,1) : ''));
+
+        $cards = $student
+            ? \App\Models\StudentCard::where('student_id', $student->id)
+                ->where('status', 'active')
+                ->with('template')
+                ->get()
+            : collect();
+
+        $documents = $student
+            ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
+            : collect();
+
+        return view('parent.cards', compact('user', 'student', 'school', 'cards', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials', 'documents'));
+    }
+
+    public function certificates()
+    {
+        $user = auth()->user();
+        $student = Student::where('school_id', $user->school_id)
+            ->where(function ($q) use ($user) {
+                $q->where('guardian_email', $user->email)
+                  ->orWhere('user_id', $user->id);
+            })
+            ->with(['class', 'section', 'academicSession', 'school'])
+            ->first();
+
+        if (!$student) {
+            $student = Student::where('school_id', $user->school_id)->first();
+        }
+
+        $school = $user->school;
+        $classDisplay   = optional($student?->class)->name ?? 'N/A';
+        $sectionDisplay = optional($student?->section)->name ?? 'N/A';
+        $sessionDisplay = optional($student?->academicSession)->name ?? 'N/A';
+        $stuName = $student ? $student->full_name : $user->name;
+        $stuInitials = strtoupper(substr($stuName,0,1).(str_contains($stuName,' ') ? substr($stuName,strrpos($stuName,' ')+1,1) : ''));
+
+        $certificates = $student
+            ? \App\Models\StudentCertificate::where('student_id', $student->id)
+                ->with('template')
+                ->get()
+            : collect();
+
+        $documents = $student
+            ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
+            : collect();
+
+        return view('parent.certificates', compact('user', 'student', 'school', 'certificates', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials', 'documents'));
     }
 }

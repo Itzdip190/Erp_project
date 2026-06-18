@@ -296,14 +296,20 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
                     </a>
                 </li>
                 <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Academics</span>
+                    <a href="{{ route('parent.diary.index') }}">
+                        <span class="sb-submenu-label">Digital Diary</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
                 <li>
-                    <a href="#">
+                    <a href="{{ route('parent.dashboard') }}#timetable">
                         <span class="sb-submenu-label">Timetable</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ route('parent.cards.index') }}">
+                        <span class="sb-submenu-label">ID Cards & Passes</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
@@ -327,14 +333,8 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
                     </a>
                 </li>
                 <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Exams</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Reports</span>
+                    <a href="{{ route('parent.certificates.index') }}">
+                        <span class="sb-submenu-label">My Certificates</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
@@ -371,20 +371,8 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
             </div>
             <ul class="sb-submenu">
                 <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Notices</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">Messages</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
-                <li>
-                    <a href="#">
-                        <span class="sb-submenu-label">AI Assistant</span>
+                    <a href="{{ route('parent.events.index') }}">
+                        <span class="sb-submenu-label">Events & Calendar</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>

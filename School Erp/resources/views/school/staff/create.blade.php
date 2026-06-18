@@ -30,10 +30,14 @@
                 </div>
             </div>
 
-            <div class="grid-3">
+            <div class="grid-4">
                 <div class="form-group">
                     <label class="form-label">Email <span style="color:var(--red);">*</span></label>
                     <input type="email" name="email" class="form-control" value="{{ old('email') }}" required placeholder="User login email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="password" class="form-control" placeholder="Default: Welcome@2026!">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Phone</label>

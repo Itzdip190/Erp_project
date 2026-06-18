@@ -82,6 +82,7 @@ class StaffController extends Controller
             'last_name'      => 'required|string|max:100',
             'email'          => 'required|email|unique:users,email',
             'phone'          => 'nullable|string|max:20',
+            'password'       => 'nullable|string|min:6',
             'department_id'  => 'required|exists:departments,id',
             'designation_id' => 'required|exists:designations,id',
             'joining_date'   => 'required|date',
@@ -96,7 +97,7 @@ class StaffController extends Controller
             'name'      => trim($request->first_name . ' ' . $request->last_name),
             'email'     => $request->email,
             'phone'     => $request->phone,
-            'password'  => Hash::make('Welcome@2026!'),
+            'password'  => Hash::make($request->password ?: 'Welcome@2026!'),
             'school_id' => $schoolId,
             'is_active' => $request->is_active,
         ]);
@@ -160,6 +161,7 @@ class StaffController extends Controller
             'last_name'      => 'required|string|max:100',
             'email'          => 'required|email|unique:users,email,' . $staff->user_id,
             'phone'          => 'nullable|string|max:20',
+            'password'       => 'nullable|string|min:6',
             'department_id'  => 'required|exists:departments,id',
             'designation_id' => 'required|exists:designations,id',
             'joining_date'   => 'required|date',
@@ -175,6 +177,9 @@ class StaffController extends Controller
             $user->email = $request->email;
             $user->phone = $request->phone;
             $user->is_active = $request->is_active;
+            if ($request->filled('password')) {
+                $user->password = Hash::make($request->password);
+            }
             $user->save();
 
             // Re-sync Spatie Role based on Designation

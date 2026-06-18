@@ -36,7 +36,7 @@
         <table class="custom-table">
             <thead>
                 <tr>
-                    <th>Admission No</th>
+                    <th>Admission ID</th>
                     <th>Student Name</th>
                     <th>Class / Section</th>
                     <th>Guardian Name</th>

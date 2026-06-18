@@ -80,7 +80,7 @@
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
                     <label class="form-label">Search</label>
-                    <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="Name or admission no…">
+                    <input type="text" name="search" class="form-control" value="{{ request('search') }}" placeholder="Name or Admission ID…">
                 </div>
             </div>
             <div style="margin-top:14px;text-align:right;">
@@ -112,7 +112,7 @@
                 <thead>
                     <tr>
                         <th style="width:40px;text-align:center;"><input type="checkbox" id="bulkSelectAll"></th>
-                        <th>Admission No</th>
+                        <th>Admission ID</th>
                         <th>Roll No</th>
                         <th>Full Name</th>
                         <th>Class</th>

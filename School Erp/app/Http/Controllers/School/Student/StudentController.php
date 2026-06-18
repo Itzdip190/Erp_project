@@ -118,14 +118,30 @@ class StudentController extends Controller
         $data['school_id'] = $schoolId;
 
         $student = DB::transaction(function () use ($schoolId, $data) {
-            $userId = null;
+            // 1. Create student user account
+            $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
+            $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
+            $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['admission_number']));
+            $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
+
+            $studentUser = User::create([
+                'school_id' => $schoolId,
+                'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+                'email' => $studentEmail,
+                'phone' => $data['guardian_phone'] ?? null,
+                'password' => Hash::make('Student@2026!'), // Default password
+                'is_active' => true,
+            ]);
+            $studentUser->assignRole('student');
+
+            // 2. Create parent user account if guardian email is provided
             if (!empty($data['guardian_email'])) {
-                $user = User::where('email', $data['guardian_email'])
+                $parentUser = User::where('email', $data['guardian_email'])
                     ->where('school_id', $schoolId)
                     ->first();
 
-                if (!$user) {
-                    $user = User::create([
+                if (!$parentUser) {
+                    $parentUser = User::create([
                         'school_id' => $schoolId,
                         'name' => $data['guardian_name'],
                         'email' => $data['guardian_email'],
@@ -133,12 +149,11 @@ class StudentController extends Controller
                         'password' => Hash::make('schoolcloud123'),
                         'is_active' => true,
                     ]);
-                    $user->assignRole('parent');
+                    $parentUser->assignRole('parent');
                 }
-                $userId = $user->id;
             }
 
-            $data['user_id'] = $userId;
+            $data['user_id'] = $studentUser->id;
             $student = Student::create($data);
 
             StudentSession::create([
@@ -191,14 +206,40 @@ class StudentController extends Controller
             $data['photo'] = $request->file('photo')->store('students/photos', config('filesystems.default'));
         }
 
-        DB::transaction(function () use ($schoolId, $student, $data) {
+        DB::transaction(function () use ($schoolId, $student, &$data) {
+            // 1. Manage student user account
+            $studentUser = $student->user;
+            if (!$studentUser || !$studentUser->hasRole('student')) {
+                $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
+                $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
+                $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->admission_number));
+                $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
+
+                $studentUser = User::create([
+                    'school_id' => $schoolId,
+                    'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+                    'email' => $studentEmail,
+                    'phone' => $data['guardian_phone'] ?? null,
+                    'password' => Hash::make('Student@2026!'),
+                    'is_active' => true,
+                ]);
+                $studentUser->assignRole('student');
+                $data['user_id'] = $studentUser->id;
+            } else {
+                $studentUser->update([
+                    'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+                    'phone' => $data['guardian_phone'] ?? null,
+                ]);
+            }
+
+            // 2. Manage parent user account
             if (!empty($data['guardian_email'])) {
-                $user = User::where('email', $data['guardian_email'])
+                $parentUser = User::where('email', $data['guardian_email'])
                     ->where('school_id', $schoolId)
                     ->first();
 
-                if (!$user) {
-                    $user = User::create([
+                if (!$parentUser) {
+                    $parentUser = User::create([
                         'school_id' => $schoolId,
                         'name' => $data['guardian_name'],
                         'email' => $data['guardian_email'],
@@ -206,12 +247,7 @@ class StudentController extends Controller
                         'password' => Hash::make('schoolcloud123'),
                         'is_active' => true,
                     ]);
-                    $user->assignRole('parent');
-                }
-                
-                // If student has no user account, associate with the parent account
-                if (empty($student->user_id)) {
-                    $data['user_id'] = $user->id;
+                    $parentUser->assignRole('parent');
                 }
             }
 
