@@ -15,3 +15,22 @@ Route::get('/diary',              [ParentDashboardController::class, 'diary'])->
 Route::get('/events',             [ParentDashboardController::class, 'events'])->name('parent.events.index');
 Route::get('/cards',              [ParentDashboardController::class, 'cards'])->name('parent.cards.index');
 Route::get('/certificates',       [ParentDashboardController::class, 'certificates'])->name('parent.certificates.index');
+
+// Leaves
+Route::get('/leaves',             [ParentDashboardController::class, 'leaves'])->name('parent.leaves.index');
+Route::post('/leaves/store',      [ParentDashboardController::class, 'storeLeave'])->name('parent.leaves.store');
+
+// Exams
+Route::get('/exams',              [ParentDashboardController::class, 'exams'])->name('parent.exams.index');
+
+// Notices
+Route::get('/notices',            [ParentDashboardController::class, 'notices'])->name('parent.notices.index');
+
+// Surveys
+Route::get('/surveys',            [ParentDashboardController::class, 'surveys'])->name('parent.surveys.index');
+Route::post('/surveys/{survey}/vote', [ParentDashboardController::class, 'voteSurvey'])->name('parent.surveys.vote');
+
+// Chat
+Route::get('/chat',               [ParentDashboardController::class, 'chat'])->name('parent.chat.index');
+Route::post('/chat/send',         [ParentDashboardController::class, 'sendChatMessage'])->name('parent.chat.send');
+

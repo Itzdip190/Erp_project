@@ -38,6 +38,13 @@ Artisan::command('test:endpoints', function () {
                 '/school/certificates/manage',
                 '/school/certificates/class-wise',
                 '/school/certificates/report',
+                '/school/downloads/student-status',
+                '/school/downloads/staff-status',
+                '/school/downloads/parent-status',
+                '/school/downloads/student-activity',
+                '/school/downloads/staff-activity',
+                '/school/downloads/parent-activity',
+                '/school/attendance/students/report',
             ]
         ],
         [

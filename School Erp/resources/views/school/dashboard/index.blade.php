@@ -959,39 +959,39 @@ $monthShort = Carbon::create($year,$month)->format('M');
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
             <ul class="sb-submenu">
-                <li class="{{ request()->is('school/downloads/status*') ? 'active' : '' }}">
-                    <a href="{{ route('school.downloads.status') }}">
-                        <span class="sb-submenu-label">Download Status</span>
+                <li class="{{ request()->is('school/downloads/student-status*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.student-status') }}">
+                        <span class="sb-submenu-label">Student Download Status</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/downloads/activity*') ? 'active' : '' }}">
-                    <a href="{{ route('school.downloads.activity') }}">
-                        <span class="sb-submenu-label">User Session Activity</span>
+                <li class="{{ request()->is('school/downloads/staff-status*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.staff-status') }}">
+                        <span class="sb-submenu-label">Staff Download Status</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/students/export*') ? 'active' : '' }}">
-                    <a href="{{ route('school.students.export') }}">
-                        <span class="sb-submenu-label">Student Directory Export</span>
+                <li class="{{ request()->is('school/downloads/parent-status*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.parent-status') }}">
+                        <span class="sb-submenu-label">Parent Download Status</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li>
-                    <a href="#" onclick="event.preventDefault(); showComingSoon('Staff Directory Export');">
-                        <span class="sb-submenu-label">Staff Directory Export</span>
+                <li class="{{ request()->is('school/downloads/student-activity*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.student-activity') }}">
+                        <span class="sb-submenu-label">Student Activity</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li>
-                    <a href="#" onclick="event.preventDefault(); showComingSoon('Daily Attendance Export');">
-                        <span class="sb-submenu-label">Daily Attendance Export</span>
+                <li class="{{ request()->is('school/downloads/staff-activity*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.staff-activity') }}">
+                        <span class="sb-submenu-label">Staff Activity</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li>
-                    <a href="#" onclick="event.preventDefault(); showComingSoon('Security Audit Export');">
-                        <span class="sb-submenu-label">Security Audit Export</span>
+                <li class="{{ request()->is('school/downloads/parent-activity*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.parent-activity') }}">
+                        <span class="sb-submenu-label">Parent Activity</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>

@@ -35,9 +35,13 @@ class FeeManagementController extends Controller
             }
         }
 
-        $tuitionCat = FeeCategory::where('school_id', $schoolId)->where('name', 'Tuition Fee')->first();
-        $transportCat = FeeCategory::where('school_id', $schoolId)->where('name', 'Transport Fee')->first();
-        $examCat = FeeCategory::where('school_id', $schoolId)->where('name', 'Examination Fee')->first();
+        $tuitionCat = FeeCategory::where('school_id', $schoolId)->where('name', 'Tuition Fee')->first() 
+            ?? FeeCategory::create(['school_id' => $schoolId, 'name' => 'Tuition Fee', 'description' => 'Regular monthly course fee.']);
+        $transportCat = FeeCategory::where('school_id', $schoolId)->where('name', 'Transport Fee')->first()
+            ?? FeeCategory::create(['school_id' => $schoolId, 'name' => 'Transport Fee', 'description' => 'School bus fare based on distance.']);
+        $examCat = FeeCategory::where('school_id', $schoolId)->where('name', 'Examination Fee')->first()
+            ?? FeeCategory::create(['school_id' => $schoolId, 'name' => 'Examination Fee', 'description' => 'Term end assessments & print fee.']);
+
 
         // 2. Seed Fee Structures Class-wise
         if (FeeStructure::where('school_id', $schoolId)->count() === 0) {
@@ -458,7 +462,7 @@ class FeeManagementController extends Controller
             ->groupBy('payment_mode')
             ->get();
 
-        $collectionByClass = FeeReceipt::where('school_id', $schoolId)
+        $collectionByClass = FeeReceipt::where('fee_receipts.school_id', $schoolId)
             ->join('students', 'fee_receipts.student_id', '=', 'students.id')
             ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
             ->selectRaw('school_classes.name as class_name, SUM(amount_paid) as total')

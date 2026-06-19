@@ -160,8 +160,17 @@ Route::get('/student-mgmt/cca', [StudentManagementController::class, 'cca'])->na
 Route::post('/student-mgmt/cca', [StudentManagementController::class, 'saveCca']);
 
 // Download Statistics Routes
-Route::get('/downloads/status', [DownloadStatisticsController::class, 'downloadStatus'])->name('school.downloads.status');
-Route::get('/downloads/activity', [DownloadStatisticsController::class, 'userActivity'])->name('school.downloads.activity');
+Route::get('/downloads/student-status', [DownloadStatisticsController::class, 'studentDownloadStatus'])->name('school.downloads.student-status');
+Route::get('/downloads/staff-status', [DownloadStatisticsController::class, 'staffDownloadStatus'])->name('school.downloads.staff-status');
+Route::get('/downloads/parent-status', [DownloadStatisticsController::class, 'parentDownloadStatus'])->name('school.downloads.parent-status');
+Route::get('/downloads/student-activity', [DownloadStatisticsController::class, 'studentActivity'])->name('school.downloads.student-activity');
+Route::get('/downloads/staff-activity', [DownloadStatisticsController::class, 'staffActivity'])->name('school.downloads.staff-activity');
+Route::get('/downloads/parent-activity', [DownloadStatisticsController::class, 'parentActivity'])->name('school.downloads.parent-activity');
+
+// Legacy compatibility
+Route::get('/downloads/status', function() { return redirect()->route('school.downloads.student-status'); })->name('school.downloads.status');
+Route::get('/downloads/activity', function() { return redirect()->route('school.downloads.student-activity'); })->name('school.downloads.activity');
+
 
 // Fee Management Routes
 Route::get('/fees/configuration', [FeeManagementController::class, 'feeConfiguration'])->name('school.fees.configuration');
@@ -215,6 +224,45 @@ Route::get('/certificates/manage', [CertificateManagementController::class, 'man
 Route::post('/certificates/manage', [CertificateManagementController::class, 'manageCertificates']);
 Route::get('/certificates/class-wise', [CertificateManagementController::class, 'classWiseStudentCertificate'])->name('school.certificates.class-wise');
 Route::get('/certificates/report', [CertificateManagementController::class, 'certificatesReport'])->name('school.certificates.report');
+
+// Leave Management
+Route::match(['get', 'post'], '/leave/basics', [App\Http\Controllers\School\LeaveManagementController::class, 'basics'])->name('school.leave.basics');
+Route::match(['get', 'post'], '/leave/staff', [App\Http\Controllers\School\LeaveManagementController::class, 'staff'])->name('school.leave.staff');
+Route::match(['get', 'post'], '/leave/student', [App\Http\Controllers\School\LeaveManagementController::class, 'student'])->name('school.leave.student');
+
+// Communication
+Route::match(['get', 'post'], '/communication/settings', [App\Http\Controllers\School\CommunicationController::class, 'settings'])->name('school.communication.settings');
+Route::match(['get', 'post'], '/communication/notice', [App\Http\Controllers\School\CommunicationController::class, 'notice'])->name('school.communication.notice');
+Route::match(['get', 'post'], '/communication/survey', [App\Http\Controllers\School\CommunicationController::class, 'survey'])->name('school.communication.survey');
+Route::match(['get', 'post'], '/communication/sms', [App\Http\Controllers\School\CommunicationController::class, 'sms'])->name('school.communication.sms');
+Route::match(['get', 'post'], '/communication/sms-template', [App\Http\Controllers\School\CommunicationController::class, 'smsTemplate'])->name('school.communication.sms-template');
+Route::match(['get', 'post'], '/communication/whatsapp', [App\Http\Controllers\School\CommunicationController::class, 'whatsapp'])->name('school.communication.whatsapp');
+Route::match(['get', 'post'], '/communication/email', [App\Http\Controllers\School\CommunicationController::class, 'email'])->name('school.communication.email');
+Route::match(['get', 'post'], '/communication/chat', [App\Http\Controllers\School\CommunicationController::class, 'chat'])->name('school.communication.chat');
+
+// Examination
+Route::match(['get', 'post'], '/examination/grade-scale', [App\Http\Controllers\School\ExaminationController::class, 'gradeScale'])->name('school.examination.grade-scale');
+Route::match(['get', 'post'], '/examination/marks-entry', [App\Http\Controllers\School\ExaminationController::class, 'marksEntry'])->name('school.examination.marks-entry');
+Route::match(['get', 'post'], '/examination/offline-tests', [App\Http\Controllers\School\ExaminationController::class, 'offlineTests'])->name('school.examination.offline-tests');
+Route::match(['get', 'post'], '/examination/lms-tests', [App\Http\Controllers\School\ExaminationController::class, 'lmsTests'])->name('school.examination.lms-tests');
+Route::match(['get', 'post'], '/examination/report-card-template', [App\Http\Controllers\School\ExaminationController::class, 'reportCardTemplate'])->name('school.examination.report-card-template');
+Route::match(['get', 'post'], '/examination/report-card', [App\Http\Controllers\School\ExaminationController::class, 'reportCard'])->name('school.examination.report-card');
+Route::match(['get', 'post'], '/examination/report-card-v2', [App\Http\Controllers\School\ExaminationController::class, 'reportCardV2'])->name('school.examination.report-card-v2');
+Route::match(['get', 'post'], '/examination/marksheets-report', [App\Http\Controllers\School\ExaminationController::class, 'marksheetsReport'])->name('school.examination.marksheets-report');
+Route::match(['get', 'post'], '/examination/reports', [App\Http\Controllers\School\ExaminationController::class, 'reports'])->name('school.examination.reports');
+
+// Admissions
+Route::match(['get', 'post'], '/admissions/process', [App\Http\Controllers\School\AdmissionsController::class, 'process'])->name('school.admissions.process');
+Route::match(['get', 'post'], '/admissions/settings', [App\Http\Controllers\School\AdmissionsController::class, 'settings'])->name('school.admissions.settings');
+Route::match(['get', 'post'], '/admissions/enquiry-leads', [App\Http\Controllers\School\AdmissionsController::class, 'enquiryLeads'])->name('school.admissions.enquiry-leads');
+Route::match(['get', 'post'], '/admissions/application-payment', [App\Http\Controllers\School\AdmissionsController::class, 'applicationPayment'])->name('school.admissions.application-payment');
+Route::match(['get', 'post'], '/admissions/pending-documents', [App\Http\Controllers\School\AdmissionsController::class, 'pendingDocuments'])->name('school.admissions.pending-documents');
+Route::match(['get', 'post'], '/admissions/interaction-evaluation', [App\Http\Controllers\School\AdmissionsController::class, 'interactionEvaluation'])->name('school.admissions.interaction-evaluation');
+Route::match(['get', 'post'], '/admissions/admission', [App\Http\Controllers\School\AdmissionsController::class, 'admission'])->name('school.admissions.admission');
+Route::match(['get', 'post'], '/admissions/new-admission-report', [App\Http\Controllers\School\AdmissionsController::class, 'newAdmissionReport'])->name('school.admissions.new-admission-report');
+Route::match(['get', 'post'], '/admissions/daily-planner', [App\Http\Controllers\School\AdmissionsController::class, 'dailyPlanner'])->name('school.admissions.daily-planner');
+Route::match(['get', 'post'], '/admissions/dashboard', [App\Http\Controllers\School\AdmissionsController::class, 'dashboard'])->name('school.admissions.dashboard');
+
 
 
 

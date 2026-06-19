@@ -227,6 +227,11 @@ class SchoolCloudErpTest extends TestCase
         $session = AcademicSession::where('school_id', $schoolAdmin->school_id)->first();
         $student = Student::where('school_id', $schoolAdmin->school_id)->first();
 
+        // Delete pre-seeded attendance for today to prevent unique constraint violation on weekdays
+        \App\Models\StudentAttendance::where('student_id', $student->id)
+            ->where('date', date('Y-m-d'))
+            ->delete();
+
         $response = $this->actingAs($schoolAdmin)
             ->withHeaders(['X-School-Code' => 'YIS2024'])
             ->post('/school/attendance/students', [

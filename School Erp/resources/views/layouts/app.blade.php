@@ -751,39 +751,39 @@ table.tbl tr:last-child td{border-bottom:none;}
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
             <ul class="sb-submenu">
-                <li class="{{ request()->is('school/downloads/status*') ? 'active' : '' }}">
-                    <a href="{{ route('school.downloads.status') }}">
-                        <span class="sb-submenu-label">Download Status</span>
+                <li class="{{ request()->is('school/downloads/student-status*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.student-status') }}">
+                        <span class="sb-submenu-label">Student Download Status</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/downloads/activity*') ? 'active' : '' }}">
-                    <a href="{{ route('school.downloads.activity') }}">
-                        <span class="sb-submenu-label">User Session Activity</span>
+                <li class="{{ request()->is('school/downloads/staff-status*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.staff-status') }}">
+                        <span class="sb-submenu-label">Staff Download Status</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/students/export*') ? 'active' : '' }}">
-                    <a href="{{ route('school.students.export') }}">
-                        <span class="sb-submenu-label">Student Directory Export</span>
+                <li class="{{ request()->is('school/downloads/parent-status*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.parent-status') }}">
+                        <span class="sb-submenu-label">Parent Download Status</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li>
-                    <a href="#" onclick="event.preventDefault(); showToast('Exporting Staff Directory...');">
-                        <span class="sb-submenu-label">Staff Directory Export</span>
+                <li class="{{ request()->is('school/downloads/student-activity*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.student-activity') }}">
+                        <span class="sb-submenu-label">Student Activity</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li>
-                    <a href="#" onclick="event.preventDefault(); showToast('Exporting Daily Attendance logs...');">
-                        <span class="sb-submenu-label">Daily Attendance Export</span>
+                <li class="{{ request()->is('school/downloads/staff-activity*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.staff-activity') }}">
+                        <span class="sb-submenu-label">Staff Activity</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li>
-                    <a href="#" onclick="event.preventDefault(); showToast('Exporting Security Audit telemetry...');">
-                        <span class="sb-submenu-label">Security Audit Export</span>
+                <li class="{{ request()->is('school/downloads/parent-activity*') ? 'active' : '' }}">
+                    <a href="{{ route('school.downloads.parent-activity') }}">
+                        <span class="sb-submenu-label">Parent Activity</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
@@ -1005,6 +1005,238 @@ table.tbl tr:last-child td{border-bottom:none;}
                 <li class="{{ request()->is('school/certificates/report*') ? 'active' : '' }}">
                     <a href="{{ route('school.certificates.report') }}">
                         <span class="sb-submenu-label">Certificates Report</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 17. Leave Management -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-sign-out-alt"></i></div>
+                    <span class="sb-hdr-title">17. Leave Management</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li class="{{ request()->is('school/leave/basics*') ? 'active' : '' }}">
+                    <a href="{{ route('school.leave.basics') }}">
+                        <span class="sb-submenu-label">Leave Basics</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/leave/staff*') ? 'active' : '' }}">
+                    <a href="{{ route('school.leave.staff') }}">
+                        <span class="sb-submenu-label">Staff Leave</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/leave/student*') ? 'active' : '' }}">
+                    <a href="{{ route('school.leave.student') }}">
+                        <span class="sb-submenu-label">Student Leave</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 18. Communication -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-comments"></i></div>
+                    <span class="sb-hdr-title">18. Communication</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li class="{{ request()->is('school/communication/settings*') ? 'active' : '' }}">
+                    <a href="{{ route('school.communication.settings') }}">
+                        <span class="sb-submenu-label">Notification settings</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/communication/notice*') ? 'active' : '' }}">
+                    <a href="{{ route('school.communication.notice') }}">
+                        <span class="sb-submenu-label">Notice / Circular</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/communication/survey*') ? 'active' : '' }}">
+                    <a href="{{ route('school.communication.survey') }}">
+                        <span class="sb-submenu-label">Survey</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/communication/sms*') ? 'active' : '' }}">
+                    <a href="{{ route('school.communication.sms') }}">
+                        <span class="sb-submenu-label">SMS</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/communication/sms-template*') ? 'active' : '' }}">
+                    <a href="{{ route('school.communication.sms-template') }}">
+                        <span class="sb-submenu-label">SMS Template</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/communication/whatsapp*') ? 'active' : '' }}">
+                    <a href="{{ route('school.communication.whatsapp') }}">
+                        <span class="sb-submenu-label">WhatsApp</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/communication/email*') ? 'active' : '' }}">
+                    <a href="{{ route('school.communication.email') }}">
+                        <span class="sb-submenu-label">E-Mail</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/communication/chat*') ? 'active' : '' }}">
+                    <a href="{{ route('school.communication.chat') }}">
+                        <span class="sb-submenu-label">Chat</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 19. Examination -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-graduation-cap"></i></div>
+                    <span class="sb-hdr-title">19. Examination</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li class="{{ request()->is('school/examination/grade-scale*') ? 'active' : '' }}">
+                    <a href="{{ route('school.examination.grade-scale') }}">
+                        <span class="sb-submenu-label">Grade Scale</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/examination/marks-entry*') ? 'active' : '' }}">
+                    <a href="{{ route('school.examination.marks-entry') }}">
+                        <span class="sb-submenu-label">Marks Entry</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/examination/offline-tests*') ? 'active' : '' }}">
+                    <a href="{{ route('school.examination.offline-tests') }}">
+                        <span class="sb-submenu-label">Offline Tests</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/examination/lms-tests*') ? 'active' : '' }}">
+                    <a href="{{ route('school.examination.lms-tests') }}">
+                        <span class="sb-submenu-label">LMS Linked Tests</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/examination/report-card-template*') ? 'active' : '' }}">
+                    <a href="{{ route('school.examination.report-card-template') }}">
+                        <span class="sb-submenu-label">Report Card Template Creator</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/examination/report-card') ? 'active' : '' }}">
+                    <a href="{{ route('school.examination.report-card') }}">
+                        <span class="sb-submenu-label">Report Card</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/examination/report-card-v2*') ? 'active' : '' }}">
+                    <a href="{{ route('school.examination.report-card-v2') }}">
+                        <span class="sb-submenu-label">Report Card v2</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/examination/marksheets-report*') ? 'active' : '' }}">
+                    <a href="{{ route('school.examination.marksheets-report') }}">
+                        <span class="sb-submenu-label">Marksheets and ORSS Report</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/examination/reports*') ? 'active' : '' }}">
+                    <a href="{{ route('school.examination.reports') }}">
+                        <span class="sb-submenu-label">Reports</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 20. Admissions -->
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon"><i class="fas fa-user-plus"></i></div>
+                    <span class="sb-hdr-title">20. Admissions</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                <li class="{{ request()->is('school/admissions/process*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.process') }}">
+                        <span class="sb-submenu-label">Admission Process</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/admissions/settings*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.settings') }}">
+                        <span class="sb-submenu-label">Admission Settings</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/admissions/enquiry-leads*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.enquiry-leads') }}">
+                        <span class="sb-submenu-label">Enquiry Leads</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/admissions/application-payment*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.application-payment') }}">
+                        <span class="sb-submenu-label">Application & Payment</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/admissions/pending-documents*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.pending-documents') }}">
+                        <span class="sb-submenu-label">Pending Documents</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/admissions/interaction-evaluation*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.interaction-evaluation') }}">
+                        <span class="sb-submenu-label">Interaction and Evaluation</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/admissions/admission*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.admission') }}">
+                        <span class="sb-submenu-label">Admission</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/admissions/new-admission-report*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.new-admission-report') }}">
+                        <span class="sb-submenu-label">New Admission Report</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/admissions/daily-planner*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.daily-planner') }}">
+                        <span class="sb-submenu-label">Daily Planner</span>
+                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/admissions/dashboard*') ? 'active' : '' }}">
+                    <a href="{{ route('school.admissions.dashboard') }}">
+                        <span class="sb-submenu-label">Admission Dashboard</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>

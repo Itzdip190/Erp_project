@@ -171,6 +171,7 @@
             </h3>
             <div class="grid-3">
                 <div class="form-group">
+                    <!-- DEBUG: Classes Count: {{ count($classes) }} - List: {{ json_encode($classes->pluck('name')) }} -->
                     <label class="form-label">Class <span>*</span></label>
                     <select name="class_id" class="form-control" required>
                         <option value="">Select Class</option>
@@ -195,7 +196,7 @@
                     </select>
                 </div>
             </div>
-            <div class="grid-3">
+            <div class="grid-2">
                 <div class="form-group">
                     <label class="form-label">Admission Date <span>*</span></label>
                     <input type="date" name="admission_date" class="form-control" value="{{ old('admission_date', date('Y-m-d')) }}" required>
@@ -203,10 +204,6 @@
                 <div class="form-group">
                     <label class="form-label">Roll Number</label>
                     <input type="text" name="roll_number" class="form-control" value="{{ old('roll_number') }}" placeholder="Auto-generated if blank">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Opening Due Balance ($)</label>
-                    <input type="number" step="0.01" name="opening_due_balance" class="form-control" value="{{ old('opening_due_balance', 0.00) }}">
                 </div>
             </div>
 

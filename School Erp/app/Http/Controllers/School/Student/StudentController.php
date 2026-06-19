@@ -106,6 +106,7 @@ class StudentController extends Controller
     {
         $schoolId = auth()->user()->school_id;
         $data = $request->validated();
+        $data['opening_due_balance'] = $data['opening_due_balance'] ?? 0.00;
 
         if ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('students/photos', config('filesystems.default'));
@@ -198,6 +199,9 @@ class StudentController extends Controller
     {
         $schoolId = auth()->user()->school_id;
         $data = $request->validated();
+        if (array_key_exists('opening_due_balance', $data)) {
+            $data['opening_due_balance'] = $data['opening_due_balance'] ?? 0.00;
+        }
 
         if ($request->hasFile('photo')) {
             if ($student->photo) {

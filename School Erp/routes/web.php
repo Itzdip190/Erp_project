@@ -105,3 +105,27 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout.post');
 Route::get('/subscription-expired', function () {
     return view('errors.subscription-expired');
 })->name('subscription.expired');
+
+Route::get('/db-status', function () {
+    $dbConnection = config('database.default');
+    $dbConfig = config("database.connections.{$dbConnection}");
+    
+    try {
+        $classes = \App\Models\SchoolClass::all();
+        $classCount = $classes->count();
+        $classList = $classes->pluck('name')->toArray();
+        $error = null;
+    } catch (\Exception $e) {
+        $classCount = 0;
+        $classList = [];
+        $error = $e->getMessage();
+    }
+    
+    return [
+        'active_connection' => $dbConnection,
+        'database_details' => $dbConfig,
+        'classes_in_database_count' => $classCount,
+        'classes_list' => $classList,
+        'error' => $error,
+    ];
+});

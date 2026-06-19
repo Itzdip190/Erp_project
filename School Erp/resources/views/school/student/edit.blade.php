@@ -198,7 +198,7 @@
                     </select>
                 </div>
             </div>
-            <div class="grid-3">
+            <div class="grid-2">
                 <div class="form-group">
                     <label class="form-label">Admission Date <span>*</span></label>
                     <input type="date" name="admission_date" class="form-control" value="{{ old('admission_date', $student->admission_date->format('Y-m-d')) }}" required>
@@ -206,10 +206,6 @@
                 <div class="form-group">
                     <label class="form-label">Roll Number</label>
                     <input type="text" name="roll_number" class="form-control" value="{{ old('roll_number', $student->roll_number) }}">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Opening Due Balance ($)</label>
-                    <input type="number" step="0.01" name="opening_due_balance" class="form-control" value="{{ old('opening_due_balance', $student->opening_due_balance) }}">
                 </div>
             </div>
 

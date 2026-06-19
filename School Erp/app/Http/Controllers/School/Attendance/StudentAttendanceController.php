@@ -42,7 +42,7 @@ class StudentAttendanceController extends Controller
             ->get();
 
         $attendances = StudentAttendance::where('section_id', $sectionId)
-            ->where('date', $date)
+            ->whereDate('date', $date)
             ->get()
             ->keyBy('student_id');
 
@@ -68,13 +68,13 @@ class StudentAttendanceController extends Controller
 
         DB::transaction(function () use ($schoolId, $data, $date, $sectionId, $sessionId, $markedBy, $section) {
             foreach ($data['attendance'] as $item) {
-                StudentAttendance::updateOrCreate(
-                    [
-                        'school_id' => $schoolId,
-                        'student_id' => $item['student_id'],
-                        'date' => $date,
-                    ],
-                    [
+                $attendance = StudentAttendance::where('school_id', $schoolId)
+                    ->where('student_id', $item['student_id'])
+                    ->whereDate('date', $date)
+                    ->first();
+
+                if ($attendance) {
+                    $attendance->update([
                         'section_id' => $sectionId,
                         'class_id' => $section->class_id,
                         'academic_session_id' => $sessionId,
@@ -82,8 +82,21 @@ class StudentAttendanceController extends Controller
                         'remark' => $item['remark'] ?? null,
                         'marked_by' => $markedBy,
                         'attendance_type' => 'manual',
-                    ]
-                );
+                    ]);
+                } else {
+                    StudentAttendance::create([
+                        'school_id' => $schoolId,
+                        'student_id' => $item['student_id'],
+                        'date' => $date,
+                        'section_id' => $sectionId,
+                        'class_id' => $section->class_id,
+                        'academic_session_id' => $sessionId,
+                        'status' => $item['status'],
+                        'remark' => $item['remark'] ?? null,
+                        'marked_by' => $markedBy,
+                        'attendance_type' => 'manual',
+                    ]);
+                }
             }
         });
 
@@ -169,9 +182,9 @@ class StudentAttendanceController extends Controller
         foreach ($sections as $section) {
             $studentCount = Student::where('section_id', $section->id)->where('is_active', true)->count();
             
-            $present = StudentAttendance::where('section_id', $section->id)->where('date', $date)->whereIn('status', ['present', 'late'])->count();
-            $absent = StudentAttendance::where('section_id', $section->id)->where('date', $date)->where('status', 'absent')->count();
-            $leave = StudentAttendance::where('section_id', $section->id)->where('date', $date)->where('status', 'leave')->count();
+            $present = StudentAttendance::where('section_id', $section->id)->whereDate('date', $date)->whereIn('status', ['present', 'late'])->count();
+            $absent = StudentAttendance::where('section_id', $section->id)->whereDate('date', $date)->where('status', 'absent')->count();
+            $leave = StudentAttendance::where('section_id', $section->id)->whereDate('date', $date)->where('status', 'leave')->count();
 
             $totalPresent += $present;
             $totalAbsent += $absent;

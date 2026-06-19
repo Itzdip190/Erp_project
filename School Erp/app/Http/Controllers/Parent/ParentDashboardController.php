@@ -125,7 +125,13 @@ class ParentDashboardController extends Controller
                     ->with('substituteTeacher.user')
                     ->first();
                 
-                $teacherName = $substitute ? ($substitute->substituteTeacher->user->name . ' (Sub)') : ($slot->teacher ? $slot->teacher->user->name : 'N/A');
+                $teacherName = 'N/A';
+                if ($substitute && $substitute->substituteTeacher && $substitute->substituteTeacher->user) {
+                    $teacherName = $substitute->substituteTeacher->user->name . ' (Sub)';
+                } elseif ($slot->teacher && $slot->teacher->user) {
+                    $teacherName = $slot->teacher->user->name;
+                }
+                
                 $timetable[] = [
                     'time' => $slot->start_time,
                     'subject' => $slot->subject ? $slot->subject->name : 'N/A',
@@ -431,4 +437,179 @@ class ParentDashboardController extends Controller
 
         return view('parent.certificates', compact('user', 'student', 'school', 'certificates', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials', 'documents'));
     }
+
+    private function getStudentData($user)
+    {
+        $student = Student::where('school_id', $user->school_id)
+            ->where(function ($q) use ($user) {
+                $q->where('guardian_email', $user->email)
+                  ->orWhere('user_id', $user->id);
+            })
+            ->with(['class', 'section', 'academicSession', 'school'])
+            ->first();
+
+        if (!$student) {
+            $student = Student::where('school_id', $user->school_id)->first();
+        }
+
+        $school = $user->school;
+        $classDisplay   = optional($student?->class)->name ?? 'N/A';
+        $sectionDisplay = optional($student?->section)->name ?? 'N/A';
+        $sessionDisplay = optional($student?->academicSession)->name ?? 'N/A';
+        $stuName = $student ? $student->full_name : $user->name;
+        $stuInitials = strtoupper(substr($stuName,0,1).(str_contains($stuName,' ') ? substr($stuName,strrpos($stuName,' ')+1,1) : ''));
+
+        $documents = $student
+            ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
+            : collect();
+
+        return compact('user', 'student', 'school', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials', 'documents');
+    }
+
+    public function leaves()
+    {
+        $data = $this->getStudentData(auth()->user());
+        if ($data['student']) {
+            $leaves = \App\Models\LeaveApplication::where('student_id', $data['student']->id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
+            $leaves = collect();
+        }
+        return view('parent.leaves', array_merge($data, compact('leaves')));
+    }
+
+    public function storeLeave(\Illuminate\Http\Request $request)
+    {
+        $user = auth()->user();
+        $data = $this->getStudentData($user);
+        if (!$data['student']) {
+            return back()->with('error', 'No active student record found.');
+        }
+
+        $request->validate([
+            'from_date' => 'required|date',
+            'to_date' => 'required|date|after_or_equal:from_date',
+            'reason' => 'required|string',
+        ]);
+
+        \App\Models\LeaveApplication::create([
+            'school_id' => $user->school_id,
+            'student_id' => $data['student']->id,
+            'applicant_type' => 'student',
+            'from_date' => $request->from_date,
+            'to_date' => $request->to_date,
+            'reason' => $request->reason,
+            'status' => 'pending',
+        ]);
+
+        return redirect()->back()->with('success', 'Leave application submitted successfully.');
+    }
+
+    public function exams()
+    {
+        $data = $this->getStudentData(auth()->user());
+        if ($data['student']) {
+            $marks = \App\Models\StudentMark::where('student_id', $data['student']->id)
+                ->orderBy('created_at', 'desc')
+                ->get();
+        } else {
+            $marks = collect();
+        }
+        return view('parent.exams', array_merge($data, compact('marks')));
+    }
+
+    public function notices()
+    {
+        $user = auth()->user();
+        $data = $this->getStudentData($user);
+        $notices = \App\Models\Notice::where('school_id', $user->school_id)
+            ->where('status', 'active')
+            ->orderBy('publish_date', 'desc')
+            ->get();
+        return view('parent.notices', array_merge($data, compact('notices')));
+    }
+
+    public function surveys()
+    {
+        $user = auth()->user();
+        $data = $this->getStudentData($user);
+        $surveys = \App\Models\Survey::where('school_id', $user->school_id)
+            ->where('status', 'active')
+            ->with('options')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        foreach ($surveys as $survey) {
+            $survey->has_voted = \App\Models\SurveyResponse::where('survey_id', $survey->id)
+                ->where('user_id', $user->id)
+                ->exists();
+        }
+
+        return view('parent.surveys', array_merge($data, compact('surveys')));
+    }
+
+    public function voteSurvey(\Illuminate\Http\Request $request, \App\Models\Survey $survey)
+    {
+        $user = auth()->user();
+        $request->validate([
+            'option_id' => 'required|exists:survey_options,id',
+        ]);
+
+        $alreadyVoted = \App\Models\SurveyResponse::where('survey_id', $survey->id)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if ($alreadyVoted) {
+            return back()->with('error', 'You have already voted on this survey.');
+        }
+
+        \App\Models\SurveyResponse::create([
+            'survey_id' => $survey->id,
+            'user_id' => $user->id,
+            'option_id' => $request->option_id,
+        ]);
+
+        \App\Models\SurveyOption::where('id', $request->option_id)->increment('votes');
+
+        return back()->with('success', 'Vote registered successfully.');
+    }
+
+    public function chat()
+    {
+        $user = auth()->user();
+        $data = $this->getStudentData($user);
+        
+        $messages = \App\Models\ChatMessage::where('school_id', $user->school_id)
+            ->where(function ($q) use ($user) {
+                $q->where('sender_id', $user->id)->orWhere('receiver_id', $user->id);
+            })
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        $teachers = \App\Models\Staff::where('school_id', $user->school_id)
+            ->with('user')
+            ->get();
+
+        return view('parent.chat', array_merge($data, compact('messages', 'teachers')));
+    }
+
+    public function sendChatMessage(\Illuminate\Http\Request $request)
+    {
+        $user = auth()->user();
+        $request->validate([
+            'receiver_id' => 'required|exists:users,id',
+            'message' => 'required|string',
+        ]);
+
+        \App\Models\ChatMessage::create([
+            'school_id' => $user->school_id,
+            'sender_id' => $user->id,
+            'receiver_id' => $request->receiver_id,
+            'message' => $request->message,
+        ]);
+
+        return back()->with('success', 'Message sent.');
+    }
 }
+
