@@ -1,41 +1,76 @@
 @extends('layouts.app')
 
-@section('title', 'Bulk Staff Import')
 @section('page-title', 'Bulk Staff Import')
 
 @section('content')
-<div class="card" style="max-width:700px; margin:0 auto;">
-    <div class="card-hdr">
-        <h3>Bulk Import Staff from CSV</h3>
+<div class="page-hdr">
+    <div class="page-hdr-left">
+        <h1><i class="fas fa-file-import" style="color:var(--gold);margin-right:8px;"></i>Bulk Staff Import Wizard</h1>
+        <p>Import thousands of staff members and teachers in one click using CSV templates</p>
     </div>
-    <div class="card-body">
-        <p style="font-size:13px; color:var(--t2); margin-bottom:16px;">
-            Download the format template, fill in your staff data, and upload the completed CSV file here.
-        </p>
+    <div class="page-hdr-right">
+        <a href="{{ route('school.staff.index') }}" class="btn btn-outline">
+            <i class="fa fa-arrow-left"></i> Back to List
+        </a>
+    </div>
+</div>
 
-        <!-- Instructions -->
-        <div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; padding:16px; margin-bottom:24px; font-size:12px; line-height:1.6;">
-            <strong>CSV File Format requirements:</strong>
-            <ul style="padding-left:18px; margin-top:8px;">
+<div class="grid-2">
+    <!-- Import Form Card -->
+    <div class="card">
+        <div class="card-hdr">
+            <h3>Upload Spreadsheet</h3>
+        </div>
+        <div class="card-body">
+            @if(session('error'))
+                <div class="alert alert-danger" style="margin-bottom: 16px;">
+                    {{ session('error') }}
+                </div>
+            @endif
+            @if(session('success'))
+                <div class="alert alert-success" style="margin-bottom: 16px;">
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            <p style="color:var(--t2); font-size:13px; line-height:1.6; margin-bottom:20px;">
+                Download the CSV template, populate staff records, and upload it here. The import process will execute and set default login credentials for each staff member.
+            </p>
+            
+            <form method="POST" action="{{ route('school.staff.import.post') }}" enctype="multipart/form-data" style="display:flex; flex-direction:column; gap:16px;">
+                @csrf
+                <div class="form-group">
+                    <label class="form-label">Select CSV File <span style="color:var(--red);">*</span></label>
+                    <input type="file" name="csv_file" class="form-control" accept=".csv" required>
+                </div>
+                
+                <button type="submit" class="btn btn-gold" style="justify-content:center; padding:12px;">
+                    <i class="fas fa-cloud-upload-alt"></i> Upload & Process Import
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Instructions Card -->
+    <div class="card">
+        <div class="card-hdr">
+            <h3>Instructions & Template</h3>
+        </div>
+        <div class="card-body">
+            <h4 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:12px;">Download Blank Template:</h4>
+            <a href="{{ route('school.staff.import-template') }}" class="btn btn-outline" style="margin-bottom:20px;">
+                <i class="fas fa-download"></i> Download CSV Template
+            </a>
+
+            <h4 style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:8px;">Rules & Formats:</h4>
+            <ul style="list-style-type:square; padding-left:16px; font-size:12.5px; color:var(--t2); display:flex; flex-direction:column; gap:8px;">
                 <li>The first row must contain columns exactly as follows: <code>employee_id,first_name,last_name,email,phone</code>.</li>
-                <li><strong>employee_id</strong> must be unique across all staff profiles.</li>
-                <li><strong>email</strong> will be used as the username for portal logins.</li>
-                <li>Temporary passwords will be initialized automatically to <code>Welcome@2026!</code>.</li>
+                <li><strong>employee_id:</strong> Must be unique across all staff profiles.</li>
+                <li><strong>first_name, last_name:</strong> Required text fields.</li>
+                <li><strong>email:</strong> Will be used as the username for portal logins.</li>
+                <li><strong>Temporary Passwords:</strong> Will be initialized automatically to <code>Welcome@2026!</code>.</li>
             </ul>
         </div>
-
-        <form method="POST" action="{{ route('school.staff.import.post') }}" enctype="multipart/form-name">
-            @csrf
-            <div class="form-group">
-                <label class="form-label">Choose CSV File <span style="color:var(--red);">*</span></label>
-                <input type="file" name="csv_file" class="form-control" accept=".csv" required>
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--border); padding-top:16px; margin-top:20px;">
-                <a href="{{ route('school.staff.index') }}" class="btn btn-outline">Cancel</a>
-                <button type="submit" class="btn btn-primary">Import Staff Members</button>
-            </div>
-        </form>
     </div>
 </div>
 @endsection

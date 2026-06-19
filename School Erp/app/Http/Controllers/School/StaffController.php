@@ -233,6 +233,25 @@ class StaffController extends Controller
     }
 
     /**
+     * Download bulk staff import template (CSV).
+     */
+    public function downloadTemplate()
+    {
+        $headers = ['employee_id', 'first_name', 'last_name', 'email', 'phone'];
+        $exampleRow = ['EMP101', 'John', 'Doe', 'john.doe@yis.com', '9876543210'];
+
+        return response()->streamDownload(function () use ($headers, $exampleRow) {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, $headers);
+            fputcsv($output, $exampleRow);
+            fclose($output);
+        }, 'staff_import_template.csv', [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="staff_import_template.csv"',
+        ]);
+    }
+
+    /**
      * Process bulk staff import.
      */
     public function bulkImport(Request $request)

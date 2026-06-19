@@ -90,6 +90,7 @@ Route::get('/role-management/staff-access', [\App\Http\Controllers\School\RoleCo
 Route::put('/role-management/staff-access/{user}', [\App\Http\Controllers\School\RoleController::class, 'updateStaffAccess'])->name('school.roles.staff-access.update');
 
 // Staff Management CRUD & Additional Features
+Route::get('/staff/import-template', [\App\Http\Controllers\School\StaffController::class, 'downloadTemplate'])->name('school.staff.import-template');
 Route::get('/staff/import', [\App\Http\Controllers\School\StaffController::class, 'importForm'])->name('school.staff.import');
 Route::post('/staff/import', [\App\Http\Controllers\School\StaffController::class, 'bulkImport'])->name('school.staff.import.post');
 Route::get('/staff/bulk-photo', [\App\Http\Controllers\School\StaffController::class, 'bulkPhotoForm'])->name('school.staff.bulk-photo');
