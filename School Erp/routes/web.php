@@ -17,17 +17,26 @@ Route::get('/migrate-db', function (\Illuminate\Http\Request $request) {
     }
 
     try {
-        // Run migrations and seed database in force mode for production environments
-        \Illuminate\Support\Facades\Artisan::call('migrate:fresh', [
-            '--force' => true,
-            '--seed' => true
-        ]);
+        if ($request->query('fresh') === 'true') {
+            // Run migrations and seed database in force mode (DESTRUCTIVE - wipes all data)
+            \Illuminate\Support\Facades\Artisan::call('migrate:fresh', [
+                '--force' => true,
+                '--seed' => true
+            ]);
+            $actionText = "Database Fresh Migration & Seeding (Destructive)";
+        } else {
+            // Run standard migrations safely (NON-DESTRUCTIVE - keeps existing data)
+            \Illuminate\Support\Facades\Artisan::call('migrate', [
+                '--force' => true
+            ]);
+            $actionText = "Safe Database Migration (Non-Destructive)";
+        }
         
         // Clear all cached configurations, routes, and compiled views to apply changes immediately on Hostinger
         \Illuminate\Support\Facades\Artisan::call('optimize:clear');
         
         $output = \Illuminate\Support\Facades\Artisan::output();
-        return response("<h3>Database Migration, Seeding & Cache Clearing Successful!</h3><pre>{$output}</pre>", 200);
+        return response("<h3>{$actionText} Successful!</h3><pre>{$output}</pre>", 200);
     } catch (\Exception $e) {
         return response("<h3>Database Migration Failed!</h3><p>{$e->getMessage()}</p>", 500);
     }
