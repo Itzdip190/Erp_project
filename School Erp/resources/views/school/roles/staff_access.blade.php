@@ -446,18 +446,22 @@
 
 @endsection
 
+@php
+    $formattedStaff = $staff->map(function($u) {
+        $firstRole = $u->roles->first();
+        $roleName = $firstRole ? $firstRole->name : 'Staff';
+        return [
+            'id'   => $u->id,
+            'name' => $u->name,
+            'role' => ucfirst(str_replace('_', ' ', $roleName)),
+            'initials' => strtoupper(substr($u->name, 0, 1) . (str_contains($u->name, ' ') ? substr($u->name, strrpos($u->name, ' ') + 1, 1) : ''))
+        ];
+    });
+@endphp
+
 @section('scripts')
 <script>
-const ALL_STAFF = @json($staff->map(function($u) {
-    $firstRole = $u->roles->first();
-    $roleName = $firstRole ? $firstRole->name : 'Staff';
-    return [
-        'id'   => $u->id,
-        'name' => $u->name,
-        'role' => ucfirst(str_replace('_', ' ', $roleName)),
-        'initials' => strtoupper(substr($u->name, 0, 1) . (str_contains($u->name, ' ') ? substr($u->name, strrpos($u->name, ' ') + 1, 1) : ''))
-    ];
-}));
+const ALL_STAFF = @json($formattedStaff);
 
 // Currently open panel context
 let panelCtx = { moduleKey: '', featureKey: '', accessType: '', featureLabel: '' };
