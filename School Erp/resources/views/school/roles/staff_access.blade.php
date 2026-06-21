@@ -368,8 +368,8 @@
                     $viewCount = 0; $editCount = 0;
                     foreach($staff as $s) {
                         $row = $access->get("{$s->id}.{$moduleKey}.{$featureKey}");
-                        if ($row?->view_access) $viewCount++;
-                        if ($row?->edit_access) $editCount++;
+                        if ($row && $row->view_access) $viewCount++;
+                        if ($row && $row->edit_access) $editCount++;
                     }
                 @endphp
                 <tr>
@@ -448,12 +448,16 @@
 
 @section('scripts')
 <script>
-const ALL_STAFF = @json($staff->map(fn($u) => [
-    'id'   => $u->id,
-    'name' => $u->name,
-    'role' => ucfirst(str_replace('_', ' ', $u->roles->first()?->name ?? 'Staff')),
-    'initials' => strtoupper(substr($u->name, 0, 1) . (str_contains($u->name, ' ') ? substr($u->name, strrpos($u->name, ' ') + 1, 1) : ''))
-]));
+const ALL_STAFF = @json($staff->map(function($u) {
+    $firstRole = $u->roles->first();
+    $roleName = $firstRole ? $firstRole->name : 'Staff';
+    return [
+        'id'   => $u->id,
+        'name' => $u->name,
+        'role' => ucfirst(str_replace('_', ' ', $roleName)),
+        'initials' => strtoupper(substr($u->name, 0, 1) . (str_contains($u->name, ' ') ? substr($u->name, strrpos($u->name, ' ') + 1, 1) : ''))
+    ];
+}));
 
 // Currently open panel context
 let panelCtx = { moduleKey: '', featureKey: '', accessType: '', featureLabel: '' };

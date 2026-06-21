@@ -121,6 +121,7 @@ Route::get('/debug-storage', function (\Illuminate\Http\Request $request) {
     $docs = \App\Models\StudentDocument::orderBy('created_at', 'desc')->take(10)->get();
 
     $output = "<h1>Storage Diagnostic Tool</h1>";
+    $output .= "<p><strong>PHP Version:</strong> " . PHP_VERSION . "</p>";
     $output .= "<p><strong>Default Disk:</strong> {$defaultDisk}</p>";
     $output .= "<p><strong>Storage App Private Path:</strong> " . storage_path('app/private') . " (Exists: " . (is_dir(storage_path('app/private')) ? 'YES' : 'NO') . ", Writable: " . (is_writable(storage_path('app/private')) ? 'YES' : 'NO') . ")</p>";
     $output .= "<p><strong>Storage App Public Path:</strong> " . storage_path('app/public') . " (Exists: " . (is_dir(storage_path('app/public')) ? 'YES' : 'NO') . ", Writable: " . (is_writable(storage_path('app/public')) ? 'YES' : 'NO') . ")</p>";
