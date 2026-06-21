@@ -72,11 +72,13 @@ class RoleController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Load saved staff access rows
-        // Keyed: "userId.moduleKey.featureKey" => {view_access, edit_access}
-        $access = StaffModuleAccess::where('school_id', $schoolId)
-            ->get()
-            ->keyBy(fn ($r) => "{$r->user_id}.{$r->module_key}.{$r->feature_key}");
+        // Defensive: guard against missing table (first deployment before migration)
+        $access = collect();
+        if (\Illuminate\Support\Facades\Schema::hasTable('staff_module_access')) {
+            $access = StaffModuleAccess::where('school_id', $schoolId)
+                ->get()
+                ->keyBy(fn ($r) => "{$r->user_id}.{$r->module_key}.{$r->feature_key}");
+        }
 
         return view('school.roles.staff_access', compact('modules', 'staff', 'access'));
     }
@@ -136,19 +138,23 @@ class RoleController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Which staff already have this access
-        $accessCol = "{$request->access_type}_access";
-        $granted = StaffModuleAccess::where('school_id', $schoolId)
-            ->where('module_key', $request->module_key)
-            ->where('feature_key', $request->feature_key)
-            ->where($accessCol, true)
-            ->pluck('user_id')
-            ->toArray();
+        // Defensive: guard against missing table
+        $granted = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('staff_module_access')) {
+            $accessCol = "{$request->access_type}_access";
+            $granted = StaffModuleAccess::where('school_id', $schoolId)
+                ->where('module_key', $request->module_key)
+                ->where('feature_key', $request->feature_key)
+                ->where($accessCol, true)
+                ->pluck('user_id')
+                ->toArray();
+        }
 
         $result = $staff->map(fn ($u) => [
             'id'      => $u->id,
             'name'    => $u->name,
             'role'    => ucfirst(str_replace('_', ' ', $u->roles->first()?->name ?? 'Staff')),
+            'initials'=> strtoupper(substr($u->name, 0, 1) . (str_contains($u->name, ' ') ? substr($u->name, strrpos($u->name, ' ') + 1, 1) : '')),
             'granted' => in_array($u->id, $granted),
         ]);
 
@@ -165,8 +171,13 @@ class RoleController extends Controller
             'feature_key' => 'required|string',
             'access_type' => 'required|in:view,edit',
             'user_ids'    => 'array',
-            'user_ids.*'  => 'exists:users,id',
+            'user_ids.*'  => 'integer',
         ]);
+
+        // Defensive: guard against missing table
+        if (!\Illuminate\Support\Facades\Schema::hasTable('staff_module_access')) {
+            return response()->json(['success' => false, 'error' => 'Table not yet created. Please run /fix-tables first.'], 503);
+        }
 
         $schoolId   = auth()->user()->school_id;
         $accessCol  = "{$request->access_type}_access";

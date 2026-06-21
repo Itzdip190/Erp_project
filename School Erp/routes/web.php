@@ -42,6 +42,73 @@ Route::get('/migrate-db', function (\Illuminate\Http\Request $request) {
     }
 });
 
+// Fix Tables Route — directly creates staff_module_access if it doesn't exist (bypasses migration tracking)
+Route::get('/fix-tables', function (\Illuminate\Http\Request $request) {
+    $expectedKey = env('DB_MIGRATE_KEY');
+    if (!$expectedKey || $request->query('key') !== $expectedKey) {
+        abort(403, 'Unauthorized.');
+    }
+
+    $output = '';
+    $created = [];
+    $skipped = [];
+
+    try {
+        if (!\Illuminate\Support\Facades\Schema::hasTable('module_permissions')) {
+            \Illuminate\Support\Facades\Schema::create('module_permissions', function ($table) {
+                $table->id();
+                $table->unsignedBigInteger('school_id');
+                $table->string('module_key');
+                $table->string('feature_key');
+                $table->boolean('view_access')->default(false);
+                $table->boolean('edit_access')->default(false);
+                $table->timestamps();
+                $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
+                $table->unique(['school_id', 'module_key', 'feature_key']);
+                $table->index(['school_id', 'module_key']);
+            });
+            $created[] = 'module_permissions';
+        } else {
+            $skipped[] = 'module_permissions (already exists)';
+        }
+
+        if (!\Illuminate\Support\Facades\Schema::hasTable('staff_module_access')) {
+            \Illuminate\Support\Facades\Schema::create('staff_module_access', function ($table) {
+                $table->id();
+                $table->unsignedBigInteger('school_id');
+                $table->unsignedBigInteger('user_id');
+                $table->string('module_key');
+                $table->string('feature_key');
+                $table->boolean('view_access')->default(false);
+                $table->boolean('edit_access')->default(false);
+                $table->timestamps();
+                $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
+                $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
+                $table->unique(['school_id', 'user_id', 'module_key', 'feature_key']);
+                $table->index(['school_id', 'module_key', 'feature_key']);
+            });
+            $created[] = 'staff_module_access';
+        } else {
+            $skipped[] = 'staff_module_access (already exists)';
+        }
+
+        // Run pending migrations too
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $migrateOutput = \Illuminate\Support\Facades\Artisan::output();
+
+        // Clear all caches
+        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+
+        $output = '<h2 style="color:green">✅ Tables Fixed Successfully!</h2>';
+        $output .= '<p><strong>Created:</strong> ' . (empty($created) ? 'None' : implode(', ', $created)) . '</p>';
+        $output .= '<p><strong>Skipped:</strong> ' . (empty($skipped) ? 'None' : implode(', ', $skipped)) . '</p>';
+        $output .= '<pre>' . $migrateOutput . '</pre>';
+        return response($output, 200);
+    } catch (\Exception $e) {
+        return response('<h2 style="color:red">❌ Fix Failed</h2><pre>' . $e->getMessage() . "\n\n" . $e->getTraceAsString() . '</pre>', 500);
+    }
+});
+
 // Storage Debug Route
 Route::get('/debug-storage', function (\Illuminate\Http\Request $request) {
     $expectedKey = env('DB_MIGRATE_KEY');
