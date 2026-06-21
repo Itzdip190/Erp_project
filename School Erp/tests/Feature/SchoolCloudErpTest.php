@@ -611,5 +611,47 @@ class SchoolCloudErpTest extends TestCase
         $this->assertEquals(15, $udiseData['classrooms_count']);
         $this->assertEquals('Dr. Jane Doe', $udiseData['declared_by']);
     }
+
+    /**
+     * Test bulk staff import with custom headers and additional metadata fields.
+     */
+    public function test_staff_bulk_import_and_metadata(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+
+        // 1. Download template check
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get('/school/staff/import-template');
+        $response->assertStatus(200);
+        $this->assertTrue(str_contains($response->streamedContent(), 'employee_id'));
+        $this->assertTrue(str_contains($response->streamedContent(), 'alternate_phone'));
+
+        // 2. Perform Import
+        $csvContent = "employee_id,first_name,last_name,email,phone,alternate_phone,department,designation,epf_uan\n" .
+                      "EMPTEST999,Jane,Smith,jane.smith@yis.com,9876543210,9876543211,Academics,Teacher,UAN999111";
+
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('staff_import.csv', $csvContent);
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/staff/import', [
+                'csv_file' => $file
+            ]);
+
+        $response->assertRedirect();
+
+        // 3. Verify Database
+        $this->assertDatabaseHas('users', [
+            'email' => 'jane.smith@yis.com'
+        ]);
+
+        $staff = \App\Models\Staff::where('employee_id', 'EMPTEST999')->first();
+        $this->assertNotNull($staff);
+        $this->assertEquals('Jane', $staff->first_name);
+        $this->assertEquals('Smith', $staff->last_name);
+        $this->assertEquals('9876543211', $staff->additional_fields['alternate_phone']);
+        $this->assertEquals('UAN999111', $staff->additional_fields['epf_uan']);
+    }
 }
 

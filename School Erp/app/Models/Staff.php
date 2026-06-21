@@ -40,6 +40,7 @@ class Staff extends Model
         'ifsc_code',
         'pan_number',
         'is_active',
+        'additional_fields',
     ];
 
     protected $casts = [
@@ -48,6 +49,7 @@ class Staff extends Model
         'is_active' => 'boolean',
         'basic_salary' => 'decimal:2',
         'experience_years' => 'integer',
+        'additional_fields' => 'array',
     ];
 
     protected $appends = [
