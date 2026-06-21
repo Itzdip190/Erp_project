@@ -98,6 +98,89 @@ class ParentAttendanceController extends Controller
             'percentage' => $totalMarked > 0 ? round((($present + $late) / $totalMarked) * 100, 1) : 0,
         ];
 
-        return view('parent.attendance.index', compact('calendar', 'summary', 'student', 'month', 'year'));
+        $notifications = $this->getNotifications($user, $student);
+
+        return view('parent.attendance.index', compact('calendar', 'summary', 'student', 'month', 'year', 'notifications'));
+    }
+
+    private function getNotifications($user, $student)
+    {
+        $notifications = collect();
+        if ($student) {
+            // 1. Documents
+            $docs = \App\Models\StudentDocument::where('student_id', $student->id)
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            foreach ($docs as $doc) {
+                $notifications->push((object)[
+                    'type' => 'document',
+                    'title' => 'New Document Issued',
+                    'text' => $doc->original_name,
+                    'time' => $doc->created_at,
+                    'url' => route('parent.documents.download', ['document' => $doc->id, 'action' => 'view']),
+                    'icon' => 'fas fa-file-pdf',
+                    'color' => 'var(--gold)',
+                    'color_bg' => 'var(--gold-bg)',
+                ]);
+            }
+
+            // 2. ID Cards
+            $cards = \App\Models\StudentCard::where('student_id', $student->id)
+                ->with('template')
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            foreach ($cards as $card) {
+                $notifications->push((object)[
+                    'type' => 'card',
+                    'title' => 'ID Card / Pass Issued',
+                    'text' => ($card->template ? $card->template->name : 'Student ID Card') . ' (' . $card->card_number . ')',
+                    'time' => $card->created_at,
+                    'url' => route('parent.cards.index'),
+                    'icon' => 'fas fa-id-card',
+                    'color' => 'var(--blue)',
+                    'color_bg' => 'rgba(59,130,246,0.15)',
+                ]);
+            }
+
+            // 3. Payment Links
+            $paylinks = \App\Models\PaymentLink::where('student_id', $student->id)
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            foreach ($paylinks as $pl) {
+                $notifications->push((object)[
+                    'type' => 'paylink',
+                    'title' => 'New Payment Due',
+                    'text' => $pl->purpose . ' - ₹' . number_format($pl->amount, 2),
+                    'time' => $pl->created_at,
+                    'url' => $pl->link_url,
+                    'icon' => 'fas fa-indian-rupee-sign',
+                    'color' => 'var(--red)',
+                    'color_bg' => 'rgba(239,68,68,0.15)',
+                ]);
+            }
+
+            // 4. Notices
+            $notices = \App\Models\Notice::where('school_id', $user->school_id)
+                ->whereIn('target_audience', ['all', 'students'])
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            foreach ($notices as $notice) {
+                $notifications->push((object)[
+                    'type' => 'notice',
+                    'title' => 'Notice: ' . $notice->title,
+                    'text' => \Illuminate\Support\Str::limit($notice->content, 60),
+                    'time' => $notice->created_at,
+                    'url' => route('parent.notices.index'),
+                    'icon' => 'fas fa-bullhorn',
+                    'color' => 'var(--purple)',
+                    'color_bg' => 'rgba(139,92,246,0.15)',
+                ]);
+            }
+        }
+        return $notifications->sortByDesc('time')->values()->take(10);
     }
 }

@@ -272,37 +272,10 @@ textarea.form-control{height:auto;padding:10px 12px;}
 <div class="main">
 
     <!-- TOPBAR -->
-    <nav class="topbar">
-        <div class="topbar-left">
-            <button class="hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div class="greeting">
-                <h2>Leave Applications</h2>
-                <p>Apply for leaves and view history for student {{ $student->full_name }}</p>
-            </div>
-        </div>
-        <div class="topbar-right">
-            <div class="date-pill">
-                <i class="fas fa-calendar-days"></i>
-                {{ now()->format('M j, Y') }}
-            </div>
-            <!-- User -->
-            <div class="user-wrap">
-                <div class="user-btn" onclick="toggleDrop('userDrop')">
-                    <div class="avatar">{{ $stuInitials }}</div>
-                    <div class="user-info">
-                        <strong>{{ explode(' ',$stuName)[0] }}</strong>
-                        <span>Student</span>
-                    </div>
-                    <i class="fas fa-chevron-down" style="font-size:9px;color:var(--t2);margin-left:4px;"></i>
-                </div>
-                <div class="user-drop" id="userDrop">
-                    <a href="{{ route('logout') }}" class="danger"><i class="fas fa-right-from-bracket"></i> Logout</a>
-                </div>
-            </div>
-        </div>
-    </nav>
+    @include('parent.partials.topbar', [
+        'title' => 'Leave Applications',
+        'subtitle' => 'Apply for leaves and view history for student ' . ($student->full_name ?? '')
+    ])
 
     <!-- PAGE -->
     <div class="pg">
@@ -415,11 +388,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function toggleDrop(id){
-    ['userDrop'].forEach(d=>{if(d!==id)document.getElementById(d).classList.remove('open');});
+    ['userDrop', 'notifDrop'].forEach(d=>{if(d!==id)document.getElementById(d).classList.remove('open');});
     document.getElementById(id).classList.toggle('open');
 }
 document.addEventListener('click',e=>{
     if(!e.target.closest('.user-wrap'))document.getElementById('userDrop').classList.remove('open');
+    if(!e.target.closest('.notif-wrap'))document.getElementById('notifDrop').classList.remove('open');
 });
 </script>
 </body>

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
+use App\Models\StudentHouse;
+use App\Models\StudentCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -74,7 +76,11 @@ class SettingsController extends Controller
     public function instituteInfo()
     {
         $school = Auth::user()->school;
-        return view('school.settings.institute_info', compact('school'));
+        $udise = is_array($school->udise_data) ? $school->udise_data : json_decode($school->udise_data ?? '[]', true);
+        $houses = StudentHouse::where('school_id', $school->id)->get();
+        $groups = StudentCategory::where('school_id', $school->id)->get();
+
+        return view('school.settings.institute_info', compact('school', 'udise', 'houses', 'groups'));
     }
 
     /**
@@ -83,32 +89,158 @@ class SettingsController extends Controller
     public function updateInstituteInfo(Request $request)
     {
         $request->validate([
-            'name'    => 'required|string|max:150',
-            'email'   => 'nullable|email|max:100',
-            'phone'   => 'nullable|string|max:20',
-            'code'    => 'required|string|max:20|unique:schools,code,' . Auth::user()->school_id,
-            'address' => 'nullable|string',
-            'logo'    => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'name'               => 'required|string|max:150',
+            'code'               => 'required|string|max:20|unique:schools,code,' . Auth::user()->school_id,
+            'affiliation_number' => 'nullable|string|max:100',
+            'udise_number'       => 'nullable|string|max:100',
+            'board_name'         => 'nullable|string|max:100',
+            'logo'               => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'stamp'              => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'signature'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
 
         $school = Auth::user()->school;
         $school->name = $request->name;
-        $school->email = $request->email;
-        $school->phone = $request->phone;
         $school->code = $request->code;
-        $school->address = $request->address;
+
+        $udise = is_array($school->udise_data) ? $school->udise_data : json_decode($school->udise_data ?? '[]', true);
+        $udise['affiliation_number'] = $request->affiliation_number;
+        $udise['udise_code'] = $request->udise_number; // keep in sync with government reporting code
+        $udise['udise_number'] = $request->udise_number;
+        $udise['board_name'] = $request->board_name;
 
         if ($request->hasFile('logo')) {
             if ($school->logo && Storage::disk('public')->exists($school->logo)) {
                 Storage::disk('public')->delete($school->logo);
             }
-            $path = $request->file('logo')->store('school-logos', 'public');
-            $school->logo = $path;
+            $school->logo = $request->file('logo')->store('school-logos', 'public');
         }
 
+        if ($request->hasFile('stamp')) {
+            if (!empty($udise['stamp']) && Storage::disk('public')->exists($udise['stamp'])) {
+                Storage::disk('public')->delete($udise['stamp']);
+            }
+            $udise['stamp'] = $request->file('stamp')->store('school-stamps', 'public');
+        }
+
+        if ($request->hasFile('signature')) {
+            if (!empty($udise['signature']) && Storage::disk('public')->exists($udise['signature'])) {
+                Storage::disk('public')->delete($udise['signature']);
+            }
+            $udise['signature'] = $request->file('signature')->store('school-signatures', 'public');
+        }
+
+        $school->udise_data = $udise;
         $school->save();
 
         return back()->with('success', 'Institute information updated successfully!');
+    }
+
+    /**
+     * Update Institute Days & Hours.
+     */
+    public function updateInstituteHours(Request $request)
+    {
+        $school = Auth::user()->school;
+        $udise = is_array($school->udise_data) ? $school->udise_data : json_decode($school->udise_data ?? '[]', true);
+
+        $hoursData = [];
+        $days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        foreach ($days as $day) {
+            $hoursData[$day] = [
+                'start_time' => $request->input("hours.{$day}.start_time") ?: '-',
+                'end_time'   => $request->input("hours.{$day}.end_time")   ?: '-',
+            ];
+        }
+
+        $udise['days_and_time'] = $hoursData;
+        $school->udise_data = $udise;
+        $school->save();
+
+        return back()->with('success', 'Institute days and timings updated successfully!');
+    }
+
+    /**
+     * Add Student House.
+     */
+    public function addHouse(Request $request)
+    {
+        $request->validate([
+            'name'       => 'required|string|max:100',
+            'color_code' => 'nullable|string|max:7',
+        ]);
+
+        StudentHouse::create([
+            'school_id'  => Auth::user()->school_id,
+            'name'       => $request->name,
+            'color_code' => $request->color_code ?: '#2563eb',
+        ]);
+
+        return back()->with('success', 'Student House added successfully!');
+    }
+
+    /**
+     * Delete Student House.
+     */
+    public function deleteHouse($id)
+    {
+        $house = StudentHouse::where('school_id', Auth::user()->school_id)->findOrFail($id);
+        $house->delete();
+
+        return back()->with('success', 'Student House deleted successfully!');
+    }
+
+    /**
+     * Add Student Group (Category).
+     */
+    public function addGroup(Request $request)
+    {
+        $request->validate([
+            'name'        => 'required|string|max:100',
+            'description' => 'nullable|string|max:255',
+        ]);
+
+        StudentCategory::create([
+            'school_id'   => Auth::user()->school_id,
+            'name'        => $request->name,
+            'description' => $request->description,
+        ]);
+
+        return back()->with('success', 'Student Group / Category added successfully!');
+    }
+
+    /**
+     * Delete Student Group (Category).
+     */
+    public function deleteGroup($id)
+    {
+        $group = StudentCategory::where('school_id', Auth::user()->school_id)->findOrFail($id);
+        $group->delete();
+
+        return back()->with('success', 'Student Group / Category deleted successfully!');
+    }
+
+    /**
+     * Update Social Media URLs.
+     */
+    public function updateSocialMedia(Request $request)
+    {
+        $school = Auth::user()->school;
+        $udise = is_array($school->udise_data) ? $school->udise_data : json_decode($school->udise_data ?? '[]', true);
+
+        $social = [
+            'facebook'  => $request->facebook,
+            'twitter'   => $request->twitter,
+            'instagram' => $request->instagram,
+            'youtube'   => $request->youtube,
+            'linkedin'  => $request->linkedin,
+        ];
+
+        $udise['social_media'] = $social;
+        $school->udise_data = $udise;
+        $school->save();
+
+        return back()->with('success', 'Social media links updated successfully!');
     }
 
     /**
@@ -144,11 +276,91 @@ class SettingsController extends Controller
         $school = Auth::user()->school;
         $udise = is_array($school->udise_data) ? $school->udise_data : json_decode($school->udise_data ?? '[]', true);
 
-        // Fetch counts for summary
-        $totalStudents = \App\Models\Student::where('school_id', $school->id)->count();
-        $totalStaff    = \App\Models\Staff::where('school_id', $school->id)->count();
+        // Fetch school-scoped active students and classes
+        $classes = \App\Models\SchoolClass::where('school_id', $school->id)->orderBy('numeric_name')->get();
+        $students = \App\Models\Student::where('school_id', $school->id)->where('is_active', true)->get();
+        $categories = \App\Models\StudentCategory::where('school_id', $school->id)->get();
+        $categoryNames = $categories->pluck('name', 'id')->toArray();
 
-        return view('school.settings.udise', compact('school', 'udise', 'totalStudents', 'totalStaff'));
+        $enrollmentData = [];
+        $grandTotalStudents = 0;
+        foreach ($classes as $class) {
+            $classStudents = $students->where('class_id', $class->id);
+            $totalClassStudents = $classStudents->count();
+            $grandTotalStudents += $totalClassStudents;
+
+            $row = [
+                'class_id' => $class->id,
+                'class_name' => $class->name,
+                'total_students' => $totalClassStudents,
+                'general' => ['boys' => 0, 'girls' => 0],
+                'sc' => ['boys' => 0, 'girls' => 0],
+                'st' => ['boys' => 0, 'girls' => 0],
+                'obc' => ['boys' => 0, 'girls' => 0],
+            ];
+
+            foreach ($classStudents as $student) {
+                $catId = $student->category_id;
+                $catName = isset($categoryNames[$catId]) ? strtolower($categoryNames[$catId]) : 'general';
+                $gender = strtolower($student->gender) === 'male' ? 'boys' : 'girls';
+
+                if (str_contains($catName, 'sc')) {
+                    $row['sc'][$gender]++;
+                } elseif (str_contains($catName, 'st')) {
+                    $row['st'][$gender]++;
+                } elseif (str_contains($catName, 'obc')) {
+                    $row['obc'][$gender]++;
+                } else {
+                    $row['general'][$gender]++;
+                }
+            }
+            $enrollmentData[] = $row;
+        }
+
+        // Fetch staff and count teachers
+        $designations = \App\Models\Designation::where('school_id', $school->id)->get();
+        $teacherDesignationIds = $designations->filter(function ($des) {
+            $name = strtolower($des->name);
+            return str_contains($name, 'teacher') || str_contains($name, 'faculty') || str_contains($name, 'lecturer') || str_contains($name, 'principal') || str_contains($name, 'academic');
+        })->pluck('id')->toArray();
+
+        $allStaff = \App\Models\Staff::where('school_id', $school->id)->where('is_active', true)->get();
+        $teachers = $allStaff->filter(function ($staff) use ($teacherDesignationIds) {
+            if (empty($teacherDesignationIds)) {
+                return true; // fallback to all active staff if no teacher designations
+            }
+            return in_array($staff->designation_id, $teacherDesignationIds);
+        });
+
+        $totalTeachers = $teachers->count();
+        $maleTeachers = $teachers->where('gender', 'male')->count();
+        $femaleTeachers = $teachers->where('gender', 'female')->count();
+
+        $regularCount = 0;
+        $contractCount = 0;
+        foreach ($teachers as $t) {
+            $type = strtolower($t->employment_type ?? '');
+            if (str_contains($type, 'contract') || str_contains($type, 'part') || str_contains($type, 'temp')) {
+                $contractCount++;
+            } else {
+                $regularCount++;
+            }
+        }
+
+        $ptr = $totalTeachers > 0 ? round($grandTotalStudents / $totalTeachers, 2) : 0;
+
+        $teacherCounts = [
+            'total' => $totalTeachers,
+            'male' => $maleTeachers,
+            'female' => $femaleTeachers,
+            'regular' => $regularCount,
+            'contract' => $contractCount,
+            'ptr' => $ptr
+        ];
+
+        return view('school.settings.udise', compact(
+            'school', 'udise', 'grandTotalStudents', 'enrollmentData', 'teacherCounts'
+        ));
     }
 
     /**

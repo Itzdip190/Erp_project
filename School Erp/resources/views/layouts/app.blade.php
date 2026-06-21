@@ -432,8 +432,8 @@ table.tbl tr:last-child td{border-bottom:none;}
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/settings/implementation') ? 'active' : '' }}">
-                    <a href="{{ route('school.settings.implementation') }}">
+                <li class="{{ request()->is('school/implementation-tracker') ? 'active' : '' }}">
+                    <a href="{{ route('implementation.index') }}">
                         <span class="sb-submenu-label">Implementation Process</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>

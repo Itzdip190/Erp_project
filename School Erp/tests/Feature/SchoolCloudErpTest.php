@@ -10,6 +10,8 @@ use App\Models\Student;
 use App\Models\User;
 use App\Models\Subscription;
 use App\Models\Plan;
+use App\Models\StudentHouse;
+use App\Models\StudentCategory;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -339,4 +341,275 @@ class SchoolCloudErpTest extends TestCase
             'longitude' => 77.59460000,
         ]);
     }
+
+    /**
+     * Test parent/student web portal pages.
+     */
+    public function test_parent_web_portal_pages(): void
+    {
+        $parent = User::where('email', 'parent@yis.com')->first();
+
+        // 1. Dashboard loads
+        $response = $this->actingAs($parent)->get('/parent/dashboard');
+        $response->assertStatus(200);
+
+        // 2. Notices page loads
+        $response = $this->actingAs($parent)->get('/parent/notices');
+        $response->assertStatus(200);
+
+        // 3. Surveys page loads
+        $response = $this->actingAs($parent)->get('/parent/surveys');
+        $response->assertStatus(200);
+
+        // 4. Fees page loads
+        $response = $this->actingAs($parent)->get('/parent/fees');
+        $response->assertStatus(200);
+
+        // 5. Timetable page loads
+        $response = $this->actingAs($parent)->get('/parent/timetable');
+        $response->assertStatus(200);
+    }
+
+    /**
+     * Test school dashboard details AJAX endpoints.
+     */
+    public function test_school_dashboard_details_ajax_endpoints(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+
+        $types = [
+            'students',
+            'staffs',
+            'income',
+            'expense',
+            'today_collection',
+            'student_attendance',
+            'staff_attendance',
+            'fee_pending',
+            'admissions',
+            'calendar_events'
+        ];
+
+        foreach ($types as $type) {
+            $response = $this->actingAs($schoolAdmin)
+                ->withHeaders(['X-School-Code' => 'YIS2024'])
+                ->getJson("/school/dashboard/details?type={$type}");
+
+            $response->assertStatus(200)
+                ->assertJsonStructure([
+                    'title',
+                    'data',
+                    'type'
+                ]);
+        }
+
+        // Test sending reminder
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->postJson("/school/dashboard/send-reminder");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Dues notification reminders have been sent successfully!'
+            ]);
+    }
+
+    /**
+     * Test school dashboard MIS report.
+     */
+    public function test_school_dashboard_mis_report(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get('/school/dashboard/mis-report?date=2026-06-21');
+
+        $response->assertStatus(200)
+            ->assertViewIs('school.dashboard.mis_report')
+            ->assertViewHas([
+                'dailyRevenue',
+                'studentAttendancePct',
+                'studentAttendanceRatio',
+                'staffAttendancePct',
+                'staffAttendanceRatio',
+                'newAdmissionsCount',
+                'newAdmissionsThisMonth',
+                'attendanceNotMarkedTeachersCount',
+                'feeDefaultersCriticalCount',
+                'appNotDownloadedCount',
+                'todayFeeCollection',
+                'studentAppDownloadedCount',
+                'studentAppDownloadedTotal',
+                'staffAppDownloadedCount',
+                'staffAppDownloadedTotal',
+                'parentAppDownloadedCount',
+                'parentAppDownloadedTotal',
+                'pendingDownloadsCount',
+                'teachersNoSharing7DaysCount',
+                'classesMissingDiaryTodayCount',
+                'studentPresentCount',
+                'studentAbsentCount',
+                'studentHalfDayCount',
+                'studentLeaveCount',
+                'studentNotMarkedCount',
+                'staffPresentCount',
+                'staffAbsentCount',
+                'staffHalfDayCount',
+                'staffLeaveCount',
+                'staffNotMarkedCount',
+                'criticalAttendanceIssues',
+                'feeCashCollection',
+                'feeChequeCollection',
+                'feeOnlineCollection',
+                'feeTotalCollection',
+                'defaulters0_30Count',
+                'defaulters31_60Count',
+                'defaulters61_90Count',
+                'defaulters90PlusCount',
+                'overallMonthlyCollection',
+                'pendingDiscountApprovalsCount',
+                'feeDefaulters90PlusList',
+                'feeDefaulters90PlusMoreCount',
+                'classesAttendanceNotMarkedList',
+                'classesAttendanceNotMarkedMoreCount',
+                'teachersNotMarkedAttendance7DaysList',
+                'teachersNotMarkedAttendance7DaysMoreCount',
+                'teachersNoSharing7DaysList',
+                'teachersNoSharing7DaysMoreCount',
+                'classesMissingDiaryTodayList',
+                'classesMissingDiaryTodayMoreCount'
+            ]);
+    }
+
+    /**
+     * Test school institute info setting flows.
+     */
+    public function test_school_institute_info_flow(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+
+        // 1. Check page loads
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get('/school/settings/institute-info');
+
+        $response->assertStatus(200)
+            ->assertViewIs('school.settings.institute_info')
+            ->assertViewHasAll(['school', 'udise', 'houses', 'groups']);
+
+        // 2. Update Details
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->put('/school/settings/institute-info', [
+                'name' => 'Yash International School Update',
+                'code' => 'YIS2024',
+                'affiliation_number' => 'AFF-889922',
+                'udise_number' => '11223344556',
+                'board_name' => 'CBSE'
+            ]);
+        $response->assertRedirect();
+        $this->assertEquals('Yash International School Update', $schoolAdmin->school->refresh()->name);
+
+        // 3. Update Timings
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->put('/school/settings/institute-hours', [
+                'hours' => [
+                    'Monday' => ['start_time' => '07:30 AM', 'end_time' => '01:30 PM']
+                ]
+            ]);
+        $response->assertRedirect();
+        $udise = json_decode($schoolAdmin->school->refresh()->udise_data, true);
+        $this->assertEquals('07:30 AM', $udise['days_and_time']['Monday']['start_time']);
+
+        // 4. Add Student House
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/settings/houses', [
+                'name' => 'Blue House',
+                'color_code' => '#2563eb'
+            ]);
+        $response->assertRedirect();
+        $house = StudentHouse::where('school_id', $schoolAdmin->school_id)->where('name', 'Blue House')->first();
+        $this->assertNotNull($house);
+
+        // 5. Add Student Category Group
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/settings/groups', [
+                'name' => 'General Category',
+                'description' => 'General students'
+            ]);
+        $response->assertRedirect();
+        $group = StudentCategory::where('school_id', $schoolAdmin->school_id)->where('name', 'General Category')->first();
+        $this->assertNotNull($group);
+
+        // 6. Delete House
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->delete("/school/settings/houses/{$house->id}");
+        $response->assertRedirect();
+        $this->assertNull(StudentHouse::find($house->id));
+
+        // 7. Delete Group
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->delete("/school/settings/groups/{$group->id}");
+        $response->assertRedirect();
+        $this->assertNull(StudentCategory::find($group->id));
+    }
+
+    /**
+     * Test school UDISE data report settings page and updates.
+     */
+    public function test_school_udise_flow(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+
+        // 1. Get UDISE page
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get('/school/settings/udise');
+
+        $response->assertStatus(200)
+            ->assertViewIs('school.settings.udise')
+            ->assertViewHasAll(['school', 'udise', 'grandTotalStudents', 'enrollmentData', 'teacherCounts']);
+
+        // 2. Update UDISE page data
+        $postData = [
+            'academic_year' => '2025-2026',
+            'udise_code' => '11223344556',
+            'school_category' => 'higher_secondary',
+            'management_type' => 'private',
+            'affiliation_board' => 'CBSE',
+            'affiliation_number' => '12345678',
+            'classrooms_count' => 15,
+            'good_classrooms_count' => 12,
+            'boys_toilets' => 5,
+            'girls_toilets' => 6,
+            'library_available' => '1',
+            'playground_available' => '1',
+            'declared_by' => 'Dr. Jane Doe',
+            'declared_designation' => 'Principal',
+            'declared_confirm' => '1'
+        ];
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->put('/school/settings/udise', $postData);
+
+        $response->assertRedirect();
+
+        // 3. Verify DB update
+        $school = $schoolAdmin->school->refresh();
+        $udiseData = is_array($school->udise_data) ? $school->udise_data : json_decode($school->udise_data, true);
+
+        $this->assertEquals('11223344556', $udiseData['udise_code']);
+        $this->assertEquals('higher_secondary', $udiseData['school_category']);
+        $this->assertEquals(15, $udiseData['classrooms_count']);
+        $this->assertEquals('Dr. Jane Doe', $udiseData['declared_by']);
+    }
 }
+

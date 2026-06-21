@@ -131,6 +131,27 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
     font-size:11.5px;color:var(--t2);
 }
 .date-pill i{color:var(--gold);}
+.notif-wrap{position:relative;}
+.notif-btn{
+    background:var(--page);border:1px solid var(--border);border-radius:8px;
+    width:37px;height:37px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;color:var(--t2);font-size:15px;transition:.2s;position:relative;
+}
+.notif-btn:hover{border-color:var(--gold);color:var(--gold);}
+.notif-badge{
+    position:absolute;top:-5px;right:-5px;background:var(--red);color:#fff;
+    font-size:9px;font-weight:700;border-radius:10px;padding:1px 5px;min-width:16px;text-align:center;
+}
+.notif-drop{
+    position:absolute;top:calc(100% + 8px);right:0;width:280px;
+    background:#fff;border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow-lg);display:none;z-index:300;overflow:hidden;
+}
+.notif-drop.open{display:block;}
+.nd-hdr{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.nd-hdr strong{font-size:12.5px;}
+.nd-mark{font-size:11px;color:var(--gold);cursor:pointer;}
+.nd-empty{padding:22px;text-align:center;color:var(--t3);font-size:11.5px;}
 .user-wrap{position:relative;}
 .user-btn{
     display:flex;align-items:center;gap:7px;cursor:pointer;
@@ -217,37 +238,10 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 <div class="main">
 
     <!-- TOPBAR -->
-    <nav class="topbar">
-        <div class="topbar-left">
-            <button class="hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div class="greeting">
-                <h2>Notice Board</h2>
-                <p>Read official bulletins and announcements for {{ $school->name }}</p>
-            </div>
-        </div>
-        <div class="topbar-right">
-            <div class="date-pill">
-                <i class="fas fa-calendar-days"></i>
-                {{ now()->format('M j, Y') }}
-            </div>
-            <!-- User -->
-            <div class="user-wrap">
-                <div class="user-btn" onclick="toggleDrop('userDrop')">
-                    <div class="avatar">{{ $stuInitials }}</div>
-                    <div class="user-info">
-                        <strong>{{ explode(' ',$stuName)[0] }}</strong>
-                        <span>Student</span>
-                    </div>
-                    <i class="fas fa-chevron-down" style="font-size:9px;color:var(--t2);margin-left:4px;"></i>
-                </div>
-                <div class="user-drop" id="userDrop">
-                    <a href="{{ route('logout') }}" class="danger"><i class="fas fa-right-from-bracket"></i> Logout</a>
-                </div>
-            </div>
-        </div>
-    </nav>
+    @include('parent.partials.topbar', [
+        'title' => 'Notice Board',
+        'subtitle' => 'Read official bulletins and announcements for ' . ($school->name ?? 'the school')
+    ])
 
     <!-- PAGE -->
     <div class="pg">
@@ -306,11 +300,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function toggleDrop(id){
-    ['userDrop'].forEach(d=>{if(d!==id)document.getElementById(d).classList.remove('open');});
+    ['userDrop', 'notifDrop'].forEach(d=>{if(d!==id)document.getElementById(d).classList.remove('open');});
     document.getElementById(id).classList.toggle('open');
 }
 document.addEventListener('click',e=>{
     if(!e.target.closest('.user-wrap'))document.getElementById('userDrop').classList.remove('open');
+    if(!e.target.closest('.notif-wrap'))document.getElementById('notifDrop').classList.remove('open');
 });
 </script>
 </body>

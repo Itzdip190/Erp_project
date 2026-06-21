@@ -94,15 +94,25 @@ class ParentDashboardController extends Controller
         $sectionDisplay = optional($student?->section)->name ?? 'N/A';
         $sessionDisplay = optional($student?->academicSession)->name ?? 'N/A';
 
-        // Fee stats (stub)
+        // Fee stats
         $totalFee    = 0;
         $paidFee     = 0;
         $pendingFee  = 0;
         $feeRate     = 0;
 
+        if ($student) {
+            $studentFees = \App\Models\StudentFee::where('student_id', $student->id)->get();
+            $totalFee = $studentFees->sum('amount');
+            $paidFee = $studentFees->sum('paid_amount');
+            $pendingFee = max(0, $totalFee - $paidFee);
+            $feeRate = $totalFee > 0 ? round(($paidFee / $totalFee) * 100) : 0;
+        }
+
         $documents = $student
             ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
             : collect();
+
+        $notifications = $this->getNotifications($user, $student);
 
         // Database-driven timetable with mock fallback
         $dayOfWeek = now()->format('l'); // Monday, Tuesday, etc.
@@ -173,7 +183,8 @@ class ParentDashboardController extends Controller
             'absentSparkline',
             'lateSparkline',
             'documents',
-            'timetable'
+            'timetable',
+            'notifications'
         ));
     }
 
@@ -438,6 +449,87 @@ class ParentDashboardController extends Controller
         return view('parent.certificates', compact('user', 'student', 'school', 'certificates', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials', 'documents'));
     }
 
+    private function getNotifications($user, $student)
+    {
+        $notifications = collect();
+        if ($student) {
+            // 1. Documents
+            $docs = \App\Models\StudentDocument::where('student_id', $student->id)
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            foreach ($docs as $doc) {
+                $notifications->push((object)[
+                    'type' => 'document',
+                    'title' => 'New Document Issued',
+                    'text' => $doc->original_name,
+                    'time' => $doc->created_at,
+                    'url' => route('parent.documents.download', ['document' => $doc->id, 'action' => 'view']),
+                    'icon' => 'fas fa-file-pdf',
+                    'color' => 'var(--gold)',
+                    'color_bg' => 'var(--gold-bg)',
+                ]);
+            }
+
+            // 2. ID Cards
+            $cards = \App\Models\StudentCard::where('student_id', $student->id)
+                ->with('template')
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            foreach ($cards as $card) {
+                $notifications->push((object)[
+                    'type' => 'card',
+                    'title' => 'ID Card / Pass Issued',
+                    'text' => ($card->template ? $card->template->name : 'Student ID Card') . ' (' . $card->card_number . ')',
+                    'time' => $card->created_at,
+                    'url' => route('parent.cards.index'),
+                    'icon' => 'fas fa-id-card',
+                    'color' => 'var(--blue)',
+                    'color_bg' => 'rgba(59,130,246,0.15)',
+                ]);
+            }
+
+            // 3. Payment Links
+            $paylinks = \App\Models\PaymentLink::where('student_id', $student->id)
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            foreach ($paylinks as $pl) {
+                $notifications->push((object)[
+                    'type' => 'paylink',
+                    'title' => 'New Payment Due',
+                    'text' => $pl->purpose . ' - ₹' . number_format($pl->amount, 2),
+                    'time' => $pl->created_at,
+                    'url' => $pl->link_url,
+                    'icon' => 'fas fa-indian-rupee-sign',
+                    'color' => 'var(--red)',
+                    'color_bg' => 'rgba(239,68,68,0.15)',
+                ]);
+            }
+
+            // 4. Notices
+            $notices = \App\Models\Notice::where('school_id', $user->school_id)
+                ->whereIn('target_audience', ['all', 'students'])
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            foreach ($notices as $notice) {
+                $notifications->push((object)[
+                    'type' => 'notice',
+                    'title' => 'Notice: ' . $notice->title,
+                    'text' => \Illuminate\Support\Str::limit($notice->content, 60),
+                    'time' => $notice->created_at,
+                    'url' => route('parent.notices.index'),
+                    'icon' => 'fas fa-bullhorn',
+                    'color' => 'var(--purple)',
+                    'color_bg' => 'rgba(139,92,246,0.15)',
+                ]);
+            }
+        }
+        return $notifications->sortByDesc('time')->values()->take(10);
+    }
+
     private function getStudentData($user)
     {
         $student = Student::where('school_id', $user->school_id)
@@ -463,8 +555,11 @@ class ParentDashboardController extends Controller
             ? \App\Models\StudentDocument::where('student_id', $student->id)->orderBy('created_at', 'desc')->get()
             : collect();
 
-        return compact('user', 'student', 'school', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials', 'documents');
+        $notifications = $this->getNotifications($user, $student);
+
+        return compact('user', 'student', 'school', 'classDisplay', 'sectionDisplay', 'sessionDisplay', 'stuName', 'stuInitials', 'documents', 'notifications');
     }
+
 
     public function leaves()
     {
@@ -506,6 +601,46 @@ class ParentDashboardController extends Controller
         return redirect()->back()->with('success', 'Leave application submitted successfully.');
     }
 
+    public function fees()
+    {
+        $data = $this->getStudentData(auth()->user());
+        if ($data['student']) {
+            $fees = \App\Models\StudentFee::where('student_id', $data['student']->id)
+                ->with('category')
+                ->orderBy('due_date', 'asc')
+                ->get();
+        } else {
+            $fees = collect();
+        }
+        return view('parent.fees', array_merge($data, compact('fees')));
+    }
+
+    public function timetable()
+    {
+        $data = $this->getStudentData(auth()->user());
+        $timetableGrouped = [];
+
+        if ($data['student']) {
+            $slots = \App\Models\Timetable::where('class_id', $data['student']->class_id)
+                ->where('section_id', $data['student']->section_id)
+                ->with(['subject', 'teacher.user'])
+                ->get();
+
+            $daysOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            foreach ($daysOrder as $day) {
+                $daySlots = $slots->filter(fn($s) => strtolower($s->day_of_week) === strtolower($day))
+                    ->sortBy(function($s) {
+                        return strtotime($s->start_time);
+                    });
+                if ($daySlots->isNotEmpty()) {
+                    $timetableGrouped[$day] = $daySlots;
+                }
+            }
+        }
+
+        return view('parent.timetable', array_merge($data, compact('timetableGrouped')));
+    }
+
     public function exams()
     {
         $data = $this->getStudentData(auth()->user());
@@ -524,8 +659,8 @@ class ParentDashboardController extends Controller
         $user = auth()->user();
         $data = $this->getStudentData($user);
         $notices = \App\Models\Notice::where('school_id', $user->school_id)
-            ->where('status', 'active')
-            ->orderBy('publish_date', 'desc')
+            ->whereIn('target_audience', ['all', 'students'])
+            ->orderBy('created_at', 'desc')
             ->get();
         return view('parent.notices', array_merge($data, compact('notices')));
     }
@@ -535,7 +670,7 @@ class ParentDashboardController extends Controller
         $user = auth()->user();
         $data = $this->getStudentData($user);
         $surveys = \App\Models\Survey::where('school_id', $user->school_id)
-            ->where('status', 'active')
+            ->where('is_active', true)
             ->with('options')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -548,6 +683,7 @@ class ParentDashboardController extends Controller
 
         return view('parent.surveys', array_merge($data, compact('surveys')));
     }
+
 
     public function voteSurvey(\Illuminate\Http\Request $request, \App\Models\Survey $survey)
     {

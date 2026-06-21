@@ -48,14 +48,14 @@
 
         <!-- 2. Attendance & Academics -->
         <div class="sb-group">
-            <div class="sb-hdr {{ request()->routeIs('parent.attendance.*') || request()->routeIs('parent.diary.*') || request()->routeIs('parent.cards.*') || request()->routeIs('parent.exams.*') || request()->routeIs('parent.leaves.*') ? 'open' : '' }}">
+            <div class="sb-hdr {{ request()->routeIs('parent.attendance.*') || request()->routeIs('parent.diary.*') || request()->routeIs('parent.cards.*') || request()->routeIs('parent.exams.*') || request()->routeIs('parent.leaves.*') || request()->routeIs('parent.timetable.*') ? 'open' : '' }}">
                 <div class="sb-hdr-left">
                     <div class="sb-hdr-icon"><i class="fas fa-graduation-cap"></i></div>
                     <span class="sb-hdr-title">2. Attendance & Academics</span>
                 </div>
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
-            <ul class="sb-submenu {{ request()->routeIs('parent.attendance.*') || request()->routeIs('parent.diary.*') || request()->routeIs('parent.cards.*') || request()->routeIs('parent.exams.*') || request()->routeIs('parent.leaves.*') ? 'open' : '' }}">
+            <ul class="sb-submenu {{ request()->routeIs('parent.attendance.*') || request()->routeIs('parent.diary.*') || request()->routeIs('parent.cards.*') || request()->routeIs('parent.exams.*') || request()->routeIs('parent.leaves.*') || request()->routeIs('parent.timetable.*') ? 'open' : '' }}">
                 <li class="{{ request()->routeIs('parent.attendance.index') ? 'active' : '' }}">
                     <a href="{{ route('parent.attendance.index') }}">
                         <span class="sb-submenu-label">Attendance Logs</span>
@@ -68,8 +68,8 @@
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li>
-                    <a href="{{ route('parent.dashboard') }}#timetable">
+                <li class="{{ request()->routeIs('parent.timetable.index') ? 'active' : '' }}">
+                    <a href="{{ route('parent.timetable.index') }}">
                         <span class="sb-submenu-label">Timetable</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
@@ -122,16 +122,16 @@
 
         <!-- 4. Finance & Fees -->
         <div class="sb-group">
-            <div class="sb-hdr">
+            <div class="sb-hdr {{ request()->routeIs('parent.fees.*') ? 'open' : '' }}">
                 <div class="sb-hdr-left">
                     <div class="sb-hdr-icon"><i class="fas fa-indian-rupee-sign"></i></div>
                     <span class="sb-hdr-title">4. Finance & Fees</span>
                 </div>
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
-            <ul class="sb-submenu">
-                <li>
-                    <a href="#">
+            <ul class="sb-submenu {{ request()->routeIs('parent.fees.*') ? 'open' : '' }}">
+                <li class="{{ request()->routeIs('parent.fees.index') ? 'active' : '' }}">
+                    <a href="{{ route('parent.fees.index') }}">
                         <span class="sb-submenu-label">Fee Details</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>

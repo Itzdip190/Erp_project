@@ -21,6 +21,8 @@ use Illuminate\Support\Facades\Route;
 
 // Dashboard
 Route::get('/dashboard', [SchoolDashboardController::class, 'index'])->name('school.dashboard');
+Route::get('/dashboard/details', [SchoolDashboardController::class, 'getDetails'])->name('school.dashboard.details');
+Route::post('/dashboard/send-reminder', [SchoolDashboardController::class, 'sendFeeReminder'])->name('school.dashboard.send-reminder');
 Route::get('/dashboard/chart/fee',    [SchoolDashboardController::class, 'feeChartData'])->name('school.dashboard.chart.fee');
 Route::get('/dashboard/chart/attend', [SchoolDashboardController::class, 'attendanceChartData'])->name('school.dashboard.chart.attend');
 Route::get('/dashboard/snapshot',     [SchoolDashboardController::class, 'snapshot'])->name('school.dashboard.snapshot');
@@ -78,6 +80,13 @@ Route::get('/dashboard/mis-report', [SchoolDashboardController::class, 'misRepor
 // Settings & Institute Info
 Route::get('/settings/institute-info', [SettingsController::class, 'instituteInfo'])->name('school.settings.institute-info');
 Route::put('/settings/institute-info', [SettingsController::class, 'updateInstituteInfo'])->name('school.settings.institute-info.update');
+Route::put('/settings/institute-hours', [SettingsController::class, 'updateInstituteHours'])->name('school.settings.institute-hours.update');
+Route::post('/settings/houses', [SettingsController::class, 'addHouse'])->name('school.settings.houses.store');
+Route::delete('/settings/houses/{house}', [SettingsController::class, 'deleteHouse'])->name('school.settings.houses.destroy');
+Route::post('/settings/groups', [SettingsController::class, 'addGroup'])->name('school.settings.groups.store');
+Route::delete('/settings/groups/{group}', [SettingsController::class, 'deleteGroup'])->name('school.settings.groups.destroy');
+Route::post('/settings/social-media', [SettingsController::class, 'updateSocialMedia'])->name('school.settings.social-media.update');
+
 Route::get('/settings/implementation', [SettingsController::class, 'implementationProcess'])->name('school.settings.implementation');
 Route::get('/settings/udise', [SettingsController::class, 'udise'])->name('school.settings.udise');
 Route::put('/settings/udise', [SettingsController::class, 'updateUdise'])->name('school.settings.udise.update');
@@ -86,8 +95,12 @@ Route::post('/settings/reset-password', [SettingsController::class, 'resetPasswo
 
 // Role Management Features
 Route::get('/role-management/roles', [\App\Http\Controllers\School\RoleController::class, 'index'])->name('school.roles.index');
+Route::put('/role-management/roles/permissions', [\App\Http\Controllers\School\RoleController::class, 'updateRolePermissions'])->name('school.roles.permissions.update');
 Route::get('/role-management/staff-access', [\App\Http\Controllers\School\RoleController::class, 'staffAccess'])->name('school.roles.staff-access');
-Route::put('/role-management/staff-access/{user}', [\App\Http\Controllers\School\RoleController::class, 'updateStaffAccess'])->name('school.roles.staff-access.update');
+// AJAX: get staff list for a module+feature cell
+Route::get('/role-management/staff-cell', [\App\Http\Controllers\School\RoleController::class, 'getStaffForCell'])->name('school.roles.staff-cell');
+// AJAX: save staff selections for a cell
+Route::post('/role-management/staff-cell/save', [\App\Http\Controllers\School\RoleController::class, 'saveStaffCell'])->name('school.roles.staff-cell.save');
 
 // Staff Management CRUD & Additional Features
 Route::get('/staff/import-template', [\App\Http\Controllers\School\StaffController::class, 'downloadTemplate'])->name('school.staff.import-template');
@@ -263,6 +276,16 @@ Route::match(['get', 'post'], '/admissions/admission', [App\Http\Controllers\Sch
 Route::match(['get', 'post'], '/admissions/new-admission-report', [App\Http\Controllers\School\AdmissionsController::class, 'newAdmissionReport'])->name('school.admissions.new-admission-report');
 Route::match(['get', 'post'], '/admissions/daily-planner', [App\Http\Controllers\School\AdmissionsController::class, 'dailyPlanner'])->name('school.admissions.daily-planner');
 Route::match(['get', 'post'], '/admissions/dashboard', [App\Http\Controllers\School\AdmissionsController::class, 'dashboard'])->name('school.admissions.dashboard');
+
+// Implementation Tracker Module
+Route::prefix('implementation-tracker')
+    ->name('implementation.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\ImplementationTracker\ImplementationTrackerController::class, 'index'])->name('index');
+        Route::put('/update/{tab}', [\App\Http\Controllers\ImplementationTracker\ImplementationTrackerController::class, 'update'])->name('update');
+        Route::get('/logs', [\App\Http\Controllers\ImplementationTracker\ImplementationTrackerController::class, 'logs'])->name('logs');
+    });
+
 
 
 

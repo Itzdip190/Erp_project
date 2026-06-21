@@ -3,101 +3,195 @@
 namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
+use App\Models\ModulePermission;
+use App\Models\StaffModuleAccess;
 use App\Models\User;
+use App\Support\ModuleRegistry;
 use Illuminate\Http\Request;
-use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
-    /**
-     * Show roles list and user counts.
-     */
+    /* ─────────────────────────────────────────────────────────────────
+     *  ROLE CATEGORY – module + feature view/edit toggles
+     * ───────────────────────────────────────────────────────────────── */
+
     public function index()
     {
         $schoolId = auth()->user()->school_id;
+        $modules  = ModuleRegistry::all();
 
-        // Fetch Spatie roles with the number of users in this school
-        $roles = Role::whereIn('name', ['school_admin', 'teacher', 'accountant', 'parent', 'student', 'driver'])->get();
+        // Load saved permissions keyed by "moduleKey.featureKey"
+        $saved = ModulePermission::where('school_id', $schoolId)
+            ->get()
+            ->keyBy(fn ($p) => "{$p->module_key}.{$p->feature_key}");
 
-        $rolesData = [];
-        foreach ($roles as $role) {
-            $userCount = User::where('school_id', $schoolId)
-                ->role($role->name)
-                ->count();
-
-            $rolesData[] = [
-                'name'        => $role->name,
-                'display_name'=> ucfirst(str_replace('_', ' ', $role->name)),
-                'user_count'  => $userCount,
-                'guard'       => $role->guard_name,
-                'description' => $this->getRoleDescription($role->name),
-            ];
-        }
-
-        return view('school.roles.index', compact('rolesData'));
+        return view('school.roles.index', compact('modules', 'saved'));
     }
 
-    /**
-     * Show staff access control list.
-     */
-    public function staffAccess(Request $request)
+    public function updateRolePermissions(Request $request)
     {
         $schoolId = auth()->user()->school_id;
-        $search = $request->get('search');
+        $modules  = ModuleRegistry::all();
 
-        $query = User::where('school_id', $schoolId)
-            ->whereHas('roles', function ($q) {
-                $q->whereIn('name', ['school_admin', 'teacher', 'accountant']);
-            });
+        // Build expected feature list from registry
+        foreach ($modules as $moduleKey => $module) {
+            foreach ($module['features'] as $featureKey => $_) {
+                $viewKey = "view_{$moduleKey}_{$featureKey}";
+                $editKey = "edit_{$moduleKey}_{$featureKey}";
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
-            });
+                ModulePermission::updateOrCreate(
+                    [
+                        'school_id'   => $schoolId,
+                        'module_key'  => $moduleKey,
+                        'feature_key' => $featureKey,
+                    ],
+                    [
+                        'view_access' => $request->boolean($viewKey),
+                        'edit_access' => $request->boolean($editKey),
+                    ]
+                );
+            }
         }
 
-        $users = $query->with('roles')->paginate(10);
-        $roles = Role::whereIn('name', ['school_admin', 'teacher', 'accountant'])->get();
+        return back()->with('success', 'Role permissions saved successfully!');
+    }
 
-        return view('school.roles.staff_access', compact('users', 'roles', 'search'));
+    /* ─────────────────────────────────────────────────────────────────
+     *  STAFF ACCESS CONTROL – per-staff, per-module, per-feature access
+     * ───────────────────────────────────────────────────────────────── */
+
+    public function staffAccess()
+    {
+        $schoolId = auth()->user()->school_id;
+        $modules  = ModuleRegistry::all();
+
+        // All teaching/admin staff for this school
+        $staff = User::where('school_id', $schoolId)
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['teacher', 'accountant', 'school_admin']))
+            ->with('roles')
+            ->orderBy('name')
+            ->get();
+
+        // Load saved staff access rows
+        // Keyed: "userId.moduleKey.featureKey" => {view_access, edit_access}
+        $access = StaffModuleAccess::where('school_id', $schoolId)
+            ->get()
+            ->keyBy(fn ($r) => "{$r->user_id}.{$r->module_key}.{$r->feature_key}");
+
+        return view('school.roles.staff_access', compact('modules', 'staff', 'access'));
     }
 
     /**
-     * Update access control / toggle status for a staff member.
+     * AJAX: toggle a single staff-module-feature row.
      */
-    public function updateStaffAccess(Request $request, User $user)
+    public function updateStaffAccess(Request $request)
     {
         $request->validate([
-            'role'      => 'required|exists:roles,name',
-            'is_active' => 'required|boolean',
+            'user_id'      => 'required|exists:users,id',
+            'module_key'   => 'required|string',
+            'feature_key'  => 'required|string',
+            'access_type'  => 'required|in:view,edit',
+            'value'        => 'required|boolean',
         ]);
 
+        $schoolId = auth()->user()->school_id;
+
         // Verify user belongs to same school
-        if ($user->school_id !== auth()->user()->school_id) {
-            abort(403, 'Unauthorized.');
+        $user = User::findOrFail($request->user_id);
+        if ($user->school_id !== $schoolId) {
+            return response()->json(['error' => 'Unauthorized'], 403);
         }
 
-        // Toggle user status
-        $user->is_active = $request->is_active;
-        $user->save();
+        $row = StaffModuleAccess::updateOrCreate(
+            [
+                'school_id'   => $schoolId,
+                'user_id'     => $request->user_id,
+                'module_key'  => $request->module_key,
+                'feature_key' => $request->feature_key,
+            ],
+            [
+                "{$request->access_type}_access" => $request->value,
+            ]
+        );
 
-        // Sync Spatie role
-        $user->syncRoles([$request->role]);
-
-        return back()->with('success', "Access settings for {$user->name} updated successfully!");
+        return response()->json(['success' => true, 'row' => $row]);
     }
 
-    private function getRoleDescription($roleName): string
+    /**
+     * Get all staff for a module+feature cell (for the slide-in panel).
+     */
+    public function getStaffForCell(Request $request)
     {
-        return match($roleName) {
-            'school_admin' => 'Full administrative access to manage students, staff, and configurations.',
-            'teacher'      => 'Academic access to manage classrooms, mark student attendance and generate cards.',
-            'accountant'   => 'Financial and read-only student access to manage fee collections and records.',
-            'parent'       => 'Portal access to view student progress, attendance, and download certificates.',
-            'student'      => 'Portal access to view dashboard, class documents and attendance logs.',
-            'driver'       => 'Mobile access to coordinate transport routes and tracking.',
-            default        => 'Standard portal access role.',
-        };
+        $request->validate([
+            'module_key'  => 'required|string',
+            'feature_key' => 'required|string',
+            'access_type' => 'required|in:view,edit',
+        ]);
+
+        $schoolId = auth()->user()->school_id;
+
+        $staff = User::where('school_id', $schoolId)
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['teacher', 'accountant', 'school_admin']))
+            ->with('roles')
+            ->orderBy('name')
+            ->get();
+
+        // Which staff already have this access
+        $accessCol = "{$request->access_type}_access";
+        $granted = StaffModuleAccess::where('school_id', $schoolId)
+            ->where('module_key', $request->module_key)
+            ->where('feature_key', $request->feature_key)
+            ->where($accessCol, true)
+            ->pluck('user_id')
+            ->toArray();
+
+        $result = $staff->map(fn ($u) => [
+            'id'      => $u->id,
+            'name'    => $u->name,
+            'role'    => ucfirst(str_replace('_', ' ', $u->roles->first()?->name ?? 'Staff')),
+            'granted' => in_array($u->id, $granted),
+        ]);
+
+        return response()->json(['staff' => $result]);
+    }
+
+    /**
+     * Save all staff selections for a module+feature cell (bulk save from panel).
+     */
+    public function saveStaffCell(Request $request)
+    {
+        $request->validate([
+            'module_key'  => 'required|string',
+            'feature_key' => 'required|string',
+            'access_type' => 'required|in:view,edit',
+            'user_ids'    => 'array',
+            'user_ids.*'  => 'exists:users,id',
+        ]);
+
+        $schoolId   = auth()->user()->school_id;
+        $accessCol  = "{$request->access_type}_access";
+        $grantedIds = $request->input('user_ids', []);
+
+        // Get all staff for this school
+        $allStaffIds = User::where('school_id', $schoolId)
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['teacher', 'accountant', 'school_admin']))
+            ->pluck('id')
+            ->toArray();
+
+        foreach ($allStaffIds as $userId) {
+            StaffModuleAccess::updateOrCreate(
+                [
+                    'school_id'   => $schoolId,
+                    'user_id'     => $userId,
+                    'module_key'  => $request->module_key,
+                    'feature_key' => $request->feature_key,
+                ],
+                [
+                    $accessCol => in_array($userId, $grantedIds),
+                ]
+            );
+        }
+
+        return response()->json(['success' => true, 'count' => count($grantedIds)]);
     }
 }

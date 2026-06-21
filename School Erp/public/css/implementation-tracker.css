@@ -1,0 +1,311 @@
+/* ═══════════════════════════════════════════════════════════════
+   IMPLEMENTATION TRACKER — Scoped Stylesheet
+   Theme: Royal Blue & Clean White
+   ═══════════════════════════════════════════════════════════════ */
+:root {
+  --impl-primary-blue: #0B5394;
+  --impl-dark-navy: #0D3B5C;
+  --impl-light-blue: #E8F1FA;
+  --impl-accent-gold: #B5862B;
+  --impl-white: #FFFFFF;
+  --impl-border-grey: #DCE3EA;
+  --impl-pending-red-bg: #FCE4E4;
+  --impl-pending-red-text: #C0392B;
+  --impl-completed-green-bg: #E1F7E0;
+  --impl-completed-green-text: #1E7E34;
+}
+
+.impl-wrapper {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(11, 83, 148, 0.05);
+  border: 1px solid var(--impl-border-grey);
+  margin-top: 16px;
+}
+
+/* ── TABS NAVIGATION ────────────────────────────────────────── */
+.impl-tabs-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--impl-border-grey);
+  margin-bottom: 20px;
+}
+.impl-tabs-list {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  gap: 8px;
+}
+.impl-tab-btn {
+  background: #fff;
+  color: var(--impl-dark-navy);
+  border: 1px solid var(--impl-border-grey);
+  border-bottom: none;
+  padding: 10px 20px;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  top: 2px;
+}
+.impl-tab-btn.active {
+  background: var(--impl-primary-blue);
+  color: #fff;
+  border-color: var(--impl-primary-blue);
+}
+.impl-tab-btn:not(.active):hover {
+  background: #f8fafc;
+  color: var(--impl-primary-blue);
+}
+
+/* Actions Header Buttons */
+.impl-actions-hdr {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-bottom: 8px;
+}
+.impl-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+.impl-btn-update {
+  background: var(--impl-primary-blue);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(11, 83, 148, 0.2);
+}
+.impl-btn-update:hover {
+  background: var(--impl-dark-navy);
+  transform: translateY(-1px);
+}
+.impl-btn-edit {
+  background: #fff;
+  color: var(--impl-primary-blue);
+  border: 1.5px solid var(--impl-primary-blue);
+}
+.impl-btn-edit:hover:not(:disabled) {
+  background: var(--impl-light-blue);
+}
+.impl-btn-edit:disabled {
+  border-color: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+  background: #f1f5f9;
+}
+.impl-btn-logs {
+  background: #fff;
+  color: var(--impl-dark-navy);
+  border: 1.5px solid var(--impl-border-grey);
+}
+.impl-btn-logs:hover {
+  background: #f8fafc;
+}
+
+/* ── DATA TABLES ───────────────────────────────────────────── */
+.impl-table-container {
+  overflow-x: auto;
+  max-height: 60vh;
+  border: 1px solid var(--impl-border-grey);
+  border-radius: 12px;
+}
+.impl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+/* Sticky Header */
+.impl-table th {
+  background: var(--impl-dark-navy);
+  color: #fff;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  padding: 14px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 2px solid var(--impl-border-grey);
+}
+.impl-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--impl-border-grey);
+  color: #1e293b;
+  vertical-align: middle;
+}
+.impl-table tbody tr:nth-child(even) td {
+  background: var(--impl-light-blue);
+}
+.impl-table tbody tr:hover td {
+  background: rgba(11, 83, 148, 0.08) !important;
+}
+
+/* Confirmation Highlight (School Side) */
+.impl-cell-confirm {
+  transition: background-color 0.25s ease;
+}
+.impl-cell-confirm.pending {
+  background: var(--impl-pending-red-bg) !important;
+  color: var(--impl-pending-red-text);
+  font-weight: 700;
+}
+.impl-cell-confirm.confirmed {
+  background: var(--impl-completed-green-bg) !important;
+  color: var(--impl-completed-green-text);
+  font-weight: 700;
+}
+
+/* Badges for status */
+.impl-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  text-align: center;
+}
+.impl-badge.pending {
+  background: var(--impl-pending-red-bg);
+  color: var(--impl-pending-red-text);
+}
+.impl-badge.completed {
+  background: var(--impl-completed-green-bg);
+  color: var(--impl-completed-green-text);
+}
+.impl-badge.progress {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+/* Form controls in inline-edit mode */
+.impl-edit-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--impl-border-grey);
+  border-radius: 6px;
+  font-size: 12.5px;
+  outline: none;
+  font-family: inherit;
+}
+.impl-edit-input:focus {
+  border-color: var(--impl-primary-blue);
+  box-shadow: 0 0 0 2px rgba(11, 83, 148, 0.1);
+}
+.impl-edit-select {
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--impl-border-grey);
+  font-size: 12.5px;
+  width: 100%;
+}
+.impl-file-wrapper {
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.impl-file-link {
+  color: var(--impl-primary-blue);
+  text-decoration: underline;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.impl-file-link:hover {
+  color: var(--impl-dark-navy);
+}
+
+/* Tab contents hides/shows */
+.impl-tab-content {
+  display: none;
+}
+.impl-tab-content.active {
+  display: block;
+}
+
+/* Guidelines link */
+.impl-guidelines-link {
+  color: var(--impl-primary-blue);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  cursor: pointer;
+}
+.impl-guidelines-link:hover {
+  text-decoration: underline;
+}
+
+/* Modal styling */
+.impl-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.impl-modal.active {
+  display: flex;
+}
+.impl-modal-content {
+  background: #fff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 800px;
+  border: 1px solid var(--impl-border-grey);
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+}
+.impl-modal-hdr {
+  background: var(--impl-dark-navy);
+  color: #fff;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.impl-modal-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 20px;
+  cursor: pointer;
+}
+.impl-modal-close:hover {
+  color: #fff;
+}
+.impl-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}

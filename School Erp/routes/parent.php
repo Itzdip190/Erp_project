@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/dashboard',          [ParentDashboardController::class, 'index'])->name('parent.dashboard');
 Route::get('/children/{student}', [ParentChildrenController::class,  'show'])->name('parent.children.show');
 Route::get('/attendance',         [ParentAttendanceController::class,'index'])->name('parent.attendance.index');
+Route::get('/fees',               [ParentDashboardController::class, 'fees'])->name('parent.fees.index');
+Route::get('/timetable',          [ParentDashboardController::class, 'timetable'])->name('parent.timetable.index');
 Route::get('/documents',          [ParentDashboardController::class, 'documents'])->name('parent.documents.index');
 Route::get('/documents/{document}/download', [ParentDashboardController::class, 'downloadDocument'])->name('parent.documents.download');
 

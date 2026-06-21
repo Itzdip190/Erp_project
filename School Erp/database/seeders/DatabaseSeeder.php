@@ -24,6 +24,10 @@ class DatabaseSeeder extends Seeder
             SubjectSeeder::class,
             ParentStudentSeeder::class,
             TestStudentSeeder::class,
+            ImplDataImplementationSeeder::class,
+            ImplTemplateImplementationSeeder::class,
+            ImplIntegrationsSeeder::class,
+            ImplTrainingSeeder::class,
         ]);
     }
 }
