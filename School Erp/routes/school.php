@@ -10,6 +10,8 @@ use App\Http\Controllers\School\SchoolDashboardController;
 use App\Http\Controllers\School\SettingsController;
 use App\Http\Controllers\School\ClassAssignmentController;
 use App\Http\Controllers\School\TimetableController;
+use App\Http\Controllers\School\TimetableGroupController;
+use App\Http\Controllers\School\ClassTimetableController;
 use App\Http\Controllers\School\StudentManagementController;
 use App\Http\Controllers\School\DownloadStatisticsController;
 use App\Http\Controllers\School\FeeManagementController;
@@ -62,6 +64,7 @@ Route::middleware(['check.module:attendance'])->group(function () {
     Route::get('/attendance/students/report', [StudentAttendanceController::class, 'report'])->name('school.attendance.students.report');
     Route::get('/attendance/students/daily', [StudentAttendanceController::class, 'dailyReport'])->name('school.attendance.students.daily');
     Route::get('/attendance/students/stats', [StudentAttendanceController::class, 'stats'])->name('school.attendance.students.stats');
+    Route::get('/attendance/students/marking-report', [StudentAttendanceController::class, 'markingReport'])->name('school.attendance.students.marking-report');
 
     // Staff Attendance
     Route::get('/attendance/staff', [StaffAttendanceController::class, 'index'])->name('school.attendance.staff.index');
@@ -95,7 +98,7 @@ Route::post('/settings/reset-password', [SettingsController::class, 'resetPasswo
 
 // Role Management Features
 Route::get('/role-management/roles', [\App\Http\Controllers\School\RoleController::class, 'index'])->name('school.roles.index');
-Route::put('/role-management/roles/permissions', [\App\Http\Controllers\School\RoleController::class, 'updateRolePermissions'])->name('school.roles.permissions.update');
+Route::post('/role-management/roles/update-staff', [\App\Http\Controllers\School\RoleController::class, 'updateStaffDesignations'])->name('school.roles.update-staff');
 Route::get('/role-management/staff-access', [\App\Http\Controllers\School\RoleController::class, 'staffAccess'])->name('school.roles.staff-access');
 // AJAX: get staff list for a module+feature cell
 Route::get('/role-management/staff-cell', [\App\Http\Controllers\School\RoleController::class, 'getStaffForCell'])->name('school.roles.staff-cell');
@@ -108,8 +111,8 @@ Route::get('/staff/import', [\App\Http\Controllers\School\StaffController::class
 Route::post('/staff/import', [\App\Http\Controllers\School\StaffController::class, 'bulkImport'])->name('school.staff.import.post');
 Route::get('/staff/bulk-photo', [\App\Http\Controllers\School\StaffController::class, 'bulkPhotoForm'])->name('school.staff.bulk-photo');
 Route::post('/staff/bulk-photo', [\App\Http\Controllers\School\StaffController::class, 'bulkPhotoUpload'])->name('school.staff.bulk-photo.post');
-Route::get('/staff/bulk-attendance', [\App\Http\Controllers\School\StaffController::class, 'bulkAttendance'])->name('school.staff.bulk-attendance');
-Route::post('/staff/bulk-attendance', [\App\Http\Controllers\School\StaffController::class, 'saveBulkAttendance'])->name('school.staff.bulk-attendance.post');
+Route::get('/staff/bulk-attendance', [StaffAttendanceController::class, 'bulkAttendance'])->name('school.staff.bulk-attendance');
+Route::post('/staff/bulk-attendance', [StaffAttendanceController::class, 'saveBulkAttendance'])->name('school.staff.bulk-attendance.post');
 
 Route::resource('staff', \App\Http\Controllers\School\StaffController::class)->names([
     'index' => 'school.staff.index',
@@ -125,39 +128,65 @@ Route::resource('staff', \App\Http\Controllers\School\StaffController::class)->n
 Route::get('/assignments/class-overview', [ClassAssignmentController::class, 'classOverview'])->name('school.assignments.class-overview');
 Route::get('/assignments/classes', [ClassAssignmentController::class, 'classesForm'])->name('school.assignments.classes');
 Route::post('/assignments/classes', [ClassAssignmentController::class, 'storeClass'])->name('school.assignments.classes.store');
+Route::put('/assignments/classes/{class}', [ClassAssignmentController::class, 'updateClass'])->name('school.assignments.classes.update');
+Route::post('/assignments/classes/reorder', [ClassAssignmentController::class, 'reorderClasses'])->name('school.assignments.classes.reorder');
+Route::get('/assignments/classes/logs', [ClassAssignmentController::class, 'classLogs'])->name('school.assignments.classes.logs');
 Route::post('/assignments/sections', [ClassAssignmentController::class, 'storeSection'])->name('school.assignments.sections.store');
 Route::delete('/assignments/classes/{class}', [ClassAssignmentController::class, 'destroyClass'])->name('school.assignments.classes.destroy');
 Route::delete('/assignments/sections/{section}', [ClassAssignmentController::class, 'destroySection'])->name('school.assignments.sections.destroy');
 
 Route::get('/assignments/subjects', [ClassAssignmentController::class, 'subjectsForm'])->name('school.assignments.subjects');
 Route::post('/assignments/subjects', [ClassAssignmentController::class, 'storeSubject'])->name('school.assignments.subjects.store');
+Route::post('/assignments/subjects/reorder', [ClassAssignmentController::class, 'reorderSubjects'])->name('school.assignments.subjects.reorder');
+Route::get('/assignments/subjects/logs', [ClassAssignmentController::class, 'subjectLogs'])->name('school.assignments.subjects.logs');
+Route::put('/assignments/subjects/{subject}', [ClassAssignmentController::class, 'updateSubject'])->name('school.assignments.subjects.update');
 Route::delete('/assignments/subjects/{subject}', [ClassAssignmentController::class, 'destroySubject'])->name('school.assignments.subjects.destroy');
 
 Route::get('/assignments/teachers', [ClassAssignmentController::class, 'teachersForm'])->name('school.assignments.teachers');
+Route::get('/assignments/teachers/load-grid', [ClassAssignmentController::class, 'loadTeacherGrid'])->name('school.assignments.teachers.load-grid');
+Route::post('/assignments/teachers/save-grid', [ClassAssignmentController::class, 'saveTeacherGrid'])->name('school.assignments.teachers.save-grid');
+Route::get('/assignments/teachers/logs', [ClassAssignmentController::class, 'teacherLogs'])->name('school.assignments.teachers.logs');
+Route::get('/assignments/teachers/export-template', [ClassAssignmentController::class, 'exportTeacherMappingTemplate'])->name('school.assignments.teachers.export-template');
+Route::post('/assignments/teachers/import', [ClassAssignmentController::class, 'importTeacherMapping'])->name('school.assignments.teachers.import');
 Route::post('/assignments/teachers', [ClassAssignmentController::class, 'storeAssignment'])->name('school.assignments.teachers.store');
 Route::post('/assignments/sections/{section}/class-teacher', [ClassAssignmentController::class, 'updateClassTeacher'])->name('school.assignments.class-teacher.update');
 Route::delete('/assignments/teachers/{assignment}', [ClassAssignmentController::class, 'destroyAssignment'])->name('school.assignments.teachers.destroy');
 
+
 // Timetable Administration Routes
-Route::get('/timetable/class', [TimetableController::class, 'classTimetable'])->name('school.timetable.class');
-Route::post('/timetable/class', [TimetableController::class, 'storeClassTimetable'])->name('school.timetable.class.store');
-Route::delete('/timetable/class/{timetable}', [TimetableController::class, 'destroyClassTimetable'])->name('school.timetable.class.destroy');
-Route::get('/timetable/group', [TimetableController::class, 'groupTimetable'])->name('school.timetable.group');
+// Group-Wise Timetable
+Route::get('/timetable/groups', [TimetableGroupController::class, 'index'])->name('school.timetable.group');
+Route::post('/timetable/groups', [TimetableGroupController::class, 'store'])->name('school.timetable.group.store');
+Route::put('/timetable/groups/{group}', [TimetableGroupController::class, 'update'])->name('school.timetable.group.update');
+Route::patch('/timetable/groups/{group}/toggle-status', [TimetableGroupController::class, 'toggleStatus'])->name('school.timetable.group.toggle-status');
+
+// Class Time Table
+Route::get('/timetable/class', [ClassTimetableController::class, 'index'])->name('school.timetable.class');
+Route::get('/timetable/class/grid', [ClassTimetableController::class, 'getGrid'])->name('school.timetable.class.grid');
+Route::post('/timetable/class/cell', [ClassTimetableController::class, 'saveCell'])->name('school.timetable.class.cell.save');
+Route::delete('/timetable/class/cell/{cell}', [ClassTimetableController::class, 'deleteCell'])->name('school.timetable.class.cell.delete');
+Route::post('/timetable/class/cell/{cell}/copy', [ClassTimetableController::class, 'copyCell'])->name('school.timetable.class.cell.copy');
+Route::get('/timetable/class/download', [ClassTimetableController::class, 'download'])->name('school.timetable.class.download');
+
+// Teacher assignment
+Route::get('/timetable/check-teacher', [ClassTimetableController::class, 'checkTeacherAssigned'])->name('school.timetable.check-teacher');
+Route::post('/timetable/assign-teacher', [ClassTimetableController::class, 'assignTeacher'])->name('school.timetable.assign-teacher');
 Route::get('/timetable/teacher', [TimetableController::class, 'teacherTimetable'])->name('school.timetable.teacher');
 Route::get('/timetable/substitution', [TimetableController::class, 'teacherSubstitution'])->name('school.timetable.substitution');
 Route::post('/timetable/substitution', [TimetableController::class, 'storeSubstitution'])->name('school.timetable.substitution.store');
 Route::delete('/timetable/substitution/{substitution}', [TimetableController::class, 'destroySubstitution'])->name('school.timetable.substitution.destroy');
-Route::get('/timetable/workload', [TimetableController::class, 'teacherWorkload'])->name('school.timetable.workload');
+
 
 // Student Management Extension Routes
 Route::get('/student-mgmt/import', [StudentManagementController::class, 'bulkImport'])->name('school.student-mgmt.import');
 Route::get('/student-mgmt/bulk-photo', [StudentManagementController::class, 'bulkPhoto'])->name('school.student-mgmt.bulk-photo');
+Route::post('/student-mgmt/bulk-photo', [StudentManagementController::class, 'bulkPhotoUpload'])->name('school.student-mgmt.bulk-photo.post');
 Route::get('/student-mgmt/optional-subject', [StudentManagementController::class, 'optionalSubject'])->name('school.student-mgmt.optional-subject');
 Route::post('/student-mgmt/optional-subject', [StudentManagementController::class, 'saveOptionalSubject']);
 Route::get('/student-mgmt/admission-report', [StudentManagementController::class, 'admissionReport'])->name('school.student-mgmt.admission-report');
 Route::get('/student-mgmt/siblings', [StudentManagementController::class, 'siblings'])->name('school.student-mgmt.siblings');
 Route::get('/student-mgmt/bulk-attendance', [StudentManagementController::class, 'bulkAttendance'])->name('school.student-mgmt.bulk-attendance');
-Route::post('/student-mgmt/bulk-attendance', [\App\Http\Controllers\School\Attendance\StudentAttendanceController::class, 'store']);
+Route::post('/student-mgmt/bulk-attendance', [StudentManagementController::class, 'saveBulkAttendance'])->name('school.student-mgmt.bulk-attendance.post');
 Route::get('/student-mgmt/report', [StudentManagementController::class, 'studentReport'])->name('school.student-mgmt.report');
 Route::get('/student-mgmt/app-settings', [StudentManagementController::class, 'appSettings'])->name('school.student-mgmt.app-settings');
 Route::post('/student-mgmt/app-settings', [StudentManagementController::class, 'saveAppSettings']);
@@ -189,9 +218,10 @@ Route::get('/downloads/activity', function() { return redirect()->route('school.
 // Fee Management Routes
 Route::get('/fees/configuration', [FeeManagementController::class, 'feeConfiguration'])->name('school.fees.configuration');
 Route::post('/fees/configuration', [FeeManagementController::class, 'feeConfiguration']);
-Route::get('/fees/basics', [FeeManagementController::class, 'feeBasics'])->name('school.fees.basics');
+Route::match(['get', 'post'], '/fees/basics', [FeeManagementController::class, 'feeBasics'])->name('school.fees.basics');
 Route::get('/fees/class-wise', [FeeManagementController::class, 'classWiseFee'])->name('school.fees.class-wise');
 Route::post('/fees/class-wise', [FeeManagementController::class, 'classWiseFee']);
+Route::post('/fees/class-wise/save-allocation', [FeeManagementController::class, 'saveAllocation'])->name('school.fees.class-wise.save-allocation');
 Route::get('/fees/student-wise', [FeeManagementController::class, 'studentWiseFee'])->name('school.fees.student-wise');
 Route::post('/fees/student-wise', [FeeManagementController::class, 'studentWiseFee']);
 Route::get('/fees/optional-mapping', [FeeManagementController::class, 'optionalFeeMapping'])->name('school.fees.optional-mapping');
