@@ -302,10 +302,36 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
             </div>
         </div>
 
+        @php
+            $payUrl = '#';
+            if (isset($config) && $config && $config->payment_url_enabled && $config->payment_url) {
+                $payUrl = $config->payment_url;
+                $replacements = [
+                    '{student_id}' => $student->id,
+                    '{student_name}' => urlencode($student->full_name),
+                    '{admission_no}' => urlencode($student->admission_id),
+                    '{amount}' => $totalPending,
+                    '{purpose}' => urlencode('School Fees Payment'),
+                    '{school_id}' => $student->school_id,
+                ];
+                $payUrl = str_replace(array_keys($replacements), array_values($replacements), $payUrl);
+                if (strpos($payUrl, '{') === false && strpos($payUrl, 'student_id') === false) {
+                    $separator = (strpos($payUrl, '?') === false) ? '?' : '&';
+                    $payUrl .= $separator . "student_id={$student->id}&amount={$totalPending}";
+                }
+            }
+        @endphp
         <div class="card">
-            <div class="card-hdr" style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="card-hdr" style="display:flex; justify-content:space-between; align-items:center; gap: 8px;">
                 <span class="card-title"><i class="fas fa-receipt" style="color:var(--gold);margin-right:8px;"></i>Fee Ledger & Statements</span>
-                <button onclick="window.print()" class="btn btn-outline" style="padding:6px 12px; font-size:11.5px; background:none; border:1px solid var(--border); border-radius:6px; cursor:pointer;"><i class="fas fa-print"></i> Print Statement</button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    @if(isset($config) && $config && $config->payment_url_enabled && $config->payment_url && $totalPending > 0)
+                        <a href="{{ $payUrl }}" target="_blank" class="btn btn-success" style="padding:6px 12px; font-size:11.5px; border-radius:6px; cursor:pointer; text-decoration:none; display: inline-flex; align-items: center; gap: 4px; background:#10b981; color:#fff;">
+                            <i class="fas fa-credit-card"></i> Pay Outstanding Balance
+                        </a>
+                    @endif
+                    <button onclick="window.print()" class="btn btn-outline" style="padding:6px 12px; font-size:11.5px; background:none; border:1px solid var(--border); border-radius:6px; cursor:pointer;"><i class="fas fa-print"></i> Print Statement</button>
+                </div>
             </div>
             <div class="card-body">
                 <div class="table-responsive">

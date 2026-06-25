@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('class_id')->constrained('school_classes')->cascadeOnDelete();
             $table->foreignId('academic_session_id')->constrained()->cascadeOnDelete();
             $table->date('date');
-            $table->enum('status', ['present', 'absent', 'late', 'half_day', 'holiday', 'leave']);
+            $table->enum('status', ['present', 'absent', 'late', 'half_day', 'holiday', 'leave', 'duty_leave']);
             $table->unsignedBigInteger('marked_by');
             $table->foreign('marked_by')->references('id')->on('users')->cascadeOnDelete();
             $table->string('remark')->nullable();

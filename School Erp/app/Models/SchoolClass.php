@@ -14,6 +14,9 @@ class SchoolClass extends Model
         'school_id',
         'name',
         'numeric_name',
+        'local_name',
+        'class_code',
+        'sort_order',
     ];
 
     protected $casts = [

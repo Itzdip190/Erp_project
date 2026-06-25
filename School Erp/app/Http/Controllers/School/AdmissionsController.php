@@ -7,6 +7,11 @@ use Illuminate\Http\Request;
 use App\Models\EnquiryLead;
 use App\Models\SchoolClass;
 use App\Models\Student;
+use App\Models\Section;
+use App\Models\AcademicSession;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+
 
 class AdmissionsController extends Controller
 {
@@ -151,9 +156,92 @@ class AdmissionsController extends Controller
         return view('school.admissions.admission', compact('leads', 'classes'));
     }
 
-    public function newAdmissionReport()
+    public function newAdmissionReport(Request $request)
     {
-        return view('school.admissions.new_admission_report');
+        $schoolId = auth()->user()->school_id;
+        $classes = SchoolClass::where('school_id', $schoolId)->get();
+        $academicSessions = AcademicSession::where('school_id', $schoolId)->get();
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+            ?? AcademicSession::where('school_id', $schoolId)->first();
+
+        $sessionId = $request->get('academic_session_id') ?? $currentSession?->id;
+        $classId = $request->get('class_id');
+        $sectionId = $request->get('section_id');
+        $fromDate = $request->get('from_date');
+        $toDate = $request->get('to_date');
+
+        // Fetch sections of the selected class
+        $sections = $classId 
+            ? Section::where('school_id', $schoolId)->where('class_id', $classId)->get() 
+            : collect();
+
+        // Build query
+        $query = Student::where('school_id', $schoolId)
+            ->with(['class', 'section', 'academicSession']);
+
+        if ($sessionId) {
+            $query->where('academic_session_id', $sessionId);
+        }
+        if ($classId) {
+            $query->where('class_id', $classId);
+        }
+        if ($sectionId) {
+            $query->where('section_id', $sectionId);
+        }
+        if ($fromDate) {
+            $query->whereDate('admission_date', '>=', $fromDate);
+        }
+        if ($toDate) {
+            $query->whereDate('admission_date', '<=', $toDate);
+        }
+
+        // Check if export is requested
+        if ($request->get('export') === 'excel') {
+            $students = $query->orderBy('admission_date', 'desc')->get();
+            
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            
+            $headers = ['Student Name', 'Admission ID', 'Academic Year', 'Admission Date', 'Class', 'Section', 'Father Name', 'Father Mobile Number'];
+            $sheet->fromArray($headers, null, 'A1');
+            
+            $rowIdx = 2;
+            foreach ($students as $student) {
+                $sheet->fromArray([
+                    $student->full_name,
+                    $student->admission_number,
+                    $student->academicSession?->name,
+                    $student->admission_date ? $student->admission_date->format('d/m/Y') : 'N/A',
+                    $student->class?->name,
+                    $student->section?->name,
+                    $student->father_name,
+                    $student->father_phone ?? $student->guardian_phone
+                ], null, 'A' . $rowIdx++);
+            }
+            
+            $writer = new Xlsx($spreadsheet);
+            
+            return response()->streamDownload(function () use ($writer) {
+                $writer->save('php://output');
+            }, 'new_admission_report.xlsx', [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        }
+
+        // Paginate students for the view
+        $students = $query->orderBy('admission_date', 'desc')->paginate(10)->withQueryString();
+
+        return view('school.admissions.new_admission_report', compact(
+            'classes',
+            'sections',
+            'academicSessions',
+            'students',
+            'sessionId',
+            'classId',
+            'sectionId',
+            'fromDate',
+            'toDate'
+        ));
     }
 
     public function dailyPlanner(Request $request)

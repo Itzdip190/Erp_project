@@ -15,12 +15,12 @@
         <h3>File Upload Area</h3>
     </div>
     <div class="card-body">
-        <form method="POST" action="#" class="alert alert-warning" style="display:flex; flex-direction:column; align-items:center; padding:30px; text-align:center; border:2px dashed var(--gold); background:rgba(245,158,11,.03); cursor:pointer;">
+        <form id="bulkPhotoForm" method="POST" action="{{ route('school.student-mgmt.bulk-photo.post') }}" enctype="multipart/form-data" class="alert alert-warning" style="display:flex; flex-direction:column; align-items:center; padding:30px; text-align:center; border:2px dashed var(--gold); background:rgba(245,158,11,.03); cursor:pointer;">
             @csrf
             <i class="fas fa-cloud-arrow-up" style="font-size:3rem; color:var(--gold); margin-bottom:12px;"></i>
             <h4 style="font-size:14px; font-weight:700; color:var(--navy); margin-bottom:6px;">Drag & Drop files here or click to browse</h4>
-            <p style="font-size:12px; color:var(--t2);">Upload images in zip format or select multiple JPG/PNG files named exactly as the Student's Admission ID (e.g. <code>YIS_2026_00001.jpg</code>)</p>
-            <input type="file" multiple name="files[]" style="display:none;" id="bulkPhotoInput">
+            <p style="font-size:12px; color:var(--t2);">Select multiple JPG/PNG image files named exactly as the Student's Admission ID (e.g. <code>YAS_2026_00001.jpg</code> or <code>YIS_2026_00001.png</code>)</p>
+            <input type="file" multiple name="photos[]" style="display:none;" id="bulkPhotoInput" accept="image/*">
         </form>
     </div>
 </div>
@@ -34,26 +34,63 @@
             <thead>
                 <tr>
                     <th>Uploaded Filename</th>
-                    <th>Matched Student ID</th>
+                    <th>Matched Student ID / Name</th>
                     <th>Status</th>
                     <th>Time Logged</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td><code>YIS_2026_00001.jpg</code></td>
-                    <td>Aarav Sharma <span class="badge badge-blue">YIS/2026/00001</span></td>
-                    <td><span class="badge badge-success">Successfully Matched</span></td>
-                    <td>Just now</td>
-                </tr>
-                <tr>
-                    <td><code>YIS_2026_00002.jpg</code></td>
-                    <td>Priya Patel <span class="badge badge-blue">YIS/2026/00002</span></td>
-                    <td><span class="badge badge-success">Successfully Matched</span></td>
-                    <td>Just now</td>
-                </tr>
+                @if(session('matches'))
+                    @foreach(session('matches') as $match)
+                        <tr>
+                            <td><code>{{ $match['filename'] }}</code></td>
+                            <td>
+                                @if($match['status'] === 'success')
+                                    {{ $match['student_name'] }} <span class="badge badge-blue">{{ $match['admission_number'] }}</span>
+                                @else
+                                    <span style="color:var(--red);">No match found</span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($match['status'] === 'success')
+                                    <span class="badge badge-success">Successfully Matched</span>
+                                @else
+                                    <span class="badge badge-danger">Failed to Match</span>
+                                @endif
+                            </td>
+                            <td>Just now</td>
+                        </tr>
+                    @endforeach
+                @else
+                    <tr>
+                        <td colspan="4" style="text-align:center; color:var(--t2); padding:30px;">
+                            No photos uploaded in this session yet. Click the upload area above to select and upload photos.
+                        </td>
+                    </tr>
+                @endif
             </tbody>
         </table>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('bulkPhotoForm');
+    const input = document.getElementById('bulkPhotoInput');
+    
+    form.addEventListener('click', function(e) {
+        if (e.target !== input) {
+            input.click();
+        }
+    });
+    
+    input.addEventListener('change', function() {
+        if (input.files.length > 0) {
+            form.submit();
+        }
+    });
+});
+</script>
 @endsection

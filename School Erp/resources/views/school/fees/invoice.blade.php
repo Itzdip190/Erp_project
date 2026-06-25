@@ -46,8 +46,17 @@
                 <div>
                     <h2 style="font-family:'Plus Jakarta Sans', sans-serif; font-weight:800; color:var(--navy); font-size:18px;">SchoolCloud ERP Institution</h2>
                     <p style="font-size:12px; color:var(--t2);">128, Academic Avenue, Tech City, India</p>
+                    @if($config && $config->inst_affiliation_no)
+                    <p style="font-size:11px; color:var(--t2);">Affiliation No: AFF-98762</p>
+                    @endif
+                    @if($config && $config->inst_school_url)
+                    <p style="font-size:11px; color:var(--t2);">Website: www.pragyaschool.edu</p>
+                    @endif
                 </div>
                 <div style="text-align:right;">
+                    @if($config && $config->inst_board_logo)
+                    <div style="margin-bottom:5px;"><span class="badge badge-warning"><i class="fas fa-certificate"></i> CBSE Board</span></div>
+                    @endif
                     <h3 style="font-size:14px; color:var(--gold); text-transform:uppercase; font-weight:700;">Fee Invoice</h3>
                     <p style="font-size:11px; color:var(--t3);">Invoice Ref: INV-{{ date('Y') }}-0092</p>
                 </div>
@@ -57,9 +66,27 @@
             <div style="display:flex; justify-content:space-between; margin-bottom:20px; font-size:12.5px;">
                 <div>
                     <span style="color:var(--t3); text-transform:uppercase; font-size:10px; font-weight:700;">Bill To:</span>
+                    @if(!$config || $config->details_student_name)
                     <div style="font-weight:700; color:var(--navy); margin-top:2px;" id="invStudentName">Aarav Sharma</div>
+                    @endif
+                    @if(!$config || $config->details_class)
                     <div id="invStudentClass">Grade Class: Class 10 - Section A</div>
+                    @endif
+                    @if(!$config || $config->details_admission_no)
                     <div id="invStudentID">Admission ID: YIS/2026/00001</div>
+                    @endif
+                    @if($config && $config->details_father_name)
+                    <div id="invStudentFather">Father's Name: <span id="invFatherName">—</span></div>
+                    @endif
+                    @if($config && $config->details_mother_name)
+                    <div id="invStudentMother">Mother's Name: <span id="invMotherName">—</span></div>
+                    @endif
+                    @if($config && $config->details_address)
+                    <div id="invStudentAddress">Address: <span id="invAddress">—</span></div>
+                    @endif
+                    @if($config && $config->details_father_phone)
+                    <div id="invStudentPhone">Phone: <span id="invFatherPhone">—</span></div>
+                    @endif
                 </div>
                 <div style="text-align:right;">
                     <div><strong>Invoice Date:</strong> {{ date('Y-m-d') }}</div>
@@ -119,6 +146,10 @@ const mockInvoices = {
         name: "{{ $st->full_name }}",
         class: "{{ optional($st->class)->name ?? 'N/A' }} - {{ optional($st->section)->name ?? 'N/A' }}",
         id: "{{ $st->admission_id }}",
+        father: "{{ $st->father_name ?? '—' }}",
+        mother: "{{ $st->mother_name ?? '—' }}",
+        address: "{{ $st->address ?? '—' }}",
+        phone: "{{ $st->father_phone ?? '—' }}",
         fees: [
             @foreach($fees->where('student_id', $st->id) as $f)
             { desc: "{{ $f->category->name }}", cycle: "Term billing", amt: {{ $f->amount }} },
@@ -131,9 +162,13 @@ const mockInvoices = {
 function loadInvoiceDetails(studentId) {
     if(!studentId || !mockInvoices[studentId]) return;
     const inv = mockInvoices[studentId];
-    document.getElementById('invStudentName').textContent = inv.name;
-    document.getElementById('invStudentClass').textContent = 'Grade Class: ' + inv.class;
-    document.getElementById('invStudentID').textContent = 'Admission ID: ' + inv.id;
+    if (document.getElementById('invStudentName')) document.getElementById('invStudentName').textContent = inv.name;
+    if (document.getElementById('invStudentClass')) document.getElementById('invStudentClass').textContent = 'Grade Class: ' + inv.class;
+    if (document.getElementById('invStudentID')) document.getElementById('invStudentID').textContent = 'Admission ID: ' + inv.id;
+    if (document.getElementById('invFatherName')) document.getElementById('invFatherName').textContent = inv.father;
+    if (document.getElementById('invMotherName')) document.getElementById('invMotherName').textContent = inv.mother;
+    if (document.getElementById('invAddress')) document.getElementById('invAddress').textContent = inv.address;
+    if (document.getElementById('invFatherPhone')) document.getElementById('invFatherPhone').textContent = inv.phone;
     
     let html = '';
     let total = 0;

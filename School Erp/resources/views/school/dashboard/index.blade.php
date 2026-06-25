@@ -26,7 +26,7 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 
 /* ─── SIDEBAR ─────────────────────────────────────────────── */
 .sidebar{
-    width:185px;min-width:185px;background:var(--navy);
+    width:230px;min-width:230px;background:var(--navy);
     height:100vh;position:fixed;left:0;top:0;
     display:flex;flex-direction:column;z-index:200;
     overflow-y:auto;overflow-x:hidden;
@@ -44,15 +44,15 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 }
 .sb-logo-icon{
     width:34px;height:34px;border-radius:9px;
-    background:var(--gold);
+    background:#2563eb;
     display:flex;align-items:center;justify-content:center;
-    font-size:16px;color:var(--navy);flex-shrink:0;
+    font-size:16px;color:#fff;flex-shrink:0;
 }
 .sb-logo-text strong{
-    display:block;color:#fff;font-size:13px;font-weight:800;
+    display:block;color:#fff;font-size:15px;font-weight:800;
     font-family:'Plus Jakarta Sans',sans-serif;line-height:1.15;
 }
-.sb-logo-text span{color:var(--gold);font-size:9.5px;font-weight:500;}
+.sb-logo-text span{color:#93c5fd;font-size:11px;font-weight:500;}
 
 /* School card */
 .sb-school{
@@ -64,16 +64,20 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 .sb-school-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
 .sb-school-icon{
     width:22px;height:22px;border-radius:5px;
-    background:rgba(245,158,11,.2);
+    background:rgba(37,99,235,.25);
     display:flex;align-items:center;justify-content:center;
-    color:var(--gold);font-size:10px;flex-shrink:0;
+    color:#60a5fa;font-size:10px;flex-shrink:0;
+    overflow:hidden;
 }
-.sb-school-name{color:#fff;font-size:11.5px;font-weight:700;line-height:1.3;}
-.sb-school-session{color:rgba(255,255,255,.45);font-size:9.5px;margin-bottom:6px;}
+.sb-school-icon img{
+    width:100%;height:100%;object-fit:cover;border-radius:5px;
+}
+.sb-school-name{color:#fff;font-size:13.5px;font-weight:700;line-height:1.3;}
+.sb-school-session{color:rgba(255,255,255,.45);font-size:11px;margin-bottom:6px;}
 .sb-plan-badge{
     display:inline-flex;align-items:center;gap:4px;
-    background:var(--gold-bg);color:var(--gold);
-    font-size:9.5px;font-weight:700;border-radius:20px;padding:2px 8px;
+    background:rgba(37,99,235,.25);color:#93c5fd;
+    font-size:11px;font-weight:700;border-radius:20px;padding:2px 8px;
 }
 
 /* Nav */
@@ -89,12 +93,12 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 .sb-hdr:hover{background:rgba(255,255,255,.05);color:#fff;}
 .sb-hdr-left{display:flex;align-items:center;gap:6px;}
 .sb-hdr-icon{
-    width:22px;height:22px;border-radius:50%;background:#f59e0b;
+    width:26px;height:26px;border-radius:50%;background:#2563eb;
     display:flex;align-items:center;justify-content:center;
-    color:#fff;font-size:9.5px;flex-shrink:0;
+    color:#fff;font-size:11px;flex-shrink:0;
 }
-.sb-hdr-title{font-family:'Plus Jakarta Sans',sans-serif;color:#fff;font-size:11px;font-weight:700;letter-spacing:0.2px;}
-.sb-hdr-arrow{font-size:9px;color:rgba(255,255,255,.3);transition:transform .2s;}
+.sb-hdr-title{font-family:'Plus Jakarta Sans',sans-serif;color:#fff;font-size:13.5px;font-weight:700;letter-spacing:0.2px;}
+.sb-hdr-arrow{font-size:10px;color:rgba(255,255,255,.3);transition:transform .2s;}
 .sb-hdr.open .sb-hdr-arrow{transform:rotate(180deg);}
 
 .sb-submenu{list-style:none;padding:2px 6px 2px 20px;display:none;}
@@ -103,40 +107,40 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 .sb-submenu a{
     display:flex;align-items:center;justify-content:space-between;
     padding:6px 8px;border-radius:6px;
-    color:rgba(255,255,255,.55);font-size:11px;font-weight:500;
+    color:rgba(255,255,255,.55);font-size:13px;font-weight:500;
     text-decoration:none;transition:all .18s;
 }
 .sb-submenu a:hover{color:#fff;background:rgba(255,255,255,.05);}
-.sb-submenu li.active a{color:#f59e0b;font-weight:700;}
+.sb-submenu li.active a{color:#fff;background:rgba(37,99,235,.25);border-left:3px solid #3b82f6;font-weight:700;}
 .sb-submenu-label{display:flex;align-items:center;gap:6px;}
-.sb-submenu-icon{font-size:9px;color:#f59e0b;flex-shrink:0;opacity:0.85;}
+.sb-submenu-icon{font-size:10px;color:#60a5fa;flex-shrink:0;opacity:0.85;}
 
 /* Sidebar bottom */
 .sb-bottom{padding:10px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0;}
 .sb-help{
-    background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(245,158,11,.04));
-    border:1px solid rgba(245,158,11,.22);
+    background:linear-gradient(135deg,rgba(37,99,235,.15),rgba(37,99,235,.03));
+    border:1px solid rgba(37,99,235,.2);
     border-radius:9px;padding:11px 11px 10px;margin-bottom:8px;
 }
-.sb-help p{color:rgba(255,255,255,.5);font-size:10px;margin-bottom:6px;}
-.sb-help strong{display:block;color:#fff;font-size:11.5px;margin-bottom:8px;}
+.sb-help p{color:rgba(255,255,255,.5);font-size:11px;margin-bottom:6px;}
+.sb-help strong{display:block;color:#fff;font-size:13px;margin-bottom:8px;}
 .btn-support{
     display:block;text-align:center;
-    background:var(--gold);color:var(--navy);
-    font-size:11px;font-weight:700;border-radius:6px;
+    background:#2563eb;color:#fff;
+    font-size:12px;font-weight:700;border-radius:6px;
     padding:7px;text-decoration:none;transition:.2s;
 }
-.btn-support:hover{background:#d97706;}
+.btn-support:hover{background:#1d4ed8;}
 .sb-logout{
     display:flex;align-items:center;gap:8px;
-    color:rgba(255,255,255,.4);font-size:11.5px;
+    color:rgba(255,255,255,.4);font-size:13px;
     padding:7px 9px;border-radius:7px;
     text-decoration:none;transition:.2s;
 }
 .sb-logout:hover{background:rgba(239,68,68,.12);color:#ef4444;}
 
 /* ─── MAIN ────────────────────────────────────────────────── */
-.main{margin-left:185px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.main{margin-left:230px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
 
 /* ─── NAVBAR ─────────────────────────────────────────────── */
 .topbar{
@@ -541,7 +545,7 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
     .hamburger{display:flex;}
 }
 @media(max-width:768px){
-    .sidebar{transform:translateX(-185px);width:185px;}
+    .sidebar{transform:translateX(-230px);width:230px;}
     .sidebar.open{transform:translateX(0);}
     .sb-logo-text,.sb-school,.sb-hdr-title,.sb-hdr-arrow,.sb-bottom{display:block!important;}
     .sb-submenu{display:none;}
@@ -648,7 +652,7 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
     gap: 12px;
     margin-bottom: 20px;
 }
-@media(max-width: 1024px) {
+@media(max-width: 1280px) {
     .top-summary-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media(max-width: 600px) {
@@ -659,7 +663,8 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
     overflow: hidden;
     box-shadow: var(--shadow);
     display: flex;
-    height: 90px;
+    min-height: 90px;
+    height: auto;
     color: #fff;
     border: 1px solid var(--border);
 }
@@ -706,6 +711,8 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
     font-size: 11px;
     font-weight: 500;
     color: rgba(255,255,255,0.85);
+    flex-wrap: wrap;
+    gap: 4px;
 }
 .sum-card .right-row strong {
     font-size: 13.5px;
@@ -1119,6 +1126,14 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
     font-size: 11.5px;
     font-weight: 600;
     color: var(--t2);
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.fee-action-row span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
 }
 .fee-action-row span strong {
     color: var(--t1);
@@ -1983,7 +1998,13 @@ $monthShort = Carbon::create($year,$month)->format('M');
 
     <div class="sb-school">
         <div class="sb-school-row">
-            <div class="sb-school-icon"><i class="fas fa-school"></i></div>
+            <div class="sb-school-icon">
+                @if(!empty($school->logo) && Storage::disk('public')->exists($school->logo))
+                    <img src="{{ Storage::disk('public')->url($school->logo) }}" alt="{{ $school->name }}">
+                @else
+                    <i class="fas fa-school"></i>
+                @endif
+            </div>
             <div class="sb-school-name">{{ $school->name }}</div>
         </div>
         <div class="sb-school-session">
@@ -2038,12 +2059,14 @@ $monthShort = Carbon::create($year,$month)->format('M');
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
+                {{-- HIDDEN: Implementation Process (temporarily hidden — do not delete)
                 <li class="{{ request()->is('school/settings/implementation') ? 'active' : '' }}">
                     <a href="{{ route('school.settings.implementation') }}">
                         <span class="sb-submenu-label">Implementation Process</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
+                HIDDEN --}}
                 <li class="{{ request()->is('school/settings/udise') ? 'active' : '' }}">
                     <a href="{{ route('school.settings.udise') }}">
                         <span class="sb-submenu-label">UDISE</span>
@@ -2143,8 +2166,8 @@ $monthShort = Carbon::create($year,$month)->format('M');
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/attendance/students/report') ? 'active' : '' }}">
-                    <a href="{{ route('school.attendance.students.report') }}">
+                <li class="{{ request()->is('school/attendance/students/marking-report') ? 'active' : '' }}">
+                    <a href="{{ route('school.attendance.students.marking-report') }}">
                         <span class="sb-submenu-label">Student Attendance Marking Report</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
@@ -2223,12 +2246,6 @@ $monthShort = Carbon::create($year,$month)->format('M');
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/timetable/workload*') ? 'active' : '' }}">
-                    <a href="{{ route('school.timetable.workload') }}">
-                        <span class="sb-submenu-label">Teacher Workload</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
             </ul>
         </div>
 
@@ -2302,6 +2319,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
+                {{--
                 <li class="{{ request()->is('school/student-mgmt/app-settings*') ? 'active' : '' }}">
                     <a href="{{ route('school.student-mgmt.app-settings') }}">
                         <span class="sb-submenu-label">Student Info. Update Settings on App</span>
@@ -2344,6 +2362,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
+                --}}
             </ul>
         </div>
 
@@ -2671,7 +2690,11 @@ $monthShort = Carbon::create($year,$month)->format('M');
             <div class="user-wrap">
                 <div class="user-btn" onclick="toggleDrop('userDrop')">
                     <div class="avatar">
-                        @if($user->photo)<img src="{{ $user->photo }}" alt="">@else{{ $initials }}@endif
+                        @if($school && !empty($school->logo) && Storage::disk('public')->exists($school->logo))
+                            <img src="{{ Storage::disk('public')->url($school->logo) }}" alt="{{ $school->name }}">
+                        @else
+                            {{ $initials }}
+                        @endif
                     </div>
                     <div class="user-info">
                         <strong>{{ $user->name }}</strong>
@@ -2720,7 +2743,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                     <div class="right-row">
                         <span>Students</span>
                         <div class="row-actions">
-                            <i class="fas fa-circle-info" onclick="openDrawer('students')"></i>
+                            <i class="fas fa-circle-info" data-info="Total number of active students currently enrolled in the school."></i>
                             <i class="fas fa-circle-play" onclick="openDrawer('students')"></i>
                             <strong>{{ $totalStudents }}</strong>
                         </div>
@@ -2769,7 +2792,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                     <div class="right-row">
                         <span>Today's Collection</span>
                         <div class="row-actions">
-                            <i class="fas fa-circle-info" onclick="openDrawer('today_collection')"></i>
+                            <i class="fas fa-circle-info" data-info="Total fees collected and received today across all payment modes."></i>
                             <i class="fas fa-circle-play" onclick="openDrawer('today_collection')"></i>
                             <strong>₹ {{ number_format($todayFeeCollection) }}</strong>
                         </div>
@@ -2777,7 +2800,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                     <div class="right-row">
                         <span>Total Collection</span>
                         <div class="row-actions">
-                            <i class="fas fa-circle-info" onclick="openDrawer('total_collection')"></i>
+                            <i class="fas fa-circle-info" data-info="Total fee collection accumulated in the current academic year so far."></i>
                             <i class="fas fa-circle-play" onclick="openDrawer('total_collection')"></i>
                             <strong>₹ {{ number_format($totalFeeCollection) }}</strong>
                         </div>
@@ -2787,26 +2810,34 @@ $monthShort = Carbon::create($year,$month)->format('M');
 
             <!-- 4. Today's Attendance -->
             <div class="sum-card at-lavender">
-                <div class="card-left-part" style="width:36%;">
+                <div class="card-left-part" style="width:34%;">
                     <h4 style="font-size:10px;line-height:1.2;">Today's Attendance</h4>
                     <i class="fas fa-rotate refresh-trigger" onclick="spinIcon(this)" style="margin-top:4px;"></i>
                 </div>
-                <div class="card-right-part" style="width:64%;padding:8px 10px;">
-                    <div class="right-row" style="margin-bottom:2px;">
-                        <span>Students</span>
-                        <i class="fas fa-circle-play" style="font-size:10px;cursor:pointer;" onclick="openDrawer('student_attendance')"></i>
-                        <div class="progress-track">
-                            <div class="progress-fill" style="width: {{ $studentAttendancePct }}%;"></div>
+                <div class="card-right-part" style="width:66%;padding:6px 8px;gap:4px;">
+                    <div class="attendance-row" style="margin-bottom:2px;width:100%;">
+                        <div class="attendance-header" style="display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:500;color:var(--t2);margin-bottom:2px;">
+                            <span style="display:inline-flex;align-items:center;gap:4px;">
+                                Students
+                                <i class="fas fa-circle-play" style="font-size:10px;cursor:pointer;color:var(--t2);" onclick="openDrawer('student_attendance')"></i>
+                            </span>
+                            <strong style="color:var(--t1);font-size:12.5px;font-weight:800;">{{ $studentAttendancePct }}%</strong>
                         </div>
-                        <strong>{{ $studentAttendancePct }}%</strong>
+                        <div class="progress-track" style="margin:0;background:#e0dbe9;height:5px;border-radius:3px;overflow:hidden;width:100%;">
+                            <div class="progress-fill" style="width:{{ $studentAttendancePct }}%;height:100%;background:#b71c1c;border-radius:3px;"></div>
+                        </div>
                     </div>
-                    <div class="right-row">
-                        <span>Staffs</span>
-                        <i class="fas fa-circle-play" style="font-size:10px;cursor:pointer;" onclick="openDrawer('staff_attendance')"></i>
-                        <div class="progress-track">
-                            <div class="progress-fill" style="width: {{ $staffAttendancePct }}%;"></div>
+                    <div class="attendance-row" style="width:100%;">
+                        <div class="attendance-header" style="display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:500;color:var(--t2);margin-bottom:2px;">
+                            <span style="display:inline-flex;align-items:center;gap:4px;">
+                                Staffs
+                                <i class="fas fa-circle-play" style="font-size:10px;cursor:pointer;color:var(--t2);" onclick="openDrawer('staff_attendance')"></i>
+                            </span>
+                            <strong style="color:var(--t1);font-size:12.5px;font-weight:800;">{{ $staffAttendancePct }}%<span style="font-size:9px;color:var(--t2);margin-left:2px;">({{ $totalStaffs }})</span></strong>
                         </div>
-                        <strong>{{ $staffAttendancePct }}% <span style="font-size:9px;color:var(--t2);margin-left:2px;">{{ $totalStaffs }}</span></strong>
+                        <div class="progress-track" style="margin:0;background:#e0dbe9;height:5px;border-radius:3px;overflow:hidden;width:100%;">
+                            <div class="progress-fill" style="width:{{ $staffAttendancePct }}%;height:100%;background:#b71c1c;border-radius:3px;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2866,7 +2897,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                         <div class="attrition-box-title">
                             <i class="fas fa-users" style="color:#f59e0b;"></i>
                             <span>Students</span>
-                            <i class="fas fa-circle-info" onclick="openDrawer('students')"></i>
+                            <i class="fas fa-circle-info" data-info="Student enrollment dynamics: newly joined vs exited (TC/deleted) students."></i>
                         </div>
                         <div class="attrition-list">
                             <div class="attrition-row">
@@ -2891,7 +2922,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                         <div class="attrition-box-title">
                             <i class="fas fa-user-tie" style="color:#f59e0b;"></i>
                             <span>Staffs</span>
-                            <i class="fas fa-circle-info" onclick="openDrawer('staffs')"></i>
+                            <i class="fas fa-circle-info" data-info="Staff employment dynamics: newly joined vs exited staff members."></i>
                         </div>
                         <div class="attrition-list">
                             <div class="attrition-row">
@@ -2972,8 +3003,8 @@ $monthShort = Carbon::create($year,$month)->format('M');
                 <div class="card-header-row" style="border-bottom:none;">
                     <h3>Income And Expense <i class="fas fa-arrows-rotate refresh-trigger" onclick="spinIcon(this)"></i></h3>
                     <div style="font-size:11.5px;font-weight:600;color:var(--t1);display:flex;gap:12px;">
-                        <span>Total Income: <strong>₹ {{ number_format($totalIncome) }}</strong> <i class="fas fa-circle-info" style="color:var(--t2);"></i></span>
-                        <span>Total Expense: <strong>₹ {{ number_format($totalExpense) }}</strong> <i class="fas fa-circle-info" style="color:var(--t2);"></i></span>
+                        <span>Total Income: <strong>₹ {{ number_format($totalIncome) }}</strong> <i class="fas fa-circle-info" style="color:var(--t2);cursor:pointer;" data-info="Total fee income received in the current period."></i></span>
+                        <span>Total Expense: <strong>₹ {{ number_format($totalExpense) }}</strong> <i class="fas fa-circle-info" style="color:var(--t2);cursor:pointer;" data-info="Total expenses/expenditures incurred in the current period."></i></span>
                     </div>
                 </div>
                 <div class="income-expense-chart-container">
@@ -2995,7 +3026,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                         <span>Today's Fee Collection: <strong>₹ {{ number_format($todayFeeCollection) }}</strong></span>
                         <span style="font-size:8.5px;color:var(--t3);">Basis Fee Entry Date</span>
                     </div>
-                    <i class="fas fa-circle-info"></i>
+                    <i class="fas fa-circle-info" style="cursor:pointer;" onclick="event.stopPropagation();" data-info="Total fees collected and received today across all payment modes."></i>
                 </div>
                 <div class="fee-management-body">
                     <!-- Till Date / Annual Switch -->
@@ -3018,7 +3049,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                             <span style="display:flex;align-items:center;gap:4px;">
                                 <span class="legend-dot" style="background:#3b82f6;"></span>
                                 Collected Amount - <strong>₹ {{ number_format($feeCollectedAmount) }} ({{ $feeCollectedPct }}%)</strong>
-                                <i class="fas fa-circle-info" style="font-size:9.5px;"></i>
+                                <i class="fas fa-circle-info" id="collectedFeeInfo" style="font-size:9.5px;cursor:pointer;" data-info="Total fees collected whose due date is on or before today."></i>
                                 <i class="fas fa-arrows-rotate refresh-trigger" onclick="spinIcon(this)" style="font-size:9px;"></i>
                             </span>
                         </div>
@@ -3035,7 +3066,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                     <div class="fee-list-section" style="border-top:1px solid var(--border);">
                         <div class="fee-list-title-row">
                             <span>Fee pending (till date)</span>
-                            <i class="fas fa-circle-info"></i>
+                            <i class="fas fa-circle-info" style="cursor:pointer;" data-info="Total outstanding dues from students whose payment due dates have already passed."></i>
                         </div>
                         <div class="fee-action-row">
                             <span style="display:flex;align-items:center;gap:6px;">
@@ -3070,8 +3101,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                 </div>
                 <div class="empty-state-container" id="updatesContent">
                     <i class="fas fa-box-open empty-state-icon"></i>
-                    <h4>No new updates</h4>
-                    <p>Notices will appear here once you receive any updates</p>
+                    <h4>Loading...</h4>
                 </div>
             </div>
 
@@ -3089,7 +3119,29 @@ $monthShort = Carbon::create($year,$month)->format('M');
                             <button class="btn-blue-outline-xs" onclick="openDrawer('student_attendance')">DETAILED VIEW</button>
                         </div>
                         <div class="attendance-subpanel-body">
-                            No student attendance to show
+                            @php
+                                $stuTotal = $studentPresentToday + $studentAbsentToday + $studentHalfDayToday + $studentLeaveToday + $studentCustomToday + $studentNotMarkedToday;
+                            @endphp
+                            @if($stuTotal > 0)
+                            <div style="display:flex;border-radius:5px;overflow:hidden;height:10px;width:100%;margin-bottom:8px;">
+                                <div style="width:{{ $stuTotal > 0 ? round(($studentPresentToday/$stuTotal)*100,1) : 0 }}%;background:#10b981;"></div>
+                                <div style="width:{{ $stuTotal > 0 ? round(($studentAbsentToday/$stuTotal)*100,1) : 0 }}%;background:#ef4444;"></div>
+                                <div style="width:{{ $stuTotal > 0 ? round(($studentHalfDayToday/$stuTotal)*100,1) : 0 }}%;background:#f59e0b;"></div>
+                                <div style="width:{{ $stuTotal > 0 ? round(($studentLeaveToday/$stuTotal)*100,1) : 0 }}%;background:#ea580c;"></div>
+                                <div style="width:{{ $stuTotal > 0 ? round(($studentCustomToday/$stuTotal)*100,1) : 0 }}%;background:#ec4899;"></div>
+                                <div style="width:{{ $stuTotal > 0 ? round(($studentNotMarkedToday/$stuTotal)*100,1) : 0 }}%;background:#9ca3af;"></div>
+                            </div>
+                            <div class="legend-container" style="gap:6px 10px;">
+                                <div class="legend-item"><span class="legend-dot" style="background:#10b981;"></span>PRESENT: {{ $studentPresentToday }}</div>
+                                <div class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span>ABSENT: {{ $studentAbsentToday }}</div>
+                                <div class="legend-item"><span class="legend-dot" style="background:#f59e0b;"></span>HALFDAY: {{ $studentHalfDayToday }}</div>
+                                <div class="legend-item"><span class="legend-dot" style="background:#ea580c;"></span>LEAVE: {{ $studentLeaveToday }}</div>
+                                <div class="legend-item"><span class="legend-dot" style="background:#ec4899;"></span>CUSTOM LEAVES: {{ $studentCustomToday }}</div>
+                                <div class="legend-item"><span class="legend-dot" style="background:#9ca3af;"></span>NOT MARKED: {{ $studentNotMarkedToday }} ({{ $studentNotMarkedPct }}%)</div>
+                            </div>
+                            @else
+                            <p style="color:var(--t3);font-size:12px;padding:8px 0;">No student attendance marked today</p>
+                            @endif
                         </div>
                     </div>
 
@@ -3129,7 +3181,7 @@ $monthShort = Carbon::create($year,$month)->format('M');
                     <div class="toggle-row teacher-lbl">
                         <label>Teachers' Birthdays</label>
                         <label class="switch-wrapper">
-                            <input type="checkbox" id="teacherBirthdaySwitch" onchange="toggleBirthdays('teacher')">
+                            <input type="checkbox" id="teacherBirthdaySwitch" onchange="toggleBirthdays('teacher')" checked>
                             <span class="switch-slider"></span>
                         </label>
                     </div>
@@ -3138,30 +3190,29 @@ $monthShort = Carbon::create($year,$month)->format('M');
                 <!-- Calendar Widget showing June 2026 -->
                 <div class="calendar-widget">
                     <div class="calendar-month-selector">
-                        <select id="calendarMonth">
-                            <option value="5" selected>June</option>
+                        <select id="calendarMonth" onchange="changeCalendarMonthYear()">
+                            <option value="1">January</option>
+                            <option value="2">February</option>
+                            <option value="3">March</option>
+                            <option value="4">April</option>
+                            <option value="5">May</option>
+                            <option value="6" selected>June</option>
+                            <option value="7">July</option>
+                            <option value="8">August</option>
+                            <option value="9">September</option>
+                            <option value="10">October</option>
+                            <option value="11">November</option>
+                            <option value="12">December</option>
                         </select>
-                        <span class="year-indicator">2026 <i class="fas fa-caret-down" style="font-size:9px;"></i></span>
+                        <select id="calendarYear" onchange="changeCalendarMonthYear()" style="background:transparent; border:none; outline:none; font-size:11px; font-weight:700; color:var(--t1); cursor:pointer;">
+                            <option value="2025">2025</option>
+                            <option value="2026" selected>2026</option>
+                            <option value="2027">2027</option>
+                            <option value="2028">2028</option>
+                        </select>
                     </div>
                     <div class="calendar-grid">
-                        <div class="calendar-grid-header">Mo</div>
-                        <div class="calendar-grid-header">Tu</div>
-                        <div class="calendar-grid-header">We</div>
-                        <div class="calendar-grid-header">Th</div>
-                        <div class="calendar-grid-header">Fr</div>
-                        <div class="calendar-grid-header">Sa</div>
-                        <div class="calendar-grid-header">Su</div>
-
-                        <!-- Grid days starting Monday for June 2026 (June 1st is Monday) -->
-                        @for($i = 1; $i <= 30; $i++)
-                            <div class="calendar-grid-day {{ $i === 21 ? 'today' : '' }}" onclick="selectDate({{ $i }})">{{ $i }}</div>
-                        @endfor
-                        <!-- Empty cells to pad grid to multiple of 7 -->
-                        <div class="calendar-grid-day empty"></div>
-                        <div class="calendar-grid-day empty"></div>
-                        <div class="calendar-grid-day empty"></div>
-                        <div class="calendar-grid-day empty"></div>
-                        <div class="calendar-grid-day empty"></div>
+                        <!-- Will be populated dynamically via JS -->
                     </div>
                     <div class="calendar-events-list" id="calendarEventsList">
                         <!-- Populated dynamically via JS -->
@@ -3184,13 +3235,62 @@ const CSRF = document.querySelector('meta[name="csrf-token"]').content;
 const MONTHS_LABELS = @json($months);
 const INCOME_DATA = @json($incomeData);
 const EXPENSE_DATA = @json($expenseData);
+const NOTICES_DATA = @json($noticesData);
+const DIARIES_DATA = @json($diariesData);
+const LEAVES_DATA = @json($leavesData);
 
-// ── SPIN ICON MICRO-ANIMATION ─────────────────────────────────────────────────
+// ── SPIN ICON MICRO-ANIMATION & COOLDOWN REFRESH ───────────────────────────────
 function spinIcon(icon) {
     icon.classList.add('fa-spin');
     setTimeout(() => {
         icon.classList.remove('fa-spin');
     }, 1000);
+    triggerRefresh(icon);
+}
+
+function triggerRefresh(icon) {
+    const now = Date.now();
+    const cooldown = 15000; // 15 seconds cooldown
+    const lastRefresh = localStorage.getItem('last_dashboard_refresh');
+    
+    if (lastRefresh && (now - lastRefresh < cooldown)) {
+        const remaining = Math.ceil((cooldown - (now - lastRefresh)) / 1000);
+        const msg = `Please wait ${remaining} seconds before refreshing again.`;
+        showToast(msg);
+        
+        // HTML5 System Notification
+        if (typeof Notification !== 'undefined') {
+            if (Notification.permission === 'granted') {
+                new Notification('Dashboard Refresh Cooldown', {
+                    body: msg
+                });
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(perm => {
+                    if (perm === 'granted') {
+                        new Notification('Dashboard Refresh Cooldown', { body: msg });
+                    }
+                });
+            }
+        }
+        return;
+    }
+    
+    // Set last refresh time
+    localStorage.setItem('last_dashboard_refresh', now);
+    
+    // Show refreshing toast
+    showToast("Refreshing dashboard...");
+    
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification('Dashboard Refreshing', {
+            body: 'The dashboard page is refreshing now.'
+        });
+    }
+    
+    // Reload the page
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
 }
 
 // ── ADMISSION COUNT TOGGLE ────────────────────────────────────────────────────
@@ -3245,6 +3345,7 @@ function toggleFeeTab(tab) {
     const dueFill = document.querySelector('.collected-due-bar .fill-due');
 
     const textElements = document.querySelectorAll('.fee-list-section .fee-action-row strong');
+    const collectedInfo = document.getElementById('collectedFeeInfo');
 
     if (tab === 'tilldate') {
         tillBtn.classList.add('active');
@@ -3253,6 +3354,9 @@ function toggleFeeTab(tab) {
         
         textElements[0].innerHTML = "₹ {{ number_format($feeCollectedAmount) }} ({{ $feeCollectedPct }}%)";
         textElements[1].innerHTML = "₹ {{ number_format($feeDueAmount) }} ({{ $feeDuePct }}%)";
+        if (collectedInfo) {
+            collectedInfo.setAttribute('data-info', 'Total fees collected whose due date is on or before today.');
+        }
     } else {
         annualBtn.classList.add('active');
         collectedFill.style.width = "{{ $annualCollectedPct }}%";
@@ -3260,10 +3364,24 @@ function toggleFeeTab(tab) {
         
         textElements[0].innerHTML = "₹ {{ number_format($annualCollectedAmount) }} ({{ $annualCollectedPct }}%)";
         textElements[1].innerHTML = "₹ {{ number_format($annualDueAmount) }} ({{ $annualDuePct }}%)";
+        if (collectedInfo) {
+            collectedInfo.setAttribute('data-info', 'Total fees collected in the current academic year so far.');
+        }
     }
 }
 
 // ── RECENT UPDATES TAB SWITCH ─────────────────────────────────────────────────
+function escapeHtml(text) {
+    if (!text) return '';
+    return text
+        .toString()
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function switchUpdateTab(tab) {
     const tabs = ['Notice', 'Visitor', 'Leave', 'Diary'];
     tabs.forEach(t => document.getElementById('tab' + t).classList.remove('active'));
@@ -3273,11 +3391,31 @@ function switchUpdateTab(tab) {
     const container = document.getElementById('updatesContent');
     
     if (tab === 'notice') {
-        container.innerHTML = `
-            <i class="fas fa-box-open empty-state-icon"></i>
-            <h4>No new updates</h4>
-            <p>Notices will appear here once you receive any updates</p>
-        `;
+        if (NOTICES_DATA.length === 0) {
+            container.innerHTML = `
+                <i class="fas fa-box-open empty-state-icon"></i>
+                <h4>No new updates</h4>
+                <p>Notices will appear here once you receive any updates</p>
+            `;
+        } else {
+            let html = '<div class="updates-list">';
+            NOTICES_DATA.forEach(n => {
+                html += `
+                    <div class="update-item">
+                        <div class="update-item-header">
+                            <span class="update-item-title">${escapeHtml(n.title)}</span>
+                            <span class="update-item-date">${escapeHtml(n.date)}</span>
+                        </div>
+                        <p class="update-item-body">${escapeHtml(n.content)}</p>
+                        <div class="update-item-footer">
+                            <span class="badge badge-audience"><i class="fas fa-users"></i> ${escapeHtml(n.audience)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
     } else if (tab === 'visitor') {
         container.innerHTML = `
             <i class="fas fa-id-badge empty-state-icon" style="color: #6ee7b7;"></i>
@@ -3285,17 +3423,62 @@ function switchUpdateTab(tab) {
             <p>Visitor logs needing admin signature will appear here</p>
         `;
     } else if (tab === 'leave') {
-        container.innerHTML = `
-            <i class="fas fa-file-signature empty-state-icon" style="color: #fca5a5;"></i>
-            <h4>No leaves pending approval</h4>
-            <p>Leave requests from staff & students will show here</p>
-        `;
+        if (LEAVES_DATA.length === 0) {
+            container.innerHTML = `
+                <i class="fas fa-file-signature empty-state-icon" style="color: #fca5a5;"></i>
+                <h4>No leaves pending approval</h4>
+                <p>Leave requests will show here once submitted</p>
+            `;
+        } else {
+            let html = '<div class="updates-list">';
+            LEAVES_DATA.forEach(l => {
+                let badgeClass = 'badge-pending';
+                if (l.status === 'approved') badgeClass = 'badge-approved';
+                if (l.status === 'rejected') badgeClass = 'badge-rejected';
+                html += `
+                    <div class="update-item" style="border-left-color:#ef4444;">
+                        <div class="update-item-header">
+                            <span class="update-item-title">${escapeHtml(l.user_name)} (${escapeHtml(l.applicant_type)})</span>
+                            <span class="update-item-date">${escapeHtml(l.start_date)} - ${escapeHtml(l.end_date)}</span>
+                        </div>
+                        <p class="update-item-body"><strong>Reason:</strong> ${escapeHtml(l.reason)}</p>
+                        <div class="update-item-footer">
+                            <span class="badge badge-type"><i class="fas fa-calendar-day"></i> ${escapeHtml(l.leave_type)}</span>
+                            <span class="badge ${badgeClass}">${escapeHtml(l.status.toUpperCase())}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
     } else if (tab === 'diary') {
-        container.innerHTML = `
-            <i class="fas fa-book-open empty-state-icon" style="color: #c084fc;"></i>
-            <h4>No digital diary entries</h4>
-            <p>Today's homework & class logs are up to date</p>
-        `;
+        if (DIARIES_DATA.length === 0) {
+            container.innerHTML = `
+                <i class="fas fa-book-open empty-state-icon" style="color: #c084fc;"></i>
+                <h4>No digital diary entries</h4>
+                <p>Today's homework & class logs are up to date</p>
+            `;
+        } else {
+            let html = '<div class="updates-list">';
+            DIARIES_DATA.forEach(d => {
+                html += `
+                    <div class="update-item" style="border-left-color:#8b5cf6;">
+                        <div class="update-item-header">
+                            <span class="update-item-title">${escapeHtml(d.title)}</span>
+                            <span class="update-item-date">${escapeHtml(d.date)}</span>
+                        </div>
+                        <p class="update-item-body">${escapeHtml(d.content)}</p>
+                        <div class="update-item-footer">
+                            <span class="badge badge-teacher"><i class="fas fa-user-tie"></i> ${escapeHtml(d.staff_name)}</span>
+                            <span class="badge badge-class"><i class="fas fa-graduation-cap"></i> Class ${escapeHtml(d.class_section)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
     }
 }
 
@@ -3315,8 +3498,12 @@ function selectDate(day) {
         }
     });
 
+    const month = document.getElementById('calendarMonth').value;
+    const year = document.getElementById('calendarYear').value;
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
     // Open calendar events details drawer
-    openDrawer('calendar_events', '2026-06-' + String(day).padStart(2, '0'));
+    openDrawer('calendar_events', dateStr);
 }
 
 function toggleBirthdays(type) {
@@ -3333,14 +3520,72 @@ function showToast(msg) {
     setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ── SIDE DRAWER CONTROLLER ──────────────────────────────────────────────────
 // ── CALENDAR DATA LOADING AND RENDERING ───────────────────────────────────────
 let calendarEventsData = [];
 
+function renderCalendarGrid() {
+    const monthSelect = document.getElementById('calendarMonth');
+    const yearSelect = document.getElementById('calendarYear');
+    if (!monthSelect || !yearSelect) return;
+    
+    const month = parseInt(monthSelect.value); // 1-12
+    const year = parseInt(yearSelect.value);
+    
+    const firstDate = new Date(year, month - 1, 1);
+    const startOffset = (firstDate.getDay() + 6) % 7; // Mo = 0, Tu = 1, ..., Su = 6
+    
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    const gridContainer = document.querySelector('.calendar-grid');
+    if (!gridContainer) return;
+    
+    const headers = `
+        <div class="calendar-grid-header">Mo</div>
+        <div class="calendar-grid-header">Tu</div>
+        <div class="calendar-grid-header">We</div>
+        <div class="calendar-grid-header">Th</div>
+        <div class="calendar-grid-header">Fr</div>
+        <div class="calendar-grid-header">Sa</div>
+        <div class="calendar-grid-header">Su</div>
+    `;
+    
+    let daysHtml = headers;
+    
+    for (let i = 0; i < startOffset; i++) {
+        daysHtml += '<div class="calendar-grid-day empty"></div>';
+    }
+    
+    const todayObj = new Date();
+    const isCurrentMonthYear = (todayObj.getMonth() + 1 === month && todayObj.getFullYear() === year);
+    
+    for (let i = 1; i <= daysInMonth; i++) {
+        const isToday = (isCurrentMonthYear && todayObj.getDate() === i);
+        const todayClass = isToday ? 'today' : '';
+        daysHtml += `<div class="calendar-grid-day ${todayClass}" onclick="selectDate(${i})">${i}</div>`;
+    }
+    
+    const totalCells = startOffset + daysInMonth;
+    const remaining = (7 - (totalCells % 7)) % 7;
+    for (let i = 0; i < remaining; i++) {
+        daysHtml += '<div class="calendar-grid-day empty"></div>';
+    }
+    
+    gridContainer.innerHTML = daysHtml;
+}
+
+function changeCalendarMonthYear() {
+    renderCalendarGrid();
+    loadCalendarMonthEvents();
+}
+
 function loadCalendarMonthEvents() {
-    // Default to June 2026 as per dashboard layout
-    const month = 6;
-    const year = 2026;
+    const monthSelect = document.getElementById('calendarMonth');
+    const yearSelect = document.getElementById('calendarYear');
+    if (!monthSelect || !yearSelect) return;
+    
+    const month = monthSelect.value;
+    const year = yearSelect.value;
+    
     fetch(`/school/dashboard/details?type=calendar_month_events&month=${month}&year=${year}`)
         .then(res => res.json())
         .then(res => {
@@ -3394,6 +3639,9 @@ function renderCalendarGridAndList() {
     // Sort chronologically by day
     activeEvents.sort((a, b) => a.day - b.day);
 
+    const monthSelect = document.getElementById('calendarMonth');
+    const monthShort = monthSelect ? monthSelect.options[monthSelect.selectedIndex].text.substring(0,3) : 'June';
+
     let html = '';
     activeEvents.forEach(evt => {
         const dayWithSuffixVal = dayWithSuffix(evt.day);
@@ -3415,7 +3663,7 @@ function renderCalendarGridAndList() {
         html += `
             <div class="calendar-event-item" onclick="selectDate(${evt.day})" style="cursor:pointer; display:flex; align-items:center; margin-bottom:8px;">
                 <div class="calendar-event-bar ${barClass}"></div>
-                <div class="calendar-event-date ${dateClass}">${dayWithSuffixVal} June</div>
+                <div class="calendar-event-date ${dateClass}">${dayWithSuffixVal} ${monthShort}</div>
                 <div class="calendar-event-text">
                     <div style="color:#00695c; font-weight:600; font-size:11px;">${displayName.toUpperCase()}</div>
                     <div style="font-size:9.5px; color:#0d9488; margin-top:1px;">${subText}</div>
@@ -3450,7 +3698,7 @@ function openDrawer(type, extraVal = '') {
     // Apply proper size class based on details type
     if (type === 'students') {
         drawer.classList.add('drawer-xl');
-    } else if (type === 'staffs') {
+    } else if (type === 'staffs' || type === 'income') {
         drawer.classList.add('drawer-lg');
     } else if (type === 'send_reminder' || type === 'class_fee_report') {
         drawer.classList.add('drawer-md');
@@ -3599,12 +3847,12 @@ function renderStudentsDrawer(data) {
                         <th rowspan="2" id="studentColHdr">Class & Section</th>
                         <th colspan="2">Old Admissions</th>
                         <th rowspan="2">New Admissions</th>
-                        <th rowspan="2">Today's Admissions <i class="fas fa-circle-info" style="font-size:8px;"></i></th>
-                        <th colspan="2">TC Students <i class="fas fa-circle-info" style="font-size:8px;"></i></th>
-                        <th rowspan="2">Irregular Students <i class="fas fa-circle-info" style="font-size:8px;"></i></th>
+                        <th rowspan="2">Today's Admissions <i class="fas fa-circle-info" style="font-size:8px;cursor:pointer;" data-info="Students admitted on the selected/current date."></i></th>
+                        <th colspan="2">TC Students <i class="fas fa-circle-info" style="font-size:8px;cursor:pointer;" data-info="Students issued Transfer Certificates (Old vs New)."></i></th>
+                        <th rowspan="2">Irregular Students <i class="fas fa-circle-info" style="font-size:8px;cursor:pointer;" data-info="Students flagged for highly irregular attendance."></i></th>
                         <th rowspan="2">Deactivated Students</th>
                         <th rowspan="2">Total Students</th>
-                        <th colspan="2">Deleted Students <i class="fas fa-circle-info" style="font-size:8px;"></i></th>
+                        <th colspan="2">Deleted Students <i class="fas fa-circle-info" style="font-size:8px;cursor:pointer;" data-info="Students deleted from the active registry."></i></th>
                         <th rowspan="2">Active Students</th>
                     </tr>
                     <tr>
@@ -3922,8 +4170,8 @@ function filterStaffTable() {
                         <button class="drawer-staff-copy-btn" onclick="navigator.clipboard.writeText('${r.email}'); showToast('Email copied!')" title="Copy"><i class="far fa-copy"></i></button>
                     </td>
                     <td>
-                        <button class="drawer-action-btn green" onclick="showToast('Viewing staff details...')" title="View details"><i class="far fa-eye"></i></button>
-                        <button class="drawer-action-btn" onclick="showToast('Editing staff record...')" title="Edit staff"><i class="far fa-edit"></i></button>
+                        <button class="drawer-action-btn green" onclick="window.location.href='/school/staff/${r.id}'" title="View details"><i class="far fa-eye"></i></button>
+                        <button class="drawer-action-btn" onclick="window.location.href='/school/staff/${r.id}/edit'" title="Edit staff"><i class="far fa-edit"></i></button>
                     </td>
                 </tr>
             `;
@@ -3999,6 +4247,317 @@ function renderClassFeeReportDrawer(data) {
     `;
 }
 
+let incomeRowsData = [];
+function renderTotalIncomeDrawer(data) {
+    incomeRowsData = data || [];
+    
+    // Calculate cash and bank deposits dynamically from payment modes
+    let totalCash = 0;
+    let totalBank = 0;
+    incomeRowsData.forEach(item => {
+        let amt = parseFloat(item.amount.replace(/[^0-9.]/g, ''));
+        if (!isNaN(amt)) {
+            if (item.payment_mode && item.payment_mode.toLowerCase().includes('cash')) {
+                totalCash += amt;
+            } else {
+                totalBank += amt;
+            }
+        }
+    });
+
+    let totalIncome = totalCash + totalBank;
+    const totalIncomeStr = '₹ ' + totalIncome.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalCashStr = '₹ ' + totalCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalBankStr = '₹ ' + totalBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const body = document.getElementById('drawerBody');
+    body.innerHTML = `
+        <div class="drawer-toolbar" style="margin-bottom: 20px; display: flex; gap: 15px; font-family: 'Plus Jakarta Sans', sans-serif;">
+            <div class="drawer-select-group" style="margin: 0; min-width: 180px;">
+                <label style="font-size: 11px; font-weight: 700; color: var(--t2); margin-bottom: 4px; display: block;">Academic Year *</label>
+                <div style="position: relative;">
+                    <i class="far fa-calendar-alt" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--t2); font-size: 14px;"></i>
+                    <select class="drawer-select" style="width: 100%; padding-left: 30px; font-weight: 600; height: 34px; border: 1px solid var(--border); border-radius: 4px; background: #fff; font-family: inherit;">
+                        <option>Apr 2025 - Mar 2026</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div style="background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px; font-family: 'Plus Jakarta Sans', sans-serif;">
+            <div style="font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 15px;">
+                Total Profit/Loss: <span contenteditable="true" id="editableProfitLoss" style="color: var(--navy); font-weight: 800; border-bottom: 1px dashed var(--gold); outline: none; padding: 0 4px;" onblur="updateCustomProfitLoss(this)" onkeydown="checkAmountEnter(event, this)">${totalIncomeStr}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+                <!-- Cash in hand -->
+                <div style="display: flex; flex-direction: column;">
+                    <div style="background: #004d40; color: #fff; padding: 10px 16px; border-radius: 4px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 4px;">
+                        <span>Total Cash in Hand:</span>
+                        <span contenteditable="true" id="editableCash" style="border-bottom: 1px dashed #a7f3d0; outline: none; padding: 0 4px;" onblur="updateCustomTotals()" onkeydown="checkAmountEnter(event, this)">${totalCashStr}</span>
+                    </div>
+                    <a href="javascript:void(0)" style="color: #d97706; text-decoration: none; font-size: 11px; font-weight: 700; margin-top: 6px; display: inline-flex; align-items: center; gap: 4px;" onclick="showToast('Sending cash in hand to bank...')">
+                        SEND TO BANK <i class="fas fa-arrow-right" style="font-size: 10px;"></i>
+                    </a>
+                </div>
+                
+                <div style="font-size: 20px; font-weight: 700; color: var(--t2); padding-bottom: 18px;">+</div>
+                
+                <!-- Bank deposit -->
+                <div style="display: flex; flex-direction: column;">
+                    <div style="background: #004d40; color: #fff; padding: 10px 16px; border-radius: 4px; font-weight: 700; font-size: 13px; margin-bottom: 18px; display: flex; align-items: center; gap: 4px;">
+                        <span>Total Bank Deposit:</span>
+                        <span contenteditable="true" id="editableBank" style="border-bottom: 1px dashed #a7f3d0; outline: none; padding: 0 4px;" onblur="updateCustomTotals()" onkeydown="checkAmountEnter(event, this)">${totalBankStr}</span>
+                    </div>
+                </div>
+                
+                <div style="font-size: 20px; font-weight: 700; color: var(--t2); padding-bottom: 18px;">=</div>
+                
+                <!-- Total Income -->
+                <div style="display: flex; flex-direction: column;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 18px;">
+                        <div style="background: #004d40; color: #fff; padding: 10px 16px; border-radius: 4px; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 4px;">
+                            <span>Total Income:</span>
+                            <span id="summaryTotalIncome" style="font-weight: 800;">${totalIncomeStr}</span>
+                        </div>
+                        <i class="far fa-eye" style="cursor: pointer; color: #d97706; font-size: 16px; margin-left: 4px;" title="View details" onclick="showToast('Viewing income details...')"></i>
+                        <i class="fas fa-download" style="cursor: pointer; color: #d97706; font-size: 16px; margin-left: 4px;" title="Download invoice" onclick="showToast('Downloading statement...')"></i>
+                    </div>
+                </div>
+                
+                <!-- Show Institute Fee Toggle -->
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--t2); margin-bottom: 18px;">
+                    <span>SHOW INSTITUTE FEE</span>
+                    <label class="switch-wrapper" style="margin: 0; transform: scale(0.9);">
+                        <input type="checkbox" id="showInstituteFeeToggle" checked onchange="filterIncomeTable()">
+                        <span class="switch-slider"></span>
+                    </label>
+                    <i class="fas fa-circle-info" style="font-size: 12px; cursor: pointer; color: #000;" data-info="Toggle to filter between institute and general fees."></i>
+                </div>
+            </div>
+        </div>
+
+        <div style="background: #4db6ac; color: #fff; font-size: 12px; font-weight: 700; padding: 6px 16px; border-radius: 20px; display: inline-flex; align-items: center; gap: 8px; margin-bottom: 20px; font-family: 'Plus Jakarta Sans', sans-serif;" id="incomeModuleBadge">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: #fff; display: inline-block;"></span>
+            <span id="incomeModuleBadgeText">Total Income Added in Income Module: ${totalIncomeStr}</span>
+        </div>
+
+        <!-- Action / Search Toolbar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; font-family: 'Plus Jakarta Sans', sans-serif;">
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <button class="drawer-btn-download" style="border: 1px solid #d97706; color: #d97706; background: #fff; padding: 8px 16px; font-size: 11.5px; font-weight: 700; border-radius: 4px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;" onclick="showToast('Opening bulk upload modal...')">
+                    <i class="fas fa-upload"></i> BULK UPLOAD
+                </button>
+                <button style="border: 1px solid #d97706; background: #fff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="showToast('Accounts settings')">
+                    <i class="fas fa-cog" style="color: #d97706; font-size: 14px;"></i>
+                </button>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-left: auto;">
+                <div style="display: flex; flex-direction: column; position: relative;">
+                    <label style="font-size: 10px; font-weight: 700; color: var(--t2); margin-bottom: 2px; position: absolute; top: -14px; left: 0;">Search</label>
+                    <div style="border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; background: #fff; width: 220px; height: 34px; box-sizing: border-box;">
+                        <i class="fas fa-search" style="color: var(--t3); font-size: 12px;"></i>
+                        <input type="text" id="incomeSearchInput" onkeyup="filterIncomeTable()" placeholder="Search by Income Name" style="border: none; outline: none; font-size: 11.5px; width: 100%; font-family: inherit;">
+                    </div>
+                </div>
+                <button style="border: 1px solid #d97706; background: #fff; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="showToast('Filtering income records...')">
+                    <i class="fas fa-filter" style="color: #d97706; font-size: 14px;"></i>
+                </button>
+                <button style="border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 4px;" onclick="openDrawer('total_collection')">
+                    <i class="fas fa-sync-alt" style="color: var(--t2); font-size: 14px;"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="drawer-table-wrap" style="border-radius: 4px; overflow: hidden; border: 1px solid var(--border);">
+            <table class="drawer-table-complex" style="text-align: left; width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #0b4c46;">
+                        <th style="color: #fff; padding: 12px 16px; font-size: 12px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">Receipt ID</th>
+                        <th style="color: #fff; padding: 12px 16px; font-size: 12px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">Income Name</th>
+                        <th style="color: #fff; padding: 12px 16px; font-size: 12px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">Date</th>
+                        <th style="color: #fff; padding: 12px 16px; font-size: 12px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">Category</th>
+                        <th style="color: #fff; padding: 12px 16px; font-size: 12px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">Sub-Category</th>
+                        <th style="color: #fff; padding: 12px 16px; font-size: 12px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">Income Amount</th>
+                        <th style="color: #fff; padding: 12px 16px; font-size: 12px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;">Payment Mode</th>
+                    </tr>
+                </thead>
+                <tbody id="incomeTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;font-size:11px;color:var(--t2);font-family: 'Plus Jakarta Sans', sans-serif;">
+            <span style="background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 6px 12px; font-weight: 600; color: var(--t1);" id="incomeTotalRowsText">Total Rows: 0</span>
+            <div style="display:flex;gap:8px; align-items: center;">
+                <button style="border: 1px solid var(--border); background: #fff; width: 26px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="showToast('Previous page')">
+                    <i class="fas fa-chevron-left" style="color: var(--t2); font-size: 10px;"></i>
+                </button>
+                <span style="width: 26px; height: 26px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); color: #10b981; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 11px;">1</span>
+                <button style="border: 1px solid var(--border); background: #fff; width: 26px; height: 26px; border-radius: 4px; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="showToast('Next page')">
+                    <i class="fas fa-chevron-right" style="color: var(--t2); font-size: 10px;"></i>
+                </button>
+            </div>
+        </div>
+    `;
+
+    filterIncomeTable();
+}
+
+function updateRowAmount(el) {
+    const idx = parseInt(el.getAttribute('data-index'));
+    let val = el.textContent.trim();
+    let parsed = parseFloat(val.replace(/[^0-9.]/g, ''));
+    if (isNaN(parsed)) {
+        parsed = 0;
+    }
+    incomeRowsData[idx].amount = '₹ ' + parsed.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    el.textContent = incomeRowsData[idx].amount;
+    recalculateTotalIncome();
+}
+
+function updateRowPaymentMode(el) {
+    const idx = parseInt(el.getAttribute('data-index'));
+    let val = el.textContent.trim();
+    incomeRowsData[idx].payment_mode = val || '—';
+    el.textContent = incomeRowsData[idx].payment_mode;
+    recalculateTotalIncome();
+}
+
+function checkAmountEnter(e, el) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        el.blur();
+    }
+}
+
+function updateCustomTotals() {
+    const cashEl = document.getElementById('editableCash');
+    const bankEl = document.getElementById('editableBank');
+    
+    let cashVal = parseFloat(cashEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+    let bankVal = parseFloat(bankEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+    
+    let total = cashVal + bankVal;
+    
+    const cashStr = '₹ ' + cashVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const bankStr = '₹ ' + bankVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalStr = '₹ ' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    cashEl.textContent = cashStr;
+    bankEl.textContent = bankStr;
+    
+    document.getElementById('summaryTotalIncome').textContent = totalStr;
+    document.getElementById('editableProfitLoss').textContent = totalStr;
+    
+    const badge = document.getElementById('incomeModuleBadgeText');
+    if (badge) {
+        badge.textContent = `Total Income Added in Income Module: ${totalStr}`;
+    }
+}
+
+function updateCustomProfitLoss(el) {
+    let val = parseFloat(el.textContent.replace(/[^0-9.]/g, '')) || 0;
+    const valStr = '₹ ' + val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    el.textContent = valStr;
+    
+    document.getElementById('summaryTotalIncome').textContent = valStr;
+    document.getElementById('editableCash').textContent = valStr;
+    document.getElementById('editableBank').textContent = '₹ 0.00';
+    
+    const badge = document.getElementById('incomeModuleBadgeText');
+    if (badge) {
+        badge.textContent = `Total Income Added in Income Module: ${valStr}`;
+    }
+}
+
+function recalculateTotalIncome() {
+    let totalCash = 0;
+    let totalBank = 0;
+    incomeRowsData.forEach(item => {
+        let amt = parseFloat(item.amount.replace(/[^0-9.]/g, ''));
+        if (!isNaN(amt)) {
+            if (item.payment_mode && item.payment_mode.toLowerCase().includes('cash')) {
+                totalCash += amt;
+            } else {
+                totalBank += amt;
+            }
+        }
+    });
+
+    let totalIncome = totalCash + totalBank;
+    const totalIncomeStr = '₹ ' + totalIncome.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalCashStr = '₹ ' + totalCash.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalBankStr = '₹ ' + totalBank.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    document.getElementById('editableProfitLoss').textContent = totalIncomeStr;
+    document.getElementById('editableCash').textContent = totalCashStr;
+    document.getElementById('editableBank').textContent = totalBankStr;
+    document.getElementById('summaryTotalIncome').textContent = totalIncomeStr;
+    
+    const badge = document.getElementById('incomeModuleBadgeText');
+    if (badge) {
+        badge.textContent = `Total Income Added in Income Module: ${totalIncomeStr}`;
+    }
+}
+
+function filterIncomeTable() {
+    const searchVal = document.getElementById('incomeSearchInput').value.toLowerCase();
+    const showInstFee = document.getElementById('showInstituteFeeToggle').checked;
+
+    let filtered = incomeRowsData;
+
+    // Filter by toggle
+    if (!showInstFee) {
+        filtered = filtered.filter(r => !r.student.toLowerCase().includes('school') && !r.receipt_id.toLowerCase().includes('rec'));
+    }
+
+    if (searchVal) {
+        filtered = filtered.filter(r => 
+            (r.receipt_id && r.receipt_id.toLowerCase().includes(searchVal)) ||
+            (r.student && r.student.toLowerCase().includes(searchVal)) ||
+            ((r.income_name || 'school fee').toLowerCase().includes(searchVal)) ||
+            (r.payment_mode && r.payment_mode.toLowerCase().includes(searchVal))
+        );
+    }
+
+    let rowsHtml = '';
+    filtered.forEach(r => {
+        // Format date string YYYY-MM-DD to DD/MM/YYYY
+        let formattedDate = '-';
+        if (r.date) {
+            const parts = r.date.split('-');
+            if (parts.length === 3) {
+                formattedDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            } else {
+                formattedDate = r.date;
+            }
+        }
+
+        rowsHtml += `
+            <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 12px 16px; font-size: 12px; color: var(--t2);">${r.receipt_id || '-'}</td>
+                <td style="padding: 12px 16px; font-size: 12px; font-weight: 600; color: var(--navy);">${r.income_name || 'School Fee'}</td>
+                <td style="padding: 12px 16px; font-size: 12px; color: var(--t1);">${formattedDate}</td>
+                <td style="padding: 12px 16px; font-size: 12px; color: var(--t2);">${r.category || 'Fee'}</td>
+                <td style="padding: 12px 16px; font-size: 12px; color: var(--t2);">${r.sub_category || '-'}</td>
+                <td style="padding: 12px 16px; font-size: 12px; font-weight: 700; color: var(--t1);">
+                    <span contenteditable="true" class="editable-amount" data-index="${incomeRowsData.indexOf(r)}" style="border-bottom: 1px dashed var(--gold); padding: 2px 4px; outline: none; cursor: text;" onblur="updateRowAmount(this)" onkeydown="checkAmountEnter(event, this)">${r.amount}</span>
+                </td>
+                <td style="padding: 12px 16px; font-size: 12px; color: var(--t2);">
+                    <span contenteditable="true" class="editable-payment-mode" data-index="${incomeRowsData.indexOf(r)}" style="border-bottom: 1px dashed var(--gold); padding: 2px 4px; outline: none; cursor: text;" onblur="updateRowPaymentMode(this)" onkeydown="checkAmountEnter(event, this)">${r.payment_mode || '-'}</span>
+                </td>
+            </tr>
+        `;
+    });
+
+    if (filtered.length === 0) {
+        rowsHtml = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--t3);">No income records found</td></tr>`;
+    }
+
+    document.getElementById('incomeTableBody').innerHTML = rowsHtml;
+    document.getElementById('incomeTotalRowsText').textContent = `Total Rows: ${filtered.length}`;
+}
+
 function renderDrawerContent(type, data) {
     const body = document.getElementById('drawerBody');
     const drawer = document.getElementById('sideDrawer');
@@ -4017,8 +4576,13 @@ function renderDrawerContent(type, data) {
         return;
     }
 
-    if (type === 'students' || type === 'staffs' || type === 'send_reminder' || type === 'class_fee_report') {
+    if (type === 'students' || type === 'staffs' || type === 'send_reminder' || type === 'class_fee_report' || type === 'total_collection' || type === 'income') {
         drawer.querySelector('.drawer-header').style.background = '#d97706';
+    }
+
+    if (type === 'income') {
+        renderTotalIncomeDrawer(data);
+        return;
     }
 
     if (type === 'send_reminder') {
@@ -4225,6 +4789,17 @@ function renderDrawerContent(type, data) {
     }
 
     html += '</tbody></table>';
+    if (type === 'student_attendance') {
+        html += `<div style="margin-top:20px; display:flex; gap:10px; justify-content:center; padding:10px;">
+            <a href="/school/attendance/students" style="background:#2563eb; padding:8px 14px; font-size:12px; font-weight:700; text-decoration:none; border-radius:6px; color:#fff; display:inline-flex; align-items:center; gap:6px;"><i class="fas fa-user-check"></i> Mark Daily Attendance</a>
+            <a href="/school/student-mgmt/bulk-attendance" style="background:#9a3412; padding:8px 14px; font-size:12px; font-weight:700; text-decoration:none; border-radius:6px; color:#fff; display:inline-flex; align-items:center; gap:6px;"><i class="fas fa-calendar-days"></i> Mark Bulk Attendance</a>
+        </div>`;
+    } else if (type === 'staff_attendance') {
+        html += `<div style="margin-top:20px; display:flex; gap:10px; justify-content:center; padding:10px;">
+            <a href="/school/attendance/staff" style="background:#2563eb; padding:8px 14px; font-size:12px; font-weight:700; text-decoration:none; border-radius:6px; color:#fff; display:inline-flex; align-items:center; gap:6px;"><i class="fas fa-user-check"></i> Mark Staff Attendance</a>
+            <a href="/school/staff/bulk-attendance" style="background:#9a3412; padding:8px 14px; font-size:12px; font-weight:700; text-decoration:none; border-radius:6px; color:#fff; display:inline-flex; align-items:center; gap:6px;"><i class="fas fa-calendar-days"></i> Mark Bulk Staff</a>
+        </div>`;
+    }
     body.innerHTML = html;
 }
 
@@ -4328,8 +4903,15 @@ document.addEventListener('click',e=>{
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Request notification permission if supported
+    if (typeof Notification !== 'undefined' && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+    }
+
+    renderCalendarGrid();
     drawIncomeExpenseChart();
     loadCalendarMonthEvents();
+    switchUpdateTab('notice');
     
     // Accordion toggle for sidebar
     document.querySelectorAll('.sb-hdr').forEach(hdr => {
@@ -4352,6 +4934,51 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // Info Popover Tooltip system
+    const popover = document.createElement('div');
+    popover.className = 'info-popover';
+    document.body.appendChild(popover);
+
+    let activeTrigger = null;
+
+    function hidePopover() {
+        popover.classList.remove('show');
+        activeTrigger = null;
+    }
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.fa-circle-info[data-info]');
+        if (btn) {
+            e.stopPropagation();
+            if (activeTrigger === btn) {
+                hidePopover();
+                return;
+            }
+
+            activeTrigger = btn;
+            popover.textContent = btn.getAttribute('data-info');
+            popover.classList.add('show');
+
+            // Position calculation
+            const rect = btn.getBoundingClientRect();
+            const popoverRect = popover.getBoundingClientRect();
+            
+            const left = rect.left + window.scrollX + (rect.width / 2) - (popoverRect.width / 2);
+            const top = rect.top + window.scrollY - popoverRect.height - 8;
+            
+            popover.style.left = `${Math.max(10, left)}px`;
+            popover.style.top = `${top}px`;
+            return;
+        }
+
+        if (!e.target.closest('.info-popover')) {
+            hidePopover();
+        }
+    });
+
+    window.addEventListener('resize', hidePopover);
+    window.addEventListener('scroll', hidePopover, true);
 });
 </script>
 
@@ -4365,6 +4992,111 @@ document.addEventListener('DOMContentLoaded', () => {
     border-left:3px solid var(--gold);
 }
 #toastMsg.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+.updates-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 10px 0;
+    max-height: 380px;
+    overflow-y: auto;
+    text-align: left;
+    width: 100%;
+}
+.update-item {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 12px;
+    border-left: 4px solid var(--navy);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+}
+.update-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.08);
+}
+.update-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+.update-item-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--navy);
+}
+.update-item-date {
+    font-size: 10px;
+    color: var(--t2);
+    white-space: nowrap;
+}
+.update-item-body {
+    font-size: 11.5px;
+    color: #475569;
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+.update-item-footer {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.update-item-footer .badge {
+    font-size: 9.5px;
+    padding: 2px 7px;
+    border-radius: 12px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.badge-audience { background: #e0f2fe; color: #0369a1; }
+.badge-teacher { background: #faf5ff; color: #6b21a8; }
+.badge-class { background: #ecfdf5; color: #047857; }
+.badge-type { background: #fef3c7; color: #d97706; }
+.badge-pending { background: #fee2e2; color: #b91c1c; }
+.badge-approved { background: #dcfce7; color: #15803d; }
+.badge-rejected { background: #f3f4f6; color: #374151; }
+
+/* Premium Info Popover */
+.info-popover {
+    position: absolute;
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    max-width: 220px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -4px rgba(0, 0, 0, 0.15);
+    z-index: 99999;
+    line-height: 1.4;
+    border: 1px solid #1e293b;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+    text-align: left;
+}
+.info-popover.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+.info-popover::after {
+    content: '';
+    position: absolute;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #0f172a transparent transparent transparent;
+    bottom: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+}
 </style>
 <!-- SIDE DRAWER OVERLAY -->
 <div class="side-drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>

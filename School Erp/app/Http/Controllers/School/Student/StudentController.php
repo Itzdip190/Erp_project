@@ -109,7 +109,16 @@ class StudentController extends Controller
         $data['opening_due_balance'] = $data['opening_due_balance'] ?? 0.00;
 
         if ($request->hasFile('photo')) {
-            $data['photo'] = $request->file('photo')->store('students/photos', config('filesystems.default'));
+            $data['photo'] = $request->file('photo')->store('students/photos', 'public');
+        }
+        if ($request->hasFile('father_photo')) {
+            $data['father_photo'] = $request->file('father_photo')->store('students/photos', 'public');
+        }
+        if ($request->hasFile('mother_photo')) {
+            $data['mother_photo'] = $request->file('mother_photo')->store('students/photos', 'public');
+        }
+        if ($request->hasFile('guardian_photo')) {
+            $data['guardian_photo'] = $request->file('guardian_photo')->store('students/photos', 'public');
         }
 
         // Generate admission details atomically
@@ -205,9 +214,27 @@ class StudentController extends Controller
 
         if ($request->hasFile('photo')) {
             if ($student->photo) {
-                Storage::disk(config('filesystems.default'))->delete($student->photo);
+                Storage::disk('public')->delete($student->photo);
             }
-            $data['photo'] = $request->file('photo')->store('students/photos', config('filesystems.default'));
+            $data['photo'] = $request->file('photo')->store('students/photos', 'public');
+        }
+        if ($request->hasFile('father_photo')) {
+            if ($student->father_photo) {
+                Storage::disk('public')->delete($student->father_photo);
+            }
+            $data['father_photo'] = $request->file('father_photo')->store('students/photos', 'public');
+        }
+        if ($request->hasFile('mother_photo')) {
+            if ($student->mother_photo) {
+                Storage::disk('public')->delete($student->mother_photo);
+            }
+            $data['mother_photo'] = $request->file('mother_photo')->store('students/photos', 'public');
+        }
+        if ($request->hasFile('guardian_photo')) {
+            if ($student->guardian_photo) {
+                Storage::disk('public')->delete($student->guardian_photo);
+            }
+            $data['guardian_photo'] = $request->file('guardian_photo')->store('students/photos', 'public');
         }
 
         DB::transaction(function () use ($schoolId, $student, &$data) {
@@ -301,12 +328,13 @@ class StudentController extends Controller
             'status' => 'pending',
         ]);
 
-        // Dispatch background job to Redis imports queue
-        ProcessStudentImport::dispatch($schoolId, $importLog->id, $path)->onQueue('imports');
+        // Run synchronously to avoid queue processing issues
+        $job = new ProcessStudentImport($schoolId, $importLog->id, $path);
+        $job->handle(app(StudentNumberService::class));
 
         return response()->json([
             'success' => true,
-            'message' => 'Bulk import is processing in the background.',
+            'message' => 'Bulk import processed successfully.',
             'import_log_id' => $importLog->id,
         ]);
     }
@@ -317,10 +345,22 @@ class StudentController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         
         $headers = [
-            'first_name', 'last_name', 'roll_number', 'gender', 'date_of_birth',
-            'guardian_name', 'guardian_phone', 'guardian_email', 'guardian_relationship',
-            'address', 'city', 'state', 'pincode', 'class_id', 'section_id',
-            'academic_session_id', 'admission_date', 'opening_due_balance'
+            'first_name', 'last_name', 'first_name_local', 'last_name_local', 'email', 'phone', 'roll_number', 'gender', 'date_of_birth',
+            'place_of_birth', 'birth_certificate_no', 'usn_srn_number', 'blood_group', 'religion', 'caste', 'sub_caste', 'family_id', 'group', 'house_id', 'house_role',
+            'biometric_id', 'pen_number', 'apaar_id', 'samagra_id', 'class_at_admission', 'enrollment_number', 'tc_number',
+            'transport_month', 'transport_route', 'transport_vehicle_code', 'transport_stop', 'transport_drop_vehicle_code',
+            'prev_school', 'prev_city_country', 'prev_year_attended', 'prev_board', 'prev_reg_no', 'prev_pcm_marks', 'prev_pcm_percentage', 'prev_total_marks', 'prev_average', 'entrance_exam_name', 'entrance_exam_rank', 'entrance_exam_remarks',
+            'disciplinary_action', 'disciplinary_action_reason', 'asked_to_leave', 'asked_to_leave_reason', 'special_needs', 'special_needs_reason', 'interests_talents', 'interests_talents_reason', 'represented_school', 'represented_school_reason', 'other_info', 'other_info_reason',
+            'father_name', 'father_phone', 'father_alternate_phone', 'father_email', 'father_occupation', 'father_id', 'father_aadhar', 'father_income', 'father_qualification', 'father_passport', 'father_address',
+            'mother_name', 'mother_phone', 'mother_alternate_phone', 'mother_email', 'mother_occupation', 'mother_id', 'mother_aadhar', 'mother_income', 'mother_qualification', 'mother_passport', 'mother_address', 'mother_office_address',
+            'guardian_name', 'guardian_phone', 'guardian_email', 'guardian_relationship', 'guardian_occupation', 'guardian_passport', 'guardian_name_local', 'guardian_address',
+            'whatsapp_number',
+            'address', 'address_line_2', 'city', 'state', 'country', 'pincode', 'region',
+            'permanent_address', 'permanent_address_line_2', 'permanent_city', 'permanent_state', 'permanent_country', 'permanent_pincode', 'permanent_region',
+            'class_id', 'section_id', 'academic_session_id', 'admission_date', 'opening_due_balance',
+            'national_id', 'local_id', 'bank_account_no', 'bank_account_holder', 'bank_name', 'bank_branch', 'ifsc_code', 'bank_micr', 'note',
+            'emergency_address', 'contact_priority',
+            'medical_height', 'medical_weight', 'medical_vision_left', 'medical_vision_right', 'medical_dental', 'medical_illness', 'medical_history', 'medical_allergies', 'medical_disabilities', 'medical_doctor_name', 'medical_doctor_phone', 'medical_doctor_address'
         ];
 
         $sheet->fromArray($headers, null, 'A1');

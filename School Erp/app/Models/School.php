@@ -27,6 +27,7 @@ class School extends Model
     protected $casts = [
         'sms_config' => 'array',
         'late_grace_minutes' => 'integer',
+        'udise_data' => 'array',
     ];
 
     public function users()

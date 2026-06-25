@@ -45,16 +45,43 @@
                 <!-- Logo Stub -->
                 <div style="text-align:center; margin-bottom:15px; border-bottom:1px dashed #cbd5e1; padding-bottom:10px;">
                     <h2 style="font-size:16px; font-weight:800; margin:0; text-transform:uppercase;">Yash International School</h2>
-                    <span style="font-size:11px; color:#64748b;">OFFICIAL FEE RECEIPT DEPOSIT SLIP</span>
+                    <span style="font-size:11px; color:#64748b; display:block;">OFFICIAL FEE RECEIPT DEPOSIT SLIP</span>
+                    @if($config && $config->inst_affiliation_no)
+                    <span style="font-size:11px; color:#64748b; display:block;">AFFILIATION NO: AFF-98762</span>
+                    @endif
+                    @if($config && $config->inst_school_url)
+                    <span style="font-size:11px; color:#64748b; display:block;">WEBSITE: www.pragyaschool.edu</span>
+                    @endif
+                    @if($config && $config->inst_board_logo)
+                    <span style="font-size:11px; color:var(--gold); font-weight:bold; display:block;">CBSE BOARD</span>
+                    @endif
                 </div>
 
                 <!-- Info Block -->
                 <div style="font-size:12px; line-height:1.6; margin-bottom:15px;">
                     <div><strong>RECEIPT ID:</strong> LNK-{{ date('Ymd') }}-{{ rand(10, 99) }}</div>
                     <div><strong>DATE:</strong> {{ date('Y-m-d H:i:s') }}</div>
+                    @if(!$config || $config->details_student_name)
                     <div><strong>STUDENT NAME:</strong> <span id="slipName">Aarav Sharma</span></div>
+                    @endif
+                    @if(!$config || $config->details_admission_no)
                     <div><strong>ADMISSION ID:</strong> <span id="slipID">YIS/2026/00001</span></div>
+                    @endif
+                    @if(!$config || $config->details_class)
                     <div><strong>CLASS GRADE:</strong> <span id="slipClass">Class 10 - Section A</span></div>
+                    @endif
+                    @if($config && $config->details_father_name)
+                    <div><strong>FATHER NAME:</strong> <span id="slipFather">—</span></div>
+                    @endif
+                    @if($config && $config->details_mother_name)
+                    <div><strong>MOTHER NAME:</strong> <span id="slipMother">—</span></div>
+                    @endif
+                    @if($config && $config->details_address)
+                    <div><strong>ADDRESS:</strong> <span id="slipAddress">—</span></div>
+                    @endif
+                    @if($config && $config->details_father_phone)
+                    <div><strong>PHONE:</strong> <span id="slipPhone">—</span></div>
+                    @endif
                 </div>
 
                 <!-- Receipt Table -->
@@ -99,6 +126,10 @@ const mockSlipInvoices = {
         name: "{{ $st->full_name }}",
         class: "{{ optional($st->class)->name ?? 'N/A' }} - {{ optional($st->section)->name ?? 'N/A' }}",
         id: "{{ $st->admission_id }}",
+        father: "{{ $st->father_name ?? '—' }}",
+        mother: "{{ $st->mother_name ?? '—' }}",
+        address: "{{ $st->address ?? '—' }}",
+        phone: "{{ $st->father_phone ?? '—' }}",
         fees: [
             @foreach($fees->where('student_id', $st->id) as $f)
             { desc: "{{ $f->category->name }}", amt: {{ $f->amount }} },
@@ -111,9 +142,13 @@ const mockSlipInvoices = {
 function loadInvoiceDetails1(studentId) {
     if(!studentId || !mockSlipInvoices[studentId]) return;
     const inv = mockSlipInvoices[studentId];
-    document.getElementById('slipName').textContent = inv.name;
-    document.getElementById('slipClass').textContent = inv.class;
-    document.getElementById('slipID').textContent = inv.id;
+    if (document.getElementById('slipName')) document.getElementById('slipName').textContent = inv.name;
+    if (document.getElementById('slipClass')) document.getElementById('slipClass').textContent = inv.class;
+    if (document.getElementById('slipID')) document.getElementById('slipID').textContent = inv.id;
+    if (document.getElementById('slipFather')) document.getElementById('slipFather').textContent = inv.father;
+    if (document.getElementById('slipMother')) document.getElementById('slipMother').textContent = inv.mother;
+    if (document.getElementById('slipAddress')) document.getElementById('slipAddress').textContent = inv.address;
+    if (document.getElementById('slipPhone')) document.getElementById('slipPhone').textContent = inv.phone;
     
     let html = '';
     let total = 0;

@@ -118,10 +118,10 @@ class ParentDashboardController extends Controller
         $dayOfWeek = now()->format('l'); // Monday, Tuesday, etc.
         $dbTimetable = collect();
         if ($student) {
-            $dbTimetable = \App\Models\Timetable::where('class_id', $student->class_id)
+            $dbTimetable = \App\Models\ClassTimetableCell::where('class_id', $student->class_id)
                 ->where('section_id', $student->section_id)
                 ->where('day_of_week', $dayOfWeek)
-                ->with(['subject', 'teacher'])
+                ->with(['subject', 'teacher', 'period'])
                 ->get();
         }
 
@@ -612,8 +612,10 @@ class ParentDashboardController extends Controller
         } else {
             $fees = collect();
         }
-        return view('parent.fees', array_merge($data, compact('fees')));
+        $config = \App\Models\FeeConfiguration::where('school_id', auth()->user()->school_id)->first();
+        return view('parent.fees', array_merge($data, compact('fees', 'config')));
     }
+
 
     public function timetable()
     {
@@ -621,16 +623,16 @@ class ParentDashboardController extends Controller
         $timetableGrouped = [];
 
         if ($data['student']) {
-            $slots = \App\Models\Timetable::where('class_id', $data['student']->class_id)
+            $slots = \App\Models\ClassTimetableCell::where('class_id', $data['student']->class_id)
                 ->where('section_id', $data['student']->section_id)
-                ->with(['subject', 'teacher.user'])
+                ->with(['subject', 'teacher.user', 'period'])
                 ->get();
 
             $daysOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
             foreach ($daysOrder as $day) {
                 $daySlots = $slots->filter(fn($s) => strtolower($s->day_of_week) === strtolower($day))
                     ->sortBy(function($s) {
-                        return strtotime($s->start_time);
+                        return strtotime($s->period ? $s->period->start_time : '00:00:00');
                     });
                 if ($daySlots->isNotEmpty()) {
                     $timetableGrouped[$day] = $daySlots;

@@ -17,6 +17,7 @@ class SectionSubjectStaff extends Model
         'section_id',
         'subject_id',
         'staff_id',
+        'substitute_staff_id',
         'academic_session_id',
     ];
 
@@ -33,6 +34,11 @@ class SectionSubjectStaff extends Model
     public function staff()
     {
         return $this->belongsTo(Staff::class);
+    }
+
+    public function substituteStaff()
+    {
+        return $this->belongsTo(Staff::class, 'substitute_staff_id');
     }
 
     public function academicSession()

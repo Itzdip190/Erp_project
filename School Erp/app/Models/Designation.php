@@ -20,4 +20,9 @@ class Designation extends Model
     {
         return $this->hasMany(Staff::class);
     }
+
+    public function staffs()
+    {
+        return $this->belongsToMany(Staff::class, 'designation_staff');
+    }
 }

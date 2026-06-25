@@ -6,6 +6,12 @@
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    # Redirect all traffic to the public directory
+
+    # Don't rewrite if the target file/directory already exists
+    # (prevents infinite loop: uploads/x → public/uploads/x → public/public/uploads/x ...)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Redirect all other traffic to the public directory
     RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>

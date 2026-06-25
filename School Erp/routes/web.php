@@ -8,7 +8,6 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-// Database Migration & Seeding Helper Route for Hosting (Secured with Key)
 Route::get('/migrate-db', function (\Illuminate\Http\Request $request) {
     $expectedKey = env('DB_MIGRATE_KEY');
     
@@ -16,30 +15,86 @@ Route::get('/migrate-db', function (\Illuminate\Http\Request $request) {
         abort(403, 'Unauthorized. Please provide a valid migration key.');
     }
 
+    // Prevent PHP timeout on shared hosting (Hostinger has short default limits)
+    @set_time_limit(0);
+    @ini_set('memory_limit', '512M');
+    @ini_set('max_execution_time', 0);
+
+    $allOutput = '';
+
     try {
         if ($request->query('fresh') === 'true') {
-            // Run migrations and seed database in force mode (DESTRUCTIVE - wipes all data)
+            // DESTRUCTIVE: wipes all data
             \Illuminate\Support\Facades\Artisan::call('migrate:fresh', [
                 '--force' => true,
                 '--seed' => true
             ]);
+            $allOutput .= \Illuminate\Support\Facades\Artisan::output();
             $actionText = "Database Fresh Migration & Seeding (Destructive)";
         } else {
-            // Run standard migrations safely (NON-DESTRUCTIVE - keeps existing data)
+            // NON-DESTRUCTIVE: keeps existing data
             \Illuminate\Support\Facades\Artisan::call('migrate', [
                 '--force' => true
             ]);
-            $actionText = "Safe Database Migration (Non-Destructive)";
+            $allOutput .= \Illuminate\Support\Facades\Artisan::output();
+            if ($request->query('seed') === 'true') {
+                \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                    '--force' => true
+                ]);
+                $allOutput .= \Illuminate\Support\Facades\Artisan::output();
+                $actionText = "Safe Database Migration & Seeding (Non-Destructive)";
+            } else {
+                $actionText = "Safe Database Migration (Non-Destructive)";
+            }
+        }
+
+        // Ensure public/uploads directory exists and is writable
+        $uploadsDir = public_path('uploads');
+        if (!is_dir($uploadsDir)) {
+            mkdir($uploadsDir, 0755, true);
+            $allOutput .= "\n[INFO] Created uploads directory at: {$uploadsDir}";
+        } else {
+            $allOutput .= "\n[INFO] Uploads directory already exists at: {$uploadsDir}";
         }
         
-        // Clear all cached configurations, routes, and compiled views to apply changes immediately on Hostinger
+        // Clear all caches
         \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+        $allOutput .= \Illuminate\Support\Facades\Artisan::output();
         
-        $output = \Illuminate\Support\Facades\Artisan::output();
-        return response("<h3>{$actionText} Successful!</h3><pre>{$output}</pre>", 200);
-    } catch (\Exception $e) {
-        return response("<h3>Database Migration Failed!</h3><p>{$e->getMessage()}</p>", 500);
+        return response("<h3 style='color:green'>✅ {$actionText} Successful!</h3><pre>{$allOutput}</pre>", 200);
+    } catch (\Throwable $e) {
+        $errorMsg  = "<h3 style='color:red'>❌ Database Migration Failed!</h3>";
+        $errorMsg .= "<p><strong>Error:</strong> " . htmlspecialchars($e->getMessage()) . "</p>";
+        $errorMsg .= "<p><strong>File:</strong> " . htmlspecialchars($e->getFile()) . " (Line: " . $e->getLine() . ")</p>";
+        $errorMsg .= "<pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+        if ($allOutput) {
+            $errorMsg .= "<h4>Output before error:</h4><pre>" . htmlspecialchars($allOutput) . "</pre>";
+        }
+        return response($errorMsg, 500);
     }
+});
+
+Route::get('/deploy-git', function (\Illuminate\Http\Request $request) {
+    $expectedKey = env('DB_MIGRATE_KEY');
+    if (!$expectedKey || $request->query('key') !== $expectedKey) {
+        abort(403, 'Unauthorized.');
+    }
+
+    $output = [];
+    $returnVar = 0;
+    exec('git pull origin main 2>&1', $output, $returnVar);
+
+    if ($returnVar === 0) {
+        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $output[] = "[INFO] Laravel cache cleared and migrations run.";
+        $output[] = \Illuminate\Support\Facades\Artisan::output();
+    }
+
+    return response()->json([
+        'output' => $output,
+        'return_var' => $returnVar
+    ]);
 });
 
 // Fix Tables Route — directly creates staff_module_access if it doesn't exist (bypasses migration tracking)
@@ -84,7 +139,7 @@ Route::get('/fix-tables', function (\Illuminate\Http\Request $request) {
                 $table->timestamps();
                 $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
                 $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-                $table->unique(['school_id', 'user_id', 'module_key', 'feature_key']);
+                $table->unique(['school_id', 'user_id', 'module_key', 'feature_key'], 'sma_school_user_mod_feat_unique');
                 $table->index(['school_id', 'module_key', 'feature_key']);
             });
             $created[] = 'staff_module_access';
@@ -123,6 +178,15 @@ Route::get('/debug-storage', function (\Illuminate\Http\Request $request) {
     $output = "<h1>Storage Diagnostic Tool</h1>";
     $output .= "<p><strong>PHP Version:</strong> " . PHP_VERSION . "</p>";
     $output .= "<p><strong>Default Disk:</strong> {$defaultDisk}</p>";
+    $output .= "<p><strong>Base Path:</strong> " . base_path() . " (Exists: " . (is_dir(base_path()) ? 'YES' : 'NO') . ")</p>";
+    $output .= "<p><strong>Public Path:</strong> " . public_path() . " (Exists: " . (is_dir(public_path()) ? 'YES' : 'NO') . ")</p>";
+    $output .= "<p><strong>base_path('public') exists:</strong> " . (is_dir(base_path('public')) ? 'YES' : 'NO') . "</p>";
+    $output .= "<p><strong>base_path('uploads') exists:</strong> " . (is_dir(base_path('uploads')) ? 'YES' : 'NO') . "</p>";
+    $output .= "<p><strong>public_path('uploads') exists:</strong> " . (is_dir(public_path('uploads')) ? 'YES' : 'NO') . ", Writable: " . (is_writable(public_path('uploads')) ? 'YES' : 'NO') . "</p>";
+    $output .= "<p><strong>public disk root (config):</strong> " . config('filesystems.disks.public.root') . "</p>";
+    $output .= "<p><strong>public disk url (config):</strong> " . config('filesystems.disks.public.url') . "</p>";
+    $output .= "<p><strong>Storage::disk('public') root:</strong> " . \Illuminate\Support\Facades\Storage::disk('public')->path('') . "</p>";
+    $output .= "<p><strong>Sample photo_url would be:</strong> " . \Illuminate\Support\Facades\Storage::disk('public')->url('staff/sample.jpg') . "</p>";
     $output .= "<p><strong>Storage App Private Path:</strong> " . storage_path('app/private') . " (Exists: " . (is_dir(storage_path('app/private')) ? 'YES' : 'NO') . ", Writable: " . (is_writable(storage_path('app/private')) ? 'YES' : 'NO') . ")</p>";
     $output .= "<p><strong>Storage App Public Path:</strong> " . storage_path('app/public') . " (Exists: " . (is_dir(storage_path('app/public')) ? 'YES' : 'NO') . ", Writable: " . (is_writable(storage_path('app/public')) ? 'YES' : 'NO') . ")</p>";
     $output .= "<h2>Last 10 Student Documents in DB:</h2>";

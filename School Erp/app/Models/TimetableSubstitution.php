@@ -25,7 +25,7 @@ class TimetableSubstitution extends Model
 
     public function timetable()
     {
-        return $this->belongsTo(Timetable::class);
+        return $this->belongsTo(ClassTimetableCell::class, 'timetable_id');
     }
 
     public function originalTeacher()

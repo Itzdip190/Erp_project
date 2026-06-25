@@ -12,24 +12,28 @@ class DepartmentSeeder extends Seeder
     {
         $school = School::where('code', 'YIS2024')->firstOrFail();
 
-        Department::firstOrCreate(
-            [
-                'school_id' => $school->id,
-                'name' => 'Academic',
-            ],
-            [
-                'description' => 'Academic Department',
-            ]
-        );
+        $departments = [
+            ['name' => 'Administration',       'description' => 'School Administration'],
+            ['name' => 'Academic',             'description' => 'General Academic Department'],
+            ['name' => 'Science',              'description' => 'Science Department'],
+            ['name' => 'Mathematics',          'description' => 'Mathematics Department'],
+            ['name' => 'English',              'description' => 'English & Literature Department'],
+            ['name' => 'Social Studies',       'description' => 'Social Studies & History Department'],
+            ['name' => 'Arts & Craft',         'description' => 'Arts & Craft Department'],
+            ['name' => 'Physical Education',   'description' => 'Physical Education & Sports'],
+            ['name' => 'Computer Science',     'description' => 'Computer Science & IT Department'],
+            ['name' => 'Commerce',             'description' => 'Commerce & Accountancy Department'],
+            ['name' => 'Library',              'description' => 'School Library'],
+            ['name' => 'Finance',              'description' => 'Finance & Accounts Department'],
+            ['name' => 'Non-Teaching',         'description' => 'Non-Teaching Support Staff'],
+        ];
 
-        Department::firstOrCreate(
-            [
-                'school_id' => $school->id,
-                'name' => 'Administration',
-            ],
-            [
-                'description' => 'School Administration',
-            ]
-        );
+        foreach ($departments as $department) {
+            Department::firstOrCreate(
+                ['school_id' => $school->id, 'name' => $department['name']],
+                ['description' => $department['description']]
+            );
+        }
     }
 }
+

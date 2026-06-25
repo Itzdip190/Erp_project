@@ -14,7 +14,7 @@ class BulkImportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file' => 'required|mimes:csv,xlsx|max:5120',
+            'file' => 'required|file|max:10240',
         ];
     }
 }

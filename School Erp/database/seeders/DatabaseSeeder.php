@@ -28,6 +28,7 @@ class DatabaseSeeder extends Seeder
             ImplTemplateImplementationSeeder::class,
             ImplIntegrationsSeeder::class,
             ImplTrainingSeeder::class,
+            MisReportSeeder::class,
         ]);
     }
 }

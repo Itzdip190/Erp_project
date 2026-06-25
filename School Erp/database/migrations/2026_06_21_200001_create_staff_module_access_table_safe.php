@@ -22,7 +22,7 @@ return new class extends Migration
 
                 $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
                 $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
-                $table->unique(['school_id', 'user_id', 'module_key', 'feature_key']);
+                $table->unique(['school_id', 'user_id', 'module_key', 'feature_key'], 'sma_school_user_mod_feat_unique');
                 $table->index(['school_id', 'module_key', 'feature_key']);
             });
         }

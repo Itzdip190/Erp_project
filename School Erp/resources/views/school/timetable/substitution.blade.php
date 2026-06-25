@@ -73,6 +73,21 @@
                                         @if($period->room_number)
                                             <small style="color:var(--t3);"><i class="fas fa-location-dot"></i> {{ $period->room_number }}</small>
                                         @endif
+                                        @php
+                                            $designated = $designatedSubstitutes[$period->id] ?? null;
+                                            $freeSuggestions = $substituteSuggestions[$period->id] ?? collect();
+                                            $isDesignatedFree = $designated ? ($freeSuggestions->contains('id', $designated->id)) : false;
+                                        @endphp
+                                        @if($designated)
+                                            <div style="margin-top: 5px; font-size:11px; color:#b87000; font-weight:600; display:flex; align-items:center; gap:4px;">
+                                                <i class="fas fa-user-shield"></i> Designated: {{ $designated->full_name }}
+                                                @if($isDesignatedFree)
+                                                    <span style="color:#2e7d32; font-weight:bold;">(Free)</span>
+                                                @else
+                                                    <span style="color:#d32f2f; font-weight:bold;">(Busy)</span>
+                                                @endif
+                                            </div>
+                                        @endif
                                     </td>
                                     <td>
                                         <form method="POST" action="{{ route('school.timetable.substitution.store') }}" style="display:flex; gap:6px; align-items:center;">
@@ -83,8 +98,13 @@
                                             
                                             <select name="substitute_staff_id" class="form-control" style="max-width:180px; padding:6px 10px; font-size:12px;" required>
                                                 <option value="">Select Free Teacher</option>
-                                                @foreach($substituteSuggestions[$period->id] ?? [] as $sub)
-                                                    <option value="{{ $sub->id }}">{{ $sub->full_name }}</option>
+                                                @if($designated && !$isDesignatedFree)
+                                                    <option value="{{ $designated->id }}" style="color:#d32f2f; font-weight:600;">{{ $designated->full_name }} (Designated - Busy)</option>
+                                                @endif
+                                                @foreach($freeSuggestions as $sub)
+                                                    <option value="{{ $sub->id }}" {{ $designated && $designated->id == $sub->id ? 'selected' : '' }}>
+                                                        {{ $sub->full_name }} {{ $designated && $designated->id == $sub->id ? '(Designated)' : '' }}
+                                                    </option>
                                                 @endforeach
                                             </select>
                                             <button type="submit" class="btn btn-success" style="padding:6px 12px; font-size:12px;">

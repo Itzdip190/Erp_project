@@ -79,7 +79,6 @@ class ModuleRegistry
                     'group_timetable'      => 'Group Timetable',
                     'teacher_timetable'    => 'Teacher Timetable',
                     'teacher_substitution' => 'Teacher Substitution',
-                    'teacher_workload'     => 'Teacher Workload',
                 ],
             ],
             'student_management' => [

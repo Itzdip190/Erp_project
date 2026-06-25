@@ -15,6 +15,9 @@ class Section extends Model
         'class_id',
         'name',
         'class_teacher_id',
+        'assistant_class_teacher_id',
+        'local_name',
+        'sort_order',
     ];
 
     public function schoolClass()
@@ -25,6 +28,11 @@ class Section extends Model
     public function classTeacher()
     {
         return $this->belongsTo(Staff::class, 'class_teacher_id');
+    }
+
+    public function assistantClassTeacher()
+    {
+        return $this->belongsTo(Staff::class, 'assistant_class_teacher_id');
     }
 
     public function students()

@@ -171,6 +171,17 @@ textarea.st-control {
             @csrf
             @method('PUT')
 
+            @if ($errors->any())
+                <div style="background:#fee2e2; border-left:4px solid #ef4444; color:#991b1b; padding:12px; border-radius:8px; margin-bottom:20px; font-size:13.5px;">
+                    <strong style="display:block; margin-bottom:4px;">Please correct the errors below:</strong>
+                    <ul style="margin-left:20px; padding-left:0;">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             <!-- 1. PERSONAL DETAILS -->
             <div class="st-section">
                 <div class="st-section-hdr">
@@ -256,12 +267,12 @@ textarea.st-control {
                             <input type="text" name="additional_fields[mother_tongue]" class="st-control" value="{{ old('additional_fields.mother_tongue', $staff->additional_fields['mother_tongue'] ?? '') }}">
                         </div>
                         <div class="st-form-group">
-                            <label class="st-label">PAN Number</label>
-                            <input type="text" name="pan_number" class="st-control" value="{{ old('pan_number', $staff->pan_number) }}">
+                            <label class="st-label">PAN Number <span>*</span></label>
+                            <input type="text" name="pan_number" class="st-control" value="{{ old('pan_number', $staff->pan_number) }}" required>
                         </div>
                         <div class="st-form-group">
-                            <label class="st-label">Aadhar Number</label>
-                            <input type="text" name="additional_fields[aadhar_number]" class="st-control" value="{{ old('additional_fields.aadhar_number', $staff->additional_fields['aadhar_number'] ?? '') }}">
+                            <label class="st-label">Aadhar Number <span>*</span></label>
+                            <input type="text" name="additional_fields[aadhar_number]" class="st-control" value="{{ old('additional_fields.aadhar_number', $staff->additional_fields['aadhar_number'] ?? '') }}" required>
                         </div>
                         <div class="st-form-group">
                             <label class="st-label">Staff Photo</label>

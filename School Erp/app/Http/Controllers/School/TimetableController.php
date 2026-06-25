@@ -10,6 +10,7 @@ use App\Models\Subject;
 use App\Models\Staff;
 use App\Models\Timetable;
 use App\Models\TimetableSubstitution;
+use App\Models\ClassTimetableCell;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -107,9 +108,9 @@ class TimetableController extends Controller
         $timetableData = collect();
 
         if ($teacherId) {
-            $timetableData = Timetable::where('school_id', $schoolId)
-                ->where('staff_id', $teacherId)
-                ->with(['class', 'section', 'subject'])
+            $timetableData = ClassTimetableCell::where('school_id', $schoolId)
+                ->where('teacher_id', $teacherId)
+                ->with(['schoolClass', 'section', 'subject', 'period'])
                 ->get()
                 ->groupBy('day_of_week');
         }
@@ -128,22 +129,28 @@ class TimetableController extends Controller
 
         $periodsToSubstitute = collect();
         $substituteSuggestions = [];
+        $designatedSubstitutes = [];
+
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+            ?? AcademicSession::where('school_id', $schoolId)->first();
+        $sessionId = $currentSession ? $currentSession->id : null;
 
         if ($absentTeacherId) {
             // Get all periods scheduled for absent teacher on this day of week
-            $periodsToSubstitute = Timetable::where('school_id', $schoolId)
-                ->where('staff_id', $absentTeacherId)
+            $periodsToSubstitute = ClassTimetableCell::where('school_id', $schoolId)
+                ->where('teacher_id', $absentTeacherId)
                 ->where('day_of_week', $dayOfWeek)
-                ->with(['class', 'section', 'subject'])
+                ->with(['schoolClass', 'section', 'subject', 'period'])
                 ->get();
 
             // For each period, find substitute teachers who are free
             foreach ($periodsToSubstitute as $period) {
-                // Find teachers who have NO classes during this period's start_time and day_of_week
-                $busyTeacherIds = Timetable::where('school_id', $schoolId)
+                // Find teachers who have classes during this period's start_time and day_of_week
+                $busyTeacherIds = ClassTimetableCell::where('school_id', $schoolId)
                     ->where('day_of_week', $dayOfWeek)
-                    ->where('start_time', $period->start_time)
-                    ->pluck('staff_id')
+                    ->where('timetable_group_period_id', $period->timetable_group_period_id)
+                    ->whereNotNull('teacher_id')
+                    ->pluck('teacher_id')
                     ->toArray();
 
                 $freeTeachers = Staff::where('school_id', $schoolId)
@@ -152,18 +159,33 @@ class TimetableController extends Controller
                     ->get();
 
                 $substituteSuggestions[$period->id] = $freeTeachers;
+
+                // Check for a pre-assigned/designated substitute teacher from Module 7
+                if ($sessionId) {
+                    $mapping = \App\Models\SectionSubjectStaff::where('school_id', $schoolId)
+                        ->where('section_id', $period->section_id)
+                        ->where('subject_id', $period->subject_id)
+                        ->where('staff_id', $absentTeacherId)
+                        ->where('academic_session_id', $sessionId)
+                        ->with('substituteStaff')
+                        ->first();
+                    
+                    if ($mapping && $mapping->substituteStaff) {
+                        $designatedSubstitutes[$period->id] = $mapping->substituteStaff;
+                    }
+                }
             }
         }
 
         // Fetch existing substitutions for today
         $existingSubstitutions = TimetableSubstitution::where('school_id', $schoolId)
             ->whereDate('date', $date)
-            ->with(['timetable.class', 'timetable.section', 'timetable.subject', 'originalTeacher', 'substituteTeacher'])
+            ->with(['timetable.schoolClass', 'timetable.section', 'timetable.subject', 'timetable.period', 'originalTeacher', 'substituteTeacher'])
             ->get();
 
         return view('school.timetable.substitution', compact(
             'teachers', 'date', 'absentTeacherId', 'dayOfWeek',
-            'periodsToSubstitute', 'substituteSuggestions', 'existingSubstitutions'
+            'periodsToSubstitute', 'substituteSuggestions', 'existingSubstitutions', 'designatedSubstitutes'
         ));
     }
 
@@ -172,7 +194,7 @@ class TimetableController extends Controller
         $schoolId = auth()->user()->school_id;
         $request->validate([
             'date' => 'required|date',
-            'timetable_id' => 'required|exists:timetables,id',
+            'timetable_id' => 'required|exists:class_timetable_cells,id',
             'original_staff_id' => 'required|exists:staff,id',
             'substitute_staff_id' => 'required|exists:staff,id',
         ]);
@@ -200,42 +222,5 @@ class TimetableController extends Controller
         }
         $substitution->delete();
         return back()->with('success', 'Substitution cancelled successfully.');
-    }
-
-    public function teacherWorkload()
-    {
-        $schoolId = auth()->user()->school_id;
-
-        $workloads = Staff::where('school_id', $schoolId)
-            ->where('is_active', true)
-            ->with(['department', 'designation'])
-            ->get()
-            ->map(function($teacher) use ($schoolId) {
-                // Count weekly periods
-                $periodCount = Timetable::where('school_id', $schoolId)
-                    ->where('staff_id', $teacher->id)
-                    ->count();
-
-                // Compute workload label
-                if ($periodCount < 10) {
-                    $status = 'Underloaded';
-                    $color = 'var(--blue)';
-                } elseif ($periodCount <= 20) {
-                    $status = 'Optimal';
-                    $color = 'var(--green)';
-                } else {
-                    $status = 'Overloaded';
-                    $color = 'var(--red)';
-                }
-
-                return [
-                    'teacher' => $teacher,
-                    'periods' => $periodCount,
-                    'status' => $status,
-                    'color' => $color
-                ];
-            });
-
-        return view('school.timetable.workload', compact('workloads'));
     }
 }

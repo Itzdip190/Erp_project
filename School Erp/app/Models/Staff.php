@@ -55,6 +55,7 @@ class Staff extends Model
     protected $appends = [
         'full_name',
         'photo_url',
+        'staff_type',
     ];
 
     public function getFullNameAttribute(): string
@@ -65,9 +66,46 @@ class Staff extends Model
     public function getPhotoUrlAttribute(): string
     {
         if ($this->photo) {
-            return Storage::disk(config('filesystems.default'))->url($this->photo);
+            return Storage::disk('public')->url($this->photo);
         }
         return asset('images/avatar-staff.png');
+    }
+
+    public function getStaffTypeAttribute(): string
+    {
+        if ($this->user && $this->user->role) {
+            $userRole = strtolower($this->user->role);
+            if ($userRole === 'teacher') {
+                return 'Teaching';
+            }
+            if ($userRole === 'admin' || $userRole === 'school_admin') {
+                return 'Admin';
+            }
+            if ($userRole === 'driver') {
+                return 'Driver/Supporting staff';
+            }
+        }
+
+        $desg = strtolower($this->designation?->name ?? '');
+        $dept = strtolower($this->department?->name ?? '');
+
+        if (str_contains($desg, 'teacher') || str_contains($desg, 'instructor') || str_contains($desg, 'lecturer') || str_contains($desg, 'faculty') || $dept === 'academic') {
+            return 'Teaching';
+        }
+
+        if (str_contains($desg, 'driver') || str_contains($desg, 'conductor') || str_contains($desg, 'peon') || str_contains($desg, 'supporting') || str_contains($desg, 'helper')) {
+            return 'Driver/Supporting staff';
+        }
+
+        if (str_contains($desg, 'admin') || str_contains($desg, 'principal') || str_contains($desg, 'director') || str_contains($desg, 'manager')) {
+            return 'Admin';
+        }
+
+        if (str_contains($desg, 'clerk') || str_contains($desg, 'accountant') || str_contains($desg, 'registrar') || str_contains($desg, 'librarian') || str_contains($desg, 'receptionist')) {
+            return 'Non Teaching';
+        }
+
+        return 'Non Teaching';
     }
 
     public function school()
@@ -88,6 +126,11 @@ class Staff extends Model
     public function designation()
     {
         return $this->belongsTo(Designation::class);
+    }
+
+    public function designations()
+    {
+        return $this->belongsToMany(Designation::class, 'designation_staff');
     }
 
     public function attendances()

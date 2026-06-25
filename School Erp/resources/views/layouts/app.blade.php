@@ -24,10 +24,12 @@
     --shadow-lg:0 8px 32px rgba(0,0,0,.12);
 }
 body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);display:flex;min-height:100vh;overflow-x:hidden;}
+.w-5 { width: 1.25rem !important; }
+.h-5 { height: 1.25rem !important; }
 
 /* ─── SIDEBAR ─────────────────────────────────────────────── */
 .sidebar{
-    width:185px;min-width:185px;background:var(--navy);
+    width:230px;min-width:230px;background:var(--navy);
     height:100vh;position:fixed;left:0;top:0;
     display:flex;flex-direction:column;z-index:200;
     overflow-y:auto;overflow-x:hidden;
@@ -44,12 +46,12 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 }
 .sb-logo-icon{
     width:34px;height:34px;border-radius:9px;
-    background:var(--gold);
+    background:#2563eb;
     display:flex;align-items:center;justify-content:center;
-    font-size:16px;color:var(--navy);flex-shrink:0;
+    font-size:16px;color:#fff;flex-shrink:0;
 }
-.sb-logo-text strong{display:block;color:#fff;font-size:13px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;line-height:1.15;}
-.sb-logo-text span{color:var(--gold);font-size:9.5px;font-weight:500;}
+.sb-logo-text strong{display:block;color:#fff;font-size:15px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;line-height:1.15;}
+.sb-logo-text span{color:#93c5fd;font-size:11px;font-weight:500;}
 
 .sb-school{
     margin:12px 10px;
@@ -59,17 +61,25 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 }
 .sb-school-row{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
 .sb-school-icon{
-    width:22px;height:22px;border-radius:5px;
-    background:rgba(245,158,11,.2);
+    width:28px;height:28px;border-radius:6px;
+    background:rgba(37,99,235,.25);
     display:flex;align-items:center;justify-content:center;
-    color:var(--gold);font-size:10px;flex-shrink:0;
+    color:#60a5fa;font-size:10px;flex-shrink:0;
+    overflow:hidden;
 }
-.sb-school-name{color:#fff;font-size:11.5px;font-weight:700;line-height:1.3;}
-.sb-school-session{color:rgba(255,255,255,.45);font-size:9.5px;margin-bottom:6px;}
+.sb-school-icon img{
+    width:100%;height:100%;object-fit:cover;border-radius:6px;
+}
+/* Avatar logo override */
+.avatar img{
+    width:100%;height:100%;object-fit:cover;border-radius:9px;
+}
+.sb-school-name{color:#fff;font-size:13.5px;font-weight:700;line-height:1.3;}
+.sb-school-session{color:rgba(255,255,255,.45);font-size:11px;margin-bottom:6px;}
 .sb-plan-badge{
     display:inline-flex;align-items:center;gap:4px;
-    background:var(--gold-bg);color:var(--gold);
-    font-size:9.5px;font-weight:700;border-radius:20px;padding:2px 8px;
+    background:rgba(37,99,235,.25);color:#93c5fd;
+    font-size:11px;font-weight:700;border-radius:20px;padding:2px 8px;
 }
 
 .sb-nav{list-style:none;padding:6px 0;flex:1;overflow-y:auto;overflow-x:hidden;}
@@ -84,12 +94,12 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 .sb-hdr:hover{background:rgba(255,255,255,.05);color:#fff;}
 .sb-hdr-left{display:flex;align-items:center;gap:6px;}
 .sb-hdr-icon{
-    width:22px;height:22px;border-radius:50%;background:#f59e0b;
+    width:26px;height:26px;border-radius:50%;background:#2563eb;
     display:flex;align-items:center;justify-content:center;
-    color:#fff;font-size:9.5px;flex-shrink:0;
+    color:#fff;font-size:11px;flex-shrink:0;
 }
-.sb-hdr-title{font-family:'Plus Jakarta Sans',sans-serif;color:#fff;font-size:11px;font-weight:700;letter-spacing:0.2px;}
-.sb-hdr-arrow{font-size:9px;color:rgba(255,255,255,.3);transition:transform .2s;}
+.sb-hdr-title{font-family:'Plus Jakarta Sans',sans-serif;color:#fff;font-size:13.5px;font-weight:700;letter-spacing:0.2px;}
+.sb-hdr-arrow{font-size:10px;color:rgba(255,255,255,.3);transition:transform .2s;}
 .sb-hdr.open .sb-hdr-arrow{transform:rotate(180deg);}
 
 .sb-submenu{list-style:none;padding:2px 6px 2px 20px;display:none;}
@@ -98,39 +108,39 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 .sb-submenu a{
     display:flex;align-items:center;justify-content:space-between;
     padding:6px 8px;border-radius:6px;
-    color:rgba(255,255,255,.55);font-size:11px;font-weight:500;
+    color:rgba(255,255,255,.55);font-size:13px;font-weight:500;
     text-decoration:none;transition:all .18s;
 }
 .sb-submenu a:hover{color:#fff;background:rgba(255,255,255,.05);}
-.sb-submenu li.active a{color:#f59e0b;font-weight:700;}
+.sb-submenu li.active a{color:#fff;background:rgba(37,99,235,.25);border-left:3px solid #3b82f6;font-weight:700;}
 .sb-submenu-label{display:flex;align-items:center;gap:6px;}
-.sb-submenu-icon{font-size:9px;color:#f59e0b;flex-shrink:0;opacity:0.85;}
+.sb-submenu-icon{font-size:10px;color:#60a5fa;flex-shrink:0;opacity:0.85;}
 
 .sb-bottom{padding:10px;border-top:1px solid rgba(255,255,255,.08);flex-shrink:0;}
 .sb-help{
-    background:linear-gradient(135deg,rgba(245,158,11,.18),rgba(245,158,11,.04));
-    border:1px solid rgba(245,158,11,.22);
+    background:linear-gradient(135deg,rgba(37,99,235,.15),rgba(37,99,235,.03));
+    border:1px solid rgba(37,99,235,.2);
     border-radius:9px;padding:11px 11px 10px;margin-bottom:8px;
 }
-.sb-help p{color:rgba(255,255,255,.5);font-size:10px;margin-bottom:6px;}
-.sb-help strong{display:block;color:#fff;font-size:11.5px;margin-bottom:8px;}
+.sb-help p{color:rgba(255,255,255,.5);font-size:11px;margin-bottom:6px;}
+.sb-help strong{display:block;color:#fff;font-size:13px;margin-bottom:8px;}
 .btn-support{
     display:block;text-align:center;
-    background:var(--gold);color:var(--navy);
-    font-size:11px;font-weight:700;border-radius:6px;
+    background:#2563eb;color:#fff;
+    font-size:12px;font-weight:700;border-radius:6px;
     padding:7px;text-decoration:none;transition:.2s;
 }
-.btn-support:hover{background:#d97706;}
+.btn-support:hover{background:#1d4ed8;}
 .sb-logout{
     display:flex;align-items:center;gap:8px;
-    color:rgba(255,255,255,.4);font-size:11.5px;
+    color:rgba(255,255,255,.4);font-size:13px;
     padding:7px 9px;border-radius:7px;
     text-decoration:none;transition:.2s;
 }
 .sb-logout:hover{background:rgba(239,68,68,.12);color:#ef4444;}
 
 /* ─── MAIN ─────────────────────────────────────────────────── */
-.main{margin-left:185px;flex:1;display:flex;flex-direction:column;min-height:100vh;}
+.main{margin-left:230px;flex:1;display:flex;flex-direction:column;min-height:100vh;min-width:0;}
 
 /* ─── TOPBAR ───────────────────────────────────────────────── */
 .topbar{
@@ -187,7 +197,7 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
 .user-drop a.danger i{color:var(--red);}
 
 /* ─── PAGE CONTENT ─────────────────────────────────────────── */
-.pg{padding:22px 24px;flex:1;}
+.pg{padding:22px 24px;flex:1;min-width:0;}
 
 /* ─── PAGE HEADER BAR ──────────────────────────────────────── */
 .page-hdr{
@@ -303,13 +313,14 @@ table.tbl tr:last-child td{border-bottom:none;}
     .hamburger{display:flex;}
 }
 @media(max-width:768px){
-    .sidebar{transform:translateX(-185px);width:185px;}
+    .sidebar{transform:translateX(-230px);width:230px;}
     .sidebar.open{transform:translateX(0);}
     .sb-logo-text,.sb-school,.sb-hdr-title,.sb-hdr-arrow,.sb-bottom{display:block!important;}
     .sb-submenu{display:none;}
     .sb-submenu.open{display:block!important;}
     .sb-hdr{justify-content:space-between!important;padding:8px 10px!important;margin:0 6px!important;}
     .sb-hdr-icon{width:22px!important;height:22px!important;font-size:9.5px!important;}
+}
 .badge-sidebar-pro {
     display: inline-flex;
     align-items: center;
@@ -342,6 +353,114 @@ table.tbl tr:last-child td{border-bottom:none;}
     padding: 1px 4px;
     border-radius: 4px;
     margin-left: 4px;
+}
+/* Laravel Tailwind Pagination Fix & Beautification */
+nav[role="navigation"] {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 20px;
+    background: var(--white);
+}
+/* Hide the mobile-only pagination container by element position */
+nav[role="navigation"] > div:first-of-type {
+    display: none !important;
+}
+/* Style the desktop pagination container */
+nav[role="navigation"] > div:last-child {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+@media (min-width: 640px) {
+    nav[role="navigation"] {
+        flex-direction: row;
+        justify-content: space-between;
+    }
+    nav[role="navigation"] > div:last-child {
+        flex-direction: row !important;
+        justify-content: space-between !important;
+    }
+}
+/* Style the "Showing X to Y of Z results" text */
+nav[role="navigation"] p {
+    font-size: 13px;
+    color: var(--t2);
+    margin: 0;
+}
+/* Style the pagination buttons wrapper */
+nav[role="navigation"] span.shadow-sm {
+    display: inline-flex !important;
+    gap: 8px !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    overflow: visible !important;
+}
+/* Style each pagination link/span */
+nav[role="navigation"] span.shadow-sm > a,
+nav[role="navigation"] span.shadow-sm > span {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    padding: 0 !important;
+    background-color: var(--white) !important;
+    border: 2px solid #2563eb !important;
+    border-radius: 10px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #2563eb !important;
+    text-decoration: none !important;
+    transition: all 0.2s ease !important;
+    box-shadow: none !important;
+}
+/* Hover effect for active/clickable pages */
+nav[role="navigation"] span.shadow-sm a:hover {
+    background-color: rgba(37, 99, 235, 0.08) !important;
+    border-color: #1d4ed8 !important;
+    color: #1d4ed8 !important;
+}
+/* Style the current/active page container */
+nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
+    background-color: #2563eb !important;
+    border-color: #2563eb !important;
+    color: var(--white) !important;
+}
+/* Reset the inner span inside active/disabled wrappers to not have borders or backgrounds */
+nav[role="navigation"] span.shadow-sm span[aria-current="page"] span,
+nav[role="navigation"] span.shadow-sm span[aria-disabled="true"] span {
+    background: transparent !important;
+    border: none !important;
+    color: inherit !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    box-shadow: none !important;
+}
+/* Disabled buttons */
+nav[role="navigation"] span.shadow-sm span[aria-disabled="true"] {
+    color: var(--t3) !important;
+    border-color: var(--border) !important;
+    background-color: #f3f4f6 !important;
+    cursor: not-allowed !important;
+    opacity: 0.6 !important;
+}
+nav[role="navigation"] svg {
+    width: 16px !important;
+    height: 16px !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
 }
 </style>
 @yield('styles')
@@ -376,7 +495,13 @@ table.tbl tr:last-child td{border-bottom:none;}
     @if($currentSchool)
     <div class="sb-school">
         <div class="sb-school-row">
-            <div class="sb-school-icon"><i class="fas fa-school"></i></div>
+            <div class="sb-school-icon">
+                @if(!empty($currentSchool->logo) && Storage::disk('public')->exists($currentSchool->logo))
+                    <img src="{{ Storage::disk('public')->url($currentSchool->logo) }}" alt="{{ $currentSchool->name }}">
+                @else
+                    <i class="fas fa-school"></i>
+                @endif
+            </div>
             <div class="sb-school-name">{{ $currentSchool->name }}</div>
         </div>
         <div class="sb-school-session">
@@ -432,12 +557,14 @@ table.tbl tr:last-child td{border-bottom:none;}
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
+                {{-- HIDDEN: Implementation Process (temporarily hidden — do not delete)
                 <li class="{{ request()->is('school/implementation-tracker') ? 'active' : '' }}">
                     <a href="{{ route('implementation.index') }}">
                         <span class="sb-submenu-label">Implementation Process</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
+                HIDDEN --}}
                 <li class="{{ request()->is('school/settings/udise') ? 'active' : '' }}">
                     <a href="{{ route('school.settings.udise') }}">
                         <span class="sb-submenu-label">UDISE</span>
@@ -537,8 +664,8 @@ table.tbl tr:last-child td{border-bottom:none;}
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/attendance/students/report') ? 'active' : '' }}">
-                    <a href="{{ route('school.attendance.students.report') }}">
+                <li class="{{ request()->is('school/attendance/students/marking-report') ? 'active' : '' }}">
+                    <a href="{{ route('school.attendance.students.marking-report') }}">
                         <span class="sb-submenu-label">Student Attendance Marking Report</span>
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
@@ -617,12 +744,6 @@ table.tbl tr:last-child td{border-bottom:none;}
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/timetable/workload*') ? 'active' : '' }}">
-                    <a href="{{ route('school.timetable.workload') }}">
-                        <span class="sb-submenu-label">Teacher Workload</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
-                    </a>
-                </li>
             </ul>
         </div>
 
@@ -696,6 +817,7 @@ table.tbl tr:last-child td{border-bottom:none;}
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
+                {{--
                 <li class="{{ request()->is('school/student-mgmt/app-settings*') ? 'active' : '' }}">
                     <a href="{{ route('school.student-mgmt.app-settings') }}">
                         <span class="sb-submenu-label">Student Info. Update Settings on App</span>
@@ -738,6 +860,7 @@ table.tbl tr:last-child td{border-bottom:none;}
                         <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
                     </a>
                 </li>
+                --}}
             </ul>
         </div>
 
@@ -1281,7 +1404,13 @@ table.tbl tr:last-child td{border-bottom:none;}
             </div>
             <div class="user-wrap">
                 <div class="user-btn" onclick="this.closest('.user-wrap').querySelector('.user-drop').classList.toggle('open')">
-                    <div class="avatar">{{ $authInitials }}</div>
+                    <div class="avatar">
+                        @if($currentSchool && !empty($currentSchool->logo) && Storage::disk('public')->exists($currentSchool->logo))
+                            <img src="{{ Storage::disk('public')->url($currentSchool->logo) }}" alt="{{ $currentSchool->name }}" style="width:100%;height:100%;object-fit:cover;border-radius:9px;">
+                        @else
+                            {{ $authInitials }}
+                        @endif
+                    </div>
                     <div class="user-info">
                         <strong>{{ $authUser->name }}</strong>
                         <span>{{ $authRole }}</span>

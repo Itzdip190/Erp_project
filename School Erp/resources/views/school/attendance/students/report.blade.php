@@ -109,7 +109,9 @@
                                         @elseif($status === 'leave')
                                             <span style="color:#3b82f6; font-weight:900;">LV</span>
                                         @elseif($status === 'half_day')
-                                            <span style="color:#ec4899; font-weight:900;">H</span>
+                                            <span style="color:#eab308; font-weight:900;">HD</span>
+                                        @elseif($status === 'duty_leave')
+                                            <span style="color:#ec4899; font-weight:900;">DL</span>
                                         @else
                                             <span style="color:var(--t3); font-weight:normal;">-</span>
                                         @endif

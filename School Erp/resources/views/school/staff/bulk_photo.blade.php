@@ -13,7 +13,7 @@
             Select multiple images to upload. Each image file name MUST match the staff member's <strong>Employee ID</strong> exactly (e.g. <code>EMP001.jpg</code> or <code>EMP002.png</code>).
         </p>
 
-        <form method="POST" action="{{ route('school.staff.bulk-photo.post') }}" enctype="multipart/form-name">
+        <form method="POST" action="{{ route('school.staff.bulk-photo.post') }}" enctype="multipart/form-data">
             @csrf
             <div class="form-group">
                 <label class="form-label">Select Photo Files <span style="color:var(--red);">*</span></label>

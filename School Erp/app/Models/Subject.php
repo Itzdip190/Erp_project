@@ -18,6 +18,10 @@ class Subject extends Model
         'type',
         'max_marks',
         'pass_marks',
+        'local_name',
+        'description',
+        'is_mandatory',
+        'sort_order',
     ];
 
     protected $casts = [

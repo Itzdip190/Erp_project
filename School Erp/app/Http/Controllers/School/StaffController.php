@@ -99,11 +99,12 @@ class StaffController extends Controller
             'bank_name'           => 'nullable|string',
             'bank_account_number' => 'nullable|string',
             'ifsc_code'           => 'nullable|string',
-            'pan_number'          => 'nullable|string',
+            'pan_number'          => 'required|string',
             'qualification'       => 'nullable|string',
             'experience_years'    => 'nullable|integer',
             'date_of_birth'       => 'nullable|date',
-            'additional_fields'   => 'nullable|array',
+            'additional_fields'   => 'required|array',
+            'additional_fields.aadhar_number' => 'required|string',
         ]);
 
         // 1. Create linked User
@@ -131,7 +132,7 @@ class StaffController extends Controller
         }
 
         // 3. Create Staff profile
-        Staff::create(array_merge(
+        $staff = Staff::create(array_merge(
             $request->except('photo'),
             [
                 'school_id' => $schoolId,
@@ -139,6 +140,7 @@ class StaffController extends Controller
                 'photo'     => $photoPath
             ]
         ));
+        $staff->designations()->sync([$request->designation_id]);
 
         return redirect()->route('school.staff.index')->with('success', 'Staff member registered successfully!');
     }
@@ -192,11 +194,12 @@ class StaffController extends Controller
             'bank_name'           => 'nullable|string',
             'bank_account_number' => 'nullable|string',
             'ifsc_code'           => 'nullable|string',
-            'pan_number'          => 'nullable|string',
+            'pan_number'          => 'required|string',
             'qualification'       => 'nullable|string',
             'experience_years'    => 'nullable|integer',
             'date_of_birth'       => 'nullable|date',
-            'additional_fields'   => 'nullable|array',
+            'additional_fields'   => 'required|array',
+            'additional_fields.aadhar_number' => 'required|string',
         ]);
 
         $user = $staff->user;
@@ -230,6 +233,7 @@ class StaffController extends Controller
             $request->except('photo'),
             ['photo' => $photoPath]
         ));
+        $staff->designations()->sync([$request->designation_id]);
 
         return redirect()->route('school.staff.index')->with('success', 'Staff details updated successfully!');
     }
@@ -314,16 +318,27 @@ class StaffController extends Controller
     public function bulkImport(Request $request)
     {
         $request->validate([
-            'csv_file' => 'required|file|mimes:csv,txt|max:8192',
+            'csv_file' => 'required|file|max:10240',
         ]);
 
         $schoolId = auth()->user()->school_id;
         $file = $request->file('csv_file');
-        $handle = fopen($file->getPathname(), 'r');
-        $headerRow = fgetcsv($handle);
 
-        if (!$headerRow) {
-            return back()->with('error', 'CSV file is empty.');
+        try {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file->getPathname());
+            $sheet = $spreadsheet->getActiveSheet();
+            $rows = $sheet->toArray();
+        } catch (\Exception $e) {
+            return back()->with('error', 'Failed to read spreadsheet file: ' . $e->getMessage());
+        }
+
+        if (empty($rows)) {
+            return back()->with('error', 'Spreadsheet file is empty.');
+        }
+
+        $headerRow = $rows[0] ?? [];
+        if (empty($headerRow)) {
+            return back()->with('error', 'Spreadsheet file is empty.');
         }
 
         // Map column header names to their column index
@@ -340,7 +355,12 @@ class StaffController extends Controller
         $imported = 0;
         $skipped = 0;
 
-        while (($row = fgetcsv($handle)) !== false) {
+        $dataRows = array_slice($rows, 1);
+        foreach ($dataRows as $row) {
+            // Skip completely empty rows
+            if (empty(array_filter($row))) {
+                continue;
+            }
             // Basic validation
             $empId     = $val($row, 'employee_id');
             $firstName = $val($row, 'first_name');
@@ -432,7 +452,7 @@ class StaffController extends Controller
             ];
 
             // 5. Create Staff Profile
-            Staff::create([
+            $staff = Staff::create([
                 'school_id'           => $schoolId,
                 'user_id'             => $user->id,
                 'employee_id'         => $empId,
@@ -461,10 +481,10 @@ class StaffController extends Controller
                 'is_active'           => true,
                 'additional_fields'   => $additionalFields,
             ]);
+            $staff->designations()->sync([$desg->id]);
 
             $imported++;
         }
-        fclose($handle);
 
         return redirect()->route('school.staff.index')->with('success', "Bulk import complete! Imported: {$imported}, Skipped: {$skipped}");
     }

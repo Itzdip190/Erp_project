@@ -6,18 +6,18 @@
 @section('styles')
 <style>
 /* ── Blue-white theme overrides for this page ── */
-:root{
-    --rc-blue:#1d4ed8;
-    --rc-blue-light:#3b82f6;
-    --rc-blue-xlight:#eff6ff;
-    --rc-blue-border:#bfdbfe;
-    --rc-white:#fff;
-    --rc-text-dark:#1e3a5f;
-    --rc-text-muted:#64748b;
-    --rc-row-alt:#f8faff;
+:root {
+    --rc-blue: #1d4ed8;
+    --rc-blue-light: #3b82f6;
+    --rc-blue-xlight: #eff6ff;
+    --rc-blue-border: #bfdbfe;
+    --rc-white: #fff;
+    --rc-text-dark: #1e3a5f;
+    --rc-text-muted: #64748b;
+    --rc-row-alt: #f8faff;
 }
 
-.rc-page-header{
+.rc-page-header {
     background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 60%, #60a5fa 100%);
     border-radius: 16px;
     padding: 28px 32px;
@@ -27,20 +27,21 @@
     justify-content: space-between;
     box-shadow: 0 8px 32px rgba(29,78,216,.25);
 }
-.rc-page-header h1{
+.rc-page-header h1 {
     color: #fff;
     font-family: 'Plus Jakarta Sans', sans-serif;
     font-size: 22px;
     font-weight: 800;
     margin-bottom: 4px;
 }
-.rc-page-header p{ color: rgba(255,255,255,.75); font-size: 13px; }
-.rc-save-btn{
-    background: #fff;
-    color: var(--rc-blue);
-    border: none;
+.rc-page-header p { color: rgba(255,255,255,.75); font-size: 13px; }
+
+.rc-access-btn {
+    background: rgba(255,255,255,.15);
+    color: #fff;
+    border: 1.5px solid rgba(255,255,255,.4);
     border-radius: 10px;
-    padding: 11px 28px;
+    padding: 11px 22px;
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
@@ -48,345 +49,630 @@
     align-items: center;
     gap: 7px;
     transition: .2s;
-    box-shadow: 0 2px 8px rgba(0,0,0,.12);
+    text-decoration: none;
+    white-space: nowrap;
 }
-.rc-save-btn:hover{ background: #f0f9ff; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+.rc-access-btn:hover { background: rgba(255,255,255,.28); transform: translateY(-1px); color: #fff; }
 
-/* Module accordion card */
-.rc-module{
+/* Search bar styling */
+.rc-search-card {
     background: #fff;
     border: 1px solid var(--rc-blue-border);
     border-radius: 14px;
-    margin-bottom: 14px;
+    padding: 18px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(29,78,216,.04);
+}
+.rc-search-form {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+.rc-search-input-wrapper {
+    position: relative;
+    flex: 1;
+}
+.rc-search-input-wrapper i {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--rc-text-muted);
+    font-size: 14px;
+}
+.rc-search-input {
+    width: 100%;
+    padding: 10px 16px 10px 40px;
+    border: 1.5px solid var(--rc-blue-border);
+    border-radius: 10px;
+    font-size: 13.5px;
+    color: var(--rc-text-dark);
+    outline: none;
+    transition: all .2s;
+}
+.rc-search-input:focus {
+    border-color: var(--rc-blue-light);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+.rc-search-btn {
+    background: var(--rc-blue);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 24px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: .2s;
+}
+.rc-search-btn:hover { background: #1e40af; }
+.rc-clear-btn {
+    background: #f1f5f9;
+    color: var(--rc-text-muted);
+    border: 1.5px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: .2s;
+}
+.rc-clear-btn:hover { background: #e2e8f0; color: var(--rc-text-dark); }
+
+/* Staff table card */
+.rc-table-card {
+    background: #white;
+    border: 1px solid var(--rc-blue-border);
+    border-radius: 14px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(29,78,216,.06);
-    transition: box-shadow .2s;
 }
-.rc-module:hover{ box-shadow: 0 4px 20px rgba(29,78,216,.1); }
-
-.rc-module-header{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+.rc-table { width: 100%; border-collapse: collapse; }
+.rc-table th {
     padding: 14px 20px;
-    background: linear-gradient(90deg, var(--rc-blue-xlight) 0%, #fff 100%);
-    border-bottom: 1px solid var(--rc-blue-border);
-    cursor: pointer;
-    user-select: none;
-    transition: background .2s;
-}
-.rc-module-header:hover{ background: linear-gradient(90deg, #dbeafe 0%, #f0f9ff 100%); }
-.rc-module-header-left{ display: flex; align-items: center; gap: 12px; }
-.rc-module-icon{
-    width: 38px; height: 38px; border-radius: 10px;
-    background: linear-gradient(135deg, var(--rc-blue) 0%, var(--rc-blue-light) 100%);
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 14px; flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(29,78,216,.3);
-}
-.rc-module-title{
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--rc-text-dark);
-}
-.rc-module-subtitle{ font-size: 11px; color: var(--rc-text-muted); margin-top: 1px; }
-.rc-module-right{ display: flex; align-items: center; gap: 12px; }
-.rc-module-count{
-    background: var(--rc-blue-xlight);
-    color: var(--rc-blue);
     font-size: 11px;
     font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 20px;
-    border: 1px solid var(--rc-blue-border);
-}
-.rc-toggle-all{
-    background: none; border: 1.5px solid var(--rc-blue-border);
-    color: var(--rc-blue); border-radius: 6px;
-    padding: 4px 10px; font-size: 11px; font-weight: 600;
-    cursor: pointer; transition: .15s;
-}
-.rc-toggle-all:hover{ background: var(--rc-blue-xlight); }
-.rc-chevron{
-    color: var(--rc-blue-light); font-size: 11px;
-    transition: transform .3s;
-}
-.rc-module-header.open .rc-chevron{ transform: rotate(180deg); }
-
-/* Feature table inside accordion */
-.rc-features{ display: none; }
-.rc-features.open{ display: block; }
-.rc-feature-table{ width: 100%; border-collapse: collapse; }
-.rc-feature-table th{
-    padding: 10px 20px;
-    font-size: 11px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .5px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
     color: var(--rc-text-muted);
     background: #f8faff;
     border-bottom: 1.5px solid var(--rc-blue-border);
     text-align: left;
 }
-.rc-feature-table th.center{ text-align: center; }
-.rc-feature-table td{
-    padding: 11px 20px;
+.rc-table td {
+    padding: 16px 20px;
     font-size: 13px;
     color: var(--rc-text-dark);
     border-bottom: 1px solid #f0f5ff;
     vertical-align: middle;
 }
-.rc-feature-table tr:last-child td{ border-bottom: none; }
-.rc-feature-table tr:nth-child(even) td{ background: var(--rc-row-alt); }
-.rc-feature-table tr:hover td{ background: #eff6ff; }
+.rc-table tr:last-child td { border-bottom: none; }
+.rc-table tr:nth-child(even) td { background: var(--rc-row-alt); }
+.rc-table tr:hover td { background: #eff6ff; }
 
-.feature-name{ font-weight: 500; display: flex; align-items: center; gap: 8px; }
-.feature-name::before{
-    content: '';
-    width: 5px; height: 5px; border-radius: 50%;
-    background: var(--rc-blue-light); flex-shrink: 0;
+/* Avatar layout */
+.staff-avatar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
-
-/* Toggle switches */
-.toggle-cell{ text-align: center; }
-.toggle-wrap{ display: flex; align-items: center; justify-content: center; gap: 6px; }
-.toggle-label{ font-size: 10.5px; color: var(--rc-text-muted); font-weight: 600; }
-
-.rc-switch{
-    position: relative; display: inline-block;
-    width: 42px; height: 22px;
+.staff-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--rc-blue) 0%, var(--rc-blue-light) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(29,78,216,.2);
 }
-.rc-switch input{ opacity: 0; width: 0; height: 0; }
-.rc-slider{
-    position: absolute; cursor: pointer;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: #cbd5e1;
-    border-radius: 22px;
-    transition: .25s;
+.staff-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
 }
-.rc-slider::before{
-    content: ''; position: absolute;
-    height: 16px; width: 16px;
-    left: 3px; bottom: 3px;
-    background: white; border-radius: 50%;
-    transition: .25s;
-    box-shadow: 0 1px 4px rgba(0,0,0,.2);
-}
-.rc-switch input:checked + .rc-slider{ background: var(--rc-blue); }
-.rc-switch input:checked + .rc-slider::before{ transform: translateX(20px); }
-
-/* View toggle: lighter blue */
-.rc-switch.view-toggle input:checked + .rc-slider{ background: #60a5fa; }
-
-/* Summary stats bar */
-.rc-stats{
-    display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;
-}
-.rc-stat{
-    flex: 1; min-width: 120px;
-    background: #fff;
-    border: 1px solid var(--rc-blue-border);
-    border-radius: 12px;
-    padding: 14px 18px;
-    text-align: center;
-}
-.rc-stat-num{
+.staff-name {
     font-family: 'Plus Jakarta Sans', sans-serif;
-    font-size: 24px; font-weight: 800;
-    color: var(--rc-blue);
+    font-weight: 700;
+    color: var(--rc-text-dark);
 }
-.rc-stat-label{ font-size: 11px; color: var(--rc-text-muted); margin-top: 2px; }
+.staff-sub {
+    font-size: 11.5px;
+    color: var(--rc-text-muted);
+    margin-top: 2px;
+}
+
+/* Badge tags */
+.desg-badge-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.desg-badge {
+    background: var(--rc-blue-xlight);
+    color: var(--rc-blue);
+    border: 1px solid var(--rc-blue-border);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+}
+.role-badge {
+    background: #fef3c7;
+    color: #d97706;
+    border: 1px solid #fde68a;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 5px;
+    text-transform: uppercase;
+}
+.no-badges {
+    color: var(--rc-text-muted);
+    font-style: italic;
+    font-size: 12px;
+}
+
+.action-btn {
+    background: var(--rc-blue-xlight);
+    color: var(--rc-blue);
+    border: 1.5px solid var(--rc-blue-border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.action-btn:hover {
+    background: var(--rc-blue);
+    color: #fff;
+    border-color: var(--rc-blue);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(29,78,216,.2);
+}
+
+/* ── SLIDE-IN PANEL ── */
+.sa-panel-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(15,23,42,.45);
+    z-index: 990;
+    display: none;
+    backdrop-filter: blur(3px);
+}
+.sa-panel-backdrop.open { display: block; }
+
+.sa-panel {
+    position: fixed; top: 0; right: -460px;
+    width: 440px; height: 100vh;
+    background: #fff;
+    z-index: 1000;
+    box-shadow: -8px 0 40px rgba(29,78,216,.18);
+    display: flex; flex-direction: column;
+    transition: right .35s cubic-bezier(.4,0,.2,1);
+    border-left: 1px solid var(--rc-blue-border);
+}
+.sa-panel.open { right: 0; }
+
+.sa-panel-header {
+    padding: 22px 24px 16px;
+    background: linear-gradient(135deg, var(--rc-blue) 0%, var(--rc-blue-light) 100%);
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-shrink: 0;
+}
+.sa-panel-header h3 {
+    color: #fff;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 16px; font-weight: 800;
+    margin-bottom: 3px;
+}
+.sa-panel-header p { color: rgba(255,255,255,.75); font-size: 11.5px; }
+.sa-panel-close {
+    background: rgba(255,255,255,.15); border: none;
+    color: #fff; width: 30px; height: 30px;
+    border-radius: 8px; cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: .2s; flex-shrink: 0;
+}
+.sa-panel-close:hover { background: rgba(255,255,255,.25); }
+
+.sa-panel-search-wrap {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--rc-blue-border);
+    flex-shrink: 0;
+}
+.sa-panel-search {
+    width: 100%; padding: 8px 14px 8px 36px;
+    border: 1.5px solid var(--rc-blue-border);
+    border-radius: 9px; font-size: 13px;
+    outline: none; transition: .2s;
+    font-family: 'Inter', sans-serif;
+}
+.sa-panel-search:focus { border-color: var(--rc-blue-light); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
+.sa-search-icon {
+    position: absolute; left: 32px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--rc-text-muted); font-size: 13px;
+    pointer-events: none;
+}
+
+.sa-panel-list {
+    flex: 1; overflow-y: auto; padding: 8px 0;
+}
+.sa-panel-list::-webkit-scrollbar { width: 4px; }
+.sa-panel-list::-webkit-scrollbar-thumb { background: var(--rc-blue-border); border-radius: 4px; }
+
+/* Designation item inside panel */
+.desg-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: background .15s;
+    border-bottom: 1px solid #f8faff;
+}
+.desg-item:hover { background: var(--rc-blue-xlight); }
+.desg-item.selected { background: #dbeafe; }
+.desg-info { display: flex; flex-direction: column; gap: 3px; }
+.desg-name { font-size: 13px; font-weight: 600; color: var(--rc-text-dark); }
+.desg-desc { font-size: 11px; color: var(--rc-text-muted); }
+.desg-check {
+    width: 20px; height: 20px;
+    border-radius: 5px; border: 2px solid var(--rc-blue-border);
+    display: flex; align-items: center; justify-content: center;
+    transition: all .15s; flex-shrink: 0;
+    background: #fff;
+}
+.desg-item.selected .desg-check {
+    background: var(--rc-blue);
+    border-color: var(--rc-blue);
+    color: #fff;
+}
+
+.sa-panel-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--rc-blue-border);
+    display: flex; gap: 10px; align-items: center;
+    flex-shrink: 0;
+    background: #fafbff;
+}
+.sa-panel-save {
+    flex: 1; padding: 11px;
+    background: var(--rc-blue); color: #fff;
+    border: none; border-radius: 9px;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: .2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.sa-panel-save:hover { background: #1e40af; }
+.sa-panel-cancel {
+    padding: 11px 18px;
+    background: none; color: var(--rc-text-muted);
+    border: 1.5px solid var(--rc-blue-border);
+    border-radius: 9px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: .2s;
+}
+.sa-panel-cancel:hover { background: var(--rc-blue-xlight); color: var(--rc-blue); }
+.sa-panel-sel-count {
+    font-size: 11px; color: var(--rc-text-muted);
+    text-align: center; margin-top: 4px;
+}
+
+/* Empty state */
+.sa-empty {
+    padding: 40px 20px; text-align: center; color: var(--rc-text-muted);
+}
+.sa-empty i { font-size: 36px; color: var(--rc-blue-border); margin-bottom: 10px; display: block; }
 </style>
 @endsection
 
 @section('content')
 
-<form method="POST" action="{{ route('school.roles.permissions.update') }}" id="rolePermForm">
-@csrf
-@method('PUT')
-
 {{-- Page Header --}}
 <div class="rc-page-header">
     <div>
-        <h1><i class="fas fa-shield-halved" style="margin-right:10px;opacity:.9;"></i>Role Category — Module Permissions</h1>
-        <p>Toggle View & Edit access for each module feature. Staff access is configured separately in Staff Access Control.</p>
+        <h1><i class="fas fa-users-gear" style="margin-right:10px;opacity:.9;"></i>Role Category — Designations</h1>
+        <p>Assign multiple designations (roles) to school teachers and staff. Changes automatically synchronize with Spatie permissions.</p>
     </div>
-    <button type="submit" class="rc-save-btn">
-        <i class="fas fa-floppy-disk"></i> Save All Permissions
-    </button>
+    <a href="{{ route('school.roles.staff-access') }}" class="rc-access-btn">
+        <i class="fas fa-shield-halved"></i> Access Control Panel
+    </a>
 </div>
 
-{{-- Stats bar --}}
-<div class="rc-stats" id="rcStats">
-    <div class="rc-stat">
-        <div class="rc-stat-num" id="totalModules">{{ count($modules) }}</div>
-        <div class="rc-stat-label">Total Modules</div>
-    </div>
-    <div class="rc-stat">
-        <div class="rc-stat-num" id="totalFeatures">{{ collect($modules)->sum(fn($m) => count($m['features'])) }}</div>
-        <div class="rc-stat-label">Total Features</div>
-    </div>
-    <div class="rc-stat">
-        <div class="rc-stat-num" id="viewEnabled">0</div>
-        <div class="rc-stat-label">View Enabled</div>
-    </div>
-    <div class="rc-stat">
-        <div class="rc-stat-num" id="editEnabled">0</div>
-        <div class="rc-stat-label">Edit Enabled</div>
-    </div>
-</div>
-
-{{-- Module accordion list --}}
-@foreach($modules as $moduleKey => $module)
-@php $featureCount = count($module['features']); @endphp
-<div class="rc-module">
-    {{-- Module Header --}}
-    <div class="rc-module-header" onclick="toggleModule(this)">
-        <div class="rc-module-header-left">
-            <div class="rc-module-icon">
-                <i class="fas {{ $module['icon'] }}"></i>
-            </div>
-            <div>
-                <div class="rc-module-title">{{ $module['label'] }}</div>
-                <div class="rc-module-subtitle">{{ $featureCount }} feature{{ $featureCount !== 1 ? 's' : '' }}</div>
-            </div>
+{{-- Search Card --}}
+<div class="rc-search-card">
+    <form method="GET" action="{{ route('school.roles.index') }}" class="rc-search-form">
+        <div class="rc-search-input-wrapper">
+            <i class="fas fa-magnifying-glass"></i>
+            <input type="text"
+                   name="search"
+                   class="rc-search-input"
+                   value="{{ $search }}"
+                   placeholder="Search staff by name, email, or employee ID...">
         </div>
-        <div class="rc-module-right">
-            <span class="rc-module-count" id="count-{{ $moduleKey }}">0 / {{ $featureCount }}</span>
-            <button type="button" class="rc-toggle-all"
-                    onclick="event.stopPropagation(); toggleAllModule('{{ $moduleKey }}', this)">
-                Enable All
+        <button type="submit" class="rc-search-btn"><i class="fas fa-filter" style="margin-right: 5px;"></i> Filter</button>
+        @if($search)
+            <a href="{{ route('school.roles.index') }}" class="rc-clear-btn">Clear</a>
+        @endif
+    </form>
+</div>
+
+@if(!$staffList->count())
+<div class="sa-empty" style="background:#fff;border-radius:14px;border:1px solid var(--rc-blue-border);">
+    <i class="fas fa-user-slash"></i>
+    <strong style="display:block;color:#1e3a5f;font-size:15px;margin-bottom:6px;">No Staff Members Found</strong>
+    <p>Try refining your search or add new staff from the Staff Directory.</p>
+</div>
+@else
+{{-- Staff Listing --}}
+<div class="rc-table-card">
+    <table class="rc-table">
+        <thead>
+            <tr>
+                <th style="width: 30%;">Staff Member</th>
+                <th style="width: 20%;">Employee ID & Email</th>
+                <th style="width: 35%;">Designations (Roles)</th>
+                <th style="width: 15%; text-align: center;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($staffList as $user)
+            @php
+                $staff = $user->staff;
+                $initials = strtoupper(substr($user->name, 0, 1) . (str_contains($user->name, ' ') ? substr($user->name, strrpos($user->name, ' ') + 1, 1) : ''));
+            @endphp
+            <tr>
+                <td>
+                    <div class="staff-avatar-wrap">
+                        <div class="staff-avatar">
+                            @if($staff && $staff->photo && Storage::disk('public')->exists($staff->photo))
+                                <img src="{{ Storage::disk('public')->url($staff->photo) }}" alt="{{ $user->name }}">
+                            @else
+                                {{ $initials }}
+                            @endif
+                        </div>
+                        <div>
+                            <div class="staff-name">{{ $user->name }}</div>
+                            <div style="display: flex; gap: 4px; margin-top: 4px;">
+                                @foreach($user->roles as $role)
+                                    <span class="role-badge">{{ str_replace('_', ' ', $role->name) }}</span>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <div style="font-weight: 600;">{{ $staff->employee_id ?? 'N/A' }}</div>
+                    <div class="staff-sub">{{ $user->email }}</div>
+                </td>
+                <td>
+                    <div class="desg-badge-wrap" id="staff-desg-badges-{{ $user->id }}">
+                        @if($staff && $staff->designations->count())
+                            @foreach($staff->designations as $desg)
+                                <span class="desg-badge">{{ $desg->name }}</span>
+                            @endforeach
+                        @else
+                            <span class="no-badges">No designation assigned</span>
+                        @endif
+                    </div>
+                </td>
+                <td style="text-align: center;">
+                    <button type="button"
+                            class="action-btn"
+                            id="edit-desg-btn-{{ $user->id }}"
+                            data-id="{{ $user->id }}"
+                            data-name="{{ $user->name }}"
+                            data-email="{{ $user->email }}"
+                            data-assigned="{{ $staff ? json_encode($staff->designations->pluck('id')) : '[]' }}"
+                            onclick="openPanel(this)">
+                        <i class="fas fa-user-pen"></i> Assign Roles
+                    </button>
+                </td>
+            </tr>
+            @endforeach
+        </tbody>
+    </table>
+</div>
+
+<div style="margin-top: 15px;">
+    {{ $staffList->links() }}
+</div>
+@endif
+
+{{-- ── SLIDE-IN PANEL ── --}}
+<div class="sa-panel-backdrop" id="panelBackdrop" onclick="closePanel()"></div>
+<div class="sa-panel" id="designationPanel">
+    <div class="sa-panel-header">
+        <div>
+            <h3 id="panelTitle">Assign Designations</h3>
+            <p id="panelSubtitle">Manage roles for staff</p>
+        </div>
+        <button class="sa-panel-close" onclick="closePanel()">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <div class="sa-panel-search-wrap" style="position:relative;">
+        <i class="fas fa-magnifying-glass sa-search-icon"></i>
+        <input type="text"
+               class="sa-panel-search"
+               id="desgSearch"
+               placeholder="Search designations..."
+               oninput="filterDesignations(this.value)">
+    </div>
+
+    <div class="sa-panel-list" id="desgList">
+        {{-- Populated by JS --}}
+    </div>
+
+    <div class="sa-panel-footer">
+        <div style="flex:1;">
+            <button class="sa-panel-save" id="panelSaveBtn" onclick="savePanel()">
+                <i class="fas fa-check"></i> Save Designations
             </button>
-            <i class="fas fa-chevron-down rc-chevron"></i>
+            <div class="sa-panel-sel-count" id="selCount">0 designations selected</div>
         </div>
-    </div>
-
-    {{-- Feature Table --}}
-    <div class="rc-features" id="features-{{ $moduleKey }}">
-        <table class="rc-feature-table">
-            <thead>
-                <tr>
-                    <th style="width:55%">Feature / Sub-Module</th>
-                    <th class="center" style="width:22.5%"><i class="fas fa-eye" style="color:#60a5fa;margin-right:5px;"></i>View Access</th>
-                    <th class="center" style="width:22.5%"><i class="fas fa-pen" style="color:#1d4ed8;margin-right:5px;"></i>Edit Access</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($module['features'] as $featureKey => $featureLabel)
-                @php
-                    $savedRow   = $saved->get("{$moduleKey}.{$featureKey}");
-                    $viewChecked = $savedRow?->view_access ?? false;
-                    $editChecked = $savedRow?->edit_access ?? false;
-                    $viewName   = "view_{$moduleKey}_{$featureKey}";
-                    $editName   = "edit_{$moduleKey}_{$featureKey}";
-                @endphp
-                <tr>
-                    <td>
-                        <span class="feature-name">{{ $featureLabel }}</span>
-                    </td>
-                    <td class="toggle-cell">
-                        <div class="toggle-wrap">
-                            <span class="toggle-label">OFF</span>
-                            <label class="rc-switch view-toggle">
-                                <input type="checkbox"
-                                       name="{{ $viewName }}"
-                                       value="1"
-                                       {{ $viewChecked ? 'checked' : '' }}
-                                       class="view-chk mod-chk-{{ $moduleKey }}"
-                                       onchange="updateStats(); updateModuleCount('{{ $moduleKey }}')">
-                                <span class="rc-slider"></span>
-                            </label>
-                            <span class="toggle-label">ON</span>
-                        </div>
-                    </td>
-                    <td class="toggle-cell">
-                        <div class="toggle-wrap">
-                            <span class="toggle-label">OFF</span>
-                            <label class="rc-switch edit-toggle">
-                                <input type="checkbox"
-                                       name="{{ $editName }}"
-                                       value="1"
-                                       {{ $editChecked ? 'checked' : '' }}
-                                       class="edit-chk mod-chk-{{ $moduleKey }}"
-                                       onchange="updateStats(); updateModuleCount('{{ $moduleKey }}')">
-                                <span class="rc-slider"></span>
-                            </label>
-                            <span class="toggle-label">ON</span>
-                        </div>
-                    </td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
+        <button class="sa-panel-cancel" onclick="closePanel()">Cancel</button>
     </div>
 </div>
-@endforeach
-
-{{-- Bottom Save --}}
-<div style="text-align:right; margin-top:8px;">
-    <button type="submit" class="rc-save-btn" style="margin-left:auto;">
-        <i class="fas fa-floppy-disk"></i> Save All Permissions
-    </button>
-</div>
-</form>
 
 @endsection
 
 @section('scripts')
 <script>
-function toggleModule(header) {
-    header.classList.toggle('open');
-    const featDiv = document.getElementById('features-' + header.parentElement.querySelector('[id^="features-"]').id.replace('features-', ''));
-    // Better: find via sibling
-    const features = header.nextElementSibling;
-    if (features) features.classList.toggle('open');
+const ALL_DESIGNATIONS = @json($designations);
+
+// Currently open panel context
+let panelCtx = { userId: '', userName: '' };
+let selectedIds = new Set();
+
+function openPanel(btnEl) {
+    const userId = btnEl.getAttribute('data-id');
+    const userName = btnEl.getAttribute('data-name');
+    const userEmail = btnEl.getAttribute('data-email');
+    const assignedIds = JSON.parse(btnEl.getAttribute('data-assigned') || '[]');
+
+    panelCtx = { userId, userName };
+
+    // Set panel titles
+    document.getElementById('panelTitle').textContent = userName;
+    document.getElementById('panelSubtitle').textContent = `Manage designations for ${userEmail}`;
+
+    // Initialize selections
+    selectedIds = new Set(assignedIds);
+    renderDesignationsList(ALL_DESIGNATIONS);
+    updateSelCount();
+
+    document.getElementById('desgSearch').value = '';
+    document.getElementById('panelBackdrop').classList.add('open');
+    document.getElementById('designationPanel').classList.add('open');
 }
 
-// simpler toggle using data
-document.querySelectorAll('.rc-module-header').forEach(hdr => {
-    hdr.addEventListener('click', function(e) {
-        if (e.target.closest('.rc-toggle-all')) return;
-        this.classList.toggle('open');
-        const features = this.nextElementSibling;
-        if (features) features.classList.toggle('open');
-    });
-});
-
-function toggleAllModule(moduleKey, btn) {
-    const checkboxes = document.querySelectorAll('.mod-chk-' + moduleKey);
-    const allOn = [...checkboxes].every(c => c.checked);
-    checkboxes.forEach(c => c.checked = !allOn);
-    btn.textContent = allOn ? 'Enable All' : 'Disable All';
-    updateStats();
-    updateModuleCount(moduleKey);
+function closePanel() {
+    document.getElementById('panelBackdrop').classList.remove('open');
+    document.getElementById('designationPanel').classList.remove('open');
 }
 
-function updateModuleCount(moduleKey) {
-    const checkboxes = document.querySelectorAll('.mod-chk-' + moduleKey);
-    const on = [...checkboxes].filter(c => c.checked).length;
-    const el = document.getElementById('count-' + moduleKey);
-    if (el) el.textContent = on + ' / ' + checkboxes.length;
-}
-
-function updateStats() {
-    const viewOn = document.querySelectorAll('.view-chk:checked').length;
-    const editOn = document.querySelectorAll('.edit-chk:checked').length;
-    document.getElementById('viewEnabled').textContent = viewOn;
-    document.getElementById('editEnabled').textContent = editOn;
-}
-
-// Init on load
-document.addEventListener('DOMContentLoaded', () => {
-    updateStats();
-    @foreach($modules as $moduleKey => $module)
-    updateModuleCount('{{ $moduleKey }}');
-    @endforeach
-
-    // Auto-open first module
-    const first = document.querySelector('.rc-module-header');
-    if (first) {
-        first.classList.add('open');
-        if (first.nextElementSibling) first.nextElementSibling.classList.add('open');
+function renderDesignationsList(desgArr) {
+    const list = document.getElementById('desgList');
+    if (!desgArr.length) {
+        list.innerHTML = '<div class="sa-empty"><i class="fas fa-circle-exclamation"></i>No designations found.</div>';
+        return;
     }
-});
+    list.innerHTML = desgArr.map(d => `
+        <div class="desg-item ${selectedIds.has(d.id) ? 'selected' : ''}"
+             onclick="toggleDesignation(${d.id}, this)" data-id="${d.id}">
+            <div class="desg-info">
+                <span class="desg-name">${d.name}</span>
+                <span class="desg-desc">${d.description || 'No description provided'}</span>
+            </div>
+            <div class="desg-check">
+                ${selectedIds.has(d.id) ? '<i class="fas fa-check" style="font-size:10px;"></i>' : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function toggleDesignation(id, el) {
+    if (selectedIds.has(id)) {
+        selectedIds.delete(id);
+        el.classList.remove('selected');
+        el.querySelector('.desg-check').innerHTML = '';
+    } else {
+        selectedIds.add(id);
+        el.classList.add('selected');
+        el.querySelector('.desg-check').innerHTML = '<i class="fas fa-check" style="font-size:10px;"></i>';
+    }
+    updateSelCount();
+}
+
+function updateSelCount() {
+    const n = selectedIds.size;
+    document.getElementById('selCount').textContent = n + ' designation' + (n !== 1 ? 's' : '') + ' selected';
+}
+
+function filterDesignations(q) {
+    const lower = q.toLowerCase();
+    const filtered = ALL_DESIGNATIONS.filter(d =>
+        d.name.toLowerCase().includes(lower) || (d.description && d.description.toLowerCase().includes(lower))
+    );
+    renderDesignationsList(filtered);
+}
+
+function savePanel() {
+    const btn = document.getElementById('panelSaveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    fetch('{{ route("school.roles.update-staff") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            user_id:         panelCtx.userId,
+            designation_ids: [...selectedIds]
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Update the badges list on the table
+            const badgesWrap = document.getElementById('staff-desg-badges-' + panelCtx.userId);
+            if (badgesWrap) {
+                if (data.designations && data.designations.length) {
+                    badgesWrap.innerHTML = data.designations.map(d => `<span class="desg-badge">${d.name}</span>`).join('');
+                } else {
+                    badgesWrap.innerHTML = '<span class="no-badges">No designation assigned</span>';
+                }
+            }
+
+            // Update the Spatie roles on the row
+            const editBtn = document.getElementById('edit-desg-btn-' + panelCtx.userId);
+            if (editBtn) {
+                editBtn.setAttribute('data-assigned', JSON.stringify([...selectedIds]));
+                
+                // Update the roles badges on the row (next to name)
+                const rolesWrap = editBtn.closest('tr').querySelector('.staff-avatar-wrap > div > div:nth-child(2)');
+                if (rolesWrap && data.roles) {
+                    rolesWrap.innerHTML = data.roles.map(r => `<span class="role-badge">${r.replace('_', ' ')}</span>`).join('');
+                }
+            }
+
+            closePanel();
+            showToast('Designations updated successfully!');
+        } else {
+            showToast(data.error || 'Failed to save designations.');
+        }
+    })
+    .catch(() => showToast('Error saving designations. Please try again.'))
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Save Designations';
+    });
+}
+
+function showToast(msg) {
+    const toast = document.getElementById('appToast') || document.createElement('div');
+    if (!toast.id) {
+        toast.id = 'appToast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+}
 </script>
 @endsection

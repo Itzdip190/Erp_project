@@ -5,6 +5,7 @@ namespace App\Http\Controllers\School;
 use App\Http\Controllers\Controller;
 use App\Models\StudentHouse;
 use App\Models\StudentCategory;
+use App\Models\AcademicSession;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -79,8 +80,12 @@ class SettingsController extends Controller
         $udise = is_array($school->udise_data) ? $school->udise_data : json_decode($school->udise_data ?? '[]', true);
         $houses = StudentHouse::where('school_id', $school->id)->get();
         $groups = StudentCategory::where('school_id', $school->id)->get();
+        
+        $currentSession = AcademicSession::where('school_id', $school->id)
+            ->where('is_current', true)
+            ->first();
 
-        return view('school.settings.institute_info', compact('school', 'udise', 'houses', 'groups'));
+        return view('school.settings.institute_info', compact('school', 'udise', 'houses', 'groups', 'currentSession'));
     }
 
     /**
@@ -89,19 +94,28 @@ class SettingsController extends Controller
     public function updateInstituteInfo(Request $request)
     {
         $request->validate([
-            'name'               => 'required|string|max:150',
-            'code'               => 'required|string|max:20|unique:schools,code,' . Auth::user()->school_id,
-            'affiliation_number' => 'nullable|string|max:100',
-            'udise_number'       => 'nullable|string|max:100',
-            'board_name'         => 'nullable|string|max:100',
-            'logo'               => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'stamp'              => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'signature'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'name'                        => 'required|string|max:150',
+            'code'                        => 'required|string|max:20|unique:schools,code,' . Auth::user()->school_id,
+            'affiliation_number'          => 'nullable|string|max:100',
+            'udise_number'                => 'nullable|string|max:100',
+            'board_name'                  => 'nullable|string|max:100',
+            'logo'                        => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'stamp'                       => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'signature'                   => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'phone'                       => 'nullable|string|max:50',
+            'email'                       => 'nullable|email|max:150',
+            'address'                     => 'nullable|string|max:1000',
+            'academic_session_name'       => 'nullable|string|max:50',
+            'academic_session_start_date' => 'nullable|date',
+            'academic_session_end_date'   => 'nullable|date|after_or_equal:academic_session_start_date',
         ]);
 
         $school = Auth::user()->school;
         $school->name = $request->name;
         $school->code = $request->code;
+        $school->phone = $request->phone;
+        $school->email = $request->email;
+        $school->address = $request->address;
 
         $udise = is_array($school->udise_data) ? $school->udise_data : json_decode($school->udise_data ?? '[]', true);
         $udise['affiliation_number'] = $request->affiliation_number;
@@ -132,6 +146,29 @@ class SettingsController extends Controller
 
         $school->udise_data = $udise;
         $school->save();
+
+        if ($request->filled(['academic_session_name', 'academic_session_start_date', 'academic_session_end_date'])) {
+            // Update or create current academic session
+            $currentSession = AcademicSession::where('school_id', $school->id)
+                ->where('is_current', true)
+                ->first();
+                
+            if ($currentSession) {
+                $currentSession->update([
+                    'name'       => $request->academic_session_name,
+                    'start_date' => $request->academic_session_start_date,
+                    'end_date'   => $request->academic_session_end_date,
+                ]);
+            } else {
+                AcademicSession::create([
+                    'school_id'  => $school->id,
+                    'name'       => $request->academic_session_name,
+                    'start_date' => $request->academic_session_start_date,
+                    'end_date'   => $request->academic_session_end_date,
+                    'is_current' => true,
+                ]);
+            }
+        }
 
         return back()->with('success', 'Institute information updated successfully!');
     }

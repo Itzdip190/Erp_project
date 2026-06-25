@@ -512,13 +512,29 @@
                     <span class="inst-detail-colon">:</span>
                     <span class="inst-detail-val">{{ $udise['board_name'] ?? '-' }}</span>
                 </div>
+                <div class="inst-detail-item">
+                    <span class="inst-detail-lbl">Academic Session</span>
+                    <span class="inst-detail-colon">:</span>
+                    <span class="inst-detail-val">{{ $currentSession->name ?? '-' }}</span>
+                </div>
+                <div class="inst-detail-item">
+                    <span class="inst-detail-lbl">Session Start / End</span>
+                    <span class="inst-detail-colon">:</span>
+                    <span class="inst-detail-val">
+                        @if(isset($currentSession))
+                            {{ $currentSession->start_date ? $currentSession->start_date->format('d/m/Y') : '-' }} to {{ $currentSession->end_date ? $currentSession->end_date->format('d/m/Y') : '-' }}
+                        @else
+                            -
+                        @endif
+                    </span>
+                </div>
             </div>
 
             {{-- Logo Column --}}
             <div class="inst-asset-col">
                 <div class="inst-asset-box">
-                    @if($school->logo)
-                        <img src="{{ Storage::disk('public')->url($school->logo) }}" alt="Logo">
+                    @if(!empty($school->logo))
+                        <img src="{{ Storage::disk('public')->url($school->logo) }}" alt="Logo" style="max-width:100%;max-height:100%;object-fit:contain;">
                     @else
                         <i class="fas fa-image" style="font-size:32px; color:#cbd5e1;"></i>
                     @endif
@@ -532,7 +548,7 @@
                     @if(!empty($udise['stamp']))
                         <img src="{{ Storage::disk('public')->url($udise['stamp']) }}" alt="Stamp">
                     @else
-                        <span class="inst-asset-missing">No logo added yet</span>
+                        <span class="inst-asset-missing">No stamp added yet</span>
                     @endif
                 </div>
                 <span class="inst-asset-lbl">Stamp</span>
@@ -672,6 +688,17 @@
                     @csrf
                     @method('PUT')
 
+                    @if($errors->any())
+                    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 14px;margin-bottom:16px;">
+                        <div style="font-size:12.5px;font-weight:700;color:#991b1b;margin-bottom:4px;"><i class="fas fa-exclamation-circle" style="margin-right:4px;"></i>Please fix the following errors:</div>
+                        <ul style="margin:0;padding-left:16px;font-size:12px;color:#b91c1c;">
+                            @foreach($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    @endif
+
                     <div class="inst-form-group">
                         <label class="inst-form-label">Institute Name *</label>
                         <input type="text" name="name" class="inst-form-control" value="{{ old('name', $school->name) }}" required>
@@ -696,6 +723,24 @@
                         <div class="inst-form-group">
                             <label class="inst-form-label">UDISE Number</label>
                             <input type="text" name="udise_number" class="inst-form-control" value="{{ old('udise_number', $udise['udise_number'] ?? '') }}" placeholder="11-digit code" maxlength="11">
+                        </div>
+                    </div>
+
+                    <div style="border-top: 1px solid #e2e8f0; margin: 16px 0; padding-top: 16px;">
+                        <h4 style="font-size: 13.5px; font-weight: 800; color: #1e3a8a; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Academic Year Configuration</h4>
+                        <div class="inst-form-group">
+                            <label class="inst-form-label">Academic Session Name *</label>
+                            <input type="text" name="academic_session_name" class="inst-form-control" value="{{ old('academic_session_name', $currentSession->name ?? '') }}" required placeholder="e.g. 2025-26">
+                        </div>
+                        <div class="inst-form-grid">
+                            <div class="inst-form-group">
+                                <label class="inst-form-label">Session Start Date *</label>
+                                <input type="date" name="academic_session_start_date" class="inst-form-control" value="{{ old('academic_session_start_date', isset($currentSession) && $currentSession->start_date ? $currentSession->start_date->format('Y-m-d') : '') }}" required>
+                            </div>
+                            <div class="inst-form-group">
+                                <label class="inst-form-label">Session End Date *</label>
+                                <input type="date" name="academic_session_end_date" class="inst-form-control" value="{{ old('academic_session_end_date', isset($currentSession) && $currentSession->end_date ? $currentSession->end_date->format('Y-m-d') : '') }}" required>
+                            </div>
                         </div>
                     </div>
 
@@ -955,5 +1000,11 @@
             event.target.classList.remove('active');
         }
     }
+    // Auto-reopen modal-details if there are validation errors
+    @if($errors->any())
+        document.addEventListener('DOMContentLoaded', function() {
+            openInstModal('modal-details');
+        });
+    @endif
 </script>
 @endsection

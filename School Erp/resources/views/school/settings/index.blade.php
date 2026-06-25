@@ -24,8 +24,8 @@
                     font-size:32px;font-weight:800;color:#fff;margin:0 auto;
                     border:3px solid var(--gold);
                 ">
-                    @if(auth()->user()->photo && file_exists(public_path('storage/'.auth()->user()->photo)))
-                        <img src="{{ asset('storage/'.auth()->user()->photo) }}" style="width:100%;height:100%;object-fit:cover;" id="avatarImg" alt="">
+                    @if(auth()->user()->photo && Storage::disk('public')->exists(auth()->user()->photo))
+                        <img src="{{ Storage::disk('public')->url(auth()->user()->photo) }}" style="width:100%;height:100%;object-fit:cover;" id="avatarImg" alt="">
                     @else
                         <span id="avatarInitials">{{ strtoupper(substr(auth()->user()->name,0,1)) }}</span>
                     @endif
@@ -88,8 +88,8 @@
                                 display:flex;align-items:center;justify-content:center;
                                 font-size:18px;font-weight:800;color:#fff;flex-shrink:0;
                             " id="miniAvatar">
-                                @if(auth()->user()->photo && file_exists(public_path('storage/'.auth()->user()->photo)))
-                                    <img src="{{ asset('storage/'.auth()->user()->photo) }}" style="width:100%;height:100%;object-fit:cover;" id="miniAvatarImg" alt="">
+                                @if(auth()->user()->photo && Storage::disk('public')->exists(auth()->user()->photo))
+                                    <img src="{{ Storage::disk('public')->url(auth()->user()->photo) }}" style="width:100%;height:100%;object-fit:cover;" id="miniAvatarImg" alt="">
                                 @else
                                     <span>{{ strtoupper(substr(auth()->user()->name,0,1)) }}</span>
                                 @endif

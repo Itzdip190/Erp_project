@@ -7,53 +7,92 @@ use App\Models\ModulePermission;
 use App\Models\StaffModuleAccess;
 use App\Models\User;
 use App\Support\ModuleRegistry;
+use App\Models\Designation;
 use Illuminate\Http\Request;
 
 class RoleController extends Controller
 {
     /* ─────────────────────────────────────────────────────────────────
-     *  ROLE CATEGORY – module + feature view/edit toggles
+     *  ROLE CATEGORY – staff multiple designations mapping
      * ───────────────────────────────────────────────────────────────── */
 
-    public function index()
+    public function index(Request $request)
     {
         $schoolId = auth()->user()->school_id;
-        $modules  = ModuleRegistry::all();
+        $search   = $request->get('search');
 
-        // Load saved permissions keyed by "moduleKey.featureKey"
-        $saved = ModulePermission::where('school_id', $schoolId)
-            ->get()
-            ->keyBy(fn ($p) => "{$p->module_key}.{$p->feature_key}");
+        $query = User::where('school_id', $schoolId)
+            ->whereHas('staff')
+            ->with(['staff.designations', 'roles']);
 
-        return view('school.roles.index', compact('modules', 'saved'));
-    }
-
-    public function updateRolePermissions(Request $request)
-    {
-        $schoolId = auth()->user()->school_id;
-        $modules  = ModuleRegistry::all();
-
-        // Build expected feature list from registry
-        foreach ($modules as $moduleKey => $module) {
-            foreach ($module['features'] as $featureKey => $_) {
-                $viewKey = "view_{$moduleKey}_{$featureKey}";
-                $editKey = "edit_{$moduleKey}_{$featureKey}";
-
-                ModulePermission::updateOrCreate(
-                    [
-                        'school_id'   => $schoolId,
-                        'module_key'  => $moduleKey,
-                        'feature_key' => $featureKey,
-                    ],
-                    [
-                        'view_access' => $request->boolean($viewKey),
-                        'edit_access' => $request->boolean($editKey),
-                    ]
-                );
-            }
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhereHas('staff', function ($sq) use ($search) {
+                      $sq->where('employee_id', 'like', "%{$search}%");
+                  });
+            });
         }
 
-        return back()->with('success', 'Role permissions saved successfully!');
+        $staffList = $query->orderBy('name')->paginate(10);
+        $designations = Designation::where('school_id', $schoolId)->get();
+
+        return view('school.roles.index', compact('staffList', 'designations', 'search'));
+    }
+
+    public function updateStaffDesignations(Request $request)
+    {
+        $request->validate([
+            'user_id'          => 'required|exists:users,id',
+            'designation_ids'  => 'array',
+            'designation_ids.*'=> 'integer|exists:designations,id',
+        ]);
+
+        $schoolId = auth()->user()->school_id;
+        $user = User::where('school_id', $schoolId)->findOrFail($request->user_id);
+        $staff = $user->staff;
+
+        if (!$staff) {
+            return response()->json(['success' => false, 'error' => 'Staff profile not found.'], 404);
+        }
+
+        $designationIds = $request->input('designation_ids', []);
+
+        // Sync designations in pivot table
+        $staff->designations()->sync($designationIds);
+
+        // Update the primary designation_id in the staff table (for backward compatibility)
+        $primaryDesignationId = !empty($designationIds) ? $designationIds[0] : null;
+        $staff->update(['designation_id' => $primaryDesignationId]);
+
+        // Sync Spatie roles based on designated roles
+        $roles = [];
+        $allDesignations = Designation::whereIn('id', $designationIds)->get();
+        foreach ($allDesignations as $desg) {
+            $name = strtolower($desg->name);
+            if (str_contains($name, 'admin') || str_contains($name, 'principal')) {
+                $roles[] = 'school_admin';
+            } elseif (str_contains($name, 'accountant')) {
+                $roles[] = 'accountant';
+            } elseif (str_contains($name, 'driver')) {
+                $roles[] = 'driver';
+            } else {
+                $roles[] = 'teacher';
+            }
+        }
+        $roles = array_unique($roles);
+        if (empty($roles)) {
+            $roles = ['teacher']; // default fallback
+        }
+        $user->syncRoles($roles);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Designations and Spatie roles updated successfully!',
+            'designations' => $allDesignations->map(fn($d) => ['id' => $d->id, 'name' => $d->name]),
+            'roles' => $roles
+        ]);
     }
 
     /* ─────────────────────────────────────────────────────────────────

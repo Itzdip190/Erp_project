@@ -691,6 +691,19 @@
 .mis-follow-grid > *:nth-child(1) { animation-delay: 0.4s; }
 .mis-follow-grid > *:nth-child(2) { animation-delay: 0.45s; }
 
+/* ── TOGGLE BUTTON (looks like the span link) ─────────────── */
+button.mis-alb-more-link {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+}
+/* ── Anchor alert cards retain their text colors ─────────── */
+a.mis-alert-card .mis-alert-title { color: #1e293b; }
+a.mis-alert-card .mis-alert-badge { color: #fff; }
+a.mis-alert-card:hover .mis-alert-title { color: #1e293b; }
+
 @media print {
     .mis-print-btn, .mis-date-form {
         display: none !important;
@@ -764,7 +777,7 @@
     {{-- ── ROW 2: IMMEDIATE ACTIONS REQUIRED ──────────────────────────── --}}
     <div class="mis-section-label alert-label"><i class="fas fa-exclamation-triangle"></i>Immediate Actions Required</div>
     <div class="mis-alerts-grid">
-        <div class="mis-alert-card">
+        <a href="{{ route('school.staff.bulk-attendance') }}" class="mis-alert-card" style="text-decoration:none;">
             <div class="mis-alert-left">
                 <i class="fas fa-exclamation-circle mis-alert-icon alert-red"></i>
                 <div>
@@ -773,8 +786,8 @@
                 </div>
             </div>
             <div class="mis-alert-badge badge-red">{{ $attendanceNotMarkedTeachersCount }}</div>
-        </div>
-        <div class="mis-alert-card">
+        </a>
+        <a href="{{ route('school.fees.collection-followup') }}" class="mis-alert-card" style="text-decoration:none;">
             <div class="mis-alert-left">
                 <i class="fas fa-exclamation-circle mis-alert-icon alert-red"></i>
                 <div>
@@ -783,8 +796,8 @@
                 </div>
             </div>
             <div class="mis-alert-badge badge-red">{{ $feeDefaultersCriticalCount }}</div>
-        </div>
-        <div class="mis-alert-card">
+        </a>
+        <a href="{{ route('school.students.index') }}" class="mis-alert-card" style="text-decoration:none;">
             <div class="mis-alert-left">
                 <i class="fas fa-exclamation-triangle mis-alert-icon alert-orange"></i>
                 <div>
@@ -793,7 +806,7 @@
                 </div>
             </div>
             <div class="mis-alert-badge badge-orange">{{ $appNotDownloadedCount }}</div>
-        </div>
+        </a>
     </div>
 
     {{-- ── ROW 3: 3-COLUMN METRICS BREAKDOWN ──────────────────────────── --}}
@@ -1095,17 +1108,35 @@
             <div class="mis-alert-list-box">
                 <div class="mis-alb-title">
                     <i class="fas fa-exclamation-circle"></i>
-                    <span>Fee Defaulters (90+ Days)</span>
+                    <a href="{{ route('school.fees.collection-followup') }}" style="color:inherit;text-decoration:none;">Fee Defaulters (90+ Days)</a>
                 </div>
-                <ul class="mis-alb-list">
+                <ul class="mis-alb-list" id="feeDefaultersList">
                     @forelse($feeDefaulters90PlusList as $item)
-                        <li>• {{ $item['name'] }} ({{ $item['class_section'] }}) - ₹ {{ number_format($item['pending_amount'], 0) }} - {{ $item['due_days'] }} days</li>
+                        <li>• {{ $item['name'] }} ({{ $item['class_section'] }}) — ₹ {{ number_format($item['pending_amount'], 0) }} — {{ $item['due_days'] }} days</li>
                     @empty
                         <li>No critical fee defaulters.</li>
                     @endforelse
                 </ul>
                 @if($feeDefaulters90PlusMoreCount > 0)
-                    <span class="mis-alb-more-link">+ {{ $feeDefaulters90PlusMoreCount }} more students</span>
+                    {{-- Hidden extra items --}}
+                    <ul class="mis-alb-list mis-expand-list" id="feeDefaultersExtra" style="display:none;">
+                        @php
+                            $allFeeDefaulters = \App\Models\StudentFee::where('school_id', auth()->user()->school_id)
+                                ->whereColumn('amount', '>', 'paid_amount')
+                                ->whereDate('due_date', '<', \Carbon\Carbon::parse(request('date', today()))->subDays(90))
+                                ->with(['student.class', 'student.section'])
+                                ->get();
+                            $shownCount = $feeDefaulters90PlusList->count();
+                        @endphp
+                        @foreach($allFeeDefaulters->skip($shownCount) as $fee)
+                            @if($fee->student)
+                                <li>• {{ $fee->student->full_name }} ({{ ($fee->student->class->name ?? '—') }}-{{ ($fee->student->section->name ?? '—') }}) — ₹ {{ number_format($fee->amount - $fee->paid_amount, 0) }} — {{ \Carbon\Carbon::parse($fee->due_date)->diffInDays(today()) }} days</li>
+                            @endif
+                        @endforeach
+                    </ul>
+                    <button type="button" class="mis-alb-more-link mis-toggle-btn" data-target="feeDefaultersExtra" data-count="{{ $feeDefaulters90PlusMoreCount }}" data-label="students">
+                        + {{ $feeDefaulters90PlusMoreCount }} more students
+                    </button>
                 @endif
             </div>
 
@@ -1113,9 +1144,9 @@
             <div class="mis-alert-list-box">
                 <div class="mis-alb-title">
                     <i class="fas fa-exclamation-circle"></i>
-                    <span>Classes Attendance not marked today</span>
+                    <a href="{{ route('school.attendance.students.index') }}" style="color:inherit;text-decoration:none;">Classes Attendance not marked today</a>
                 </div>
-                <ul class="mis-alb-list">
+                <ul class="mis-alb-list" id="attNotMarkedList">
                     @forelse($classesAttendanceNotMarkedList as $item)
                         <li>• {{ $item }} (NA)</li>
                     @empty
@@ -1123,7 +1154,22 @@
                     @endforelse
                 </ul>
                 @if($classesAttendanceNotMarkedMoreCount > 0)
-                    <span class="mis-alb-more-link">+ {{ $classesAttendanceNotMarkedMoreCount }} more classes</span>
+                    @php
+                        $allUnmarkedSections = \App\Models\Section::where('school_id', auth()->user()->school_id)
+                            ->whereNotIn('id', \App\Models\StudentAttendance::where('school_id', auth()->user()->school_id)
+                                ->whereDate('date', \Carbon\Carbon::parse(request('date', today())))
+                                ->pluck('section_id')->unique())
+                            ->with('schoolClass')->get();
+                        $shownAttCount = $classesAttendanceNotMarkedList->count();
+                    @endphp
+                    <ul class="mis-alb-list mis-expand-list" id="attNotMarkedExtra" style="display:none;">
+                        @foreach($allUnmarkedSections->skip($shownAttCount) as $sec)
+                            <li>• {{ ($sec->schoolClass->name ?? '') }}-{{ $sec->name }} (NA)</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="mis-alb-more-link mis-toggle-btn" data-target="attNotMarkedExtra" data-count="{{ $classesAttendanceNotMarkedMoreCount }}" data-label="classes">
+                        + {{ $classesAttendanceNotMarkedMoreCount }} more classes
+                    </button>
                 @endif
             </div>
 
@@ -1131,9 +1177,9 @@
             <div class="mis-alert-list-box orange-box">
                 <div class="mis-alb-title">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <span>Teachers not marked attendance in 7 days</span>
+                    <a href="{{ route('school.staff.bulk-attendance') }}" style="color:inherit;text-decoration:none;">Teachers not marked attendance in 7 days</a>
                 </div>
-                <ul class="mis-alb-list">
+                <ul class="mis-alb-list" id="teachersNoAttList">
                     @forelse($teachersNotMarkedAttendance7DaysList as $item)
                         <li>• {{ $item }} (NA)</li>
                     @empty
@@ -1141,7 +1187,23 @@
                     @endforelse
                 </ul>
                 @if($teachersNotMarkedAttendance7DaysMoreCount > 0)
-                    <span class="mis-alb-more-link">+ {{ $teachersNotMarkedAttendance7DaysMoreCount }} more classes</span>
+                    @php
+                        $sectionsMarked7Days = \App\Models\StudentAttendance::where('school_id', auth()->user()->school_id)
+                            ->whereDate('date', '>=', \Carbon\Carbon::parse(request('date', today()))->subDays(7))
+                            ->pluck('section_id')->unique();
+                        $allSectionsNoAtt7Days = \App\Models\Section::where('school_id', auth()->user()->school_id)
+                            ->whereNotIn('id', $sectionsMarked7Days)
+                            ->with('schoolClass')->get();
+                        $shownNoAttCount = $teachersNotMarkedAttendance7DaysList->count();
+                    @endphp
+                    <ul class="mis-alb-list mis-expand-list" id="teachersNoAttExtra" style="display:none;">
+                        @foreach($allSectionsNoAtt7Days->skip($shownNoAttCount) as $sec)
+                            <li>• {{ ($sec->schoolClass->name ?? '') }}-{{ $sec->name }} (NA)</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="mis-alb-more-link mis-toggle-btn" data-target="teachersNoAttExtra" data-count="{{ $teachersNotMarkedAttendance7DaysMoreCount }}" data-label="classes">
+                        + {{ $teachersNotMarkedAttendance7DaysMoreCount }} more classes
+                    </button>
                 @endif
             </div>
         </div>
@@ -1157,9 +1219,9 @@
             <div class="mis-alert-list-box">
                 <div class="mis-alb-title">
                     <i class="fas fa-exclamation-circle"></i>
-                    <span>Teachers haven't shared any content in 7 days</span>
+                    <a href="{{ route('school.diary.report') }}" style="color:inherit;text-decoration:none;">Teachers haven't shared any content in 7 days</a>
                 </div>
-                <ul class="mis-alb-list">
+                <ul class="mis-alb-list" id="teachersNoShareList">
                     @forelse($teachersNoSharing7DaysList as $item)
                         <li>• {{ $item }}</li>
                     @empty
@@ -1167,7 +1229,24 @@
                     @endforelse
                 </ul>
                 @if($teachersNoSharing7DaysMoreCount > 0)
-                    <span class="mis-alb-more-link">+ {{ $teachersNoSharing7DaysMoreCount }} more teachers</span>
+                    @php
+                        $teachersWithDiary7D = \App\Models\DigitalDiary::where('school_id', auth()->user()->school_id)
+                            ->whereDate('diary_date', '>=', \Carbon\Carbon::parse(request('date', today()))->subDays(7))
+                            ->pluck('staff_id')->unique();
+                        $allTeachersNoShare = \App\Models\Staff::where('school_id', auth()->user()->school_id)
+                            ->where('is_active', true)
+                            ->whereNotIn('id', $teachersWithDiary7D)
+                            ->get();
+                        $shownShareCount = $teachersNoSharing7DaysList->count();
+                    @endphp
+                    <ul class="mis-alb-list mis-expand-list" id="teachersNoShareExtra" style="display:none;">
+                        @foreach($allTeachersNoShare->skip($shownShareCount) as $st)
+                            <li>• {{ $st->full_name }}</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="mis-alb-more-link mis-toggle-btn" data-target="teachersNoShareExtra" data-count="{{ $teachersNoSharing7DaysMoreCount }}" data-label="teachers">
+                        + {{ $teachersNoSharing7DaysMoreCount }} more teachers
+                    </button>
                 @endif
             </div>
 
@@ -1175,9 +1254,9 @@
             <div class="mis-alert-list-box blue-box">
                 <div class="mis-alb-title">
                     <i class="fas fa-info-circle"></i>
-                    <span>Classes missing diary entries today</span>
+                    <a href="{{ route('school.diary.report') }}" style="color:inherit;text-decoration:none;">Classes missing diary entries today</a>
                 </div>
-                <ul class="mis-alb-list">
+                <ul class="mis-alb-list" id="diaryMissingList">
                     @forelse($classesMissingDiaryTodayList as $item)
                         <li>• {{ $item }} (NA)</li>
                     @empty
@@ -1185,11 +1264,49 @@
                     @endforelse
                 </ul>
                 @if($classesMissingDiaryTodayMoreCount > 0)
-                    <span class="mis-alb-more-link">+ {{ $classesMissingDiaryTodayMoreCount }} more classes</span>
+                    @php
+                        $sectionsWithDiaryToday = \App\Models\DigitalDiary::where('school_id', auth()->user()->school_id)
+                            ->whereDate('diary_date', \Carbon\Carbon::parse(request('date', today())))
+                            ->pluck('section_id')->unique();
+                        $allSectionsMissingDiary = \App\Models\Section::where('school_id', auth()->user()->school_id)
+                            ->whereNotIn('id', $sectionsWithDiaryToday)
+                            ->with('schoolClass')->get();
+                        $shownDiaryCount = $classesMissingDiaryTodayList->count();
+                    @endphp
+                    <ul class="mis-alb-list mis-expand-list" id="diaryMissingExtra" style="display:none;">
+                        @foreach($allSectionsMissingDiary->skip($shownDiaryCount) as $sec)
+                            <li>• {{ ($sec->schoolClass->name ?? '') }}-{{ $sec->name }} (NA)</li>
+                        @endforeach
+                    </ul>
+                    <button type="button" class="mis-alb-more-link mis-toggle-btn" data-target="diaryMissingExtra" data-count="{{ $classesMissingDiaryTodayMoreCount }}" data-label="classes">
+                        + {{ $classesMissingDiaryTodayMoreCount }} more classes
+                    </button>
                 @endif
             </div>
         </div>
     </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.mis-toggle-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var targetId = btn.getAttribute('data-target');
+                var count = btn.getAttribute('data-count');
+                var label = btn.getAttribute('data-label');
+                var extra = document.getElementById(targetId);
+                if (!extra) return;
+
+                if (extra.style.display === 'none') {
+                    extra.style.display = 'block';
+                    btn.textContent = '\u2212 Show less';
+                } else {
+                    extra.style.display = 'none';
+                    btn.textContent = '+ ' + count + ' more ' + label;
+                }
+            });
+        });
+    });
+    </script>
 
     {{-- ── FOOTER ──────────────────────────────────────────────────────── --}}
     <div class="mis-footer">
