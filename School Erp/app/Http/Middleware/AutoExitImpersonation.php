@@ -15,7 +15,7 @@ class AutoExitImpersonation
         // If the request path is for superadmin and we are currently impersonating
         if ($request->is('superadmin*') && session()->has('is_impersonating') && session()->has('original_user_id')) {
             $originalUserId = session('original_user_id');
-            $originalUser = User::find($originalUserId);
+            $originalUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)->find($originalUserId);
 
             if ($originalUser && $originalUser->hasRole('superadmin')) {
                 // Clear impersonation session keys
