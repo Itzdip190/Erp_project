@@ -346,3 +346,25 @@ Route::get('/migrate-status', function (\Illuminate\Http\Request $request) {
         return response($e->getMessage(), 500);
     }
 });
+
+Route::get('/debug-students', function (\Illuminate\Http\Request $request) {
+    $expectedKey = env('DB_MIGRATE_KEY');
+    if (!$expectedKey || $request->query('key') !== $expectedKey) {
+        abort(403, 'Unauthorized.');
+    }
+
+    $students = \App\Models\Student::with('user')->take(15)->get()->map(function ($s) {
+        return [
+            'id' => $s->id,
+            'admission_number' => $s->admission_number,
+            'first_name' => $s->first_name,
+            'last_name' => $s->last_name,
+            'user_email' => $s->user?->email,
+            'user_phone' => $s->user?->phone,
+            'father_name' => $s->father_name,
+            'father_phone' => $s->father_phone,
+        ];
+    });
+
+    return response()->json($students);
+});
