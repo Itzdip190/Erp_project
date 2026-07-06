@@ -35,8 +35,22 @@ class LoginController extends Controller
 
         $email = $loginInput;
 
-        // If it's not a valid email, check if it's an Admission Number or a Phone Number
-        if (!filter_var($loginInput, FILTER_VALIDATE_EMAIL)) {
+        if (filter_var($loginInput, FILTER_VALIDATE_EMAIL)) {
+            // Check if it's a student's personal email
+            $student = \App\Models\Student::where('email', $loginInput)->first();
+            if ($student && $student->user) {
+                $email = $student->user->email;
+            } else {
+                // Check if it's a guardian's email
+                $studentWithGuardian = \App\Models\Student::where('guardian_email', $loginInput)->first();
+                if ($studentWithGuardian) {
+                    $parentUser = User::where('email', $loginInput)->first();
+                    if ($parentUser) {
+                        $email = $parentUser->email;
+                    }
+                }
+            }
+        } else {
             // Check student admission number
             $student = \App\Models\Student::where('admission_number', $loginInput)->first();
             if ($student && $student->user) {

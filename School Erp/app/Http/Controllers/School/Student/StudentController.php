@@ -151,7 +151,11 @@ class StudentController extends Controller
             $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
             $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
             $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['admission_number']));
+            
             $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
+            if (!empty($data['email'])) {
+                $studentEmail = $data['email'];
+            }
 
             $studentUser = User::create([
                 'school_id' => $schoolId,
@@ -370,7 +374,11 @@ class StudentController extends Controller
                 $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
                 $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
                 $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->admission_number));
+                
                 $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
+                if (!empty($data['email'])) {
+                    $studentEmail = $data['email'];
+                }
 
                 $studentUser = User::create([
                     'school_id' => $schoolId,
@@ -383,8 +391,21 @@ class StudentController extends Controller
                 $studentUser->assignRole('student');
                 $data['user_id'] = $studentUser->id;
             } else {
+                $studentEmail = $studentUser->email;
+                if (!empty($data['email'])) {
+                    $studentEmail = $data['email'];
+                } elseif ($student->first_name !== $data['first_name'] || $student->last_name !== $data['last_name']) {
+                    if (str_contains($studentUser->email, '@student.yis.com')) {
+                        $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
+                        $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
+                        $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->admission_number));
+                        $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
+                    }
+                }
+
                 $studentUser->update([
                     'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+                    'email' => $studentEmail,
                     'phone' => $data['guardian_phone'] ?? null,
                 ]);
             }

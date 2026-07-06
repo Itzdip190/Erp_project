@@ -198,6 +198,7 @@ class ProcessStudentImport implements ShouldQueue
             $mappedData['mother_name'] = $rowData['mother_name'] ?? null;
             $mappedData['mother_phone'] = $rowData['mother_mobile_number'] ?? $rowData['mother_phone'] ?? null;
             $mappedData['mother_id'] = $rowData['mother_id'] ?? null;
+            $mappedData['guardian_email'] = $rowData['guardian_email'] ?? $rowData['parent_email'] ?? $rowData['father_email'] ?? $rowData['mother_email'] ?? null;
             
             $mappedData['house_number'] = $rowData['house_number'] ?? null;
             $mappedData['location'] = $rowData['location'] ?? null;
@@ -427,7 +428,11 @@ class ProcessStudentImport implements ShouldQueue
                     $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $mappedData['first_name']));
                     $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $mappedData['last_name']));
                     $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $mappedData['admission_number']));
+                    
                     $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
+                    if (!empty($mappedData['email'])) {
+                        $studentEmail = $mappedData['email'];
+                    }
 
                     $studentUser = null;
                     if ($existingStudent && $existingStudent->user_id) {
@@ -437,18 +442,21 @@ class ProcessStudentImport implements ShouldQueue
                     if ($studentUser) {
                         $studentUser->update([
                             'name' => trim($mappedData['first_name'] . ' ' . $mappedData['last_name']),
+                            'email' => $studentEmail,
                             'phone' => $mappedData['guardian_phone'] ?? $studentUser->phone,
                         ]);
                     } else {
-                        // Make sure studentEmail is unique globally
-                        $emailExists = User::where('email', $studentEmail)->exists();
-                        if ($emailExists) {
-                            $suffix = 1;
-                            do {
-                                $suffix++;
-                                $testEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '_' . $suffix . '@student.yis.com';
-                            } while (User::where('email', $testEmail)->exists());
-                            $studentEmail = $testEmail;
+                        // Make sure studentEmail is unique globally if it's generated
+                        if (empty($mappedData['email'])) {
+                            $emailExists = User::where('email', $studentEmail)->exists();
+                            if ($emailExists) {
+                                $suffix = 1;
+                                do {
+                                    $suffix++;
+                                    $testEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '_' . $suffix . '@student.yis.com';
+                                } while (User::where('email', $testEmail)->exists());
+                                $studentEmail = $testEmail;
+                            }
                         }
 
                         $studentUser = User::create([
@@ -464,17 +472,23 @@ class ProcessStudentImport implements ShouldQueue
 
                     // Create/Update parent user account
                     $parentUser = null;
-                    if (!empty($mappedData['father_phone'])) {
-                        $parentEmail = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $mappedData['father_name'] ?? 'father')) . '.' . $cleanAdmissionId . '@parent.yis.com';
+                    $parentPhone = $mappedData['father_phone'] ?? $mappedData['guardian_phone'] ?? null;
+                    if (!empty($parentPhone) || !empty($mappedData['guardian_email'])) {
+                        $parentEmail = $mappedData['guardian_email'];
+                        if (empty($parentEmail)) {
+                            $parentEmail = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $mappedData['father_name'] ?? 'father')) . '.' . $cleanAdmissionId . '@parent.yis.com';
+                        }
                         
                         $parentUser = User::where('school_id', $this->schoolId)
-                            ->where(function($q) use ($parentEmail, $mappedData) {
-                                $q->where('email', $parentEmail)
-                                  ->orWhere('phone', $mappedData['father_phone']);
+                            ->where(function($q) use ($parentEmail, $parentPhone) {
+                                $q->where('email', $parentEmail);
+                                if (!empty($parentPhone)) {
+                                    $q->orWhere('phone', $parentPhone);
+                                }
                             })->first();
 
                         if (!$parentUser) {
-                            if (User::where('email', $parentEmail)->exists()) {
+                            if (empty($mappedData['guardian_email']) && User::where('email', $parentEmail)->exists()) {
                                 $suffix = 1;
                                 do {
                                     $suffix++;
@@ -485,17 +499,18 @@ class ProcessStudentImport implements ShouldQueue
 
                             $parentUser = User::create([
                                 'school_id' => $this->schoolId,
-                                'name' => $mappedData['father_name'] ?: 'Parent',
+                                'name' => $mappedData['father_name'] ?: ($mappedData['guardian_name'] ?: 'Parent'),
                                 'email' => $parentEmail,
-                                'phone' => $mappedData['father_phone'],
+                                'phone' => $parentPhone,
                                 'password' => Hash::make('schoolcloud123'),
                                 'is_active' => true,
                             ]);
                             $parentUser->assignRole('parent');
                         } else {
                             $parentUser->update([
-                                'name' => $mappedData['father_name'] ?: $parentUser->name,
-                                'phone' => $mappedData['father_phone'] ?: $parentUser->phone,
+                                'name' => $mappedData['father_name'] ?: ($mappedData['guardian_name'] ?: $parentUser->name),
+                                'email' => $parentEmail,
+                                'phone' => $parentPhone ?: $parentUser->phone,
                             ]);
                         }
                     }
@@ -583,6 +598,7 @@ class ProcessStudentImport implements ShouldQueue
                         'medical_doctor_name' => $mappedData['medical_doctor_name'] ?? null,
 
                         'email' => $mappedData['email'] ?? null,
+                        'guardian_email' => $mappedData['guardian_email'] ?? null,
                         'admission_type' => $mappedData['admission_type'] ?? null,
                         'boarding_type' => $mappedData['boarding_type'] ?? null,
                         'defence_personal' => $mappedData['defence_personal'],
