@@ -365,3 +365,78 @@ Route::get('/find-student', function (\Illuminate\Http\Request $request) {
     ];
 });
 
+Route::get('/fix-student-users', function (\Illuminate\Http\Request $request) {
+    $expectedKey = env('DB_MIGRATE_KEY');
+    if (!$expectedKey || $request->query('key') !== $expectedKey) {
+        abort(403, 'Unauthorized.');
+    }
+
+    $students = \App\Models\Student::whereNull('user_id')->get();
+    $fixedCount = 0;
+    $parentFixedCount = 0;
+
+    foreach ($students as $student) {
+        $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->first_name));
+        $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->last_name));
+        $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->admission_number));
+        
+        $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
+        if (!empty($student->email)) {
+            $studentEmail = $student->email;
+        }
+
+        // 1. Create or Find student user account
+        $user = \App\Models\User::where('email', $studentEmail)->first();
+        if (!$user) {
+            $user = \App\Models\User::create([
+                'school_id' => $student->school_id,
+                'name' => trim($student->first_name . ' ' . $student->last_name),
+                'email' => $studentEmail,
+                'phone' => $student->guardian_phone ?? null,
+                'password' => \Illuminate\Support\Facades\Hash::make('Student@2026!'),
+                'is_active' => true,
+            ]);
+            $user->assignRole('student');
+        }
+
+        $student->update(['user_id' => $user->id]);
+        $fixedCount++;
+
+        // 2. Create or Find parent user account
+        $parentPhone = $student->father_phone ?: $student->guardian_phone;
+        $parentEmail = $student->guardian_email;
+        if (!empty($parentPhone) || !empty($parentEmail)) {
+            if (empty($parentEmail)) {
+                $parentEmail = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->father_name ?? 'parent')) . '.' . $cleanAdmissionId . '@parent.yis.com';
+            }
+
+            $parentUser = \App\Models\User::where('school_id', $student->school_id)
+                ->where(function($q) use ($parentEmail, $parentPhone) {
+                    $q->where('email', $parentEmail);
+                    if (!empty($parentPhone)) {
+                        $q->orWhere('phone', $parentPhone);
+                    }
+                })->first();
+
+            if (!$parentUser) {
+                $parentUser = \App\Models\User::create([
+                    'school_id' => $student->school_id,
+                    'name' => $student->father_name ?: ($student->guardian_name ?: 'Parent'),
+                    'email' => $parentEmail,
+                    'phone' => $parentPhone,
+                    'password' => \Illuminate\Support\Facades\Hash::make('schoolcloud123'),
+                    'is_active' => true,
+                ]);
+                $parentUser->assignRole('parent');
+                $parentFixedCount++;
+            }
+        }
+    }
+
+    return [
+        'status' => 'success',
+        'students_fixed_count' => $fixedCount,
+        'parents_fixed_count' => $parentFixedCount,
+    ];
+});
+
