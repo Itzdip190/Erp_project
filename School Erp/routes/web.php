@@ -347,3 +347,21 @@ Route::get('/migrate-status', function (\Illuminate\Http\Request $request) {
     }
 });
 
+Route::get('/find-student', function (\Illuminate\Http\Request $request) {
+    $expectedKey = env('DB_MIGRATE_KEY');
+    if (!$expectedKey || $request->query('key') !== $expectedKey) {
+        abort(403, 'Unauthorized.');
+    }
+
+    $admission = $request->query('admission');
+    $student = \App\Models\Student::with('user')->where('admission_number', $admission)->first();
+    if (!$student) {
+        return ['error' => 'Student not found'];
+    }
+
+    return [
+        'student' => $student->toArray(),
+        'user' => $student->user ? $student->user->toArray() : null,
+    ];
+});
+
