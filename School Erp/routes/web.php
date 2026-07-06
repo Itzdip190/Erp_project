@@ -331,3 +331,18 @@ Route::get('/db-status', function () {
         'error' => $error,
     ];
 });
+
+Route::get('/migrate-status', function (\Illuminate\Http\Request $request) {
+    $expectedKey = env('DB_MIGRATE_KEY');
+    if (!$expectedKey || $request->query('key') !== $expectedKey) {
+        abort(403, 'Unauthorized.');
+    }
+
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate:status');
+        $output = \Illuminate\Support\Facades\Artisan::output();
+        return response("<pre>{$output}</pre>");
+    } catch (\Exception $e) {
+        return response($e->getMessage(), 500);
+    }
+});
