@@ -12,7 +12,7 @@ trait BelongsToSchool
         static::addGlobalScope(new SchoolScope);
 
         static::creating(function ($model) {
-            if (!$model->school_id && auth()->check()) {
+            if (!$model->school_id && auth()->hasUser()) {
                 $model->school_id = auth()->user()->school_id;
             }
         });
