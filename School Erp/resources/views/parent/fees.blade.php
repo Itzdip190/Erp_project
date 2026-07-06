@@ -347,23 +347,40 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse($fees as $fee)
                             @php
-                                $due = max(0, $fee->amount - $fee->paid_amount);
+                                $groupedFees = $fees->groupBy(function($fee) {
+                                    return $fee->installment_no ?? 1;
+                                })->sortKeys();
+                            @endphp
+                            @forelse($groupedFees as $instNo => $instFees)
+                            @php
+                                $totalCharged = $instFees->sum('amount');
+                                $totalPaid = $instFees->sum('paid_amount');
+                                $due = max(0, $totalCharged - $totalPaid);
+                                $minDueDate = $instFees->min('due_date');
+                                $dueDateStr = $minDueDate ? \Carbon\Carbon::parse($minDueDate)->format('d-M-Y') : 'N/A';
+                                
+                                $status = 'pending';
+                                if ($due <= 0) {
+                                    $status = 'paid';
+                                } elseif ($totalPaid > 0) {
+                                    $status = 'partially_paid';
+                                }
+                                
                                 $badgeClass = 'badge-danger';
-                                if ($fee->status === 'paid') {
+                                if ($status === 'paid') {
                                     $badgeClass = 'badge-success';
-                                } elseif ($fee->status === 'partially_paid') {
+                                } elseif ($status === 'partially_paid') {
                                     $badgeClass = 'badge-warning';
                                 }
                             @endphp
                             <tr>
-                                <td style="font-weight:600; color:var(--navy);">{{ $fee->category ? $fee->category->name : 'General Tuition Fee' }}</td>
-                                <td>{{ \Carbon\Carbon::parse($fee->due_date)->format('d-M-Y') }}</td>
-                                <td style="font-weight:600;">₹{{ number_format($fee->amount, 2) }}</td>
-                                <td style="font-weight:600; color:var(--green);">₹{{ number_format($fee->paid_amount, 2) }}</td>
+                                <td style="font-weight:600; color:var(--navy);">Installment {{ $instNo }}</td>
+                                <td>{{ $dueDateStr }}</td>
+                                <td style="font-weight:600;">₹{{ number_format($totalCharged, 2) }}</td>
+                                <td style="font-weight:600; color:var(--green);">₹{{ number_format($totalPaid, 2) }}</td>
                                 <td style="font-weight:700; color:var(--red);">₹{{ number_format($due, 2) }}</td>
-                                <td><span class="badge {{ $badgeClass }}">{{ str_replace('_', ' ', $fee->status) }}</span></td>
+                                <td><span class="badge {{ $badgeClass }}">{{ str_replace('_', ' ', $status) }}</span></td>
                             </tr>
                             @empty
                             <tr>

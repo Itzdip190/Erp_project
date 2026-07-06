@@ -21,7 +21,7 @@ class StudentStoreRequest extends FormRequest
             'first_name_local' => 'nullable|string|max:100',
             'last_name_local'  => 'nullable|string|max:100',
             'email'          => 'nullable|email|max:150',
-            'phone'          => 'nullable|string|max:20',
+            'phone'          => 'nullable|digits:10',
             'date_of_birth'  => 'required|date|before:today',
             'gender'         => 'required|in:male,female,other',
             'place_of_birth' => 'nullable|string|max:150',
@@ -73,8 +73,8 @@ class StudentStoreRequest extends FormRequest
             'other_info_reason' => 'nullable|string',
 
             'father_name'    => 'nullable|string|max:150',
-            'father_phone'   => 'nullable|string|max:20',
-            'father_alternate_phone' => 'nullable|string|max:20',
+            'father_phone'   => 'nullable|digits:10',
+            'father_alternate_phone' => 'nullable|digits:10',
             'father_email'   => 'nullable|email|max:150',
             'father_occupation' => 'nullable|string|max:150',
             'father_id'      => 'nullable|string|max:100',
@@ -86,8 +86,8 @@ class StudentStoreRequest extends FormRequest
             'father_photo'   => 'nullable|image|max:2048',
             
             'mother_name'    => 'nullable|string|max:150',
-            'mother_phone'   => 'nullable|string|max:20',
-            'mother_alternate_phone' => 'nullable|string|max:20',
+            'mother_phone'   => 'nullable|digits:10',
+            'mother_alternate_phone' => 'nullable|digits:10',
             'mother_email'   => 'nullable|email|max:150',
             'mother_occupation' => 'nullable|string|max:150',
             'mother_id'      => 'nullable|string|max:100',
@@ -109,7 +109,7 @@ class StudentStoreRequest extends FormRequest
             'guardian_name_local' => 'nullable|string|max:150',
             'guardian_address' => 'nullable|string',
             
-            'whatsapp_number' => 'nullable|string|max:20',
+            'whatsapp_number' => 'nullable|digits:10',
 
             'address'        => 'required|string',
             'address_line_2' => 'nullable|string|max:200',
@@ -129,6 +129,7 @@ class StudentStoreRequest extends FormRequest
 
             'admission_date' => 'required|date',
             'photo'          => 'nullable|image|max:2048',
+            'captured_photo' => 'nullable|string',
             'roll_number'    => 'nullable|string|max:50',
             'opening_due_balance' => 'nullable|numeric|min:0',
             'national_id'    => 'nullable|string|max:50',
@@ -169,6 +170,18 @@ class StudentStoreRequest extends FormRequest
                 ->where('school_id', $schoolId)],
             'house_role' => 'nullable|string|max:100',
             'group' => 'nullable|string|max:100',
+
+            'sub_category'         => 'nullable|string|max:80',
+            'any_allergy'          => 'nullable|boolean',
+            'birthmark'            => 'nullable|string|max:150',
+            'house_number'         => 'nullable|string|max:50',
+            'location'             => 'nullable|string|max:150',
+            'emergency_name'       => 'nullable|string|max:150',
+            'emergency_number'     => 'nullable|digits:10',
+            'admission_type'       => 'nullable|string|max:80',
+            'boarding_type'        => 'nullable|string|max:80',
+            'defence_personal'     => 'nullable|boolean',
+            'is_rte'               => 'nullable|boolean',
         ];
     }
 }

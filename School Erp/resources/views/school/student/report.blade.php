@@ -235,6 +235,20 @@
         justify-content: center;
         align-items: center;
     }
+
+    /* Dark Mode overrides for Student Report page */
+    body.dark-mode .report-header-title h1,
+    body.dark-mode .report-card-title {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .filter-select {
+        background-color: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .stacked-bar {
+        background-color: #1f2937 !important;
+    }
 </style>
 
 @php

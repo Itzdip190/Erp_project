@@ -13,13 +13,16 @@ class SuperAdminSeeder extends Seeder
         $user = User::firstOrCreate(
             ['email' => 'superadmin@schoolcloud.com'],
             [
-                'name' => 'Super Admin',
-                'password' => Hash::make('SuperAdminSecurePass2026!'),
+                'name'      => 'Super Admin',
+                'password'  => Hash::make('SuperAdminSecurePass2026!'),
+                'role'      => 'superadmin',
                 'school_id' => null,
                 'is_active' => true,
             ]
         );
 
-        $user->assignRole('superadmin');
+        // Always ensure both the role column AND the Spatie role are set
+        $user->update(['role' => 'superadmin']);
+        $user->syncRoles(['superadmin']);
     }
 }

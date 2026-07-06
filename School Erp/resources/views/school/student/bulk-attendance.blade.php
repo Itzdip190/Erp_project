@@ -378,6 +378,142 @@
         margin-bottom: 12px;
         color: #cbd5e1;
     }
+
+    /* ── Student Bulk Attendance Dark Mode Overrides ── */
+    body.dark-mode .bulk-container {
+        background: #0b0f19 !important;
+        box-shadow: none !important;
+    }
+    body.dark-mode .bulk-title h1 {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .bulk-title p {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .filters-card {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode .filter-col label {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .filter-col input, 
+    body.dark-mode .filter-col select {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .filter-col input:focus, 
+    body.dark-mode .filter-col select:focus {
+        border-color: #4b5563 !important;
+        background: #1f2937 !important;
+    }
+    body.dark-mode .notice-banner {
+        background: rgba(37, 99, 235, 0.1) !important;
+        border-color: rgba(37, 99, 235, 0.3) !important;
+        color: #60a5fa !important;
+    }
+    body.dark-mode .notice-banner p {
+        color: #60a5fa !important;
+    }
+    body.dark-mode .data-panel {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode .panel-header {
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .panel-header h3, 
+    body.dark-mode .panel-header-left h3 {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .panel-header p, 
+    body.dark-mode .panel-header-left p {
+        color: #94a3b8 !important;
+    }
+    body.dark-mode .btn-settings-gear {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-color: #374151 !important;
+    }
+    body.dark-mode .btn-settings-gear:hover {
+        background: #374151 !important;
+        color: #ffffff !important;
+    }
+    body.dark-mode .bulk-grid-table th {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-bottom-color: #374151 !important;
+    }
+    body.dark-mode .bulk-grid-table th.date-column-header {
+        border-left-color: #374151 !important;
+    }
+    body.dark-mode .bulk-grid-table th.weekend-header {
+        background: rgba(180, 83, 9, 0.2) !important;
+        color: #f59e0b !important;
+    }
+    body.dark-mode .bulk-grid-table td {
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .student-cell {
+        background: #111827 !important;
+    }
+    body.dark-mode .student-name {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .student-sub {
+        color: #f97316 !important;
+    }
+    body.dark-mode .status-select {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .status-select option {
+        background: #1f2937 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .select-present {
+        color: #34d399 !important;
+        border-color: #065f46 !important;
+        background: #064e3b !important;
+    }
+    body.dark-mode .select-absent {
+        color: #f87171 !important;
+        border-color: #7f1d1d !important;
+        background: #991b1b !important;
+    }
+    body.dark-mode .select-late {
+        color: #fbbf24 !important;
+        border-color: #78350f !important;
+        background: #7c2d12 !important;
+    }
+    body.dark-mode .select-half_day {
+        color: #fbbf24 !important;
+        border-color: #78350f !important;
+        background: #7c2d12 !important;
+    }
+    body.dark-mode .select-holiday {
+        color: #9ca3b8 !important;
+        border-color: #374151 !important;
+        background: #1f2937 !important;
+    }
+    body.dark-mode .select-leave, 
+    body.dark-mode .select-duty_leave {
+        color: #60a5fa !important;
+        border-color: #1e3a8a !important;
+        background: #1e3a8a !important;
+    }
+    body.dark-mode .select-not_marked {
+        color: #9ca3af !important;
+        border-color: #374151 !important;
+        background: #1f2937 !important;
+    }
+    body.dark-mode .empty-grid {
+        color: #cbd5e1 !important;
+    }
 </style>
 
 <div class="bulk-container">

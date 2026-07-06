@@ -224,6 +224,27 @@ class ClassTimetableController extends Controller
                 ]
             );
 
+            // Sync back to SectionSubjectStaff for two-way consistency
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            if ($currentSession) {
+                // Delete previous mappings for this section and subject to avoid duplicating
+                \App\Models\SectionSubjectStaff::where('school_id', $schoolId)
+                    ->where('section_id', $request->section_id)
+                    ->where('subject_id', $request->subject_id)
+                    ->where('academic_session_id', $currentSession->id)
+                    ->delete();
+
+                // Create new mapping
+                \App\Models\SectionSubjectStaff::create([
+                    'school_id' => $schoolId,
+                    'section_id' => $request->section_id,
+                    'subject_id' => $request->subject_id,
+                    'staff_id' => $request->teacher_id,
+                    'academic_session_id' => $currentSession->id,
+                ]);
+            }
+
             // Auto-save cell drop if coordinates provided
             if ($request->timetable_group_id && $request->timetable_group_period_id && $request->day_of_week) {
                 ClassTimetableCell::updateOrCreate(

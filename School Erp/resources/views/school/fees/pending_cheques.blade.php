@@ -21,6 +21,7 @@
                     <tr>
                         <th>Student Details</th>
                         <th>Bank Name</th>
+                        <th>Branch</th>
                         <th>Cheque Number</th>
                         <th>Amount (₹)</th>
                         <th>Cheque Date</th>
@@ -36,6 +37,7 @@
                             <small style="display:block; color:var(--t3);">{{ $chq->student->admission_id }}</small>
                         </td>
                         <td>{{ $chq->bank_name }}</td>
+                        <td>{{ $chq->branch ?? '-' }}</td>
                         <td><strong style="color:var(--navy); font-family:monospace;">{{ $chq->cheque_number }}</strong></td>
                         <td><strong>₹{{ number_format($chq->amount, 2) }}</strong></td>
                         <td>{{ $chq->cheque_date }}</td>
@@ -75,7 +77,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" style="text-align:center; padding:20px; color:var(--t3);">No cheques recorded.</td>
+                        <td colspan="8" style="text-align:center; padding:20px; color:var(--t3);">No cheques recorded.</td>
                     </tr>
                     @endforelse
                 </tbody>

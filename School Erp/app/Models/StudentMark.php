@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Traits\BelongsToSchool;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class StudentMark extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToSchool;
 
     protected $fillable = [
         'school_id',
@@ -18,6 +20,8 @@ class StudentMark extends Model
         'max_marks',
         'grade',
         'remarks',
+        'attendance_status',
+        'achievements',
     ];
 
     public function student()

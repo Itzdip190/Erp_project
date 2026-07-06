@@ -352,4 +352,72 @@
     font-size: 12px; color: #2563eb; font-weight: 600;
     padding: 8px 16px 0; font-style: italic;
 }
+
+/* Dark Mode overrides for weekly grid partial */
+body.dark-mode .ttg-card {
+    background: #111827;
+    border-color: #1e293b;
+    color: #f8fafc;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+body.dark-mode .ttg-class-header {
+    color: #f8fafc;
+    border-bottom-color: #1e293b;
+}
+body.dark-mode .ttg-period-th {
+    background: #1f2937;
+    border-bottom-color: #1e293b;
+    border-right-color: #1e293b;
+}
+body.dark-mode .ttg-period-label {
+    background: #1f2937;
+    border-right-color: #1e293b;
+    border-bottom-color: #1e293b;
+}
+body.dark-mode .ttg-pname {
+    color: #f8fafc;
+}
+body.dark-mode .ttg-ptime {
+    background: #111827;
+    color: #cbd5e1;
+}
+body.dark-mode .ttg-cell {
+    border-bottom-color: #1e293b;
+    border-right-color: #1e293b;
+}
+body.dark-mode .ttg-cell-off {
+    background: #1f2937;
+}
+body.dark-mode .ttg-cell-active {
+    background: #111827;
+}
+body.dark-mode .ttg-cell-empty {
+    border-color: #374151;
+    color: #64748b;
+}
+body.dark-mode .ttg-cell-active:hover .ttg-cell-empty,
+body.dark-mode .ttg-cell-empty:hover {
+    border-color: #60a5fa;
+    background: rgba(59, 130, 246, 0.1);
+    color: #60a5fa;
+}
+body.dark-mode .ttg-dropdown {
+    background: #1f2937;
+    border-color: #374151;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+body.dark-mode .ttg-dropdown button {
+    color: #cbd5e1;
+}
+body.dark-mode .ttg-dropdown button:hover {
+    background: #374151;
+}
+body.dark-mode .ttg-menu-btn {
+    background: rgba(17, 24, 39, 0.65);
+    color: #cbd5e1;
+}
+body.dark-mode .ttg-menu-btn:hover {
+    background: rgba(17, 24, 39, 0.95);
+    color: #fff;
+}
 </style>

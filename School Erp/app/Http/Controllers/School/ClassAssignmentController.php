@@ -1000,6 +1000,9 @@ class ClassAssignmentController extends Controller
                 ->whereNotIn('id', $submittedKeys)
                 ->delete();
 
+            // Sync with ClassSubjectTeacher and ClassTimetableCell
+            $this->syncTimetableAssignments($schoolId, $request->class_id, $sectionId, $sessionId);
+
             // Log activity audit trail
             \App\Models\ImplementationTracker\ImplActivityLog::create([
                 'school_id' => $schoolId,
@@ -1134,8 +1137,9 @@ class ClassAssignmentController extends Controller
 
         $importedCount = 0;
         $errors = [];
+        $syncedPairs = [];
 
-        \DB::transaction(function() use ($rows, $schoolId, $currentSession, &$importedCount, &$errors) {
+        \DB::transaction(function() use ($rows, $schoolId, $currentSession, &$importedCount, &$errors, &$syncedPairs) {
             foreach ($rows as $index => $row) {
                 $className = trim($row['Class Name'] ?? '');
                 $sectionName = trim($row['Section Name'] ?? '');
@@ -1199,6 +1203,14 @@ class ClassAssignmentController extends Controller
                         'substitute_staff_id' => $substituteStaffId,
                     ]);
                     $importedCount++;
+
+                    $pairKey = $class->id . '-' . $section->id;
+                    if (!isset($syncedPairs[$pairKey])) {
+                        $syncedPairs[$pairKey] = [
+                            'class_id' => $class->id,
+                            'section_id' => $section->id,
+                        ];
+                    }
                 }
             }
 
@@ -1213,6 +1225,10 @@ class ClassAssignmentController extends Controller
                     'changed_by' => auth()->user()->name,
                     'changed_at' => now(),
                 ]);
+            }
+
+            foreach ($syncedPairs as $pair) {
+                $this->syncTimetableAssignments($schoolId, $pair['class_id'], $pair['section_id'], $currentSession->id);
             }
         });
 
@@ -1229,5 +1245,53 @@ class ClassAssignmentController extends Controller
             'success' => true,
             'message' => "Successfully imported {$importedCount} teacher assignments."
         ]);
+    }
+
+    private function syncTimetableAssignments($schoolId, $classId, $sectionId, $sessionId)
+    {
+        // Fetch all current mappings in SectionSubjectStaff for this section and session
+        $currentMappings = \App\Models\SectionSubjectStaff::where('school_id', $schoolId)
+            ->where('section_id', $sectionId)
+            ->where('academic_session_id', $sessionId)
+            ->get();
+
+        // 1. Get all subject IDs currently assigned
+        $assignedSubjectIds = $currentMappings->pluck('subject_id')->unique()->toArray();
+
+        // 2. Update or create ClassSubjectTeacher and update existing cells
+        foreach ($currentMappings as $mapping) {
+            \App\Models\ClassSubjectTeacher::updateOrCreate([
+                'school_id' => $schoolId,
+                'class_id' => $classId,
+                'section_id' => $sectionId,
+                'subject_id' => $mapping->subject_id,
+            ], [
+                'teacher_id' => $mapping->staff_id,
+            ]);
+
+            // Also update any existing ClassTimetableCell for this class/section/subject to use the new teacher
+            \App\Models\ClassTimetableCell::where('school_id', $schoolId)
+                ->where('class_id', $classId)
+                ->where('section_id', $sectionId)
+                ->where('subject_id', $mapping->subject_id)
+                ->update([
+                    'teacher_id' => $mapping->staff_id
+                ]);
+        }
+
+        // 3. Delete ClassSubjectTeacher mappings and set teacher_id = null in ClassTimetableCell for subjects that are no longer assigned to any teacher
+        \App\Models\ClassSubjectTeacher::where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('section_id', $sectionId)
+            ->whereNotIn('subject_id', $assignedSubjectIds)
+            ->delete();
+
+        \App\Models\ClassTimetableCell::where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('section_id', $sectionId)
+            ->whereNotIn('subject_id', $assignedSubjectIds)
+            ->update([
+                'teacher_id' => null
+            ]);
     }
 }

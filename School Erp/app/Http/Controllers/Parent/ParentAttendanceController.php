@@ -29,10 +29,7 @@ class ParentAttendanceController extends Controller
                 })
                 ->first();
 
-            // Fallback for legacy support
-            if (!$student) {
-                $student = Student::where('school_id', $user->school_id)->first();
-            }
+            // Fallback for legacy support removed
 
             if (!$student) {
                 abort(404, 'Student not found');
@@ -43,9 +40,7 @@ class ParentAttendanceController extends Controller
 
             // Security check: ensure student belongs to user (as guardian or student user themselves)
             if ($student->guardian_email !== $user->email && $student->user_id !== $user->id) {
-                if ($student->school_id !== $user->school_id) {
-                    abort(403, 'Access denied');
-                }
+                abort(403, 'Access denied');
             }
         }
 

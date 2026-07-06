@@ -22,12 +22,7 @@ class ParentDashboardController extends Controller
             ->with(['class', 'section', 'academicSession', 'school'])
             ->first();
 
-        // For legacy support — also check by guardian name
-        if (!$student) {
-            $student = Student::where('school_id', $user->school_id)
-                ->with(['class', 'section', 'academicSession', 'school'])
-                ->first();
-        }
+        // For legacy support — removed insecure fallback
 
         $school = $user->school;
 
@@ -201,9 +196,7 @@ class ParentDashboardController extends Controller
             ->with(['class', 'section', 'academicSession', 'school'])
             ->first();
 
-        if (!$student) {
-            $student = Student::where('school_id', $user->school_id)->first();
-        }
+        // Removed insecure fallback
 
         $school = $user->school;
         $classDisplay   = optional($student?->class)->name ?? 'N/A';
@@ -232,9 +225,7 @@ class ParentDashboardController extends Controller
             })
             ->first();
 
-        if (!$student) {
-            $student = Student::where('school_id', $user->school_id)->first();
-        }
+        // Removed insecure fallback
 
         if (!$student || $document->student_id !== $student->id) {
             abort(403, 'Unauthorized access to this document.');
@@ -319,9 +310,7 @@ class ParentDashboardController extends Controller
             ->with(['class', 'section', 'academicSession', 'school'])
             ->first();
 
-        if (!$student) {
-            $student = Student::where('school_id', $user->school_id)->first();
-        }
+        // Removed insecure fallback
 
         $school = $user->school;
         $classDisplay   = optional($student?->class)->name ?? 'N/A';
@@ -356,9 +345,7 @@ class ParentDashboardController extends Controller
             ->with(['class', 'section', 'academicSession', 'school'])
             ->first();
 
-        if (!$student) {
-            $student = Student::where('school_id', $user->school_id)->first();
-        }
+        // Removed insecure fallback
 
         $school = $user->school;
         $classDisplay   = optional($student?->class)->name ?? 'N/A';
@@ -389,9 +376,7 @@ class ParentDashboardController extends Controller
             ->with(['class', 'section', 'academicSession', 'school'])
             ->first();
 
-        if (!$student) {
-            $student = Student::where('school_id', $user->school_id)->first();
-        }
+        // Removed insecure fallback
 
         $school = $user->school;
         $classDisplay   = optional($student?->class)->name ?? 'N/A';
@@ -425,9 +410,7 @@ class ParentDashboardController extends Controller
             ->with(['class', 'section', 'academicSession', 'school'])
             ->first();
 
-        if (!$student) {
-            $student = Student::where('school_id', $user->school_id)->first();
-        }
+        // Removed insecure fallback
 
         $school = $user->school;
         $classDisplay   = optional($student?->class)->name ?? 'N/A';
@@ -526,6 +509,53 @@ class ParentDashboardController extends Controller
                     'color_bg' => 'rgba(139,92,246,0.15)',
                 ]);
             }
+
+            // 5. Offline Tests
+            if (\Illuminate\Support\Facades\Schema::hasTable('offline_tests')) {
+                $offlineTests = \App\Models\OfflineTest::where('school_id', $user->school_id)
+                    ->where(function($q) use ($student) {
+                        $q->whereNull('class_id')->orWhere('class_id', $student->class_id);
+                    })
+                    ->with('subject')
+                    ->orderBy('created_at', 'desc')
+                    ->take(5)
+                    ->get();
+                foreach ($offlineTests as $ot) {
+                    $notifications->push((object)[
+                        'type' => 'offline_test',
+                        'title' => 'Offline Test: ' . $ot->title,
+                        'text' => ($ot->subject ? $ot->subject->name : 'General Subject') . ($ot->start_date_time ? ' | ' . date('d M, h:i A', strtotime($ot->start_date_time)) : ''),
+                        'time' => $ot->created_at,
+                        'url' => route('parent.exams.index'),
+                        'icon' => 'fas fa-file-signature',
+                        'color' => 'var(--gold)',
+                        'color_bg' => 'var(--gold-bg)',
+                    ]);
+                }
+            }
+
+            // 6. General Exams
+            if (\Illuminate\Support\Facades\Schema::hasTable('exams')) {
+                $exams = \App\Models\Exam::where('school_id', $user->school_id)
+                    ->where(function($q) use ($student) {
+                        $q->whereNull('class_id')->orWhere('class_id', $student->class_id);
+                    })
+                    ->orderBy('created_at', 'desc')
+                    ->take(5)
+                    ->get();
+                foreach ($exams as $ex) {
+                    $notifications->push((object)[
+                        'type' => 'exam',
+                        'title' => 'Exam Scheduled: ' . $ex->name,
+                        'text' => 'Term/Session: ' . $ex->academic_year . ($ex->start_date ? ' | Date: ' . date('d M Y', strtotime($ex->start_date)) : ''),
+                        'time' => $ex->created_at,
+                        'url' => route('parent.exams.index'),
+                        'icon' => 'fas fa-pen-ruler',
+                        'color' => 'var(--blue)',
+                        'color_bg' => 'rgba(59,130,246,0.15)',
+                    ]);
+                }
+            }
         }
         return $notifications->sortByDesc('time')->values()->take(10);
     }
@@ -540,9 +570,7 @@ class ParentDashboardController extends Controller
             ->with(['class', 'section', 'academicSession', 'school'])
             ->first();
 
-        if (!$student) {
-            $student = Student::where('school_id', $user->school_id)->first();
-        }
+        // Removed insecure fallback
 
         $school = $user->school;
         $classDisplay   = optional($student?->class)->name ?? 'N/A';
@@ -647,13 +675,37 @@ class ParentDashboardController extends Controller
     {
         $data = $this->getStudentData(auth()->user());
         if ($data['student']) {
-            $marks = \App\Models\StudentMark::where('student_id', $data['student']->id)
+            $student = $data['student'];
+            $marks = \App\Models\StudentMark::where('student_id', $student->id)
+                ->with('subject')
                 ->orderBy('created_at', 'desc')
                 ->get();
+
+            $offlineTests = \Illuminate\Support\Facades\Schema::hasTable('offline_tests')
+                ? \App\Models\OfflineTest::where('school_id', auth()->user()->school_id)
+                    ->where(function($q) use ($student) {
+                        $q->whereNull('class_id')->orWhere('class_id', $student->class_id);
+                    })
+                    ->with(['subject', 'teacher'])
+                    ->orderBy('start_date_time', 'asc')
+                    ->get()
+                : collect();
+
+            $scheduledExams = \Illuminate\Support\Facades\Schema::hasTable('exams')
+                ? \App\Models\Exam::where('school_id', auth()->user()->school_id)
+                    ->where(function($q) use ($student) {
+                        $q->whereNull('class_id')->orWhere('class_id', $student->class_id);
+                    })
+                    ->with('examSubjects.subject')
+                    ->orderBy('created_at', 'desc')
+                    ->get()
+                : collect();
         } else {
             $marks = collect();
+            $offlineTests = collect();
+            $scheduledExams = collect();
         }
-        return view('parent.exams', array_merge($data, compact('marks')));
+        return view('parent.exams', array_merge($data, compact('marks', 'offlineTests', 'scheduledExams')));
     }
 
     public function notices()
@@ -748,6 +800,42 @@ class ParentDashboardController extends Controller
         ]);
 
         return back()->with('success', 'Message sent.');
+    }
+
+    public function assignments()
+    {
+        $data = $this->getStudentData();
+        $student = $data['student'];
+
+        $assignments = collect();
+        if ($student) {
+            $assignments = \App\Models\TeacherAssignment::where('school_id', $student->school_id)
+                ->where('class_id', $student->class_id)
+                ->where('section_id', $student->section_id)
+                ->with(['subject', 'teacher'])
+                ->latest()
+                ->get();
+        }
+
+        return view('parent.assignments', array_merge($data, compact('assignments')));
+    }
+
+    public function studyMaterials()
+    {
+        $data = $this->getStudentData();
+        $student = $data['student'];
+
+        $materials = collect();
+        if ($student) {
+            $materials = \App\Models\StudyMaterial::where('school_id', $student->school_id)
+                ->where('class_id', $student->class_id)
+                ->where('section_id', $student->section_id)
+                ->with(['subject', 'teacher'])
+                ->latest()
+                ->get();
+        }
+
+        return view('parent.study_materials', array_merge($data, compact('materials')));
     }
 }
 

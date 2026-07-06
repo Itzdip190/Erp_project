@@ -22,12 +22,14 @@ class School extends Model
         'late_grace_minutes',
         'staff_punch_in_start',
         'staff_punch_in_end',
+        'disabled_modules',
     ];
 
     protected $casts = [
         'sms_config' => 'array',
         'late_grace_minutes' => 'integer',
         'udise_data' => 'array',
+        'disabled_modules' => 'array',
     ];
 
     public function users()
@@ -38,6 +40,11 @@ class School extends Model
     public function students()
     {
         return $this->hasMany(Student::class);
+    }
+
+    public function staff()
+    {
+        return $this->hasMany(Staff::class);
     }
 
     public function subscriptions()

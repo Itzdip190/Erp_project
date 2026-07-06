@@ -351,10 +351,81 @@
         border-color: #e06b00;
         background: rgba(224, 107, 0, 0.02);
     }
-    .upload-box-icon {
-        font-size: 40px;
-        color: var(--t3);
-        margin-bottom: 12px;
+    /* ── ASSIGN TEACHERS DARK MODE OVERRIDES ── */
+    body.dark-mode .filter-bar,
+    body.dark-mode .leaders-card,
+    body.dark-mode .stats-container {
+        background: #111827 !important;
+        border: 1px solid #1e293b !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode .filter-label {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .filter-select,
+    body.dark-mode .filter-input {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .filter-select option {
+        background: #1f2937 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .btn-orange-border {
+        background: #1f2937 !important;
+        color: #f59e0b !important;
+        border-color: #f59e0b !important;
+    }
+    body.dark-mode .btn-orange-border:hover {
+        background: rgba(245, 158, 11, 0.2) !important;
+    }
+    body.dark-mode .stats-card-mini.green {
+        background: rgba(16, 185, 129, 0.2) !important;
+        border: 1px solid rgba(16, 185, 129, 0.4) !important;
+        color: #34d399 !important;
+    }
+    body.dark-mode .stats-card-mini.red {
+        background: rgba(239, 68, 68, 0.2) !important;
+        border: 1px solid rgba(239, 68, 68, 0.4) !important;
+        color: #f87171 !important;
+    }
+    body.dark-mode .teacher-item-row {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+    }
+    body.dark-mode .teacher-item-name {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .drawer {
+        background: #111827 !important;
+        border-left: 1px solid #1e293b !important;
+        box-shadow: -5px 0 25px rgba(0, 0, 0, 0.6) !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .drawer-header {
+        background: linear-gradient(135deg, #111827 0%, #1e1b4b 60%, #312e81 100%) !important;
+        border-bottom: 1px solid #1e293b !important;
+    }
+    body.dark-mode .drawer-footer {
+        background: #1f2937 !important;
+        border-top-color: #374151 !important;
+    }
+    body.dark-mode .tab-container {
+        border-color: #374151 !important;
+    }
+    body.dark-mode .tab-btn {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .tab-btn.active {
+        background: #6366f1 !important;
+        color: #ffffff !important;
+    }
+    body.dark-mode .upload-box {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #cbd5e1 !important;
     }
 </style>
 
@@ -847,8 +918,10 @@
             });
         });
 
-        const classTeacherId = document.getElementById('classTeacherSelect').value;
-        const assistantClassTeacherId = document.getElementById('assistantClassTeacherSelect').value;
+        const classTeacherEl = document.getElementById('classTeacherSelect');
+        const assistantClassTeacherEl = document.getElementById('assistantClassTeacherSelect');
+        const classTeacherId = classTeacherEl ? classTeacherEl.value : null;
+        const assistantClassTeacherId = assistantClassTeacherEl ? assistantClassTeacherEl.value : null;
 
         const object = {
             academic_session_id: sessionId,

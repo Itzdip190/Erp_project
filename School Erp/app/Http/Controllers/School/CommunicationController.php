@@ -14,32 +14,7 @@ class CommunicationController extends Controller
 {
     private function ensureCommunicationSeeded($schoolId)
     {
-        if (Notice::where('school_id', $schoolId)->count() === 0) {
-            Notice::create([
-                'school_id' => $schoolId,
-                'title' => 'Annual Sports Meet 2026',
-                'content' => 'The Annual Sports Meet is scheduled to take place next month from the 10th to the 12th. All students are encouraged to participate.',
-                'target_audience' => 'all',
-            ]);
-            Notice::create([
-                'school_id' => $schoolId,
-                'title' => 'Mid-term Exams Notice',
-                'content' => 'Please note that the mid-term examinations syllabus and date sheets have been published. Check the examination section for details.',
-                'target_audience' => 'students',
-            ]);
-        }
-
-        if (Survey::where('school_id', $schoolId)->count() === 0) {
-            $survey = Survey::create([
-                'school_id' => $schoolId,
-                'question' => 'Which extra-curricular activity do you prefer for summer camp?',
-                'is_active' => true,
-            ]);
-
-            SurveyOption::create(['survey_id' => $survey->id, 'option_text' => 'Robot Building & Coding']);
-            SurveyOption::create(['survey_id' => $survey->id, 'option_text' => 'Lawn Tennis & Swimming']);
-            SurveyOption::create(['survey_id' => $survey->id, 'option_text' => 'Drama & Creative Arts']);
-        }
+        // No auto-seeding
     }
 
     public function settings(Request $request)

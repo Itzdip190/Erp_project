@@ -107,7 +107,7 @@
                         </label>
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                        <input type="text" id="payment_url_input" name="payment_url" value="{{ $config?->payment_url ?? 'https://online.edutinker.com/form/student/fees?schoolId=' . auth()->user()->school_id . '&schoolName=Pragya%20School' }}" class="form-control" style="background:#fff; border-color:#bfdbfe; color:#1e293b; flex:1;" placeholder="Enter custom gateway URL. Use tags like {student_id}, {amount}, {purpose}">
+                        <input type="text" id="payment_url_input" name="payment_url" value="{{ $config?->payment_url ?? 'https://online.edutinker.com/form/student/fees?schoolId=' . auth()->user()->school_id . '&schoolName=' . rawurlencode(auth()->user()->school?->name ?? 'School') }}" class="form-control" style="background:#fff; border-color:#bfdbfe; color:#1e293b; flex:1;" placeholder="Enter custom gateway URL. Use tags like {student_id}, {amount}, {purpose}">
                         <button type="button" class="btn btn-outline" style="border-color: #bfdbfe; background: #fff; padding: 10px;" onclick="copyUrlToClipboard()" title="Copy Payment Link">
                             <i class="fas fa-copy" style="color: #3b82f6;"></i>
                         </button>
@@ -643,6 +643,126 @@ input:checked + .slider:before {
 .order-item .item-handle i {
     color: #94a3b8;
     cursor: grab;
+}
+
+/* ── FEE CONFIGURATION DARK MODE OVERRIDES ── */
+body.dark-mode .fee-config .page-hdr {
+    border-bottom-color: #1e293b !important;
+}
+body.dark-mode .fee-config .page-hdr-left h1,
+body.dark-mode .fee-config .page-hdr-left h1 i {
+    color: #818cf8 !important;
+}
+body.dark-mode .fee-config .page-hdr-left p {
+    color: #94a3b8 !important;
+}
+body.dark-mode .fee-config .page-hdr-right .btn-outline {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #cbd5e1 !important;
+}
+body.dark-mode .fee-config .page-hdr-right .btn-outline:hover {
+    background: #374151 !important;
+    color: #ffffff !important;
+}
+body.dark-mode .fee-config .card {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    box-shadow: none !important;
+}
+body.dark-mode .fee-config .card-hdr {
+    background-color: #1f2937 !important;
+    border-bottom-color: #1e293b !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .fee-config .card-hdr h3,
+body.dark-mode .fee-config .card-hdr h3 i {
+    color: #f8fafc !important;
+}
+body.dark-mode .fee-config .card-body {
+    background: #111827 !important;
+    color: #cbd5e1 !important;
+}
+body.dark-mode .fee-config label.form-label,
+body.dark-mode .fee-config .form-group label {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .fee-config select.form-control,
+body.dark-mode .fee-config input.form-control,
+body.dark-mode .fee-config textarea.form-control {
+    background-color: #1f2937 !important;
+    color: #f8fafc !important;
+    border-color: #374151 !important;
+}
+body.dark-mode .fee-config select.form-control option {
+    background-color: #1f2937 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .fee-config .form-group[style*="background-color: #eff6ff"],
+body.dark-mode .fee-config .form-group[style*="background-color:#eff6ff"] {
+    background-color: #1f2937 !important;
+    border-color: #1e293b !important;
+}
+body.dark-mode .fee-config .form-group[style*="background-color: #eff6ff"] span,
+body.dark-mode .fee-config .form-group[style*="background-color:#eff6ff"] span {
+    color: #f8fafc !important;
+}
+body.dark-mode .fee-config .form-group[style*="background-color: #eff6ff"] input,
+body.dark-mode .fee-config .form-group[style*="background-color:#eff6ff"] input {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .fee-config .form-group[style*="background-color: #eff6ff"] button,
+body.dark-mode .fee-config .form-group[style*="background-color:#eff6ff"] button {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+}
+body.dark-mode .fee-config .form-group[style*="background-color: #eff6ff"] button i,
+body.dark-mode .fee-config .form-group[style*="background-color:#eff6ff"] button i {
+    color: #818cf8 !important;
+}
+body.dark-mode .fee-config .form-group[style*="background-color: #eff6ff"] small,
+body.dark-mode .fee-config .form-group[style*="background-color:#eff6ff"] small {
+    color: #94a3b8 !important;
+}
+body.dark-mode .fee-config .form-group[style*="background-color: #eff6ff"] code,
+body.dark-mode .fee-config .form-group[style*="background-color:#eff6ff"] code {
+    background-color: #111827 !important;
+    color: #f87171 !important;
+}
+body.dark-mode .fee-config label[style*="color:#1e293b"],
+body.dark-mode .fee-config label[style*="color: #1e293b"] {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .fee-config .toggle-item {
+    border-bottom-color: #1e293b !important;
+}
+body.dark-mode .fee-config .toggle-item > span {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .fee-config table.table th {
+    background-color: #1f2937 !important;
+    color: #f8fafc !important;
+    border-bottom-color: #1e293b !important;
+}
+body.dark-mode .fee-config table.table td {
+    background-color: #111827 !important;
+    color: #cbd5e1 !important;
+    border-bottom-color: #1e293b !important;
+}
+body.dark-mode .fee-config table.table tr:hover td {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+}
+body.dark-mode .order-item {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+}
+body.dark-mode .order-item .item-handle {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .order-item .item-handle i {
+    color: #64748b !important;
 }
 </style>
 

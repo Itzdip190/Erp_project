@@ -309,10 +309,120 @@
 }
 
 /* Empty state */
-.sa-empty{
-    padding: 40px 20px; text-align: center; color: var(--sa-muted);
+/* ── STAFF ACCESS CONTROL DARK MODE OVERRIDES ── */
+body.dark-mode {
+    --sa-blue: #818cf8 !important;
+    --sa-blue2: #6366f1 !important;
+    --sa-blue3: #a5b4fc !important;
+    --sa-xlight: #1f2937 !important;
+    --sa-border: #374151 !important;
+    --sa-text: #f8fafc !important;
+    --sa-muted: #cbd5e1 !important;
 }
-.sa-empty i{ font-size: 36px; color: var(--sa-border); margin-bottom: 10px; display: block; }
+body.dark-mode .sa-header {
+    background: linear-gradient(135deg, #111827 0%, #1e1b4b 60%, #312e81 100%) !important;
+    border: 1px solid rgba(129, 140, 248, 0.2) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+body.dark-mode .sa-header h1,
+body.dark-mode .sa-header p {
+    color: #f8fafc !important;
+}
+body.dark-mode .sa-info-badge {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .sa-module {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+body.dark-mode .sa-module-hdr {
+    background: #1f2937 !important;
+    border-bottom-color: #374151 !important;
+}
+body.dark-mode .sa-module-hdr:hover {
+    background: #374151 !important;
+}
+body.dark-mode .sa-mod-title {
+    color: #f8fafc !important;
+}
+body.dark-mode .sa-table th {
+    background: #111827 !important;
+    color: #cbd5e1 !important;
+    border-bottom-color: #374151 !important;
+}
+body.dark-mode .sa-table td {
+    color: #f8fafc !important;
+    border-bottom-color: #1e293b !important;
+}
+body.dark-mode .sa-table tr:nth-child(even) td {
+    background: #111827 !important;
+}
+body.dark-mode .sa-table tr:hover td {
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+body.dark-mode .sa-access-btn.view-btn,
+body.dark-mode .sa-access-btn.edit-btn {
+    background: #1f2937 !important;
+    color: #818cf8 !important;
+    border-color: #374151 !important;
+}
+body.dark-mode .sa-access-btn.view-btn:hover,
+body.dark-mode .sa-access-btn.edit-btn:hover {
+    background: #374151 !important;
+    border-color: #818cf8 !important;
+}
+body.dark-mode .sa-access-btn.view-btn.has-access,
+body.dark-mode .sa-access-btn.edit-btn.has-access {
+    background: rgba(99, 102, 241, 0.25) !important;
+    color: #a5b4fc !important;
+    border-color: #6366f1 !important;
+}
+body.dark-mode .sa-badge-count {
+    background: rgba(99, 102, 241, 0.3) !important;
+    color: #ffffff !important;
+}
+body.dark-mode .sa-panel {
+    background: #111827 !important;
+    border-left-color: #1e293b !important;
+    box-shadow: -8px 0 40px rgba(0, 0, 0, 0.6) !important;
+}
+body.dark-mode .sa-panel-search-wrap,
+body.dark-mode .sa-panel-footer {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+}
+body.dark-mode .sa-panel-search {
+    background: #111827 !important;
+    border-color: #374151 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .sa-staff-item {
+    border-bottom-color: #1e293b !important;
+}
+body.dark-mode .sa-staff-item:hover {
+    background: #1f2937 !important;
+}
+body.dark-mode .sa-staff-item.selected {
+    background: rgba(99, 102, 241, 0.2) !important;
+}
+body.dark-mode .sa-staff-name {
+    color: #f8fafc !important;
+}
+body.dark-mode .sa-staff-role {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .sa-staff-check {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+}
+body.dark-mode .sa-empty {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
 </style>
 @endsection
 
@@ -344,7 +454,7 @@
 <div class="sa-module">
     <div class="sa-module-hdr" onclick="this.classList.toggle('open'); this.nextElementSibling.classList.toggle('open')">
         <div class="sa-mod-icon"><i class="fas {{ $module['icon'] }}"></i></div>
-        <div class="sa-mod-title">{{ $module['label'] }}</div>
+        <div class="sa-mod-title">{{ $loop->iteration }}. {{ preg_replace('/^\d+[\.\)]\s*/', '', $module['label']) }}</div>
         <i class="fas fa-chevron-down sa-mod-chevron"></i>
     </div>
 

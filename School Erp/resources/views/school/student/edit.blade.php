@@ -106,7 +106,10 @@
         <h1><i class="fas fa-user-edit" style="color:var(--gold);margin-right:8px;"></i>Modify Student Profile</h1>
         <p>Edit student general details, class/section mapping, family background, previous education history, bank and health details</p>
     </div>
-    <div class="page-hdr-right">
+    <div class="page-hdr-right" style="display: flex; gap: 10px; align-items: center;">
+        <a href="{{ route('school.students.download-pdf', $student->id) }}" class="btn" style="background-color: var(--gold, #d4af37); color: #fff; border: 1px solid var(--gold, #d4af37); display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-weight: 600; text-decoration: none;">
+            <i class="fa fa-download"></i> Download PDF
+        </a>
         <a href="{{ route('school.students.index') }}" class="btn btn-outline">
             <i class="fa fa-arrow-left"></i> Back to List
         </a>
@@ -150,10 +153,33 @@
                                     <i class="fa fa-user" style="font-size: 3rem; color: var(--t3);"></i>
                                 @endif
                             </div>
-                            <label class="btn btn-outline" style="font-size: 11px; padding: 6px 12px; cursor: pointer;">
-                                <i class="fa fa-camera"></i> Change Photo
-                                <input type="file" name="photo" id="photoInput" style="display: none;" accept="image/*">
-                            </label>
+                            <input type="hidden" name="captured_photo" id="captured_photo" value="{{ old('captured_photo') }}">
+                            <div style="display: flex; gap: 6px;">
+                                <label class="btn btn-outline" style="font-size: 11px; padding: 6px 12px; cursor: pointer; margin: 0;">
+                                    <i class="fa fa-image"></i> Choose Photo
+                                    <input type="file" name="photo" id="photoInput" style="display: none;" accept="image/*">
+                                </label>
+                                <button type="button" class="btn btn-outline" id="cameraTriggerBtn" style="font-size: 11px; padding: 6px 12px;">
+                                    <i class="fa fa-camera"></i> Camera
+                                </button>
+                            </div>
+
+                            <!-- Camera Modal Overlay -->
+                            <div id="cameraModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(8px); padding: 20px;">
+                                <div class="glass-card" style="max-width: 480px; width: 100%; border-radius: 20px; overflow: hidden; padding: 24px; text-align: center; display: flex; flex-direction: column; gap: 1.5rem; background: var(--card); border: 1px solid var(--border);">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; margin: 0; font-size: 1.25rem; color: var(--navy);">Camera Capture</h3>
+                                        <button type="button" id="closeCameraBtn" style="background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: var(--t2);"><i class="fa fa-times"></i></button>
+                                    </div>
+                                    <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; border: 2px solid var(--border);">
+                                        <video id="cameraVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                                        <canvas id="cameraCanvas" style="display: none;"></canvas>
+                                    </div>
+                                    <div style="display: flex; justify-content: center; gap: 1rem;">
+                                        <button type="button" id="takeSnapshotBtn" class="btn btn-gold" style="padding: 10px 24px; border-radius: 10px; font-weight: 700; background: var(--gold); border: none; color: #fff; cursor: pointer;"><i class="fa fa-circle"></i> Capture</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Main Personal fields -->
@@ -219,7 +245,7 @@
                                     <input type="text" name="birth_certificate_no" class="form-control" value="{{ old('birth_certificate_no', $student->birth_certificate_no) }}">
                                 </div>
                             </div>
-                            <div class="grid-3">
+                            <div class="grid-4">
                                 <div class="form-group">
                                     <label class="form-label">USN/SRN Number</label>
                                     <input type="text" name="usn_srn_number" class="form-control" value="{{ old('usn_srn_number', $student->usn_srn_number) }}">
@@ -232,8 +258,12 @@
                                     <label class="form-label">Blood Group</label>
                                     <input type="text" name="blood_group" class="form-control" value="{{ old('blood_group', $student->blood_group) }}" placeholder="e.g. O+">
                                 </div>
+                                <div class="form-group">
+                                    <label class="form-label">Birthmark (if any)</label>
+                                    <input type="text" name="birthmark" class="form-control" value="{{ old('birthmark', $student->birthmark) }}">
+                                </div>
                             </div>
-                            <div class="grid-3">
+                            <div class="grid-4">
                                 <div class="form-group">
                                     <label class="form-label">Student House</label>
                                     <select name="house_id" class="form-control">
@@ -254,6 +284,21 @@
                                         @foreach($categories as $cat)
                                             <option value="{{ $cat->id }}" {{ old('category_id', $student->category_id) == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
                                         @endforeach
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Sub Category</label>
+                                    <select name="sub_category" class="form-control">
+                                        <option value="">Select Sub Category</option>
+                                        <option value="EWS" {{ old('sub_category', $student->sub_category) === 'EWS' ? 'selected' : '' }}>EWS</option>
+                                        <option value="Others" {{ old('sub_category', $student->sub_category) === 'Others' ? 'selected' : '' }}>Others</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">RTE Student?</label>
+                                    <select name="is_rte" class="form-control">
+                                        <option value="0" {{ old('is_rte', $student->is_rte) == 0 ? 'selected' : '' }}>No</option>
+                                        <option value="1" {{ old('is_rte', $student->is_rte) == 1 ? 'selected' : '' }}>Yes</option>
                                     </select>
                                 </div>
                             </div>
@@ -339,6 +384,31 @@
                         <div class="form-group">
                             <label class="form-label">Opening Due Balance</label>
                             <input type="number" step="0.01" name="opening_due_balance" class="form-control" value="{{ old('opening_due_balance', $student->opening_due_balance) }}">
+                        </div>
+                    </div>
+                    <div class="grid-3" style="margin-top:16px;">
+                        <div class="form-group">
+                            <label class="form-label">Admission Type</label>
+                             <select name="admission_type" class="form-control">
+                                <option value="">Select Admission Type</option>
+                                <option value="New Admission" {{ old('admission_type', $student->admission_type) === 'New Admission' ? 'selected' : '' }}>New Admission</option>
+                                <option value="Old Admission" {{ old('admission_type', $student->admission_type) === 'Old Admission' ? 'selected' : '' }}>Old Admission</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Boarding Type</label>
+                            <select name="boarding_type" class="form-control">
+                                <option value="">Select Boarding Type</option>
+                                <option value="Day Scholar" {{ old('boarding_type', $student->boarding_type) === 'Day Scholar' ? 'selected' : '' }}>Day Scholar</option>
+                                <option value="Hosteler" {{ old('boarding_type', $student->boarding_type) === 'Hosteler' ? 'selected' : '' }}>Hosteler</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Defence Personal? (Yes/No)</label>
+                            <select name="defence_personal" class="form-control">
+                                <option value="0" {{ old('defence_personal', $student->defence_personal) == '0' ? 'selected' : '' }}>No</option>
+                                <option value="1" {{ old('defence_personal', $student->defence_personal) == '1' ? 'selected' : '' }}>Yes</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -672,9 +742,20 @@
                             <label class="form-label">Preferred WhatsApp Number</label>
                             <input type="text" name="whatsapp_number" class="form-control" value="{{ old('whatsapp_number', $student->whatsapp_number) }}">
                         </div>
-                        <div class="form-group">
+                         <div class="form-group">
                             <label class="form-label">Religion</label>
-                            <input type="text" name="religion" class="form-control" value="{{ old('religion', $student->religion) }}">
+                            <select name="religion" class="form-control">
+                                <option value="">Select Religion</option>
+                                <option value="Hinduism" {{ old('religion', $student->religion) === 'Hinduism' ? 'selected' : '' }}>Hinduism</option>
+                                <option value="Islam" {{ old('religion', $student->religion) === 'Islam' ? 'selected' : '' }}>Islam</option>
+                                <option value="Christianity" {{ old('religion', $student->religion) === 'Christianity' ? 'selected' : '' }}>Christianity</option>
+                                <option value="Sikhism" {{ old('religion', $student->religion) === 'Sikhism' ? 'selected' : '' }}>Sikhism</option>
+                                <option value="Buddhism" {{ old('religion', $student->religion) === 'Buddhism' ? 'selected' : '' }}>Buddhism</option>
+                                <option value="Jainism" {{ old('religion', $student->religion) === 'Jainism' ? 'selected' : '' }}>Jainism</option>
+                                <option value="Zoroastrianism" {{ old('religion', $student->religion) === 'Zoroastrianism' ? 'selected' : '' }}>Zoroastrianism (Parsi)</option>
+                                <option value="Judaism" {{ old('religion', $student->religion) === 'Judaism' ? 'selected' : '' }}>Judaism</option>
+                                <option value="Others" {{ old('religion', $student->religion) === 'Others' ? 'selected' : '' }}>Others</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label class="form-label">Caste</label>
@@ -770,9 +851,19 @@
                     <i class="fas fa-chevron-down accordion-icon"></i>
                 </div>
                 <div class="accordion-body">
-                    <div class="form-group">
-                        <label class="form-label">Emergency Address</label>
-                        <input type="text" name="emergency_address" class="form-control" value="{{ old('emergency_address', $student->emergency_address) }}">
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Emergency Contact Name</label>
+                            <input type="text" name="emergency_name" class="form-control" value="{{ old('emergency_name', $student->emergency_name) }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Emergency Contact Number</label>
+                            <input type="text" name="emergency_number" class="form-control" value="{{ old('emergency_number', $student->emergency_number) }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Emergency Address</label>
+                            <input type="text" name="emergency_address" class="form-control" value="{{ old('emergency_address', $student->emergency_address) }}">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -804,7 +895,7 @@
                 <div class="accordion-body">
                     <!-- Current Address -->
                     <div style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:5px;">Current Address</div>
-                    <div class="grid-2">
+                    <div class="grid-4">
                         <div class="form-group">
                             <label class="form-label">Address Line 1 <span>*</span></label>
                             <input type="text" name="address" id="current_address" class="form-control" value="{{ old('address', $student->address) }}" required>
@@ -812,6 +903,14 @@
                         <div class="form-group">
                             <label class="form-label">Address Line 2</label>
                             <input type="text" name="address_line_2" id="current_address_line_2" class="form-control" value="{{ old('address_line_2', $student->address_line_2) }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">House Number</label>
+                            <input type="text" name="house_number" id="current_house_number" class="form-control" value="{{ old('house_number', $student->house_number) }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Location</label>
+                            <input type="text" name="location" id="current_location" class="form-control" value="{{ old('location', $student->location) }}">
                         </div>
                     </div>
                     <div class="grid-4">
@@ -962,13 +1061,20 @@
                             <input type="text" name="medical_illness" class="form-control" value="{{ old('medical_illness', $student->medical_illness) }}">
                         </div>
                     </div>
-                    <div class="grid-3">
+                    <div class="grid-4">
                         <div class="form-group">
                             <label class="form-label">Medical History</label>
                             <textarea name="medical_history" class="form-control" rows="2">{{ old('medical_history', $student->medical_history) }}</textarea>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Allergies</label>
+                            <label class="form-label">Any Allergy? (Yes/No)</label>
+                            <select name="any_allergy" class="form-control">
+                                <option value="0" {{ old('any_allergy', $student->any_allergy) == '0' ? 'selected' : '' }}>No</option>
+                                <option value="1" {{ old('any_allergy', $student->any_allergy) == '1' ? 'selected' : '' }}>Yes</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Allergies (Description)</label>
                             <textarea name="medical_allergies" class="form-control" rows="2">{{ old('medical_allergies', $student->medical_allergies) }}</textarea>
                         </div>
                         <div class="form-group">
@@ -1052,6 +1158,7 @@
             $('#pickup_fields').slideDown(200);
         } else {
             $('#pickup_fields').slideUp(200);
+            $('#pickup_fields').find('input').val('');
         }
     });
     $('#drop_enabled').on('change', function() {
@@ -1059,21 +1166,37 @@
             $('#drop_fields').slideDown(200);
         } else {
             $('#drop_fields').slideUp(200);
+            $('#drop_fields').find('input').val('');
         }
     });
 
-    // Age calculation
+     // Age calculation (Years, Months, Days)
     $('input[name="date_of_birth"]').on('change', function() {
         let dob = $(this).val();
         if (dob) {
             let birthDate = new Date(dob);
             let today = new Date();
-            let age = today.getFullYear() - birthDate.getFullYear();
-            let m = today.getMonth() - birthDate.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-                age--;
+            
+            let years = today.getFullYear() - birthDate.getFullYear();
+            let months = today.getMonth() - birthDate.getMonth();
+            let days = today.getDate() - birthDate.getDate();
+            
+            if (days < 0) {
+                months--;
+                let prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+                days += prevMonth.getDate();
             }
-            $('input[name="age"]').val(age >= 0 ? age : 0);
+            
+            if (months < 0) {
+                years--;
+                months += 12;
+            }
+            
+            if (years < 0) {
+                $('input[name="age"]').val('0 years, 0 months, 0 days');
+            } else {
+                $('input[name="age"]').val(`${years} years, ${months} months, ${days} days`);
+            }
         } else {
             $('input[name="age"]').val('');
         }
@@ -1084,6 +1207,18 @@
     if (dobVal) {
         $('input[name="date_of_birth"]').trigger('change');
     }
+
+    // Restrict phone inputs to 10 digits and only numbers
+    const phoneFields = ['phone', 'father_phone', 'father_alternate_phone', 'mother_phone', 'mother_alternate_phone', 'guardian_phone', 'whatsapp_number', 'emergency_number', 'medical_doctor_phone'];
+    phoneFields.forEach(name => {
+        const input = document.querySelector(`input[name="${name}"]`);
+        if (input) {
+            input.setAttribute('maxlength', '10');
+            input.addEventListener('input', function() {
+                this.value = this.value.replace(/[^0-9]/g, '');
+            });
+        }
+    });
 
     // Questionnaire conditional boxes
     function setupQuestionnaireToggle(radioName, boxId) {
@@ -1135,5 +1270,107 @@
     if (initialClassId) {
         filterSections(initialClassId, initialSectionId);
     }
+
+    // Camera capture and preview logic
+    document.addEventListener('DOMContentLoaded', function() {
+        const cameraTriggerBtn = document.getElementById('cameraTriggerBtn');
+        const cameraModal = document.getElementById('cameraModal');
+        const closeCameraBtn = document.getElementById('closeCameraBtn');
+        const cameraVideo = document.getElementById('cameraVideo');
+        const cameraCanvas = document.getElementById('cameraCanvas');
+        const takeSnapshotBtn = document.getElementById('takeSnapshotBtn');
+        const capturedPhotoInput = document.getElementById('captured_photo');
+        const avatarPreview = document.getElementById('avatarPreview');
+        const photoInput = document.getElementById('photoInput');
+        
+        let stream = null;
+
+        if (cameraTriggerBtn) {
+            cameraTriggerBtn.addEventListener('click', async function() {
+                cameraModal.style.display = 'flex';
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: 640, height: 480, facingMode: 'user' }, 
+                        audio: false 
+                    });
+                    cameraVideo.srcObject = stream;
+                } catch (err) {
+                    console.error("Camera access error:", err);
+                    alert("Could not access camera. Please verify permissions.");
+                    cameraModal.style.display = 'none';
+                }
+            });
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            cameraVideo.srcObject = null;
+            cameraModal.style.display = 'none';
+        }
+
+        if (closeCameraBtn) {
+            closeCameraBtn.addEventListener('click', stopCamera);
+        }
+
+        if (takeSnapshotBtn) {
+            takeSnapshotBtn.addEventListener('click', function() {
+                if (!stream) return;
+                
+                const context = cameraCanvas.getContext('2d');
+                cameraCanvas.width = cameraVideo.videoWidth || 640;
+                cameraCanvas.height = cameraVideo.videoHeight || 480;
+                
+                context.drawImage(cameraVideo, 0, 0, cameraCanvas.width, cameraCanvas.height);
+                
+                const dataUrl = cameraCanvas.toDataURL('image/jpeg');
+                capturedPhotoInput.value = dataUrl;
+                
+                // Clear standard file input so it doesn't conflict
+                if (photoInput) {
+                    photoInput.value = '';
+                }
+                
+                // Show preview
+                if (avatarPreview) {
+                    avatarPreview.style.backgroundImage = `url(${dataUrl})`;
+                    const icon = avatarPreview.querySelector('.fa-user');
+                    if (icon) icon.style.display = 'none';
+                }
+                
+                stopCamera();
+            });
+        }
+
+        // Convert standard selected file to base64 so validation failures don't lose it!
+        if (photoInput) {
+            photoInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        capturedPhotoInput.value = evt.target.result;
+                        if (avatarPreview) {
+                            avatarPreview.style.backgroundImage = `url(${evt.target.result})`;
+                            const icon = avatarPreview.querySelector('.fa-user');
+                            if (icon) icon.style.display = 'none';
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // Check on page load if captured_photo has an old value (validation redirect)
+        if (capturedPhotoInput && capturedPhotoInput.value) {
+            if (avatarPreview) {
+                avatarPreview.style.backgroundImage = `url(${capturedPhotoInput.value})`;
+                const icon = avatarPreview.querySelector('.fa-user');
+                if (icon) icon.style.display = 'none';
+            }
+        }
+    });
 </script>
 @endsection

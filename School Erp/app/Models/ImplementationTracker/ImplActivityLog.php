@@ -25,4 +25,9 @@ class ImplActivityLog extends Model
     protected $casts = [
         'changed_at' => 'datetime',
     ];
+
+    public function school()
+    {
+        return $this->belongsTo(\App\Models\School::class, 'school_id');
+    }
 }

@@ -59,6 +59,11 @@ class LoginController extends Controller
             // Update last login timestamp
             $user->update(['last_login_at' => now()]);
 
+            // Set session school_code for the resolved school
+            if ($user->school_id && $user->school) {
+                session(['school_code' => $user->school->code]);
+            }
+
             // Log successful attempt
             LoginLog::create([
                 'user_id' => $user->id,
@@ -93,8 +98,10 @@ class LoginController extends Controller
     {
         if ($user->hasRole('superadmin')) {
             return redirect()->intended('/superadmin/dashboard');
-        } elseif ($user->hasRole('school_admin') || $user->hasRole('teacher') || $user->hasRole('accountant')) {
+        } elseif ($user->hasRole('school_admin')) {
             return redirect()->intended('/school/dashboard');
+        } elseif ($user->hasRole('teacher') || $user->hasRole('staff') || $user->hasRole('accountant') || $user->role === 'teacher') {
+            return redirect()->intended('/teacher/dashboard');
         } elseif ($user->hasRole('parent') || $user->hasRole('student')) {
             return redirect()->intended('/parent/dashboard');
         }

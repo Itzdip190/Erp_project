@@ -13,6 +13,11 @@ class Plan extends Model
         'name',
         'price',
         'duration_days',
+        'features',
+    ];
+
+    protected $casts = [
+        'features' => 'array',
     ];
 
     public function subscriptions()

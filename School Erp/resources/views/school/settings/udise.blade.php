@@ -395,6 +395,92 @@
         transform: translateY(0);
         opacity: 1;
     }
+
+    /* ── UDISE DARK MODE OVERRIDES ─────────────────────────────── */
+    body.dark-mode {
+        --udise-primary: #818cf8 !important;
+        --udise-dark: #f8fafc !important;
+        --udise-light: #1f2937 !important;
+        --udise-accent: #f59e0b !important;
+        --udise-white: #111827 !important;
+        --udise-border: #1e293b !important;
+        --udise-bg: #0b0f19 !important;
+        --udise-text: #f8fafc !important;
+        --udise-text-muted: #cbd5e1 !important;
+    }
+    body.dark-mode .udise-header-row,
+    body.dark-mode .udise-wrapper {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .udise-header-title,
+    body.dark-mode .udise-section-title,
+    body.dark-mode .udise-label,
+    body.dark-mode .udise-checkbox-label {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .udise-header-subtitle,
+    body.dark-mode .udise-section-desc {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .udise-select-yr,
+    body.dark-mode .udise-input,
+    body.dark-mode .udise-table-input {
+        background-color: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .udise-btn-dl {
+        background: #1f2937 !important;
+        color: #f59e0b !important;
+        border-color: #f59e0b !important;
+    }
+    body.dark-mode .udise-btn-dl:hover {
+        background: rgba(245, 158, 11, 0.2) !important;
+    }
+    body.dark-mode .udise-tabs-list {
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .udise-tab-btn {
+        color: #94a3b8 !important;
+    }
+    body.dark-mode .udise-tab-btn.active {
+        color: #818cf8 !important;
+    }
+    body.dark-mode .udise-tab-btn.active::after {
+        background: #818cf8 !important;
+    }
+    body.dark-mode .udise-checkbox-grid {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+    }
+    body.dark-mode .udise-checkbox-card:hover {
+        background: rgba(255, 255, 255, 0.05) !important;
+    }
+    body.dark-mode .udise-table-container {
+        border-color: #1e293b !important;
+    }
+    body.dark-mode .udise-table th {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-bottom-color: #374151 !important;
+    }
+    body.dark-mode .udise-table td {
+        border-bottom-color: #1e293b !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .udise-table tbody tr:hover td {
+        background: rgba(255, 255, 255, 0.04) !important;
+    }
+    body.dark-mode .udise-dec-box {
+        background: rgba(245, 158, 11, 0.15) !important;
+        border-color: rgba(245, 158, 11, 0.3) !important;
+    }
+    body.dark-mode .udise-dec-text {
+        color: #fdba74 !important;
+    }
 </style>
 @endsection
 

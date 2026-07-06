@@ -106,7 +106,11 @@ class RoleController extends Controller
 
         // All teaching/admin staff for this school
         $staff = User::where('school_id', $schoolId)
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['teacher', 'accountant', 'school_admin']))
+            ->where(function ($q) {
+                $q->whereIn('role', ['teacher', 'accountant', 'school_admin', 'staff'])
+                  ->orWhereHas('roles', fn ($r) => $r->whereIn('name', ['teacher', 'accountant', 'school_admin', 'staff']))
+                  ->orWhereHas('staff');
+            })
             ->with('roles')
             ->orderBy('name')
             ->get();
@@ -114,9 +118,28 @@ class RoleController extends Controller
         // Defensive: guard against missing table (first deployment before migration)
         $access = collect();
         if (\Illuminate\Support\Facades\Schema::hasTable('staff_module_access')) {
-            $access = StaffModuleAccess::where('school_id', $schoolId)
-                ->get()
-                ->keyBy(fn ($r) => "{$r->user_id}.{$r->module_key}.{$r->feature_key}");
+            $rawAccess = StaffModuleAccess::where('school_id', $schoolId)->get();
+            $access = collect();
+            foreach ($rawAccess as $r) {
+                $access->put("{$r->user_id}.{$r->module_key}.{$r->feature_key}", $r);
+                
+                // Map old keys to new attendance module for UI compatibility
+                if ($r->module_key === 'staff_management' && $r->feature_key === 'staff_attendance') {
+                    $access->put("{$r->user_id}.attendance.staff_attendance", $r);
+                }
+                if ($r->module_key === 'staff_management' && $r->feature_key === 'bulk_attendance') {
+                    $access->put("{$r->user_id}.attendance.staff_bulk_attendance", $r);
+                }
+                if ($r->module_key === 'student_management' && $r->feature_key === 'student_attendance') {
+                    $access->put("{$r->user_id}.attendance.student_attendance", $r);
+                }
+                if ($r->module_key === 'student_management' && $r->feature_key === 'bulk_attendance') {
+                    $access->put("{$r->user_id}.attendance.student_bulk_attendance", $r);
+                }
+                if ($r->module_key === 'staff_management' && $r->feature_key === 'student_att_report') {
+                    $access->put("{$r->user_id}.attendance.student_att_report", $r);
+                }
+            }
         }
 
         return view('school.roles.staff_access', compact('modules', 'staff', 'access'));
@@ -151,7 +174,7 @@ class RoleController extends Controller
                 'feature_key' => $request->feature_key,
             ],
             [
-                "{$request->access_type}_access" => $request->value,
+                "{$request->access_type}_access" => (bool) $request->value,
             ]
         );
 
@@ -172,7 +195,11 @@ class RoleController extends Controller
         $schoolId = auth()->user()->school_id;
 
         $staff = User::where('school_id', $schoolId)
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['teacher', 'accountant', 'school_admin']))
+            ->where(function ($q) {
+                $q->whereIn('role', ['teacher', 'accountant', 'school_admin', 'staff'])
+                  ->orWhereHas('roles', fn ($r) => $r->whereIn('name', ['teacher', 'accountant', 'school_admin', 'staff']))
+                  ->orWhereHas('staff');
+            })
             ->with('roles')
             ->orderBy('name')
             ->get();
@@ -181,20 +208,62 @@ class RoleController extends Controller
         $granted = [];
         if (\Illuminate\Support\Facades\Schema::hasTable('staff_module_access')) {
             $accessCol = "{$request->access_type}_access";
-            $granted = StaffModuleAccess::where('school_id', $schoolId)
-                ->where('module_key', $request->module_key)
-                ->where('feature_key', $request->feature_key)
-                ->where($accessCol, true)
-                ->pluck('user_id')
+            $query = StaffModuleAccess::where('school_id', $schoolId)
+                ->where($accessCol, true);
+            
+            $moduleKey = $request->module_key;
+            $featureKey = $request->feature_key;
+            
+            if ($moduleKey === 'attendance') {
+                $query->where(function($q) use ($featureKey) {
+                    $q->where(function($sq) use ($featureKey) {
+                        $sq->where('module_key', 'attendance')
+                           ->where('feature_key', $featureKey);
+                    });
+                    
+                    if ($featureKey === 'staff_attendance') {
+                        $q->orWhere(function($sq) {
+                            $sq->where('module_key', 'staff_management')
+                               ->where('feature_key', 'staff_attendance');
+                        });
+                    } elseif ($featureKey === 'staff_bulk_attendance') {
+                        $q->orWhere(function($sq) {
+                            $sq->where('module_key', 'staff_management')
+                               ->where('feature_key', 'bulk_attendance');
+                        });
+                    } elseif ($featureKey === 'student_attendance') {
+                        $q->orWhere(function($sq) {
+                            $sq->where('module_key', 'student_management')
+                               ->where('feature_key', 'student_attendance');
+                        });
+                    } elseif ($featureKey === 'student_bulk_attendance') {
+                        $q->orWhere(function($sq) {
+                            $sq->where('module_key', 'student_management')
+                               ->where('feature_key', 'bulk_attendance');
+                        });
+                    } elseif ($featureKey === 'student_att_report') {
+                        $q->orWhere(function($sq) {
+                            $sq->where('module_key', 'staff_management')
+                               ->where('feature_key', 'student_att_report');
+                        });
+                    }
+                });
+            } else {
+                $query->where('module_key', $moduleKey)
+                      ->where('feature_key', $featureKey);
+            }
+            
+            $granted = $query->pluck('user_id')
+                ->map(fn($id) => (int)$id)
                 ->toArray();
         }
 
         $result = $staff->map(fn ($u) => [
             'id'      => $u->id,
             'name'    => $u->name,
-            'role'    => ucfirst(str_replace('_', ' ', $u->roles->first()?->name ?? 'Staff')),
+            'role'    => ucfirst(str_replace('_', ' ', $u->roles->first()?->name ?? $u->role ?? 'Staff')),
             'initials'=> strtoupper(substr($u->name, 0, 1) . (str_contains($u->name, ' ') ? substr($u->name, strrpos($u->name, ' ') + 1, 1) : '')),
-            'granted' => in_array($u->id, $granted),
+            'granted' => in_array((int)$u->id, $granted, true),
         ]);
 
         return response()->json(['staff' => $result]);
@@ -210,7 +279,6 @@ class RoleController extends Controller
             'feature_key' => 'required|string',
             'access_type' => 'required|in:view,edit',
             'user_ids'    => 'array',
-            'user_ids.*'  => 'integer',
         ]);
 
         // Defensive: guard against missing table
@@ -220,15 +288,22 @@ class RoleController extends Controller
 
         $schoolId   = auth()->user()->school_id;
         $accessCol  = "{$request->access_type}_access";
-        $grantedIds = $request->input('user_ids', []);
+        $grantedIds = array_map('intval', $request->input('user_ids', []));
 
         // Get all staff for this school
         $allStaffIds = User::where('school_id', $schoolId)
-            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['teacher', 'accountant', 'school_admin']))
+            ->where(function ($q) {
+                $q->whereIn('role', ['teacher', 'accountant', 'school_admin', 'staff'])
+                  ->orWhereHas('roles', fn ($r) => $r->whereIn('name', ['teacher', 'accountant', 'school_admin', 'staff']))
+                  ->orWhereHas('staff');
+            })
             ->pluck('id')
+            ->map(fn($id) => (int)$id)
             ->toArray();
 
         foreach ($allStaffIds as $userId) {
+            $hasAccess = in_array($userId, $grantedIds, true);
+            
             StaffModuleAccess::updateOrCreate(
                 [
                     'school_id'   => $schoolId,
@@ -237,9 +312,44 @@ class RoleController extends Controller
                     'feature_key' => $request->feature_key,
                 ],
                 [
-                    $accessCol => in_array($userId, $grantedIds),
+                    $accessCol => $hasAccess,
                 ]
             );
+            
+            if ($request->module_key === 'attendance') {
+                $oldModuleKey = null;
+                $oldFeatureKey = null;
+                if ($request->feature_key === 'staff_attendance') {
+                    $oldModuleKey = 'staff_management';
+                    $oldFeatureKey = 'staff_attendance';
+                } elseif ($request->feature_key === 'staff_bulk_attendance') {
+                    $oldModuleKey = 'staff_management';
+                    $oldFeatureKey = 'bulk_attendance';
+                } elseif ($request->feature_key === 'student_attendance') {
+                    $oldModuleKey = 'student_management';
+                    $oldFeatureKey = 'student_attendance';
+                } elseif ($request->feature_key === 'student_bulk_attendance') {
+                    $oldModuleKey = 'student_management';
+                    $oldFeatureKey = 'bulk_attendance';
+                } elseif ($request->feature_key === 'student_att_report') {
+                    $oldModuleKey = 'staff_management';
+                    $oldFeatureKey = 'student_att_report';
+                }
+                
+                if ($oldModuleKey && $oldFeatureKey) {
+                    StaffModuleAccess::updateOrCreate(
+                        [
+                            'school_id'   => $schoolId,
+                            'user_id'     => $userId,
+                            'module_key'  => $oldModuleKey,
+                            'feature_key' => $oldFeatureKey,
+                        ],
+                        [
+                            $accessCol => $hasAccess,
+                        ]
+                    );
+                }
+            }
         }
 
         return response()->json(['success' => true, 'count' => count($grantedIds)]);

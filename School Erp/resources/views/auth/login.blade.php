@@ -708,6 +708,13 @@
                 </button>
             </form>
 
+            <div style="text-align: center; margin-top: 18px; margin-bottom: 5px;">
+                <p style="font-size: 13.5px; color: var(--text-muted);">
+                    Want to register your school? 
+                    <a href="{{ route('school.signup') }}" style="color: var(--primary-blue); font-weight: 700; text-decoration: none;">Create a request</a>
+                </p>
+            </div>
+
             <div class="divider">or</div>
 
             <!-- Download Section -->

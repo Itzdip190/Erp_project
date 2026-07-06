@@ -175,6 +175,56 @@ textarea.st-control {
         gap: 10px;
     }
 }
+
+/* ── STAFF REGISTRATION DARK MODE OVERRIDES ── */
+body.dark-mode {
+    --st-blue: #818cf8 !important;
+    --st-blue-hover: #6366f1 !important;
+    --st-blue-light: #1f2937 !important;
+    --st-border: #1e293b !important;
+    --st-text: #f8fafc !important;
+    --st-text-muted: #cbd5e1 !important;
+}
+body.dark-mode .st-card {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .st-card-hdr {
+    background: linear-gradient(135deg, #111827 0%, #1e1b4b 60%, #312e81 100%) !important;
+    border-bottom: 1px solid #1e293b !important;
+}
+body.dark-mode .st-section {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+}
+body.dark-mode .st-section-hdr {
+    background: #1f2937 !important;
+    border-bottom-color: #374151 !important;
+    color: #818cf8 !important;
+}
+body.dark-mode .st-label {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .st-control {
+    background-color: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode select.st-control option {
+    background-color: #1f2937 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .st-btn-cancel {
+    background: #1f2937 !important;
+    color: #cbd5e1 !important;
+    border-color: #374151 !important;
+}
+body.dark-mode .st-btn-cancel:hover {
+    background: #374151 !important;
+    color: #ffffff !important;
+}
 </style>
 @endsection
 
@@ -234,7 +284,7 @@ textarea.st-control {
                         </div>
                     </div>
 
-                    <div class="st-grid-3">
+                    <div class="st-grid-4">
                         <div class="st-form-group">
                             <label class="st-label">Alternate Mobile</label>
                             <input type="text" name="additional_fields[alternate_phone]" class="st-control" value="{{ old('additional_fields.alternate_phone') }}" placeholder="Alternate mobile number">
@@ -242,6 +292,10 @@ textarea.st-control {
                         <div class="st-form-group">
                             <label class="st-label">Date of Birth</label>
                             <input type="date" name="date_of_birth" class="st-control" value="{{ old('date_of_birth') }}">
+                        </div>
+                        <div class="st-form-group">
+                            <label class="st-label">Age</label>
+                            <input type="text" name="age" class="st-control" placeholder="Calculated from Date of Birth" readonly>
                         </div>
                         <div class="st-form-group">
                             <label class="st-label">Gender</label>
@@ -273,7 +327,18 @@ textarea.st-control {
                         </div>
                         <div class="st-form-group">
                             <label class="st-label">Religion</label>
-                            <input type="text" name="additional_fields[religion]" class="st-control" placeholder="e.g. Hinduism, Christianity">
+                            <select name="additional_fields[religion]" class="st-control">
+                                <option value="">Select Religion</option>
+                                <option value="Hinduism" {{ old('additional_fields.religion') === 'Hinduism' ? 'selected' : '' }}>Hinduism</option>
+                                <option value="Islam" {{ old('additional_fields.religion') === 'Islam' ? 'selected' : '' }}>Islam</option>
+                                <option value="Christianity" {{ old('additional_fields.religion') === 'Christianity' ? 'selected' : '' }}>Christianity</option>
+                                <option value="Sikhism" {{ old('additional_fields.religion') === 'Sikhism' ? 'selected' : '' }}>Sikhism</option>
+                                <option value="Buddhism" {{ old('additional_fields.religion') === 'Buddhism' ? 'selected' : '' }}>Buddhism</option>
+                                <option value="Jainism" {{ old('additional_fields.religion') === 'Jainism' ? 'selected' : '' }}>Jainism</option>
+                                <option value="Zoroastrianism" {{ old('additional_fields.religion') === 'Zoroastrianism' ? 'selected' : '' }}>Zoroastrianism (Parsi)</option>
+                                <option value="Judaism" {{ old('additional_fields.religion') === 'Judaism' ? 'selected' : '' }}>Judaism</option>
+                                <option value="Others" {{ old('additional_fields.religion') === 'Others' ? 'selected' : '' }}>Others</option>
+                            </select>
                         </div>
                     </div>
 
@@ -283,16 +348,47 @@ textarea.st-control {
                             <input type="text" name="additional_fields[mother_tongue]" class="st-control" placeholder="e.g. English, Hindi">
                         </div>
                         <div class="st-form-group">
-                            <label class="st-label">PAN Number <span>*</span></label>
-                            <input type="text" name="pan_number" class="st-control" value="{{ old('pan_number') }}" required placeholder="e.g. ABCDE1234F">
+                            <label class="st-label">PAN Number</label>
+                            <input type="text" name="pan_number" class="st-control" value="{{ old('pan_number') }}" placeholder="e.g. ABCDE1234F">
                         </div>
                         <div class="st-form-group">
-                            <label class="st-label">Aadhar Number <span>*</span></label>
-                            <input type="text" name="additional_fields[aadhar_number]" class="st-control" value="{{ old('additional_fields.aadhar_number') }}" required placeholder="12-digit Aadhar number">
+                            <label class="st-label">Aadhar Number</label>
+                            <input type="text" name="additional_fields[aadhar_number]" class="st-control" value="{{ old('additional_fields.aadhar_number') }}" placeholder="12-digit Aadhar number">
                         </div>
-                        <div class="st-form-group">
-                            <label class="st-label">Staff Photo</label>
-                            <input type="file" name="photo" class="st-control" accept="image/*">
+                        <div class="st-form-group" style="grid-column: span 2; display: flex; align-items: center; gap: 15px; margin-bottom: 0;">
+                            <div id="avatarPreview" style="width: 80px; height: 80px; border-radius: 50%; border: 2px dashed var(--st-border); display: flex; align-items: center; justify-content: center; background-position: center; background-size: cover; overflow: hidden; background-color: #f8fafc; flex-shrink: 0; border-color: var(--border);">
+                                <i class="fa fa-user" style="font-size: 2rem; color: var(--t3);"></i>
+                            </div>
+                            <div style="flex: 1;">
+                                <label class="st-label">Staff Photo</label>
+                                <input type="hidden" name="captured_photo" id="captured_photo" value="{{ old('captured_photo') }}">
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <label class="st-btn-submit" style="font-size: 11px; padding: 6px 12px; cursor: pointer; background: #4b5563; margin: 0; display: inline-block;">
+                                        <i class="fa fa-image"></i> Choose Photo
+                                        <input type="file" name="photo" id="photoInput" style="display: none;" accept="image/*">
+                                    </label>
+                                    <button type="button" class="btn btn-outline" id="cameraTriggerBtn" style="font-size: 11px; padding: 6px 12px;">
+                                        <i class="fa fa-camera"></i> Camera
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Camera Modal Overlay -->
+                        <div id="cameraModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(8px); padding: 20px;">
+                            <div class="glass-card" style="max-width: 480px; width: 100%; border-radius: 20px; overflow: hidden; padding: 24px; text-align: center; display: flex; flex-direction: column; gap: 1.5rem; background: var(--card); border: 1px solid var(--border);">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; margin: 0; font-size: 1.25rem; color: var(--navy);">Camera Capture</h3>
+                                    <button type="button" id="closeCameraBtn" style="background: transparent; border: none; font-size: 1.2rem; cursor: pointer; color: var(--t2);"><i class="fa fa-times"></i></button>
+                                </div>
+                                <div style="position: relative; width: 100%; aspect-ratio: 4/3; background: #000; border-radius: 12px; overflow: hidden; border: 2px solid var(--border);">
+                                    <video id="cameraVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>
+                                    <canvas id="cameraCanvas" style="display: none;"></canvas>
+                                </div>
+                                <div style="display: flex; justify-content: center; gap: 1rem;">
+                                    <button type="button" id="takeSnapshotBtn" class="btn btn-gold" style="padding: 10px 24px; border-radius: 10px; font-weight: 700; background: var(--gold); border: none; color: #fff; cursor: pointer;"><i class="fa fa-circle"></i> Capture</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -641,3 +737,163 @@ textarea.st-control {
     </div>
 </div>
 @endsection
+
+@section('scripts')
+<script>
+    // Camera capture and preview logic
+    document.addEventListener('DOMContentLoaded', function() {
+        const cameraTriggerBtn = document.getElementById('cameraTriggerBtn');
+        const cameraModal = document.getElementById('cameraModal');
+        const closeCameraBtn = document.getElementById('closeCameraBtn');
+        const cameraVideo = document.getElementById('cameraVideo');
+        const cameraCanvas = document.getElementById('cameraCanvas');
+        const takeSnapshotBtn = document.getElementById('takeSnapshotBtn');
+        const capturedPhotoInput = document.getElementById('captured_photo');
+        const avatarPreview = document.getElementById('avatarPreview');
+        const photoInput = document.getElementById('photoInput');
+        
+        let stream = null;
+
+        if (cameraTriggerBtn) {
+            cameraTriggerBtn.addEventListener('click', async function() {
+                cameraModal.style.display = 'flex';
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: 640, height: 480, facingMode: 'user' }, 
+                        audio: false 
+                    });
+                    cameraVideo.srcObject = stream;
+                } catch (err) {
+                    console.error("Camera access error:", err);
+                    alert("Could not access camera. Please verify permissions.");
+                    cameraModal.style.display = 'none';
+                }
+            });
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            cameraVideo.srcObject = null;
+            cameraModal.style.display = 'none';
+        }
+
+        if (closeCameraBtn) {
+            closeCameraBtn.addEventListener('click', stopCamera);
+        }
+
+        if (takeSnapshotBtn) {
+            takeSnapshotBtn.addEventListener('click', function() {
+                if (!stream) return;
+                
+                const context = cameraCanvas.getContext('2d');
+                cameraCanvas.width = cameraVideo.videoWidth || 640;
+                cameraCanvas.height = cameraVideo.videoHeight || 480;
+                
+                context.drawImage(cameraVideo, 0, 0, cameraCanvas.width, cameraCanvas.height);
+                
+                const dataUrl = cameraCanvas.toDataURL('image/jpeg');
+                capturedPhotoInput.value = dataUrl;
+                
+                // Clear standard file input so it doesn't conflict
+                if (photoInput) {
+                    photoInput.value = '';
+                }
+                
+                // Show preview
+                if (avatarPreview) {
+                    avatarPreview.style.backgroundImage = `url(${dataUrl})`;
+                    const icon = avatarPreview.querySelector('.fa-user');
+                    if (icon) icon.style.display = 'none';
+                }
+                
+                stopCamera();
+            });
+        }
+
+        // Convert standard selected file to base64 so validation failures don't lose it!
+        if (photoInput) {
+            photoInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        capturedPhotoInput.value = evt.target.result;
+                        if (avatarPreview) {
+                            avatarPreview.style.backgroundImage = `url(${evt.target.result})`;
+                            const icon = avatarPreview.querySelector('.fa-user');
+                            if (icon) icon.style.display = 'none';
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        // Check on page load if captured_photo has an old value (validation redirect)
+        if (capturedPhotoInput && capturedPhotoInput.value) {
+            if (avatarPreview) {
+                avatarPreview.style.backgroundImage = `url(${capturedPhotoInput.value})`;
+                const icon = avatarPreview.querySelector('.fa-user');
+                if (icon) icon.style.display = 'none';
+            }
+        }
+
+        // Detailed Age calculation
+        const dobInput = document.querySelector('input[name="date_of_birth"]');
+        const ageInput = document.querySelector('input[name="age"]');
+        
+        if (dobInput && ageInput) {
+            const calculateAge = function() {
+                const dob = dobInput.value;
+                if (dob) {
+                    const birthDate = new Date(dob);
+                    const today = new Date();
+                    
+                    let years = today.getFullYear() - birthDate.getFullYear();
+                    let months = today.getMonth() - birthDate.getMonth();
+                    let days = today.getDate() - birthDate.getDate();
+                    
+                    if (days < 0) {
+                        months--;
+                        const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+                        days += prevMonth.getDate();
+                    }
+                    
+                    if (months < 0) {
+                        years--;
+                        months += 12;
+                    }
+                    
+                    if (years < 0) {
+                        ageInput.value = '0 years, 0 months, 0 days';
+                    } else {
+                        ageInput.value = `${years} years, ${months} months, ${days} days`;
+                    }
+                } else {
+                    ageInput.value = '';
+                }
+            };
+            
+            dobInput.addEventListener('change', calculateAge);
+            if (dobInput.value) {
+                calculateAge();
+            }
+        }
+
+        // Restrict phone numbers to 10 digits and only numbers
+        const phoneFields = ['phone', 'additional_fields[alternate_phone]', 'additional_fields[father_phone]'];
+        phoneFields.forEach(name => {
+            const input = document.querySelector(`input[name="${name}"]`);
+            if (input) {
+                input.setAttribute('maxlength', '10');
+                input.addEventListener('input', function() {
+                    this.value = this.value.replace(/[^0-9]/g, '');
+                });
+            }
+        });
+    });
+</script>
+

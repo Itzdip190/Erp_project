@@ -15,6 +15,23 @@
     --rc-text-dark: #1e3a5f;
     --rc-text-muted: #64748b;
     --rc-row-alt: #f8faff;
+    --rc-hover: #eff6ff;
+    --rc-input-bg: #fff;
+    --rc-selected: #dbeafe;
+}
+
+body.dark-mode {
+    --rc-blue: #3b82f6;
+    --rc-blue-light: #60a5fa;
+    --rc-blue-xlight: #1e293b;
+    --rc-blue-border: #374151;
+    --rc-white: #111827;
+    --rc-text-dark: #f8fafc;
+    --rc-text-muted: #94a3b8;
+    --rc-row-alt: #1f2937;
+    --rc-hover: rgba(255, 255, 255, 0.04);
+    --rc-input-bg: #1f2937;
+    --rc-selected: rgba(59, 130, 246, 0.25);
 }
 
 .rc-page-header {
@@ -56,7 +73,7 @@
 
 /* Search bar styling */
 .rc-search-card {
-    background: #fff;
+    background: var(--rc-white);
     border: 1px solid var(--rc-blue-border);
     border-radius: 14px;
     padding: 18px 24px;
@@ -87,6 +104,7 @@
     border-radius: 10px;
     font-size: 13.5px;
     color: var(--rc-text-dark);
+    background-color: var(--rc-input-bg);
     outline: none;
     transition: all .2s;
 }
@@ -107,9 +125,9 @@
 }
 .rc-search-btn:hover { background: #1e40af; }
 .rc-clear-btn {
-    background: #f1f5f9;
+    background: var(--rc-input-bg);
     color: var(--rc-text-muted);
-    border: 1.5px solid #e2e8f0;
+    border: 1.5px solid var(--rc-blue-border);
     border-radius: 10px;
     padding: 9px 18px;
     font-size: 13px;
@@ -118,11 +136,11 @@
     text-decoration: none;
     transition: .2s;
 }
-.rc-clear-btn:hover { background: #e2e8f0; color: var(--rc-text-dark); }
+.rc-clear-btn:hover { background: var(--rc-hover); color: var(--rc-text-dark); }
 
 /* Staff table card */
 .rc-table-card {
-    background: #white;
+    background: var(--rc-white);
     border: 1px solid var(--rc-blue-border);
     border-radius: 14px;
     overflow: hidden;
@@ -136,7 +154,7 @@
     text-transform: uppercase;
     letter-spacing: .5px;
     color: var(--rc-text-muted);
-    background: #f8faff;
+    background: var(--rc-row-alt);
     border-bottom: 1.5px solid var(--rc-blue-border);
     text-align: left;
 }
@@ -144,12 +162,12 @@
     padding: 16px 20px;
     font-size: 13px;
     color: var(--rc-text-dark);
-    border-bottom: 1px solid #f0f5ff;
+    border-bottom: 1px solid var(--rc-blue-border);
     vertical-align: middle;
 }
 .rc-table tr:last-child td { border-bottom: none; }
 .rc-table tr:nth-child(even) td { background: var(--rc-row-alt); }
-.rc-table tr:hover td { background: #eff6ff; }
+.rc-table tr:hover td { background: var(--rc-hover); }
 
 /* Avatar layout */
 .staff-avatar-wrap {
@@ -255,7 +273,7 @@
 .sa-panel {
     position: fixed; top: 0; right: -460px;
     width: 440px; height: 100vh;
-    background: #fff;
+    background: var(--rc-white);
     z-index: 1000;
     box-shadow: -8px 0 40px rgba(29,78,216,.18);
     display: flex; flex-direction: column;
@@ -290,6 +308,7 @@
     padding: 14px 20px;
     border-bottom: 1px solid var(--rc-blue-border);
     flex-shrink: 0;
+    position: relative;
 }
 .sa-panel-search {
     width: 100%; padding: 8px 14px 8px 36px;
@@ -297,6 +316,8 @@
     border-radius: 9px; font-size: 13px;
     outline: none; transition: .2s;
     font-family: 'Inter', sans-serif;
+    background-color: var(--rc-input-bg);
+    color: var(--rc-text-dark);
 }
 .sa-panel-search:focus { border-color: var(--rc-blue-light); box-shadow: 0 0 0 3px rgba(59,130,246,.12); }
 .sa-search-icon {
@@ -320,10 +341,10 @@
     padding: 12px 20px;
     cursor: pointer;
     transition: background .15s;
-    border-bottom: 1px solid #f8faff;
+    border-bottom: 1px solid var(--rc-blue-border);
 }
 .desg-item:hover { background: var(--rc-blue-xlight); }
-.desg-item.selected { background: #dbeafe; }
+.desg-item.selected { background: var(--rc-selected); }
 .desg-info { display: flex; flex-direction: column; gap: 3px; }
 .desg-name { font-size: 13px; font-weight: 600; color: var(--rc-text-dark); }
 .desg-desc { font-size: 11px; color: var(--rc-text-muted); }
@@ -332,7 +353,7 @@
     border-radius: 5px; border: 2px solid var(--rc-blue-border);
     display: flex; align-items: center; justify-content: center;
     transition: all .15s; flex-shrink: 0;
-    background: #fff;
+    background: var(--rc-white);
 }
 .desg-item.selected .desg-check {
     background: var(--rc-blue);
@@ -345,7 +366,7 @@
     border-top: 1px solid var(--rc-blue-border);
     display: flex; gap: 10px; align-items: center;
     flex-shrink: 0;
-    background: #fafbff;
+    background: var(--rc-row-alt);
 }
 .sa-panel-save {
     flex: 1; padding: 11px;

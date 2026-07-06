@@ -131,6 +131,7 @@ class Student extends Model
         'academic_session_id',
         'admission_date',
         'is_active',
+        'fee_visible',
         'opening_due_balance',
         'national_id',
         'local_id',
@@ -156,6 +157,18 @@ class Student extends Model
         'medical_doctor_phone',
         'medical_doctor_address',
         'custom_fields',
+        'sub_category',
+        'any_allergy',
+        'birthmark',
+        'house_number',
+        'location',
+        'emergency_name',
+        'emergency_number',
+        'admission_type',
+        'boarding_type',
+        'defence_personal',
+        'is_rte',
+        'fee_schedule_id',
     ];
 
     protected $casts = [
@@ -172,17 +185,30 @@ class Student extends Model
         'interests_talents' => 'boolean',
         'represented_school' => 'boolean',
         'other_info' => 'boolean',
+        'any_allergy' => 'boolean',
+        'defence_personal' => 'boolean',
+        'is_rte' => 'boolean',
     ];
 
     protected $appends = [
         'full_name',
         'photo_url',
         'age',
+        'admission_id',
+        'detailed_age',
     ];
 
     public function getFullNameAttribute(): string
     {
         return trim("{$this->first_name} {$this->last_name}");
+    }
+
+    /**
+     * Alias for admission_number — used across all ERP fee views.
+     */
+    public function getAdmissionIdAttribute(): ?string
+    {
+        return $this->admission_number;
     }
 
     public function getPhotoUrlAttribute(): string
@@ -196,6 +222,22 @@ class Student extends Model
     public function getAgeAttribute(): int
     {
         return Carbon::parse($this->date_of_birth)->age;
+    }
+
+    public function getDetailedAgeAttribute(): string
+    {
+        if (!$this->date_of_birth) {
+            return 'N/A';
+        }
+        $dob = Carbon::parse($this->date_of_birth);
+        $diff = $dob->diff(Carbon::now());
+        
+        $parts = [];
+        $parts[] = "{$diff->y} years";
+        $parts[] = "{$diff->m} months";
+        $parts[] = "{$diff->d} days";
+        
+        return implode(', ', $parts);
     }
 
     public function school()
@@ -253,6 +295,21 @@ class Student extends Model
         return $this->belongsToMany(Subject::class, 'student_optional_subjects', 'student_id', 'subject_id')
             ->withPivot('academic_session_id')
             ->withTimestamps();
+    }
+
+    public function studentFees()
+    {
+        return $this->hasMany(StudentFee::class, 'student_id');
+    }
+
+    public function feeReceipts()
+    {
+        return $this->hasMany(FeeReceipt::class, 'student_id');
+    }
+
+    public function feeSchedule()
+    {
+        return $this->belongsTo(FeeSchedule::class, 'fee_schedule_id');
     }
 }
 

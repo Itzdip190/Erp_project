@@ -293,6 +293,43 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
             </div>
         </div>
 
+        {{-- Upcoming Offline Tests and Exams --}}
+        @if(isset($offlineTests) && $offlineTests->isNotEmpty())
+        <div class="card">
+            <div class="card-hdr">
+                <span class="card-title"><i class="fas fa-file-signature" style="color:var(--gold);margin-right:8px;"></i>Scheduled Offline Written Tests</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Test Title</th>
+                                <th>Subject</th>
+                                <th>Teacher</th>
+                                <th>Date & Time</th>
+                                <th>Duration</th>
+                                <th>Grading Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($offlineTests as $ot)
+                            <tr>
+                                <td style="font-weight:700; color:var(--navy);">{{ $ot->title }}</td>
+                                <td>{{ $ot->subject?->name ?? 'General' }}</td>
+                                <td>{{ $ot->teacher?->first_name ?? 'N/A' }}</td>
+                                <td style="color:var(--blue); font-weight:600;">{{ $ot->start_date_time ? date('d M Y, h:i A', strtotime($ot->start_date_time)) : 'To be announced' }}</td>
+                                <td>{{ $ot->duration_minutes ? $ot->duration_minutes.' mins' : 'N/A' }}</td>
+                                <td><span style="background:var(--gold-bg); color:var(--gold); padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700;">{{ $ot->grading_type }}</span></td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        @endif
+
         <div class="card">
             <div class="card-hdr" style="display:flex; justify-content:space-between; align-items:center;">
                 <span class="card-title"><i class="fas fa-poll" style="color:var(--gold);margin-right:8px;"></i>Subject Wise Assessment Scores</span>
@@ -316,15 +353,20 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
                             @forelse($marks as $mark)
                             @php
                                 $percent = $mark->max_marks > 0 ? round(($mark->marks_obtained / $mark->max_marks) * 100, 1) : 0;
-                                $subGrade = $percent >= 90 ? 'A+' : ($percent >= 80 ? 'A' : ($percent >= 70 ? 'B' : ($percent >= 60 ? 'C' : ($percent >= 40 ? 'D' : 'F'))));
+                                $subGrade = $mark->grade ?: \App\Models\GradeScale::getGradeForPercentage(
+                                    $mark->school_id,
+                                    $student->class_id,
+                                    $percent,
+                                    \App\Models\GradeScale::getGradeScaleType($mark->subject ? $mark->subject->type : 'Scholastic')
+                                );
                             @endphp
                             <tr>
-                                <td style="font-weight:600; color:var(--navy);">{{ $mark->subject_name }}</td>
-                                <td>{{ ucfirst(str_replace('_', ' ', $mark->exam_type)) }}</td>
+                                <td style="font-weight:600; color:var(--navy);">{{ $mark->subject ? $mark->subject->name : 'N/A' }}</td>
+                                <td>{{ $mark->exam_name }}</td>
                                 <td style="font-weight:700; color:var(--blue);">{{ $mark->marks_obtained }}</td>
                                 <td>{{ $mark->max_marks }}</td>
                                 <td>{{ $percent }}%</td>
-                                <td><span class="badge @if($percent >= 60) badge-success @else badge-danger @endif">{{ $subGrade }}</span></td>
+                                <td><span class="badge @if(!in_array($subGrade, ['F', 'NOT GOOD'])) badge-success @else badge-danger @endif">{{ $subGrade }}</span></td>
                                 <td>{{ $mark->remarks ?? 'Satisfactory performance.' }}</td>
                             </tr>
                             @empty

@@ -20,130 +20,12 @@ class FeeManagementController extends Controller
 {
     private function ensureFeesSeeded($schoolId)
     {
-        // 1. Seed Fee Categories
-        if (FeeCategory::where('school_id', $schoolId)->count() === 0) {
-            $categories = [
-                ['name' => 'Tuition Fee', 'description' => 'Regular monthly course fee.'],
-                ['name' => 'Transport Fee', 'description' => 'School bus fare based on distance.'],
-                ['name' => 'Examination Fee', 'description' => 'Term end assessments & print fee.'],
-                ['name' => 'Library Fee', 'description' => 'Access to digital and physical catalog.'],
-                ['name' => 'Laboratory Fee', 'description' => 'Computer and Science Lab maintenance.'],
-                ['name' => 'Sports Fee', 'description' => 'Recreation and training equipment fee.']
-            ];
-            foreach ($categories as $cat) {
-                FeeCategory::create(array_merge($cat, ['school_id' => $schoolId]));
-            }
-        }
-
-        $tuitionCat = FeeCategory::where('school_id', $schoolId)->where('name', 'Tuition Fee')->first() 
-            ?? FeeCategory::create(['school_id' => $schoolId, 'name' => 'Tuition Fee', 'description' => 'Regular monthly course fee.']);
-        $transportCat = FeeCategory::where('school_id', $schoolId)->where('name', 'Transport Fee')->first()
-            ?? FeeCategory::create(['school_id' => $schoolId, 'name' => 'Transport Fee', 'description' => 'School bus fare based on distance.']);
-        $examCat = FeeCategory::where('school_id', $schoolId)->where('name', 'Examination Fee')->first()
-            ?? FeeCategory::create(['school_id' => $schoolId, 'name' => 'Examination Fee', 'description' => 'Term end assessments & print fee.']);
-
-
-        // 2. Seed Fee Structures Class-wise
-        if (FeeStructure::where('school_id', $schoolId)->count() === 0) {
-            $classes = SchoolClass::where('school_id', $schoolId)->get();
-            foreach ($classes as $index => $class) {
-                FeeStructure::create([
-                    'school_id' => $schoolId,
-                    'class_id' => $class->id,
-                    'fee_category_id' => $tuitionCat->id,
-                    'amount' => 2000.00 + ($index * 300.00),
-                    'schedule_type' => 'monthly',
-                ]);
-                FeeStructure::create([
-                    'school_id' => $schoolId,
-                    'class_id' => $class->id,
-                    'fee_category_id' => $examCat->id,
-                    'amount' => 500.00,
-                    'schedule_type' => 'quarterly',
-                ]);
-            }
-        }
-
-        // 3. Seed Student-wise Fees
-        if (StudentFee::where('school_id', $schoolId)->count() === 0) {
-            $students = Student::where('school_id', $schoolId)->get();
-            foreach ($students as $student) {
-                $classStructure = FeeStructure::where('school_id', $schoolId)
-                    ->where('class_id', $student->class_id)
-                    ->where('fee_category_id', $tuitionCat->id)
-                    ->first();
-                
-                $tuitionAmt = $classStructure ? $classStructure->amount : 2500.00;
-
-                // Tuition Fee entry (Unpaid)
-                StudentFee::create([
-                    'school_id' => $schoolId,
-                    'student_id' => $student->id,
-                    'fee_category_id' => $tuitionCat->id,
-                    'amount' => $tuitionAmt,
-                    'due_date' => now()->addDays(5)->toDateString(),
-                    'paid_amount' => 0.00,
-                    'status' => 'pending',
-                ]);
-
-                // Exam Fee entry (Paid)
-                StudentFee::create([
-                    'school_id' => $schoolId,
-                    'student_id' => $student->id,
-                    'fee_category_id' => $examCat->id,
-                    'amount' => 500.00,
-                    'due_date' => now()->subDays(15)->toDateString(),
-                    'paid_amount' => 500.00,
-                    'status' => 'paid',
-                ]);
-                
-                // Add some completed receipts
-                FeeReceipt::create([
-                    'school_id' => $schoolId,
-                    'student_id' => $student->id,
-                    'receipt_number' => 'REC-' . rand(100000, 999999),
-                    'amount_paid' => 500.00,
-                    'payment_mode' => 'online',
-                    'transaction_id' => 'TXN' . rand(1000000, 9999999),
-                    'payment_date' => now()->subDays(15)->toDateString(),
-                ]);
-            }
-        }
-
-        // 4. Seed Pending Cheques
-        if (PendingCheque::where('school_id', $schoolId)->count() === 0) {
-            $students = Student::where('school_id', $schoolId)->take(3)->get();
-            $banks = ['HDFC Bank', 'State Bank of India', 'ICICI Bank'];
-            foreach ($students as $i => $student) {
-                PendingCheque::create([
-                    'school_id' => $schoolId,
-                    'student_id' => $student->id,
-                    'bank_name' => $banks[$i % count($banks)],
-                    'cheque_number' => 'CHQ' . rand(100000, 999999),
-                    'amount' => 3000.00,
-                    'cheque_date' => now()->subDays(2)->toDateString(),
-                    'status' => 'pending',
-                ]);
-            }
-        }
-
-        // 5. Seed Payment Links
-        if (PaymentLink::where('school_id', $schoolId)->count() === 0) {
-            $students = Student::where('school_id', $schoolId)->take(2)->get();
-            foreach ($students as $student) {
-                PaymentLink::create([
-                    'school_id' => $schoolId,
-                    'student_id' => $student->id,
-                    'amount' => 2800.00,
-                    'purpose' => 'Tuition Fees - June',
-                    'link_url' => 'https://schoolcloud.erp/pay/lnk_' . uniqid(),
-                    'status' => 'active',
-                ]);
-            }
-        }
-
-        // 6. Seed Fee Configuration
+        // Only seed FeeConfiguration so system parameters are initialized, 
+        // but do not seed any demo categories, class fee structures, student fees, receipts, cheques, or payment links.
         if (\App\Models\FeeConfiguration::where('school_id', $schoolId)->count() === 0) {
+            $school = \App\Models\School::find($schoolId);
+            $schoolName = $school ? rawurlencode($school->name) : 'School';
+
             \App\Models\FeeConfiguration::create([
                 'school_id' => $schoolId,
                 'receipt_layout' => 'A4 Portrait',
@@ -154,7 +36,7 @@ class FeeManagementController extends Controller
                 'default_payment_mode' => 'Cash',
                 'discount_label' => 'Discount',
                 'payment_url_enabled' => true,
-                'payment_url' => 'https://online.edutinker.com/form/student/fees?schoolId=' . $schoolId . '&schoolName=Pragya%20School',
+                'payment_url' => 'https://online.edutinker.com/form/student/fees?schoolId=' . $schoolId . '&schoolName=' . $schoolName,
                 'add_fee_due' => true,
                 'add_fee_discount' => true,
                 'add_fee_balance' => true,
@@ -197,20 +79,23 @@ class FeeManagementController extends Controller
             ]);
         }
 
-        // 7. Seed Student Categories if they don't exist
-        $dayBoarding = \App\Models\StudentCategory::where('school_id', $schoolId)->where('name', 'Day boarding')->first()
-            ?? \App\Models\StudentCategory::create(['school_id' => $schoolId, 'name' => 'Day boarding', 'description' => 'Day boarding students']);
-        $hostel = \App\Models\StudentCategory::where('school_id', $schoolId)->where('name', 'Hostel')->first()
-            ?? \App\Models\StudentCategory::create(['school_id' => $schoolId, 'name' => 'Hostel', 'description' => 'Hostel boarders']);
-
-        // Make sure students are assigned to these categories
-        $students = Student::where('school_id', $schoolId)->get();
-        foreach ($students as $index => $student) {
-            if (is_null($student->category_id)) {
-                $student->category_id = ($index % 2 === 0) ? $dayBoarding->id : $hostel->id;
-                $student->save();
-            }
+        // Also ensure a current active session exists
+        $currentSession = \App\Models\AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        if (!$currentSession) {
+            $currentSession = \App\Models\AcademicSession::create([
+                'school_id' => $schoolId,
+                'name' => 'Apr 2026 - Mar 2027',
+                'start_date' => '2026-04-01',
+                'end_date' => '2027-03-31',
+                'is_current' => true,
+            ]);
         }
+
+        // Also ensure default student categories exist
+        \App\Models\StudentCategory::firstOrCreate(['school_id' => $schoolId, 'name' => 'Day boarding']);
+        \App\Models\StudentCategory::firstOrCreate(['school_id' => $schoolId, 'name' => 'Hostel']);
+
+        // Auto-seeding schedules and components disabled per user request to start with empty fee basics setup
     }
 
     public function feeConfiguration(Request $request)
@@ -516,75 +401,7 @@ class FeeManagementController extends Controller
         $miscFeesCount = \App\Models\MiscFee::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->count();
         $finesCount = \App\Models\FeeFine::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->count();
 
-        if ($schedulesCount === 0) {
-            \App\Models\FeeSchedule::create([
-                'school_id' => $schoolId,
-                'academic_session_id' => $selectedSession->id,
-                'classes' => 'NUR, 6, LKG, UKG, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12',
-                'no_of_installments' => 4,
-                'name' => 'fees schedule 1',
-                'start_date' => Carbon::create(2025, 4, 1)->toDateString(),
-                'end_date' => Carbon::create(2025, 12, 30)->toDateString(),
-            ]);
-            \App\Models\FeeSchedule::create([
-                'school_id' => $schoolId,
-                'academic_session_id' => $selectedSession->id,
-                'classes' => 'NUR, 6, LKG, UKG, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12',
-                'no_of_installments' => 12,
-                'name' => 'Fee scheduled 2',
-                'start_date' => Carbon::create(2025, 4, 1)->toDateString(),
-                'end_date' => Carbon::create(2026, 3, 30)->toDateString(),
-            ]);
-            $schedulesCount = 2;
-        }
-
-        if ($componentsCount === 0) {
-            \App\Models\FeeComponent::create([
-                'school_id' => $schoolId,
-                'academic_session_id' => $selectedSession->id,
-                'head_name' => 'School Fee',
-                'component_name' => 'Transport Fee',
-                'admission_type' => 'All Students',
-                'gender' => 'All Students',
-            ]);
-            \App\Models\FeeComponent::create([
-                'school_id' => $schoolId,
-                'academic_session_id' => $selectedSession->id,
-                'head_name' => 'School fees',
-                'component_name' => 'ADMISSION FEES',
-                'admission_type' => 'New',
-                'gender' => 'All Students',
-            ]);
-            \App\Models\FeeComponent::create([
-                'school_id' => $schoolId,
-                'academic_session_id' => $selectedSession->id,
-                'head_name' => 'School fees',
-                'component_name' => 'MONTHLY FEES',
-                'admission_type' => 'All Students',
-                'gender' => 'All Students',
-            ]);
-            \App\Models\FeeComponent::create([
-                'school_id' => $schoolId,
-                'academic_session_id' => $selectedSession->id,
-                'head_name' => 'School fees',
-                'component_name' => 'ID card Fees',
-                'admission_type' => 'All Students',
-                'gender' => 'All Students',
-            ]);
-            $componentsCount = 4;
-        }
-
-        if ($finesCount === 0) {
-            \App\Models\FeeFine::create([
-                'school_id' => $schoolId,
-                'academic_session_id' => $selectedSession->id,
-                'name' => 'late fine',
-                'fine_type' => 'Fixed Amount',
-                'fine_amount' => 250.00,
-                'status' => true,
-            ]);
-            $finesCount = 1;
-        }
+        // No auto-seeding
 
         // Fetch list items for tables
         $schedules = \App\Models\FeeSchedule::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->get();
@@ -616,70 +433,141 @@ class FeeManagementController extends Controller
 
     public function classWiseFee(Request $request)
     {
-        $schoolId = auth()->user()->school_id;
-        $this->ensureFeesSeeded($schoolId);
+        try {
+            $schoolId = auth()->user()->school_id;
+            $this->ensureFeesSeeded($schoolId);
 
-        $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->get();
-        $currentSession = \App\Models\AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first() ?? $academicSessions->first();
-        
-        $sessionId = $request->get('academic_session_id', $currentSession ? $currentSession->id : null);
+        // Ensure student categories "Day boarding" and "Hostel" are created
+        \App\Models\StudentCategory::firstOrCreate(['school_id' => $schoolId, 'name' => 'Day boarding']);
+        \App\Models\StudentCategory::firstOrCreate(['school_id' => $schoolId, 'name' => 'Hostel']);
+
+        // Load academic sessions
+        $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->orderBy('name', 'desc')->get();
+        $currentSession = $academicSessions->where('is_current', true)->first() ?? $academicSessions->first();
+        if (!$currentSession) {
+            // Create a default session if none exists
+            $currentSession = \App\Models\AcademicSession::create([
+                'school_id' => $schoolId,
+                'name' => 'Apr 2025 - Mar 2026',
+                'is_current' => true,
+                'start_date' => '2025-04-01',
+                'end_date' => '2026-03-31',
+            ]);
+            $academicSessions = collect([$currentSession]);
+        }
+
+        $sessionId = $request->get('academic_session_id', $currentSession->id);
         $selectedSession = \App\Models\AcademicSession::where('school_id', $schoolId)->find($sessionId) ?? $currentSession;
 
-        $classes = SchoolClass::where('school_id', $schoolId)->orderBy('sort_order')->get();
-        if ($classes->count() === 0) {
-            $defaultClass = SchoolClass::create([
-                'school_id' => $schoolId,
-                'name' => 'NUR',
-                'numeric_name' => 0,
-                'sort_order' => 1,
+        // No auto-seeding
+
+        if ($request->isMethod('post')) {
+            if ($request->ajax() || $request->wantsJson()) {
+                $request->validate([
+                    'academic_session_id' => 'required|exists:academic_sessions,id',
+                    'class_id' => 'required|exists:school_classes,id',
+                    'section_id' => 'nullable|exists:sections,id',
+                    'fee_schedule_id' => 'required|exists:fee_schedules,id',
+                    'student_category_id' => 'required|exists:student_categories,id',
+                    'fee_component_id' => 'required|exists:fee_components,id',
+                    'is_active' => 'required',
+                    'amount' => 'required|numeric|min:0',
+                    'installments' => 'nullable|array',
+                ]);
+
+                $classWiseFee = \App\Models\ClassWiseFee::updateOrCreate([
+                    'school_id' => $schoolId,
+                    'academic_session_id' => $request->academic_session_id,
+                    'class_id' => $request->class_id,
+                    'section_id' => $request->section_id ?: null,
+                    'fee_schedule_id' => $request->fee_schedule_id,
+                    'student_category_id' => $request->student_category_id,
+                    'fee_component_id' => $request->fee_component_id,
+                ], [
+                    'is_active' => filter_var($request->is_active, FILTER_VALIDATE_BOOLEAN),
+                    'amount' => $request->amount,
+                    'installments' => $request->installments,
+                ]);
+
+                $this->syncClassWiseFeeToStudents($schoolId, $classWiseFee);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Class-wise Fee structure updated successfully!',
+                    'data' => $classWiseFee
+                ]);
+            }
+
+            // Fallback for regular POST form submission (e.g. if AJAX is disabled)
+            $request->validate([
+                'class_id' => 'required|exists:school_classes,id',
+                'fee_category_id' => 'required|exists:fee_categories,id',
+                'amount' => 'required|numeric|min:0',
+                'schedule_type' => 'required|string',
             ]);
-            $classes = collect([$defaultClass]);
+
+            // Keep compatibility with old form if submitted
+            FeeStructure::updateOrCreate(
+                [
+                    'school_id' => $schoolId,
+                    'class_id' => $request->class_id,
+                    'fee_category_id' => $request->fee_category_id,
+                ],
+                [
+                    'amount' => $request->amount,
+                    'schedule_type' => $request->schedule_type,
+                ]
+            );
+
+            return back()->with('success', 'Class-wise Fee Structure updated successfully!');
         }
 
-        $classId = $request->get('class_id', $classes->first()->id);
-        $selectedClass = SchoolClass::where('school_id', $schoolId)->find($classId) ?? $classes->first();
+        $classes = SchoolClass::where('school_id', $schoolId)->orderBy('sort_order')->orderBy('name')->get();
+        
+        $selectedClassId = $request->get('class_id');
+        if (!$selectedClassId && $classes->isNotEmpty()) {
+            $selectedClassId = $classes->first()->id;
+        }
+        $selectedClass = $classes->where('id', $selectedClassId)->first();
 
-        // Load sections for selected class
-        $sections = Section::where('school_id', $schoolId)->where('class_id', $selectedClass->id)->get();
-        if ($sections->count() === 0) {
-            $defaultSection = Section::create([
-                'school_id' => $schoolId,
-                'class_id' => $selectedClass->id,
-                'name' => 'A',
-            ]);
-            $sections = collect([$defaultSection]);
+        $sections = collect();
+        if ($selectedClass) {
+            $sections = $selectedClass->sections()->orderBy('sort_order')->orderBy('name')->get();
         }
 
-        $sectionId = $request->get('section_id', $sections->first()->id);
-        $selectedSection = Section::where('school_id', $schoolId)->where('class_id', $selectedClass->id)->find($sectionId) ?? $sections->first();
+        $selectedSectionId = $request->has('section_id') ? $request->get('section_id') : null;
+        if ($selectedSectionId === null && $sections->isNotEmpty()) {
+            $selectedSectionId = $sections->first()->id;
+        }
+        $selectedSection = $selectedSectionId ? $sections->where('id', $selectedSectionId)->first() : null;
 
-        // Load Student Categories
-        $studentCategories = \App\Models\StudentCategory::where('school_id', $schoolId)->get();
+        $schedules = \App\Models\FeeSchedule::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->get();
+        // Only show Day boarding category in class-wise fee (Hostel removed per design)
+        $studentCategories = \App\Models\StudentCategory::where('school_id', $schoolId)
+            ->where('name', 'Day boarding')
+            ->get();
+        $components = \App\Models\FeeComponent::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->get();
 
-        // Load Fee Schedules for selected session that apply to selectedClass
-        $schedules = \App\Models\FeeSchedule::where('school_id', $schoolId)
+        // Load existing configurations
+        $classWiseFees = \App\Models\ClassWiseFee::where('school_id', $schoolId)
             ->where('academic_session_id', $selectedSession->id)
-            ->get()
-            ->filter(function($sched) use ($selectedClass) {
-                $classesList = array_map('trim', explode(',', $sched->classes));
-                return in_array($selectedClass->name, $classesList);
-            });
-
-        // Load Fee Components for selected session
-        $components = \App\Models\FeeComponent::where('school_id', $schoolId)
-            ->where('academic_session_id', $selectedSession->id)
+            ->where('class_id', $selectedClassId)
+            ->where(function($q) use ($selectedSectionId) {
+                if ($selectedSectionId) {
+                    $q->where('section_id', $selectedSectionId)->orWhereNull('section_id');
+                } else {
+                    $q->whereNull('section_id');
+                }
+            })
             ->get();
 
-        // Load existing Class-wise allocations for this class/section
-        $allocations = \App\Models\ClassWiseFeeAllocation::where('school_id', $schoolId)
-            ->where('academic_session_id', $selectedSession->id)
-            ->where('class_id', $selectedClass->id)
-            ->where('section_id', $selectedSection->id)
-            ->get()
-            ->keyBy(function($a) {
-                return "{$a->fee_schedule_id}_{$a->student_category_id}_{$a->fee_component_id}";
-            });
-
+        if ($selectedSectionId) {
+            $classWiseFees = $classWiseFees->groupBy(function($item) {
+                return $item->fee_schedule_id . '-' . $item->student_category_id . '-' . $item->fee_component_id;
+            })->map(function($group) use ($selectedSectionId) {
+                return $group->where('section_id', $selectedSectionId)->first() ?? $group->whereNull('section_id')->first();
+            })->values();
+        }
         return view('school.fees.class_wise', compact(
             'academicSessions',
             'selectedSession',
@@ -687,130 +575,433 @@ class FeeManagementController extends Controller
             'selectedClass',
             'sections',
             'selectedSection',
-            'studentCategories',
             'schedules',
+            'studentCategories',
             'components',
-            'allocations'
+            'classWiseFees'
         ));
-    }
-
-    public function saveAllocation(Request $request)
-    {
-        $schoolId = auth()->user()->school_id;
-        
-        $request->validate([
-            'academic_session_id' => 'required|exists:academic_sessions,id',
-            'class_id' => 'required|exists:school_classes,id',
-            'section_id' => 'required|exists:sections,id',
-            'fee_schedule_id' => 'required|exists:fee_schedules,id',
-            'student_category_id' => 'required|exists:student_categories,id',
-            'fee_component_id' => 'required|exists:fee_components,id',
-            'status' => 'required|in:0,1',
-            'installment_amounts' => 'nullable|array',
-        ]);
-
-        $installments = $request->input('installment_amounts', []);
-        $totalAmount = array_sum(array_map('floatval', $installments));
-
-        $allocation = \App\Models\ClassWiseFeeAllocation::updateOrCreate(
-            [
-                'school_id' => $schoolId,
-                'academic_session_id' => $request->academic_session_id,
-                'class_id' => $request->class_id,
-                'section_id' => $request->section_id,
-                'fee_schedule_id' => $request->fee_schedule_id,
-                'student_category_id' => $request->student_category_id,
-                'fee_component_id' => $request->fee_component_id,
-            ],
-            [
-                'status' => $request->status == 1,
-                'amount' => $totalAmount,
-                'installment_amounts' => $installments,
-            ]
-        );
-
-        $this->regenerateStudentFeesForAllocation($allocation);
-
-        return response()->json([
-            'success' => true,
-            'amount' => $totalAmount,
-            'status' => $allocation->status,
-            'message' => 'Fee configuration and student fees updated successfully!'
-        ]);
-    }
-
-    private function regenerateStudentFeesForAllocation($allocation)
-    {
-        $schoolId = $allocation->school_id;
-        
-        $component = \App\Models\FeeComponent::find($allocation->fee_component_id);
-        if (!$component) return;
-
-        $categoryName = $component->component_name;
-        $category = \App\Models\FeeCategory::where('school_id', $schoolId)
-            ->where('name', $categoryName)
-            ->first();
-        if (!$category) {
-            $category = \App\Models\FeeCategory::create([
-                'school_id' => $schoolId,
-                'name' => $categoryName,
-                'description' => "Category for component: {$categoryName}"
+        } catch (\Exception $e) {
+            dd([
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
+    }
 
-        $studentsQuery = Student::where('school_id', $schoolId)
-            ->where('class_id', $allocation->class_id)
-            ->where('category_id', $allocation->student_category_id);
-            
-        if ($allocation->section_id) {
-            $studentsQuery->where('section_id', $allocation->section_id);
+    private function syncClassWiseFeeToStudents($schoolId, $classWiseFee)
+    {
+        // Find or create FeeCategory matching this component's name
+        $component = \App\Models\FeeComponent::where('school_id', $schoolId)->find($classWiseFee->fee_component_id);
+        if (!$component) return;
+
+        $category = \App\Models\FeeCategory::firstOrCreate([
+            'school_id' => $schoolId,
+            'name' => $component->component_name,
+        ], [
+            'description' => 'Automatically generated category for ' . $component->component_name
+        ]);
+
+        // Strictly scoped: find students in this school's class/section only
+        $query = \App\Models\Student::where('school_id', $schoolId)
+            ->where('class_id', $classWiseFee->class_id);
+
+        if ($classWiseFee->section_id) {
+            $query->where('section_id', $classWiseFee->section_id);
         }
-        
-        $students = $studentsQuery->get();
 
-        $schedule = \App\Models\FeeSchedule::find($allocation->fee_schedule_id);
-        if (!$schedule) return;
+        // Filter by category mapped from boarding_type — strictly within this school
+        $dayBoardingCat = \App\Models\StudentCategory::where('school_id', $schoolId)
+            ->where('name', 'Day boarding')
+            ->first();
+        $hostelCat = \App\Models\StudentCategory::where('school_id', $schoolId)
+            ->where('name', 'Hostel')
+            ->first();
 
-        $startDate = \Carbon\Carbon::parse($schedule->start_date);
-        $endDate = \Carbon\Carbon::parse($schedule->end_date);
-        $totalDays = $startDate->diffInDays($endDate);
-        
-        $numInstallments = count($allocation->installment_amounts ?? []);
-        if ($numInstallments === 0) {
-            $numInstallments = $schedule->no_of_installments;
-        }
+        // Get the schedule for this school to use as fallback for students without fee_schedule_id
+        $scheduleForSchool = \App\Models\FeeSchedule::where('school_id', $schoolId)
+            ->where('id', $classWiseFee->fee_schedule_id)
+            ->first();
+        $classWiseFeeScheduleId = $classWiseFee->fee_schedule_id;
 
-        $daysPerInstallment = $numInstallments > 0 ? ($totalDays / $numInstallments) : $totalDays;
+        $students = $query->get()->filter(function($student) use ($classWiseFeeScheduleId, $dayBoardingCat, $hostelCat, $schoolId) {
+            // Determine effective category based on boarding_type
+            $effectiveCatId = null;
+            if (!empty($student->boarding_type) && stripos($student->boarding_type, 'hostel') !== false) {
+                $effectiveCatId = $hostelCat ? $hostelCat->id : null;
+            } else {
+                $effectiveCatId = $dayBoardingCat ? $dayBoardingCat->id : null;
+            }
 
+            // Match by student's fee_schedule_id; if null, treat as matching the class-wise fee's schedule
+            $studentScheduleId = $student->fee_schedule_id;
+            if ($studentScheduleId && $studentScheduleId != $classWiseFeeScheduleId) {
+                return false; // Student is explicitly on a different schedule
+            }
+
+            // If student has no schedule, they inherit the class-wise fee's schedule
+            if (!$studentScheduleId) {
+                // Assign the schedule to the student so future syncs work correctly
+                $student->fee_schedule_id = $classWiseFeeScheduleId;
+                $student->save();
+            }
+
+            // Match only day-boarding students (Hostel removed from class-wise fee UI)
+            return $effectiveCatId == $classWiseFeeScheduleId || $effectiveCatId !== null;
+        })->filter(function($student) use ($classWiseFee, $dayBoardingCat, $hostelCat) {
+            // Double check: only match students whose effective category matches the class-wise fee's student_category_id
+            $effectiveCatId = null;
+            if (!empty($student->boarding_type) && stripos($student->boarding_type, 'hostel') !== false) {
+                $effectiveCatId = $hostelCat ? $hostelCat->id : null;
+            } else {
+                $effectiveCatId = $dayBoardingCat ? $dayBoardingCat->id : null;
+            }
+            return $effectiveCatId == $classWiseFee->student_category_id;
+        });
+
+        // Transport automatic deletion removed to allow class-wise transport fee components to apply by default
         foreach ($students as $student) {
-            \App\Models\StudentFee::where('school_id', $schoolId)
-                ->where('student_id', $student->id)
-                ->where('fee_category_id', $category->id)
-                ->where('status', '!=', 'paid')
-                ->delete();
 
-            if ($allocation->status && count($allocation->installment_amounts ?? []) > 0) {
-                foreach ($allocation->installment_amounts as $i => $amount) {
-                    $amt = floatval($amount);
-                    if ($amt <= 0) continue;
+            if ($classWiseFee->is_active) {
+                $installments = $classWiseFee->installments ?? [];
+                $activeInstallmentNos = [];
 
-                    $instEnd = $startDate->copy()->addDays(round(($i + 1) * $daysPerInstallment) - 1);
-                    if ($i == $numInstallments - 1) {
-                        $instEnd = $endDate;
+                foreach ($installments as $inst) {
+                    $instNo = $inst['installment_no'] ?? null;
+                    if (!$instNo) continue;
+
+                    $activeInstallmentNos[] = $instNo;
+                    $instAmount = floatval($inst['amount'] ?? 0);
+
+                    $dueDate = now()->addDays(30)->toDateString();
+                    if (!empty($inst['date_range'])) {
+                        $parts = explode(' - ', $inst['date_range']);
+                        if (count($parts) === 2) {
+                            try {
+                                $dueDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($parts[1]))->toDateString();
+                            } catch (\Exception $e) {}
+                        }
                     }
 
+                    $studentFee = \App\Models\StudentFee::where('school_id', $schoolId)
+                        ->where('student_id', $student->id)
+                        ->where('fee_component_id', $classWiseFee->fee_component_id)
+                        ->where('installment_no', $instNo)
+                        ->where('fee_schedule_id', $classWiseFee->fee_schedule_id)
+                        ->first();
+
+                    if ($studentFee) {
+                        $paidAmount = $studentFee->paid_amount;
+                        $status = 'pending';
+                        if ($paidAmount >= $instAmount) $status = 'paid';
+                        elseif ($paidAmount > 0) $status = 'partially_paid';
+
+                        $studentFee->update([
+                            'fee_category_id' => $category->id,
+                            'fee_schedule_id'  => $classWiseFee->fee_schedule_id,
+                            'amount'           => $instAmount,
+                            'due_date'         => $dueDate,
+                            'status'           => $status,
+                        ]);
+                    } else {
+                        \App\Models\StudentFee::create([
+                            'school_id'        => $schoolId,
+                            'student_id'       => $student->id,
+                            'fee_category_id'  => $category->id,
+                            'fee_schedule_id'  => $classWiseFee->fee_schedule_id,
+                            'fee_component_id' => $classWiseFee->fee_component_id,
+                            'installment_no'   => $instNo,
+                            'amount'           => $instAmount,
+                            'paid_amount'      => 0.00,
+                            'due_date'         => $dueDate,
+                            'status'           => 'pending',
+                        ]);
+                    }
+                }
+
+                // Clean up out-of-range unpaid installments
+                \App\Models\StudentFee::where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->where('fee_schedule_id', $classWiseFee->fee_schedule_id)
+                    ->where('fee_component_id', $classWiseFee->fee_component_id)
+                    ->whereNotIn('installment_no', $activeInstallmentNos)
+                    ->where('paid_amount', 0)
+                    ->delete();
+
+            } else {
+                // Component toggled OFF: remove all unpaid fees for this component under this schedule
+                \App\Models\StudentFee::where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->where('fee_schedule_id', $classWiseFee->fee_schedule_id)
+                    ->where('fee_component_id', $classWiseFee->fee_component_id)
+                    ->where('paid_amount', 0)
+                    ->delete();
+            }
+        }
+    }
+
+    public static function syncStudentFees($student)
+    {
+        $schoolId = $student->school_id;
+
+        $studentScheduleId = $student->fee_schedule_id;
+        if (!$studentScheduleId) {
+            // Find a schedule that covers this student's class — strictly within the school
+            $studentClassName = optional($student->class)->name ?? optional(\App\Models\SchoolClass::find($student->class_id))->name;
+            $matchedSchedule = null;
+            if ($studentClassName) {
+                $schoolSchedules = \App\Models\FeeSchedule::where('school_id', $schoolId)->get();
+                foreach ($schoolSchedules as $sch) {
+                    $classesList = json_decode($sch->classes, true);
+                    if (!is_array($classesList)) {
+                        $classesList = array_map('trim', explode(',', $sch->classes ?? ''));
+                    } else {
+                        $classesList = array_map('trim', $classesList);
+                    }
+                    
+                    $studClassNorm = strtolower(str_replace(' ', '', $studentClassName));
+                    foreach ($classesList as $c) {
+                        $cNorm = strtolower(str_replace(' ', '', $c));
+                        if ($studClassNorm === $cNorm || 
+                            (preg_replace('/[^0-9]/', '', $studClassNorm) === preg_replace('/[^0-9]/', '', $cNorm) && preg_replace('/[^0-9]/', '', $studClassNorm) !== '') ||
+                            ($cNorm !== '' && (stripos($studClassNorm, $cNorm) !== false || stripos($cNorm, $studClassNorm) !== false))) {
+                            $matchedSchedule = $sch;
+                            break 2;
+                        }
+                    }
+                }
+            }
+            if (!$matchedSchedule) {
+                $matchedSchedule = \App\Models\FeeSchedule::where('school_id', $schoolId)->first();
+            }
+            $studentScheduleId = $matchedSchedule ? $matchedSchedule->id : null;
+            // Persist so future syncs are consistent
+            if ($studentScheduleId && !$student->fee_schedule_id) {
+                $student->fee_schedule_id = $studentScheduleId;
+                $student->save();
+            }
+        }
+
+        // Delete unpaid student fees that do not belong to the student's active schedule
+        \App\Models\StudentFee::where('student_id', $student->id)
+            ->where(function($q) use ($studentScheduleId) {
+                if ($studentScheduleId) {
+                    $q->where('fee_schedule_id', '!=', $studentScheduleId)
+                      ->orWhereNull('fee_schedule_id');
+                }
+            })
+            ->where('paid_amount', 0)
+            ->delete();
+
+        // 1. Get all active ClassWiseFee structures for this student's class
+        $query = \App\Models\ClassWiseFee::where('school_id', $schoolId)
+            ->where('class_id', $student->class_id)
+            ->where('is_active', true);
+
+        if ($studentScheduleId) {
+            $query->where('fee_schedule_id', $studentScheduleId);
+        }
+
+        // If the structure is section-specific, filter by student's section or null
+        if ($student->section_id) {
+            $query->where(function($q) use ($student) {
+                $q->where('section_id', $student->section_id)
+                  ->orWhereNull('section_id');
+            });
+        } else {
+            $query->whereNull('section_id');
+        }
+
+        // Filter by student's category mapped from boarding_type
+        $dayBoardingCat = \App\Models\StudentCategory::where('school_id', $schoolId)
+            ->where('name', 'Day boarding')
+            ->first();
+        $hostelCat = \App\Models\StudentCategory::where('school_id', $schoolId)
+            ->where('name', 'Hostel')
+            ->first();
+        
+        $effectiveCatId = null;
+        if (!empty($student->boarding_type) && stripos($student->boarding_type, 'hostel') !== false) {
+            $effectiveCatId = $hostelCat ? $hostelCat->id : null;
+        } else {
+            $effectiveCatId = $dayBoardingCat ? $dayBoardingCat->id : null;
+        }
+        
+        if ($effectiveCatId) {
+            $query->where('student_category_id', $effectiveCatId);
+        }
+
+        $classWiseFees = $query->get();
+
+        if ($student->section_id) {
+            $classWiseFees = $classWiseFees->groupBy(function($item) {
+                return $item->fee_schedule_id . '-' . $item->student_category_id . '-' . $item->fee_component_id;
+            })->map(function($group) use ($student) {
+                return $group->where('section_id', $student->section_id)->first() ?? $group->whereNull('section_id')->first();
+            })->values();
+        }
+
+        $activeComponentIds = $classWiseFees->pluck('fee_component_id')->toArray();
+        if (count($activeComponentIds) > 0) {
+            \App\Models\StudentFee::where('student_id', $student->id)
+                ->where('fee_schedule_id', $studentScheduleId)
+                ->whereNotIn('fee_component_id', $activeComponentIds)
+                ->where('paid_amount', 0)
+                ->delete();
+        } else {
+            \App\Models\StudentFee::where('student_id', $student->id)
+                ->where('fee_schedule_id', $studentScheduleId)
+                ->where('paid_amount', 0)
+                ->delete();
+        }
+
+        foreach ($classWiseFees as $classWiseFee) {
+            $component = \App\Models\FeeComponent::find($classWiseFee->fee_component_id);
+            if (!$component) continue;
+
+            $category = \App\Models\FeeCategory::firstOrCreate([
+                'school_id' => $schoolId,
+                'name' => $component->component_name,
+            ], [
+                'description' => 'Automatically generated category for ' . $component->component_name
+            ]);
+
+            // Transport automatic deletion removed to allow class-wise transport fee components to apply by default
+
+            $installments = $classWiseFee->installments ?? [];
+            $activeInstallmentNos = [];
+
+            foreach ($installments as $inst) {
+                $instNo = $inst['installment_no'] ?? null;
+                if (!$instNo) continue;
+
+                $activeInstallmentNos[] = $instNo;
+                $instAmount = floatval($inst['amount'] ?? 0);
+
+                // Determine due date
+                $dueDate = now()->addDays(30)->toDateString();
+                if (!empty($inst['date_range'])) {
+                    $parts = explode(' - ', $inst['date_range']);
+                    if (count($parts) === 2) {
+                        try {
+                            $dueDate = \Carbon\Carbon::createFromFormat('d/m/Y', trim($parts[1]))->toDateString();
+                        } catch (\Exception $e) {
+                            // Keep default
+                        }
+                    }
+                }
+
+                // Find or create StudentFee for this specific installment
+                $studentFee = \App\Models\StudentFee::where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->where('fee_component_id', $classWiseFee->fee_component_id)
+                    ->where('installment_no', $instNo)
+                    ->where('fee_schedule_id', $studentScheduleId)
+                    ->first();
+
+                if ($studentFee) {
+                    $paidAmount = $studentFee->paid_amount;
+                    $status = 'pending';
+                    if ($paidAmount >= $instAmount) {
+                        $status = 'paid';
+                    } elseif ($paidAmount > 0) {
+                        $status = 'partially_paid';
+                    }
+                    
+                    $studentFee->update([
+                        'fee_category_id' => $category->id,
+                        'amount' => $instAmount,
+                        'due_date' => $dueDate,
+                        'status' => $status,
+                    ]);
+                } else {
                     \App\Models\StudentFee::create([
                         'school_id' => $schoolId,
                         'student_id' => $student->id,
                         'fee_category_id' => $category->id,
-                        'amount' => $amt,
-                        'due_date' => $instEnd->toDateString(),
+                        'fee_schedule_id' => $studentScheduleId,
+                        'fee_component_id' => $classWiseFee->fee_component_id,
+                        'installment_no' => $instNo,
+                        'amount' => $instAmount,
                         'paid_amount' => 0.00,
+                        'due_date' => $dueDate,
                         'status' => 'pending',
                     ]);
                 }
             }
+
+            // Delete any unpaid installments that are now out-of-range
+            \App\Models\StudentFee::where('student_id', $student->id)
+                ->where('fee_schedule_id', $studentScheduleId)
+                ->where('fee_component_id', $classWiseFee->fee_component_id)
+                ->whereNotIn('installment_no', $activeInstallmentNos)
+                ->where('paid_amount', 0)
+                ->delete();
         }
+
+        // Transport automatic deletion removed to allow class-wise transport fee components to apply by default
+    }
+
+
+    public static function generateInstallmentDates($startDate, $endDate, $count)
+    {
+        $start = \Carbon\Carbon::parse($startDate);
+        $end = \Carbon\Carbon::parse($endDate);
+        $dates = [];
+        
+        if ($count == 12) {
+            // Monthly
+            for ($i = 0; $i < 12; $i++) {
+                $currentStart = $start->copy()->addMonths($i)->startOfMonth();
+                $currentEnd = $currentStart->copy()->endOfMonth();
+                
+                if ($currentEnd->gt($end)) {
+                    $currentEnd = $end->copy();
+                }
+                if ($currentStart->gt($end)) {
+                    $currentStart = $end->copy()->startOfMonth();
+                    $currentEnd = $end->copy();
+                }
+                $dates[] = $currentStart->format('d/m/Y') . ' - ' . $currentEnd->format('d/m/Y');
+            }
+        } elseif ($count == 4) {
+            // Quarterly: Apr, Jul, Oct, Dec
+            $months = [0, 3, 6, 8];
+            for ($i = 0; $i < 4; $i++) {
+                $currentStart = $start->copy()->addMonths($months[$i])->startOfMonth();
+                $currentEnd = $currentStart->copy()->endOfMonth();
+                
+                if ($currentEnd->gt($end)) {
+                    $currentEnd = $end->copy();
+                }
+                $dates[] = $currentStart->format('d/m/Y') . ' - ' . $currentEnd->format('d/m/Y');
+            }
+        } else {
+            // Divide range evenly
+            $totalDays = $start->diffInDays($end);
+            $daysPerPeriod = $count > 1 ? intval($totalDays / ($count - 1)) : $totalDays;
+            
+            for ($i = 0; $i < $count; $i++) {
+                if ($i == 0) {
+                    $currentStart = $start->copy();
+                } else {
+                    $currentStart = $start->copy()->addDays($i * $daysPerPeriod);
+                }
+                
+                $currentEnd = $currentStart->copy()->addMonth()->subDay();
+                if ($currentEnd->gt($end) || $i == $count - 1) {
+                    $currentEnd = $end->copy();
+                }
+                if ($currentStart->gt($end)) {
+                    $currentStart = $end->copy();
+                }
+                
+                $dates[] = $currentStart->format('d/m/Y') . ' - ' . $currentEnd->format('d/m/Y');
+            }
+        }
+        
+        return $dates;
     }
 
     public function studentWiseFee(Request $request)
@@ -818,62 +1009,326 @@ class FeeManagementController extends Controller
         $schoolId = auth()->user()->school_id;
         $this->ensureFeesSeeded($schoolId);
 
+        // ─── POST REQUESTS ────────────────────────────────────────────────
         if ($request->isMethod('post')) {
-            $request->validate([
-                'student_fee_id' => 'required|exists:student_fees,id',
-                'amount_paid' => 'required|numeric|min:0.01',
-                'payment_mode' => 'required|string',
-                'transaction_id' => 'nullable|string',
-            ]);
+            $action = $request->input('action', 'mark_paid');
 
-            $studentFee = StudentFee::where('school_id', $schoolId)->findOrFail($request->student_fee_id);
-            $newPaid = $studentFee->paid_amount + $request->amount_paid;
-
-            if ($newPaid >= $studentFee->amount) {
-                $studentFee->status = 'paid';
-                $studentFee->paid_amount = $studentFee->amount;
-            } else {
-                $studentFee->status = 'partially_paid';
-                $studentFee->paid_amount = $newPaid;
+            if ($action === 'toggle_visibility') {
+                $studentId = $request->input('student_id');
+                $student   = Student::where('school_id', $schoolId)->findOrFail($studentId);
+                $student->fee_visible = filter_var($request->input('visible'), FILTER_VALIDATE_BOOLEAN);
+                $student->save();
+                return response()->json(['success' => true, 'visible' => $student->fee_visible]);
             }
-            $studentFee->save();
 
-            // Create Receipt
-            FeeReceipt::create([
-                'school_id' => $schoolId,
-                'student_id' => $studentFee->student_id,
-                'receipt_number' => 'REC-' . rand(100000, 999999),
-                'amount_paid' => $request->amount_paid,
-                'payment_mode' => $request->payment_mode,
-                'transaction_id' => $request->transaction_id,
-                'payment_date' => now()->toDateString(),
+            if ($action === 'bulk_toggle_visibility') {
+                $request->validate([
+                    'student_ids' => 'required|array',
+                    'student_ids.*' => 'exists:students,id',
+                    'visible' => 'required|boolean',
+                ]);
+                Student::where('school_id', $schoolId)
+                    ->whereIn('id', $request->student_ids)
+                    ->update(['fee_visible' => $request->visible]);
+                return response()->json(['success' => true]);
+            }
+
+            if ($action === 'mark_paid') {
+                $request->validate([
+                    'student_fee_id'       => 'nullable|exists:student_fees,id',
+                    'student_id'           => 'nullable|exists:students,id',
+                    'installment_no'       => 'nullable',
+                    'amount_paid'          => 'required|numeric|min:0.01',
+                    'payment_mode'         => 'required|string',
+                    'transaction_id'       => 'nullable|string',
+                    'receipt_date'         => 'nullable|date',
+                    'receipt_no'           => 'nullable|string',
+                    'bank_name'            => 'nullable|string',
+                    'cheque_date'          => 'nullable|date',
+                    'branch'               => 'nullable|string',
+                    'instant_discount_amount' => 'nullable|numeric|min:0',
+                    'instant_discount_type'   => 'nullable|in:percentage,flat',
+                ]);
+
+                // Calculate effective amount after instant discount
+                $rawAmountPaid     = floatval($request->input('amount_paid'));
+                $discountAmount    = floatval($request->input('instant_discount_amount', 0));
+                $discountType      = $request->input('instant_discount_type', 'flat');
+                $effectiveDiscount = 0;
+                if ($discountAmount > 0) {
+                    if ($discountType === 'percentage') {
+                        $effectiveDiscount = round($rawAmountPaid * $discountAmount / 100, 2);
+                    } else {
+                        $effectiveDiscount = min($discountAmount, $rawAmountPaid);
+                    }
+                }
+                // Merge the computed discount back into request for use below
+                $request->merge([
+                    '_computed_discount' => $effectiveDiscount,
+                    '_computed_discount_type' => $discountType,
+                ]);
+
+                $receiptDate = $request->input('receipt_date') ?: now()->toDateString();
+                $receiptNo   = $request->input('receipt_no') ?: ('REC-' . rand(100000, 999999));
+                $paymentMode = $request->input('payment_mode');
+
+                if ($paymentMode === 'cheque') {
+                    // Create pending cheque
+                    PendingCheque::create([
+                        'school_id'      => $schoolId,
+                        'student_id'     => $request->student_id ?: StudentFee::find($request->student_fee_id)->student_id,
+                        'bank_name'      => $request->bank_name ?: 'N/A',
+                        'cheque_number'  => $request->transaction_id ?: 'CHQ-' . rand(100000, 999999),
+                        'amount'         => $request->amount_paid,
+                        'cheque_date'    => $request->cheque_date ?: now()->toDateString(),
+                        'branch'         => $request->branch,
+                        'installment_no' => $request->installment_no,
+                        'receipt_number' => $receiptNo,
+                        'entry_date'     => now()->toDateString(),
+                        'receipt_date'   => $receiptDate,
+                        'status'         => 'pending',
+                    ]);
+
+                    if ($request->wantsJson()) {
+                        return response()->json(['success' => true, 'message' => 'Cheque recorded as pending clearing!']);
+                    }
+                    return back()->with('success', 'Cheque recorded as pending clearing!');
+                }
+
+                // Normal/immediate payment (cash, online, bank transfer)
+                if ($request->student_fee_id) {
+                    $sf = StudentFee::where('school_id', $schoolId)->findOrFail($request->student_fee_id);
+                    $discount = floatval($request->input('_computed_discount', 0));
+                    if ($discount > 0) {
+                        $sf->instant_discount_amount += $discount;
+                        $sf->instant_discount_type = $request->input('_computed_discount_type');
+                    }
+                    
+                    $newPaid = $sf->paid_amount + $request->amount_paid;
+                    $due = max(0, $sf->amount - $sf->instant_discount_amount);
+                    $sf->paid_amount = min($newPaid, $due);
+                    $sf->status = $sf->paid_amount >= $due ? 'paid' : 'partially_paid';
+                    $sf->save();
+                    
+                    $studentId = $sf->student_id;
+                } else {
+                    $studentId = $request->student_id;
+                    $instNo = $request->installment_no;
+                    $amountToDistribute = floatval($request->amount_paid);
+                    $discount = floatval($request->input('_computed_discount', 0));
+                    $discountType = $request->input('_computed_discount_type');
+
+                    $feesToPay = StudentFee::where('school_id', $schoolId)
+                        ->where('student_id', $studentId)
+                        ->where('installment_no', $instNo)
+                        ->where('status', '!=', 'paid')
+                        ->orderBy('id', 'asc')
+                        ->get();
+                        
+                    if ($feesToPay->isEmpty()) {
+                        $feesToPay = StudentFee::where('school_id', $schoolId)
+                            ->where('student_id', $studentId)
+                            ->where('installment_no', $instNo)
+                            ->orderBy('id', 'asc')
+                            ->get();
+                    }
+
+                    // Distribute discount first
+                    $discountToDistribute = $discount;
+                    if ($discountToDistribute > 0 && $feesToPay->isNotEmpty()) {
+                        foreach ($feesToPay as $sf) {
+                            if ($discountToDistribute <= 0) break;
+                            $dueBeforeDiscount = max(0, $sf->amount - $sf->instant_discount_amount - $sf->paid_amount);
+                            if ($dueBeforeDiscount <= 0) continue;
+                            $discountForThis = min($discountToDistribute, $dueBeforeDiscount);
+                            $sf->instant_discount_amount += $discountForThis;
+                            $sf->instant_discount_type = $discountType;
+                            $sf->save();
+                            $discountToDistribute -= $discountForThis;
+                        }
+                    }
+
+                    // Distribute paid amount
+                    foreach ($feesToPay as $sf) {
+                        if ($amountToDistribute <= 0) break;
+                        $due = max(0, $sf->amount - $sf->instant_discount_amount - $sf->paid_amount);
+                        if ($due <= 0) continue;
+                        $paymentForThis = min($amountToDistribute, $due);
+                        $sf->paid_amount += $paymentForThis;
+                        $sf->status = $sf->paid_amount >= ($sf->amount - $sf->instant_discount_amount) ? 'paid' : 'partially_paid';
+                        $sf->save();
+                        $amountToDistribute -= $paymentForThis;
+                    }
+                }
+
+                FeeReceipt::create([
+                    'school_id'      => $schoolId,
+                    'student_id'     => $studentId,
+                    'receipt_number' => $receiptNo,
+                    'amount_paid'    => $request->amount_paid,
+                    'discount_amount'=> $request->input('_computed_discount', 0),
+                    'discount_type'  => $request->input('_computed_discount_type'),
+                    'payment_mode'   => $paymentMode,
+                    'transaction_id' => $request->transaction_id,
+                    'payment_date'   => $receiptDate,
+                ]);
+
+                if ($request->wantsJson()) {
+                    return response()->json(['success' => true, 'message' => 'Payment collected successfully!']);
+                }
+                return back()->with('success', 'Fee Payment collected successfully!');
+            }
+        }
+
+        // ─── GET: Load academic sessions ────────────────────────────────
+        $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->orderBy('name', 'desc')->get();
+        $currentSession   = $academicSessions->where('is_current', true)->first() ?? $academicSessions->first();
+
+        // Create default session if none
+        if (!$currentSession) {
+            $currentSession = \App\Models\AcademicSession::create([
+                'school_id'  => $schoolId,
+                'name'       => 'Apr 2025 - Mar 2026',
+                'start_date' => '2025-04-01',
+                'end_date'   => '2026-03-31',
+                'is_current' => true,
             ]);
-
-            return back()->with('success', 'Fee Payment collected successfully!');
+            $academicSessions = collect([$currentSession]);
         }
 
-        $studentsQuery = Student::where('school_id', $schoolId);
-        $feesQuery = StudentFee::where('school_id', $schoolId)
-            ->with(['student.class', 'student.section', 'category']);
+        $sessionId       = $request->get('academic_session_id', $currentSession->id);
+        $selectedSession = \App\Models\AcademicSession::where('school_id', $schoolId)->find($sessionId) ?? $currentSession;
 
-        if ($request->has('class_id') && $request->class_id != '') {
-            $studentsQuery->where('class_id', $request->class_id);
-            $feesQuery->whereHas('student', function($q) use ($request) {
-                $q->where('class_id', $request->class_id);
+        // ─── Filters ────────────────────────────────────────────────────
+        $classes         = \App\Models\SchoolClass::where('school_id', $schoolId)->orderBy('sort_order')->orderBy('name')->get();
+        $selectedClassId = $request->get('class_id');
+        if ($selectedClassId === '' || $selectedClassId === 'all') {
+            $selectedClassId = null;
+        }
+        $selectedClass   = $selectedClassId ? $classes->where('id', $selectedClassId)->first() : null;
+
+        $sections        = $selectedClass ? $selectedClass->sections()->orderBy('name')->get() : collect();
+        $selectedSectionId = $request->get('section_id');
+        if ($selectedSectionId === '' || $selectedSectionId === 'all') {
+            $selectedSectionId = null;
+        }
+
+        // Reset section_id if it does not belong to the selected class
+        if ($selectedClass && $selectedSectionId && !$sections->contains('id', $selectedSectionId)) {
+            $selectedSectionId = null;
+        }
+
+        // ─── Detail view: single student ────────────────────────────────
+        $viewStudentId = $request->get('view_student');
+        $viewStudent   = null;
+        $studentFees   = collect();
+        $feeScheduleName = null;
+        $appliedDiscounts = [];
+
+        if ($viewStudentId) {
+            $viewStudent = Student::where('school_id', $schoolId)
+                ->with(['class', 'section', 'category'])
+                ->find($viewStudentId);
+
+            if ($viewStudent) {
+                self::syncStudentFees($viewStudent);
+
+                $studentFees = StudentFee::where('school_id', $schoolId)
+                    ->where('student_id', $viewStudentId)
+                    ->with(['category', 'component'])
+                    ->orderBy('installment_no')
+                    ->get();
+
+                // Try to get actual matching fee schedule name for the student's class
+                $studentClass = optional($viewStudent->class)->name;
+                if ($studentClass) {
+                    $schedules = \App\Models\FeeSchedule::where('school_id', $schoolId)
+                        ->where('academic_session_id', $selectedSession->id)
+                        ->get();
+                    foreach ($schedules as $sch) {
+                        $schClasses = array_map('trim', explode(',', $sch->classes ?? ''));
+                        if (in_array($studentClass, $schClasses)) {
+                            $feeScheduleName = $sch->name;
+                            break;
+                        }
+                    }
+                }
+
+                // Applied discounts for this student
+                $appliedDiscounts = \App\Models\FeeDiscount::where('school_id', $schoolId)
+                    ->where('academic_session_id', $selectedSession->id)
+                    ->get()
+                    ->filter(function ($d) use ($viewStudentId) {
+                        $ids = json_decode($d->student_ids ?? '[]', true);
+                        return empty($ids) || in_array($viewStudentId, $ids);
+                    });
+            }
+        }
+
+        // Dynamically sync student fees for the queried class/section (limit 150)
+        // to make sure their calculated totals, amounts, and statuses reflect the latest class-wise setups.
+        $syncQuery = Student::where('school_id', $schoolId);
+        if ($selectedClassId) {
+            $syncQuery->where('class_id', $selectedClassId);
+        }
+        if ($selectedSectionId) {
+            $syncQuery->where('section_id', $selectedSectionId);
+        }
+        $studentsToSync = $syncQuery->limit(150)->get();
+        foreach ($studentsToSync as $sToSync) {
+            self::syncStudentFees($sToSync);
+        }
+
+        // ─── LIST: students with fee summary ────────────────────────────
+        $query = Student::where('school_id', $schoolId)
+            ->with(['class', 'section', 'studentFees' => function ($q) use ($schoolId) {
+                $q->where('school_id', $schoolId);
+            }]);
+
+        if ($selectedClassId) {
+            $query->where('class_id', $selectedClassId);
+        }
+        if ($selectedSectionId) {
+            $query->where('section_id', $selectedSectionId);
+        }
+
+        $search = $request->get('search');
+        if ($search && strlen($search) >= 3) {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'like', "%$search%")
+                  ->orWhere('last_name', 'like', "%$search%")
+                  ->orWhere('admission_number', 'like', "%$search%");
             });
         }
 
-        if ($request->has('section_id') && $request->section_id != '') {
-            $studentsQuery->where('section_id', $request->section_id);
-            $feesQuery->whereHas('student', function($q) use ($request) {
-                $q->where('section_id', $request->section_id);
+        if ($request->get('all_year')) {
+            $query->whereHas('studentFees', function($q) use ($schoolId) {
+                $q->where('school_id', $schoolId)->whereColumn('amount', '>', 'paid_amount');
             });
         }
 
-        $students = $studentsQuery->with(['class', 'section'])->get();
-        $fees = $feesQuery->get();
+        $studentsWithFees = $query->paginate(25)->withQueryString();
 
-        return view('school.fees.student_wise', compact('students', 'fees'));
+        // Build fee schedule map for each student
+        $schedules = \App\Models\FeeSchedule::where('school_id', $schoolId)
+            ->where('academic_session_id', $selectedSession->id)
+            ->get();
+
+        return view('school.fees.student_wise', compact(
+            'academicSessions',
+            'selectedSession',
+            'classes',
+            'selectedClass',
+            'sections',
+            'selectedSectionId',
+            'studentsWithFees',
+            'schedules',
+            'viewStudent',
+            'studentFees',
+            'feeScheduleName',
+            'appliedDiscounts',
+            'search'
+        ));
     }
 
     public function optionalFeeMapping(Request $request)
@@ -984,27 +1439,96 @@ class FeeManagementController extends Controller
 
     public function scheduleMapper(Request $request)
     {
-        $schoolId = auth()->user()->school_id;
+        $school = app()->bound('currentSchool') ? app('currentSchool') : null;
+        $schoolId = $school ? $school->id : auth()->user()->school_id;
         $this->ensureFeesSeeded($schoolId);
 
         if ($request->isMethod('post')) {
-            $request->validate([
-                'fee_category_id' => 'required|exists:fee_categories,id',
-                'schedule_type' => 'required|string',
-            ]);
+            if ($request->has('student_schedules')) {
+                foreach ($request->student_schedules as $studentId => $scheduleId) {
+                    $student = Student::where('school_id', $schoolId)->find($studentId);
+                    if ($student) {
+                        $student->fee_schedule_id = $scheduleId;
+                        $student->save();
+                        self::syncStudentFees($student);
+                    }
+                }
+                return back()->with('success', 'Student Fee Schedules updated successfully!');
+            }
 
-            // Bulk update structures for this category in the school
-            FeeStructure::where('school_id', $schoolId)
-                ->where('fee_category_id', $request->fee_category_id)
-                ->update(['schedule_type' => $request->schedule_type]);
+            if ($request->has('fee_category_id')) {
+                $request->validate([
+                    'fee_category_id' => 'required|exists:fee_categories,id',
+                    'schedule_type' => 'required|string',
+                ]);
 
-            return back()->with('success', 'Fee Schedules updated for selected category!');
+                FeeStructure::where('school_id', $schoolId)
+                    ->where('fee_category_id', $request->fee_category_id)
+                    ->update(['schedule_type' => $request->schedule_type]);
+
+                return back()->with('success', 'Fee Schedules updated for selected category!');
+            }
         }
 
         $categories = FeeCategory::where('school_id', $schoolId)->get();
         $structures = FeeStructure::where('school_id', $schoolId)->with(['class', 'category'])->get();
+        $sessions = \App\Models\AcademicSession::where('school_id', $schoolId)->get();
+        $classes = SchoolClass::where('school_id', $schoolId)->get();
+        $sections = \App\Models\Section::where('school_id', $schoolId)->get()->unique('name');
 
-        return view('school.fees.schedule_mapper', compact('categories', 'structures'));
+        // Resolve selected academic session based on academic_year parameter
+        $selectedYear = $request->get('academic_year');
+        $currentSession = \App\Models\AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        if (!$currentSession) {
+            $currentSession = \App\Models\AcademicSession::where('school_id', $schoolId)->first();
+        }
+
+        $selectedSession = $currentSession;
+        if ($selectedYear) {
+            $matchedSession = \App\Models\AcademicSession::where('school_id', $schoolId)
+                ->where('name', 'like', "%{$selectedYear}%")
+                ->first();
+            if ($matchedSession) {
+                $selectedSession = $matchedSession;
+            }
+        }
+
+        $schedulesQuery = \App\Models\FeeSchedule::where('school_id', $schoolId);
+        if ($selectedSession) {
+            $schedulesQuery->where('academic_session_id', $selectedSession->id);
+        }
+        $schedules = $schedulesQuery->get()->unique('name');
+
+        $query = Student::where('school_id', $schoolId)->with(['class', 'section']);
+
+        if ($selectedSession) {
+            $query->where('academic_session_id', $selectedSession->id);
+        }
+
+        if ($request->filled('class_id')) {
+            $query->where('class_id', $request->class_id);
+        }
+        if ($request->filled('section_id')) {
+            $secVal = $request->section_id;
+            $query->whereHas('section', function($q) use ($secVal) {
+                $q->where('id', $secVal)->orWhere('name', $secVal);
+            });
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('first_name', 'like', "%{$search}%")
+                  ->orWhere('last_name', 'like', "%{$search}%")
+                  ->orWhere('admission_id', 'like', "%{$search}%")
+                  ->orWhere('admission_number', 'like', "%{$search}%");
+            });
+        }
+
+        $students = $query->take(50)->get();
+
+        // No auto-seeding of dummy students
+
+        return view('school.fees.schedule_mapper', compact('categories', 'structures', 'sessions', 'classes', 'sections', 'schedules', 'students'));
     }
 
     public function refundFee(Request $request)
@@ -1041,10 +1565,45 @@ class FeeManagementController extends Controller
         $schoolId = auth()->user()->school_id;
         $this->ensureFeesSeeded($schoolId);
 
-        $receipts = FeeReceipt::where('school_id', $schoolId)->with(['student.class', 'student.section'])->get();
+        $sessions = \App\Models\AcademicSession::where('school_id', $schoolId)->get();
+        $classes = SchoolClass::where('school_id', $schoolId)->get();
+        $sections = \App\Models\Section::where('school_id', $schoolId)->get()->unique('name');
+
+        $query = FeeReceipt::where('school_id', $schoolId)->with(['student.class', 'student.section']);
+
+        if ($request->filled('class_id')) {
+            $query->whereHas('student', function($q) use ($request) {
+                $q->where('class_id', $request->class_id);
+            });
+        }
+        if ($request->filled('section_id')) {
+            $secVal = $request->section_id;
+            $query->whereHas('student', function($q) use ($secVal) {
+                $q->whereHas('section', function($sq) use ($secVal) {
+                    $sq->where('id', $secVal)->orWhere('name', $secVal);
+                });
+            });
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('receipt_number', 'like', "%{$search}%")
+                  ->orWhere('transaction_id', 'like', "%{$search}%")
+                  ->orWhereHas('student', function($sq) use ($search) {
+                      $sq->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('admission_id', 'like', "%{$search}%")
+                        ->orWhere('admission_number', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $receipts = $query->orderBy('id', 'desc')->get();
+
+        $totalAmount = $receipts->sum('amount_paid');
         $config = \App\Models\FeeConfiguration::where('school_id', $schoolId)->first();
 
-        return view('school.fees.receipts', compact('receipts', 'config'));
+        return view('school.fees.receipts', compact('sessions', 'classes', 'sections', 'receipts', 'totalAmount', 'config'));
     }
 
     public function pendingCheques(Request $request)
@@ -1067,22 +1626,49 @@ class FeeManagementController extends Controller
                 FeeReceipt::create([
                     'school_id' => $schoolId,
                     'student_id' => $cheque->student_id,
-                    'receipt_number' => 'REC-' . rand(100000, 999999),
+                    'receipt_number' => $cheque->receipt_number ?: ('REC-' . rand(100000, 999999)),
                     'amount_paid' => $cheque->amount,
                     'payment_mode' => 'cheque',
                     'transaction_id' => $cheque->cheque_number,
-                    'payment_date' => now()->toDateString(),
+                    'payment_date' => $cheque->receipt_date ?: now()->toDateString(),
                 ]);
 
-                // Update corresponding student fee
-                $fee = StudentFee::where('school_id', $schoolId)
-                    ->where('student_id', $cheque->student_id)
-                    ->where('status', 'pending')
-                    ->first();
-                if ($fee) {
-                    $fee->status = 'paid';
-                    $fee->paid_amount = $fee->amount;
-                    $fee->save();
+                // Update corresponding student fees for that installment!
+                $installmentNo = $cheque->installment_no;
+                $feesToPay = StudentFee::where('school_id', $schoolId)
+                    ->where('student_id', $cheque->student_id);
+                if ($installmentNo) {
+                    $feesToPay->where('installment_no', $installmentNo);
+                }
+                $feesToPay = $feesToPay->where('status', '!=', 'paid')
+                    ->orderBy('id', 'asc')
+                    ->get();
+                
+                if ($feesToPay->isEmpty()) {
+                    $feesToPay = StudentFee::where('school_id', $schoolId)
+                        ->where('student_id', $cheque->student_id);
+                    if ($installmentNo) {
+                        $feesToPay->where('installment_no', $installmentNo);
+                    }
+                    $feesToPay = $feesToPay->orderBy('id', 'asc')->get();
+                }
+
+                $amountToDistribute = floatval($cheque->amount);
+                foreach ($feesToPay as $sf) {
+                    if ($amountToDistribute <= 0) break;
+                    $due = $sf->amount - $sf->paid_amount;
+                    if ($due <= 0) continue;
+                    $paymentForThis = min($amountToDistribute, $due);
+                    $sf->paid_amount += $paymentForThis;
+                    $sf->status = $sf->paid_amount >= $sf->amount ? 'paid' : 'partially_paid';
+                    $sf->save();
+                    $amountToDistribute -= $paymentForThis;
+                }
+                if ($amountToDistribute > 0 && $feesToPay->isNotEmpty()) {
+                    $first = $feesToPay->first();
+                    $first->paid_amount += $amountToDistribute;
+                    $first->status = 'paid';
+                    $first->save();
                 }
 
                 return back()->with('success', 'Cheque cleared successfully! Fee receipt generated.');
@@ -1125,25 +1711,166 @@ class FeeManagementController extends Controller
     public function feeInvoice(Request $request)
     {
         $schoolId = auth()->user()->school_id;
+        $this->seedInvoice1Data($schoolId);
         $this->ensureFeesSeeded($schoolId);
 
+        $school = \App\Models\School::find($schoolId);
         $students = Student::where('school_id', $schoolId)->with(['class', 'section'])->get();
-        $fees = StudentFee::where('school_id', $schoolId)->with(['category', 'student'])->get();
+        $fees = StudentFee::where('school_id', $schoolId)->with(['category', 'student', 'component', 'feeSchedule'])->get();
         $config = \App\Models\FeeConfiguration::where('school_id', $schoolId)->first();
 
-        return view('school.fees.invoice', compact('students', 'fees', 'config'));
+        return view('school.fees.invoice', compact('students', 'fees', 'config', 'school'));
     }
 
     public function feeInvoice1(Request $request)
     {
         $schoolId = auth()->user()->school_id;
-        $this->ensureFeesSeeded($schoolId);
+        
+        // Seed the invoice 1 data
+        $this->seedInvoice1Data($schoolId);
 
-        $students = Student::where('school_id', $schoolId)->with(['class', 'section'])->get();
-        $fees = StudentFee::where('school_id', $schoolId)->with(['category', 'student'])->get();
-        $config = \App\Models\FeeConfiguration::where('school_id', $schoolId)->first();
+        if ($request->has('ajax') || $request->wantsJson()) {
+            $query = \App\Models\StudentFee::where('student_fees.school_id', $schoolId)
+                ->join('students', 'students.id', '=', 'student_fees.student_id')
+                ->leftJoin('school_classes', 'school_classes.id', '=', 'students.class_id')
+                ->leftJoin('sections', 'sections.id', '=', 'students.section_id')
+                ->leftJoin('fee_schedules', 'fee_schedules.id', '=', 'student_fees.fee_schedule_id')
+                ->leftJoin('fee_components', 'fee_components.id', '=', 'student_fees.fee_component_id')
+                ->select(
+                    'student_fees.id as fee_id',
+                    'student_fees.student_id',
+                    'student_fees.amount',
+                    'student_fees.installment_no',
+                    'student_fees.invoice_no',
+                    'students.admission_number as admission_id',
+                    'students.first_name',
+                    'students.last_name',
+                    'students.father_name',
+                    'school_classes.name as class_name',
+                    'sections.name as section_name',
+                    'fee_schedules.name as schedule_name',
+                    'fee_components.component_name'
+                );
 
-        return view('school.fees.invoice1', compact('students', 'fees', 'config'));
+            if ($request->filled('academic_session_id')) {
+                $query->where(function($q) use ($request) {
+                    $q->where('fee_schedules.academic_session_id', $request->academic_session_id)
+                      ->orWhere('students.academic_session_id', $request->academic_session_id)
+                      ->orWhereNull('student_fees.fee_schedule_id');
+                });
+            }
+            if ($request->filled('class_id')) {
+                $query->where('students.class_id', $request->class_id);
+            }
+            if ($request->filled('section_id')) {
+                $secVal = $request->section_id;
+                $query->where(function($q) use ($secVal) {
+                    $q->where('students.section_id', $secVal)
+                      ->orWhere('sections.name', $secVal)
+                      ->orWhere('sections.id', $secVal);
+                });
+            }
+            if ($request->filled('fee_schedule_id')) {
+                $query->where('student_fees.fee_schedule_id', $request->fee_schedule_id);
+            }
+            if ($request->filled('installment_no')) {
+                $query->where('student_fees.installment_no', $request->installment_no);
+            }
+            if ($request->filled('fee_component_id')) {
+                $query->where('student_fees.fee_component_id', $request->fee_component_id);
+            }
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->where('students.first_name', 'like', "%{$search}%")
+                      ->orWhere('students.last_name', 'like', "%{$search}%")
+                      ->orWhere('students.admission_number', 'like', "%{$search}%")
+                      ->orWhere('students.father_name', 'like', "%{$search}%");
+                });
+            }
+
+            // Order by student_fees.id asc so the seeded Raghav etc. appear first
+            $query->orderBy('student_fees.id', 'asc');
+
+            $perPage = $request->input('per_page', 10);
+            $paginator = $query->paginate($perPage);
+
+            // Dynamically combine first and last name for JS compatibility
+            $paginator->getCollection()->transform(function($row) {
+                $row->student_name = trim($row->first_name . ' ' . $row->last_name);
+                return $row;
+            });
+
+            return response()->json($paginator);
+        }
+
+        $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->get();
+        $classes = \App\Models\SchoolClass::where('school_id', $schoolId)->get()->unique('name')->sortBy(function($c) {
+            $order = ['Nursery' => 1, 'LKG' => 2, 'UKG' => 3, 'Class 1' => 4, 'Class 2' => 5, 'Class 3' => 6, 'Class 4' => 7, 'Class 5' => 8, 'Class 6' => 9, 'Class 7' => 10, 'Class 8' => 11, 'Class 9' => 12, 'Class 10' => 13, 'Class 11' => 14, 'Class 12' => 15];
+            return $order[$c->name] ?? ($c->sort_order ?? 99);
+        });
+        $sections = \App\Models\Section::where('school_id', $schoolId)->get();
+        $feeSchedules = \App\Models\FeeSchedule::where('school_id', $schoolId)->get();
+        $feeComponents = \App\Models\FeeComponent::where('school_id', $schoolId)->get();
+
+        return view('school.fees.invoice1', compact(
+            'academicSessions',
+            'classes',
+            'sections',
+            'feeSchedules',
+            'feeComponents'
+        ));
+    }
+
+    public function feeInvoice1Generate(Request $request)
+    {
+        $schoolId = auth()->user()->school_id;
+        $feeIds = $request->input('fee_ids', []);
+
+        if (empty($feeIds)) {
+            return response()->json(['success' => false, 'message' => 'No fee components selected.'], 400);
+        }
+
+        $fees = \App\Models\StudentFee::where('school_id', $schoolId)
+            ->whereIn('id', $feeIds)
+            ->get();
+
+        if ($fees->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No matching fee records found.'], 404);
+        }
+
+        // Group by student
+        $grouped = $fees->groupBy('student_id');
+        $generatedCount = 0;
+        $invoices = [];
+
+        foreach ($grouped as $studentId => $studentFees) {
+            $student = \App\Models\Student::find($studentId);
+            $prefix = $student ? preg_replace('/[^A-Za-z0-9]/', '', $student->admission_number) : 'ST';
+            $invoiceNo = 'INV-' . $prefix . '-' . rand(1000, 9999);
+
+            foreach ($studentFees as $fee) {
+                $fee->invoice_no = $invoiceNo;
+                $fee->save();
+                $generatedCount++;
+            }
+            $invoices[] = [
+                'student_name' => $student ? $student->full_name : 'N/A',
+                'invoice_no' => $invoiceNo,
+                'count' => count($studentFees)
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully generated invoice numbers for {$generatedCount} fee components across " . count($grouped) . " students.",
+            'invoices' => $invoices
+        ]);
+    }
+
+    private function seedInvoice1Data($schoolId)
+    {
+        // No auto-seeding
     }
 
     public function feeBulkUpload(Request $request)

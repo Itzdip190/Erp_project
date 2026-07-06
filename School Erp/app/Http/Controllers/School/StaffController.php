@@ -81,7 +81,7 @@ class StaffController extends Controller
             'first_name'          => 'required|string|max:100',
             'last_name'           => 'required|string|max:100',
             'email'               => 'required|email|unique:users,email',
-            'phone'               => 'required|string|max:20',
+            'phone'               => 'required|digits:10',
             'password'            => 'nullable|string|min:6',
             'department_id'       => 'required|exists:departments,id',
             'designation_id'      => 'required|exists:designations,id',
@@ -90,6 +90,7 @@ class StaffController extends Controller
             'basic_salary'        => 'required|numeric|min:0',
             'is_active'           => 'required|boolean',
             'photo'               => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'captured_photo'      => 'nullable|string',
             'gender'              => 'nullable|string',
             'blood_group'         => 'nullable|string',
             'address'             => 'nullable|string',
@@ -99,12 +100,14 @@ class StaffController extends Controller
             'bank_name'           => 'nullable|string',
             'bank_account_number' => 'nullable|string',
             'ifsc_code'           => 'nullable|string',
-            'pan_number'          => 'required|string',
+            'pan_number'          => 'nullable|string',
             'qualification'       => 'nullable|string',
             'experience_years'    => 'nullable|integer',
             'date_of_birth'       => 'nullable|date',
-            'additional_fields'   => 'required|array',
-            'additional_fields.aadhar_number' => 'required|string',
+            'additional_fields'   => 'nullable|array',
+            'additional_fields.aadhar_number' => 'nullable|string',
+            'additional_fields.alternate_phone' => 'nullable|digits:10',
+            'additional_fields.father_phone' => 'nullable|digits:10',
         ]);
 
         // 1. Create linked User
@@ -127,13 +130,15 @@ class StaffController extends Controller
 
         // 2. Upload Photo
         $photoPath = null;
-        if ($request->hasFile('photo')) {
+        if ($request->filled('captured_photo')) {
+            $photoPath = $this->saveBase64Photo($request->input('captured_photo'), 'staff-photos');
+        } elseif ($request->hasFile('photo')) {
             $photoPath = $request->file('photo')->store('staff-photos', 'public');
         }
 
         // 3. Create Staff profile
         $staff = Staff::create(array_merge(
-            $request->except('photo'),
+            $request->except(['photo', 'captured_photo']),
             [
                 'school_id' => $schoolId,
                 'user_id'   => $user->id,
@@ -176,7 +181,7 @@ class StaffController extends Controller
             'first_name'          => 'required|string|max:100',
             'last_name'           => 'required|string|max:100',
             'email'               => 'required|email|unique:users,email,' . $staff->user_id,
-            'phone'               => 'required|string|max:20',
+            'phone'               => 'required|digits:10',
             'password'            => 'nullable|string|min:6',
             'department_id'       => 'required|exists:departments,id',
             'designation_id'      => 'required|exists:designations,id',
@@ -185,6 +190,7 @@ class StaffController extends Controller
             'basic_salary'        => 'required|numeric|min:0',
             'is_active'           => 'required|boolean',
             'photo'               => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'captured_photo'      => 'nullable|string',
             'gender'              => 'nullable|string',
             'blood_group'         => 'nullable|string',
             'address'             => 'nullable|string',
@@ -194,12 +200,14 @@ class StaffController extends Controller
             'bank_name'           => 'nullable|string',
             'bank_account_number' => 'nullable|string',
             'ifsc_code'           => 'nullable|string',
-            'pan_number'          => 'required|string',
+            'pan_number'          => 'nullable|string',
             'qualification'       => 'nullable|string',
             'experience_years'    => 'nullable|integer',
             'date_of_birth'       => 'nullable|date',
-            'additional_fields'   => 'required|array',
-            'additional_fields.aadhar_number' => 'required|string',
+            'additional_fields'   => 'nullable|array',
+            'additional_fields.aadhar_number' => 'nullable|string',
+            'additional_fields.alternate_phone' => 'nullable|digits:10',
+            'additional_fields.father_phone' => 'nullable|digits:10',
         ]);
 
         $user = $staff->user;
@@ -222,7 +230,9 @@ class StaffController extends Controller
         }
 
         $photoPath = $staff->photo;
-        if ($request->hasFile('photo')) {
+        if ($request->filled('captured_photo')) {
+            $photoPath = $this->saveBase64Photo($request->input('captured_photo'), 'staff-photos', $staff->photo);
+        } elseif ($request->hasFile('photo')) {
             if ($staff->photo && Storage::disk('public')->exists($staff->photo)) {
                 Storage::disk('public')->delete($staff->photo);
             }
@@ -230,7 +240,7 @@ class StaffController extends Controller
         }
 
         $staff->update(array_merge(
-            $request->except('photo'),
+            $request->except(['photo', 'captured_photo']),
             ['photo' => $photoPath]
         ));
         $staff->designations()->sync([$request->designation_id]);
@@ -270,35 +280,53 @@ class StaffController extends Controller
     public function downloadTemplate()
     {
         $headers = [
-            'employee_id', 'first_name', 'last_name', 'email', 'phone', 'alternate_phone',
-            'date_of_birth', 'gender', 'marital_status', 'category', 'blood_group', 'religion',
-            'mother_tongue', 'pan_number', 'aadhar_number', 'department', 'designation',
-            'employment_type', 'joining_date', 'basic_salary', 'qualification', 'experience_years',
-            'epf_account', 'esi_account', 'epf_uan', 'epf_joining_date', 'epf_exit_date',
-            'esi_joining_date', 'esi_exit_date', 'remarks', 'bank_name', 'bank_account_number',
-            'ifsc_code', 'branch_name', 'father_name', 'father_phone', 'mother_name', 'mother_phone',
-            'spouse_name', 'spouse_phone', 'passport_number', 'visa_details', 'permanent_address',
-            'permanent_city', 'permanent_state', 'permanent_pincode', 'correspondence_address',
-            'correspondence_city', 'correspondence_state', 'correspondence_pincode',
-            'emergency_contact_name', 'emergency_relationship', 'emergency_contact_phone',
-            'emergency_alt_phone', 'dl_number', 'dl_expiry', 'gross_salary', 'net_salary',
-            'deductions', 'linkedin_url', 'facebook_url', 'twitter_url'
+            'First Name * (required)',
+            'Last Name',
+            'Email * (required)',
+            'Joining Date (dd/mm/yyyy)',
+            'Employee ID * (required)',
+            'Gender',
+            'DOB (dd/mm/yyyy)',
+            'Phone number * (required)',
+            'Staff Type',
+            'Adhar Number',
+            'Pan Number',
+            'House Number',
+            'Location',
+            'Country',
+            'State',
+            'Zip',
+            'Bank Name',
+            'Account Name',
+            'Account Number',
+            'Ifsc Code',
+            'City',
+            'Highest Qualification'
         ];
 
         $exampleRow = [
-            'EMP101', 'John', 'Doe', 'john.doe@yis.com', '9876543210', '9876543211',
-            '1990-05-15', 'male', 'married', 'General', 'O+', 'Christianity',
-            'English', 'ABCDE1234F', '123456789012', 'Academics', 'Teacher',
-            'permanent', '2026-06-01', '25000.00', 'B.Ed, M.Sc', '5',
-            'EPF12345', 'ESI12345', 'UAN123456789', '2026-06-01', '',
-            '2026-06-01', '', 'Hardworking staff', 'State Bank of India', '12345678901',
-            'SBIN0001234', 'Main Branch', 'Robert Doe', '9876543212', 'Mary Doe', '9876543213',
-            'Sarah Doe', '9876543214', 'PP123456', 'Valid till 2030', '123 Main St',
-            'New York', 'NY', '10001', '456 Side St',
-            'New York', 'NY', '10001',
-            'Jane Doe', 'Sister', '9876543215',
-            '9876543216', 'DL12345', '2035-12-31', '30000.00', '25000.00',
-            '5000.00', 'https://linkedin.com/in/johndoe', 'https://facebook.com/johndoe', 'https://twitter.com/johndoe'
+            'John',
+            'Doe',
+            'john.doe@yis.com',
+            '01/06/2026',
+            'EMP101',
+            'male',
+            '15/05/1990',
+            '9876543210',
+            'Teaching',
+            '123456789012',
+            'ABCDE1234F',
+            '123',
+            'Main Street',
+            'India',
+            'Delhi',
+            '110001',
+            'State Bank of India',
+            'John Doe',
+            '12345678901',
+            'SBIN0001234',
+            'New Delhi',
+            'B.Ed, M.Sc'
         ];
 
         return response()->streamDownload(function () use ($headers, $exampleRow) {
@@ -341,15 +369,89 @@ class StaffController extends Controller
             return back()->with('error', 'Spreadsheet file is empty.');
         }
 
+        // Normalization helper for headers
+        $normalizeHeader = function($name) {
+            $name = strtolower(trim((string)$name));
+            // Remove parenthesized content (e.g. "(dd/mm/yyyy)", "*(required)")
+            $name = preg_replace('/\s*\(.*?\)\s*/', '', $name);
+            // Remove asterisks
+            $name = str_replace('*', '', $name);
+            // Strip spaces, dashes, and underscores for key lookup
+            $name = preg_replace('/[\s_-]+/', '', $name);
+            
+            $aliases = [
+                'employeeid' => 'employee_id',
+                'firstname' => 'first_name',
+                'lastname' => 'last_name',
+                'email' => 'email',
+                'phone' => 'phone',
+                'phonenumber' => 'phone',
+                'joiningdate' => 'joining_date',
+                'dateofjoining' => 'joining_date',
+                'gender' => 'gender',
+                'dob' => 'date_of_birth',
+                'dateofbirth' => 'date_of_birth',
+                'stafftype' => 'staff_type',
+                'adharnumber' => 'aadhar_number',
+                'aadhar' => 'aadhar_number',
+                'adhar' => 'aadhar_number',
+                'aadharnumber' => 'aadhar_number',
+                'pannumber' => 'pan_number',
+                'pan' => 'pan_number',
+                'housenumber' => 'house_number',
+                'location' => 'location',
+                'country' => 'country',
+                'state' => 'state',
+                'zip' => 'pincode',
+                'zipcode' => 'pincode',
+                'pincode' => 'pincode',
+                'bankname' => 'bank_name',
+                'accountname' => 'account_name',
+                'accountnumber' => 'bank_account_number',
+                'bankaccountnumber' => 'bank_account_number',
+                'ifsccode' => 'ifsc_code',
+                'ifsc' => 'ifsc_code',
+                'city' => 'city',
+                'highestqualification' => 'qualification',
+                'qualification' => 'qualification',
+            ];
+            
+            return $aliases[$name] ?? $name;
+        };
+
         // Map column header names to their column index
-        $headerMap = array_flip(array_map('trim', $headerRow));
+        $headerMap = [];
+        foreach ($headerRow as $index => $rawHeader) {
+            if ($rawHeader !== null && $rawHeader !== '') {
+                $normalized = $normalizeHeader($rawHeader);
+                $headerMap[$normalized] = $index;
+            }
+        }
 
         // Helper function to safely fetch cell value by header name
         $val = function($row, $headerName) use ($headerMap) {
             if (isset($headerMap[$headerName]) && isset($row[$headerMap[$headerName]])) {
-                return trim($row[$headerMap[$headerName]]);
+                return trim((string)$row[$headerMap[$headerName]]);
             }
             return '';
+        };
+
+        // Date parser helper
+        $parseDate = function($val) {
+            if (empty($val)) return null;
+            $val = trim((string)$val);
+            if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $val)) {
+                $parts = explode('/', $val);
+                return sprintf('%04d-%02d-%02d', $parts[2], $parts[1], $parts[0]);
+            }
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $val)) {
+                return $val;
+            }
+            try {
+                return \Carbon\Carbon::parse($val)->format('Y-m-d');
+            } catch (\Exception $e) {
+                return null;
+            }
         };
 
         $imported = 0;
@@ -364,10 +466,11 @@ class StaffController extends Controller
             // Basic validation
             $empId     = $val($row, 'employee_id');
             $firstName = $val($row, 'first_name');
-            $lastName  = $val($row, 'last_name');
+            $lastName  = $val($row, 'last_name') ?: '';
             $email     = $val($row, 'email');
+            $phone     = $val($row, 'phone');
 
-            if (empty($empId) || empty($firstName) || empty($lastName) || empty($email)) {
+            if (empty($empId) || empty($firstName) || empty($email) || empty($phone)) {
                 $skipped++;
                 continue;
             }
@@ -396,16 +499,22 @@ class StaffController extends Controller
             $user = User::create([
                 'name'      => trim($firstName . ' ' . $lastName),
                 'email'     => $email,
-                'phone'     => $val($row, 'phone') ?: null,
+                'phone'     => $phone ?: null,
                 'password'  => Hash::make('Welcome@2026!'),
                 'school_id' => $schoolId,
                 'is_active' => true,
             ]);
 
             // Assign Spatie Role based on Designation
-            $roleName = str_contains(strtolower($desgName), 'admin') || str_contains(strtolower($desgName), 'principal')
-                ? 'school_admin'
-                : (str_contains(strtolower($desgName), 'accountant') ? 'accountant' : 'teacher');
+            $roleName = 'teacher';
+            $lowerDesg = strtolower($desgName);
+            if (str_contains($lowerDesg, 'admin') || str_contains($lowerDesg, 'principal')) {
+                $roleName = 'school_admin';
+            } elseif (str_contains($lowerDesg, 'accountant')) {
+                $roleName = 'accountant';
+            } elseif (str_contains($lowerDesg, 'driver')) {
+                $roleName = 'driver';
+            }
             $user->assignRole($roleName);
 
             // 4. Group JSON additional fields
@@ -419,10 +528,10 @@ class StaffController extends Controller
                 'epf_account'              => $val($row, 'epf_account'),
                 'esi_account'              => $val($row, 'esi_account'),
                 'epf_uan'                  => $val($row, 'epf_uan'),
-                'epf_joining_date'         => $val($row, 'epf_joining_date'),
-                'epf_exit_date'            => $val($row, 'epf_exit_date'),
-                'esi_joining_date'         => $val($row, 'esi_joining_date'),
-                'esi_exit_date'            => $val($row, 'esi_exit_date'),
+                'epf_joining_date'         => $parseDate($val($row, 'epf_joining_date')),
+                'epf_exit_date'            => $parseDate($val($row, 'epf_exit_date')),
+                'esi_joining_date'         => $parseDate($val($row, 'esi_joining_date')),
+                'esi_exit_date'            => $parseDate($val($row, 'esi_exit_date')),
                 'remarks'                  => $val($row, 'remarks'),
                 'branch_name'              => $val($row, 'branch_name'),
                 'father_name'              => $val($row, 'father_name'),
@@ -442,14 +551,27 @@ class StaffController extends Controller
                 'emergency_contact_phone'  => $val($row, 'emergency_contact_phone'),
                 'emergency_alt_phone'      => $val($row, 'emergency_alt_phone'),
                 'dl_number'                => $val($row, 'dl_number'),
-                'dl_expiry'                => $val($row, 'dl_expiry'),
+                'dl_expiry'                => $parseDate($val($row, 'dl_expiry')),
                 'gross_salary'             => $val($row, 'gross_salary'),
                 'net_salary'               => $val($row, 'net_salary'),
                 'deductions'               => $val($row, 'deductions'),
                 'linkedin_url'             => $val($row, 'linkedin_url'),
                 'facebook_url'             => $val($row, 'facebook_url'),
                 'twitter_url'              => $val($row, 'twitter_url'),
+                
+                // Add the user's custom fields
+                'staff_type'               => $val($row, 'staff_type'),
+                'house_number'             => $val($row, 'house_number'),
+                'location'                 => $val($row, 'location'),
+                'country'                  => $val($row, 'country'),
+                'account_name'             => $val($row, 'account_name'),
             ];
+
+            // Build permanent address from House Number and Location if permanent_address is empty
+            $address = $val($row, 'permanent_address') ?: trim($val($row, 'house_number') . ' ' . $val($row, 'location'));
+            if (empty($address)) {
+                $address = null;
+            }
 
             // 5. Create Staff Profile
             $staff = Staff::create([
@@ -459,15 +581,15 @@ class StaffController extends Controller
                 'first_name'          => $firstName,
                 'last_name'           => $lastName,
                 'email'               => $email,
-                'phone'               => $val($row, 'phone') ?: null,
-                'joining_date'        => $val($row, 'joining_date') ?: today()->toDateString(),
-                'date_of_birth'       => $val($row, 'date_of_birth') ?: null,
-                'gender'              => in_array(strtolower($val($row, 'gender')), ['male', 'female', 'other']) ? strtolower($val($row, 'gender')) : 'other',
+                'phone'               => $phone ?: null,
+                'joining_date'        => $parseDate($val($row, 'joining_date')) ?: today()->toDateString(),
+                'date_of_birth'       => $parseDate($val($row, 'date_of_birth')),
+                'gender'              => in_array(strtolower($val($row, 'gender')), ['male', 'female', 'other']) ? strtolower($val($row, 'gender')) : null,
                 'blood_group'         => $val($row, 'blood_group') ?: null,
-                'address'             => $val($row, 'permanent_address') ?: null,
-                'city'                => $val($row, 'permanent_city') ?: null,
-                'state'               => $val($row, 'permanent_state') ?: null,
-                'pincode'             => $val($row, 'permanent_pincode') ?: null,
+                'address'             => $address,
+                'city'                => $val($row, 'city') ?: null,
+                'state'               => $val($row, 'state') ?: null,
+                'pincode'             => $val($row, 'pincode') ?: null,
                 'department_id'       => $dept->id,
                 'designation_id'      => $desg->id,
                 'employment_type'     => in_array(strtolower($val($row, 'employment_type')), ['permanent', 'contract', 'part_time']) ? strtolower($val($row, 'employment_type')) : 'permanent',
@@ -510,11 +632,18 @@ class StaffController extends Controller
         $schoolId = auth()->user()->school_id;
         $updated = 0;
 
+        // Fetch all staff members for normalization matching
+        $staffMembers = Staff::where('school_id', $schoolId)->get();
+
         foreach ($request->file('photos') as $file) {
             $filename = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-            $staff = Staff::where('school_id', $schoolId)
-                ->where('employee_id', $filename)
-                ->first();
+            $normalizedFilename = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $filename));
+
+            // Find matching staff member
+            $staff = $staffMembers->first(function($st) use ($normalizedFilename) {
+                $normEmpId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $st->employee_id));
+                return $normEmpId === $normalizedFilename;
+            });
 
             if ($staff) {
                 if ($staff->photo && Storage::disk('public')->exists($staff->photo)) {
@@ -590,5 +719,50 @@ class StaffController extends Controller
         }
 
         return back()->with('success', 'Staff attendance updated successfully!');
+    }
+
+    protected function saveBase64Photo(?string $base64Data, string $folder, ?string $oldPath = null): ?string
+    {
+        if (empty($base64Data)) {
+            return null;
+        }
+
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
+            $data = substr($base64Data, strpos($base64Data, ',') + 1);
+            $type = strtolower($type[1]); // e.g. png, jpeg, gif, webp
+
+            if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png', 'webp'])) {
+                return null;
+            }
+
+            $data = base64_decode($data);
+            if ($data === false) {
+                return null;
+            }
+
+            $fileName = \Illuminate\Support\Str::random(40) . '.' . $type;
+            $path = $folder . '/' . $fileName;
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $data);
+
+            if ($oldPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($oldPath)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($oldPath);
+            }
+
+            return $path;
+        }
+
+        return null;
+    }
+
+    public function downloadProfile(Staff $staff)
+    {
+        $schoolId = auth()->user()->school_id;
+        if ($staff->school_id !== $schoolId) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.staff.profile-pdf', compact('staff'));
+        return $pdf->stream("staff_profile_{$staff->employee_id}.pdf");
     }
 }

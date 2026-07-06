@@ -10,32 +10,7 @@ class EventHolidayController extends Controller
 {
     private function ensureEventsSeeded($schoolId)
     {
-        if (Event::where('school_id', $schoolId)->count() === 0) {
-            Event::create([
-                'school_id' => $schoolId,
-                'title' => 'Independence Day Celebration',
-                'description' => 'Flag hoisting ceremony and patriotic cultural events at school ground.',
-                'start_date' => now()->addDays(5)->toDateString(),
-                'end_date' => now()->addDays(5)->toDateString(),
-                'is_holiday' => true,
-            ]);
-            Event::create([
-                'school_id' => $schoolId,
-                'title' => 'Annual Science Exhibition',
-                'description' => 'Students will display science projects and experiments in classrooms.',
-                'start_date' => now()->addDays(12)->toDateString(),
-                'end_date' => now()->addDays(13)->toDateString(),
-                'is_holiday' => false,
-            ]);
-            Event::create([
-                'school_id' => $schoolId,
-                'title' => 'Summer Vacation',
-                'description' => 'School closed for summer break.',
-                'start_date' => now()->subDays(10)->toDateString(),
-                'end_date' => now()->subDays(2)->toDateString(),
-                'is_holiday' => true,
-            ]);
-        }
+        // No auto-seeding
     }
 
     public function eventManagement(Request $request)

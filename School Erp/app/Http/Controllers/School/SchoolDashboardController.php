@@ -18,6 +18,9 @@ use App\Models\StudentAttendance;
 use App\Models\User;
 use App\Models\Section;
 use App\Models\FcmDeviceToken;
+use App\Models\StudentDocument;
+use App\Models\OfflineTest;
+use App\Models\SchoolExpense;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\View\View;
@@ -43,13 +46,27 @@ class SchoolDashboardController extends Controller
 
         // Accounts counts
         $totalFeeCollection = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
-        $totalIncome = $totalFeeCollection + 35000.00;
-        $totalExpense = 0; // Mapped as ₹0 in screenshot
+        $totalIncome = $totalFeeCollection;
+        $totalExpense = (float) SchoolExpense::where('school_id', $schoolId)
+            ->where('status', '!=', 'cancelled')
+            ->sum('amount');
 
         // Fee counts
         $todayFeeCollection = (float) StudentFee::where('school_id', $schoolId)
             ->whereDate('updated_at', today())
             ->sum('paid_amount');
+
+        $todayFeeDue = (float) StudentFee::where('school_id', $schoolId)
+            ->whereDate('due_date', today())
+            ->sum('amount');
+        $todayFeeCollectionPct = 0;
+        if ($todayFeeCollection > 0) {
+            if ($todayFeeDue > 0) {
+                $todayFeeCollectionPct = min(100, round(($todayFeeCollection / $todayFeeDue) * 100));
+            } else {
+                $todayFeeCollectionPct = 100;
+            }
+        }
 
         // Today's Attendance rates
         $markedStudentsToday = StudentAttendance::where('school_id', $schoolId)
@@ -62,8 +79,8 @@ class SchoolDashboardController extends Controller
                 ->whereDate('date', today())
                 ->where('status', 'half_day')
                 ->count() * 0.5);
-        $studentAttendancePct = $markedStudentsToday > 0 
-            ? round(($presentStudentsToday / $markedStudentsToday) * 100) 
+        $studentAttendancePct = $totalStudents > 0 
+            ? round(($presentStudentsToday / $totalStudents) * 100) 
             : 0;
 
         $markedStaffToday = StaffAttendance::where('school_id', $schoolId)
@@ -76,8 +93,8 @@ class SchoolDashboardController extends Controller
                 ->whereDate('date', today())
                 ->where('status', 'half_day')
                 ->count() * 0.5);
-        $staffAttendancePct = $markedStaffToday > 0 
-            ? round(($presentStaffToday / $markedStaffToday) * 100) 
+        $staffAttendancePct = $totalStaffs > 0 
+            ? round(($presentStaffToday / $totalStaffs) * 100) 
             : 0;
 
         // ── 2. ENROLLMENT OVERVIEW (GENDER, ATTRITION, ADMISSIONS) ───────────
@@ -133,6 +150,18 @@ class SchoolDashboardController extends Controller
             $idx = array_search($monthName, $months);
             if ($idx !== false) {
                 $incomeData[$idx] += (int) $payment->paid_amount;
+            }
+        }
+
+        // Populate expenseData from SchoolExpense table
+        $expenseRecords = SchoolExpense::where('school_id', $schoolId)
+            ->where('status', '!=', 'cancelled')
+            ->get();
+        foreach ($expenseRecords as $expRec) {
+            $monthName = Carbon::parse($expRec->expense_date)->format('F');
+            $idx = array_search($monthName, $months);
+            if ($idx !== false) {
+                $expenseData[$idx] += (float) $expRec->amount;
             }
         }
 
@@ -276,6 +305,7 @@ class SchoolDashboardController extends Controller
             'feeDueAmount',
             'feeCollectedPct',
             'feeDuePct',
+            'todayFeeCollectionPct',
             'annualCollectedAmount',
             'annualDueAmount',
             'annualCollectedPct',
@@ -486,8 +516,8 @@ class SchoolDashboardController extends Controller
         $studentAttendance = StudentAttendance::where('school_id', $schoolId)->whereDate('date', $date)->get();
         $studentPresent = $studentAttendance->where('status', 'present')->count();
         $studentMarked = $studentAttendance->count();
-        $studentAttendancePct = $studentMarked > 0 ? round(($studentPresent / $studentMarked) * 100) : 0;
-        $studentAttendanceRatio = "{$studentPresent}/{$studentMarked}";
+        $studentAttendancePct = $totalStudents > 0 ? round(($studentPresent / $totalStudents) * 100) : 0;
+        $studentAttendanceRatio = "{$studentPresent}/{$totalStudents}";
 
         // 3. Staff Attendance
         $totalStaff = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
@@ -589,7 +619,7 @@ class SchoolDashboardController extends Controller
             ->count();
 
         $pendingDownloadsCount = $appNotDownloadedCount;
-        $todayBooksIssued = 0;
+        $todayBooksIssued = StudentDocument::where('school_id', $schoolId)->whereDate('created_at', $date)->count();
         $todayBooksReturned = 0;
         $todayNoticesShared = Notice::where('school_id', $schoolId)
             ->whereDate('created_at', $date)
@@ -600,18 +630,21 @@ class SchoolDashboardController extends Controller
             ->whereDate('created_at', $date)
             ->count();
         $todayApplicationsCount = EnquiryLead::where('school_id', $schoolId)
-            ->where('status', 'contacted') // contacted = application in seeder
+            ->whereIn('status', ['contacted', 'application'])
             ->whereDate('created_at', $date)
             ->count();
-        $todayInteractionsCount = 0;
+        $todayInteractionsCount = EnquiryLead::where('school_id', $schoolId)
+            ->where('status', 'evaluation')
+            ->whereDate('created_at', $date)
+            ->count();
         $todayAdmissionsCount = Student::where('school_id', $schoolId)
             ->whereDate('admission_date', $date)
             ->count();
 
-        $todayAssignmentsShared = 0;
-        $todayMaterialsShared = 0;
-        $todayTestsShared = 0;
-        $todayDiariesShared = \App\Models\DigitalDiary::where('school_id', $schoolId)
+        $todayAssignmentsShared = DigitalDiary::where('school_id', $schoolId)->whereDate('diary_date', $date)->count();
+        $todayMaterialsShared = StudentDocument::where('school_id', $schoolId)->whereDate('created_at', $date)->count();
+        $todayTestsShared = OfflineTest::where('school_id', $schoolId)->whereDate('created_at', $date)->count();
+        $todayDiariesShared = DigitalDiary::where('school_id', $schoolId)
             ->whereDate('diary_date', $date)
             ->count();
 
@@ -837,7 +870,7 @@ class SchoolDashboardController extends Controller
                         $total = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id)->count();
                         $active = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id)->where('is_active', true)->count();
                         $deactivated = $total - $active;
-                        $new = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id)->whereDate('admission_date', '>=', $sessionStartDate)->count();
+                        $new = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id)->whereYear('admission_date', now()->year)->count();
                         $promoted = max(0, $active - $new);
                         $today = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id)->whereDate('admission_date', today())->count();
                         
@@ -932,8 +965,24 @@ class SchoolDashboardController extends Controller
                         'sections' => $c->sections->map(fn($s) => ['id' => $s->id, 'name' => $s->name])->toArray()
                     ];
                 }
+
+                // Demo pending fee students for visual preview
+                $demoPendingStudents = [
+                    ['id' => 1, 'name' => 'Aarav Sharma',    'roll' => 'S-1021', 'class' => 'Class 10', 'section' => 'A', 'total_fee' => '₹12,000', 'paid' => '₹8,000',  'due' => '₹4,000',  'due_date' => '15 Jun 2025', 'overdue' => true],
+                    ['id' => 2, 'name' => 'Priya Patel',     'roll' => 'S-1034', 'class' => 'Class 9',  'section' => 'B', 'total_fee' => '₹10,500', 'paid' => '₹5,000',  'due' => '₹5,500',  'due_date' => '20 Jun 2025', 'overdue' => true],
+                    ['id' => 3, 'name' => 'Rohan Mehta',     'roll' => 'S-1056', 'class' => 'Class 8',  'section' => 'A', 'total_fee' => '₹9,000',  'paid' => '₹9,000',  'due' => '₹0',      'due_date' => '—',           'overdue' => false],
+                    ['id' => 4, 'name' => 'Sneha Reddy',     'roll' => 'S-1078', 'class' => 'Class 10', 'section' => 'C', 'total_fee' => '₹12,000', 'paid' => '₹3,500',  'due' => '₹8,500',  'due_date' => '10 Jun 2025', 'overdue' => true],
+                    ['id' => 5, 'name' => 'Kiran Yadav',     'roll' => 'S-1092', 'class' => 'Class 7',  'section' => 'A', 'total_fee' => '₹8,000',  'paid' => '₹4,000',  'due' => '₹4,000',  'due_date' => '25 Jun 2025', 'overdue' => true],
+                    ['id' => 6, 'name' => 'Divya Nair',      'roll' => 'S-1103', 'class' => 'Class 9',  'section' => 'A', 'total_fee' => '₹10,500', 'paid' => '₹10,500', 'due' => '₹0',      'due_date' => '—',           'overdue' => false],
+                    ['id' => 7, 'name' => 'Arjun Singh',     'roll' => 'S-1117', 'class' => 'Class 11', 'section' => 'B', 'total_fee' => '₹14,000', 'paid' => '₹7,000',  'due' => '₹7,000',  'due_date' => '05 Jun 2025', 'overdue' => true],
+                    ['id' => 8, 'name' => 'Meera Krishnan',  'roll' => 'S-1129', 'class' => 'Class 6',  'section' => 'A', 'total_fee' => '₹7,500',  'paid' => '₹2,500',  'due' => '₹5,000',  'due_date' => '18 Jun 2025', 'overdue' => true],
+                    ['id' => 9, 'name' => 'Vivek Gupta',     'roll' => 'S-1145', 'class' => 'Class 12', 'section' => 'A', 'total_fee' => '₹15,000', 'paid' => '₹12,000', 'due' => '₹3,000',  'due_date' => '28 Jun 2025', 'overdue' => false],
+                    ['id' =>10, 'name' => 'Ananya Joshi',    'roll' => 'S-1158', 'class' => 'Class 8',  'section' => 'B', 'total_fee' => '₹9,000',  'paid' => '₹0',      'due' => '₹9,000',  'due_date' => '01 Jun 2025', 'overdue' => true],
+                ];
+
                 $data = [
-                    'classes' => $classesList
+                    'classes'         => $classesList,
+                    'pendingStudents' => $demoPendingStudents,
                 ];
                 break;
 
@@ -949,6 +998,7 @@ class SchoolDashboardController extends Controller
                     ->get();
                 $events = Event::where('school_id', $schoolId)
                     ->whereMonth('start_date', $month)
+                    ->whereYear('start_date', $year)
                     ->get();
                     
                 $birthdayList = [];
@@ -976,7 +1026,7 @@ class SchoolDashboardController extends Controller
                     $birthdayList[] = [
                         'day' => $day,
                         'name' => $ev->title,
-                        'type' => 'event',
+                        'type' => $ev->is_holiday ? 'holiday' : 'event',
                         'details' => $ev->description ?? 'Event'
                     ];
                 }
@@ -1038,19 +1088,6 @@ class SchoolDashboardController extends Controller
                         ];
                     }
                 }
-                
-                // Append other income row to make total income greater than total collection
-                $data[] = [
-                    'receipt_id' => 'OTH-INC-101',
-                    'student' => 'General (Other Income)',
-                    'amount' => '₹ ' . number_format(35000.00, 2),
-                    'date' => date('Y-m-d'),
-                    'status' => 'Paid',
-                    'payment_mode' => 'Online',
-                    'category' => 'Other Income',
-                    'sub_category' => 'Rent',
-                    'income_name' => 'Canteen Rent & Other General Income'
-                ];
                 break;
 
             case 'expense':
@@ -1177,7 +1214,7 @@ class SchoolDashboardController extends Controller
                 foreach ($events as $ev) {
                     $data[] = [
                         'event_name' => $ev->title,
-                        'type' => 'Event',
+                        'type' => $ev->is_holiday ? 'Holiday' : 'Event',
                         'time' => Carbon::parse($ev->start_time)->format('h:i A') . ' - ' . Carbon::parse($ev->end_time)->format('h:i A'),
                         'details' => $ev->description ?? '—'
                     ];
@@ -1231,6 +1268,329 @@ class SchoolDashboardController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Dues notification reminders have been sent successfully!'
+        ]);
+    }
+
+    public function refreshBox(Request $request): JsonResponse
+    {
+        $schoolId = auth()->user()->school_id;
+        $box = $request->get('box');
+
+        $data = [];
+
+        if ($box === 'overview') {
+            $totalStudents = Student::where('school_id', $schoolId)->where('is_active', true)->count();
+            $totalStaffs = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
+            $data = [
+                'totalStudents' => $totalStudents,
+                'totalStaffs' => $totalStaffs,
+            ];
+        } elseif ($box === 'accounts') {
+            $totalFeeCollection = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
+            $totalIncome = $totalFeeCollection;
+            $totalExpense = 0.0;
+            $data = [
+                'totalIncome' => number_format($totalIncome),
+                'totalExpense' => number_format($totalExpense),
+            ];
+        } elseif ($box === 'fee') {
+            $todayFeeCollection = (float) StudentFee::where('school_id', $schoolId)
+                ->whereDate('updated_at', today())
+                ->sum('paid_amount');
+            $totalFeeCollection = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
+            
+            $todayFeeDue = (float) StudentFee::where('school_id', $schoolId)
+                ->whereDate('due_date', today())
+                ->sum('amount');
+            $todayFeeCollectionPct = 0;
+            if ($todayFeeCollection > 0) {
+                if ($todayFeeDue > 0) {
+                    $todayFeeCollectionPct = min(100, round(($todayFeeCollection / $todayFeeDue) * 100));
+                } else {
+                    $todayFeeCollectionPct = 100;
+                }
+            }
+
+            $feeCollectedAmount = (float) StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->sum('paid_amount');
+            $feeDueAmount = (float) StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->whereColumn('amount', '>', 'paid_amount')->sum(\DB::raw('amount - paid_amount'));
+            $feeTotalSum = $feeCollectedAmount + $feeDueAmount;
+            $feeCollectedPct = $feeTotalSum > 0 ? round(($feeCollectedAmount / $feeTotalSum) * 100, 2) : 0;
+
+            $data = [
+                'todayFeeCollection' => number_format($todayFeeCollection),
+                'todayFeeCollectionPct' => $todayFeeCollectionPct,
+                'totalFeeCollection' => number_format($totalFeeCollection),
+                'feeCollectedPct' => $feeCollectedPct,
+            ];
+        } elseif ($box === 'attendance') {
+            $totalStudents = Student::where('school_id', $schoolId)->where('is_active', true)->count();
+            $totalStaffs = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
+
+            $markedStudentsToday = StudentAttendance::where('school_id', $schoolId)
+                ->whereDate('date', today())
+                ->count();
+            $presentStudentsToday = StudentAttendance::where('school_id', $schoolId)
+                ->whereDate('date', today())
+                ->whereIn('status', ['present', 'late', 'duty_leave'])
+                ->count() + (StudentAttendance::where('school_id', $schoolId)
+                    ->whereDate('date', today())
+                    ->where('status', 'half_day')
+                    ->count() * 0.5);
+            $studentAttendancePct = $totalStudents > 0 
+                ? round(($presentStudentsToday / $totalStudents) * 100) 
+                : 0;
+
+            $markedStaffToday = StaffAttendance::where('school_id', $schoolId)
+                ->whereDate('date', today())
+                ->count();
+            $presentStaffToday = StaffAttendance::where('school_id', $schoolId)
+                ->whereDate('date', today())
+                ->whereIn('status', ['present', 'late'])
+                ->count() + (StaffAttendance::where('school_id', $schoolId)
+                    ->whereDate('date', today())
+                    ->where('status', 'half_day')
+                    ->count() * 0.5);
+            $staffAttendancePct = $totalStaffs > 0 
+                ? round(($presentStaffToday / $totalStaffs) * 100) 
+                : 0;
+
+            $data = [
+                'studentAttendancePct' => $studentAttendancePct,
+                'staffAttendancePct' => $staffAttendancePct,
+                'studentPresentToday' => $presentStudentsToday,
+                'staffPresentToday' => $presentStaffToday,
+            ];
+        } elseif ($box === 'attrition') {
+            $totalStudents = Student::where('school_id', $schoolId)->where('is_active', true)->count();
+            $totalStaffs = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
+            $studentNewlyJoined = Student::where('school_id', $schoolId)->whereYear('admission_date', now()->year)->count();
+            $studentExited = Student::where('school_id', $schoolId)->onlyTrashed()->count();
+            $staffNewlyJoined = Staff::where('school_id', $schoolId)->whereYear('joining_date', now()->year)->count();
+            $staffExited = Staff::where('school_id', $schoolId)->onlyTrashed()->count();
+            
+            $data = [
+                'studentNewlyJoined' => $studentNewlyJoined,
+                'studentExited' => $studentExited,
+                'studentStrength' => $totalStudents,
+                'staffNewlyJoined' => $staffNewlyJoined,
+                'staffExited' => $staffExited,
+                'staffStrength' => $totalStaffs,
+            ];
+        } elseif ($box === 'admissions') {
+            $admissionEnquiry = EnquiryLead::where('school_id', $schoolId)->whereIn('status', ['new', 'enquiry'])->count();
+            $admissionApplication = EnquiryLead::where('school_id', $schoolId)->whereIn('status', ['contacted', 'application'])->count();
+            $admissionPayment = EnquiryLead::where('school_id', $schoolId)->where('status', 'payment')->count();
+            $admissionEvaluation = EnquiryLead::where('school_id', $schoolId)->where('status', 'evaluation')->count();
+            $admissionCount = EnquiryLead::where('school_id', $schoolId)->whereIn('status', ['enrolled', 'admission'])->count();
+
+            $data = [
+                'enquiry' => $admissionEnquiry,
+                'application' => $admissionApplication,
+                'payment' => $admissionPayment,
+                'evaluation' => $admissionEvaluation,
+                'admission' => $admissionCount,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $data
+        ]);
+    }
+
+    public function incomeExpenseChartData(Request $request): JsonResponse
+    {
+        $schoolId = auth()->user()->school_id;
+        $filter = $request->get('filter', 'This Year');
+
+        $labels = [];
+        $incomeData = [];
+        $expenseData = [];
+        $totalIncome = 0;
+        $totalExpense = 0;
+
+        if ($filter === 'This Month') {
+            $daysInMonth = now()->daysInMonth;
+            for ($d = 1; $d <= $daysInMonth; $d++) {
+                $labels[] = (string) $d;
+                $incomeData[] = 0;
+                $expenseData[] = 0;
+            }
+
+            $feePayments = StudentFee::where('school_id', $schoolId)
+                ->whereMonth('updated_at', now()->month)
+                ->whereYear('updated_at', now()->year)
+                ->where('paid_amount', '>', 0)
+                ->get();
+
+            foreach ($feePayments as $payment) {
+                $day = Carbon::parse($payment->updated_at)->day;
+                if ($day <= $daysInMonth) {
+                    $incomeData[$day - 1] += (float) $payment->paid_amount;
+                }
+            }
+
+            // Add monthly expenses by day
+            $monthExpenses = SchoolExpense::where('school_id', $schoolId)
+                ->whereMonth('expense_date', now()->month)
+                ->whereYear('expense_date', now()->year)
+                ->where('status', '!=', 'cancelled')
+                ->get();
+            foreach ($monthExpenses as $expRec) {
+                $day = Carbon::parse($expRec->expense_date)->day;
+                if ($day <= $daysInMonth) {
+                    $expenseData[$day - 1] += (float) $expRec->amount;
+                }
+            }
+
+            $totalIncome = array_sum($incomeData);
+            $totalExpense = array_sum($expenseData);
+
+        } elseif ($filter === 'Last 6 Months') {
+            for ($i = 5; $i >= 0; $i--) {
+                $m = now()->subMonths($i);
+                $labels[] = $m->format('F');
+                $incomeData[] = 0;
+                $expenseData[] = 0;
+            }
+
+            $feePayments = StudentFee::where('school_id', $schoolId)
+                ->where('updated_at', '>=', now()->subMonths(5)->startOfMonth())
+                ->where('paid_amount', '>', 0)
+                ->get();
+
+            foreach ($feePayments as $payment) {
+                $monthName = Carbon::parse($payment->updated_at)->format('F');
+                $idx = array_search($monthName, $labels);
+                if ($idx !== false) {
+                    $incomeData[$idx] += (float) $payment->paid_amount;
+                }
+            }
+
+            // Add last 6 months expenses
+            $last6Expenses = SchoolExpense::where('school_id', $schoolId)
+                ->where('expense_date', '>=', now()->subMonths(5)->startOfMonth())
+                ->where('status', '!=', 'cancelled')
+                ->get();
+            foreach ($last6Expenses as $expRec) {
+                $monthName = Carbon::parse($expRec->expense_date)->format('F');
+                $idx = array_search($monthName, $labels);
+                if ($idx !== false) {
+                    $expenseData[$idx] += (float) $expRec->amount;
+                }
+            }
+
+            $totalIncome = array_sum($incomeData);
+            $totalExpense = array_sum($expenseData);
+
+        } else {
+            $labels = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February'];
+            $incomeData = array_fill(0, count($labels), 0);
+            $expenseData = array_fill(0, count($labels), 0);
+
+            $feePayments = StudentFee::where('school_id', $schoolId)
+                ->where('paid_amount', '>', 0)
+                ->get();
+
+            foreach ($feePayments as $payment) {
+                $monthName = Carbon::parse($payment->updated_at)->format('F');
+                $idx = array_search($monthName, $labels);
+                if ($idx !== false) {
+                    $incomeData[$idx] += (float) $payment->paid_amount;
+                }
+            }
+
+            // Annual expense data from SchoolExpense
+            $allExpenses = SchoolExpense::where('school_id', $schoolId)
+                ->where('status', '!=', 'cancelled')
+                ->get();
+            foreach ($allExpenses as $expRec) {
+                $monthName = Carbon::parse($expRec->expense_date)->format('F');
+                $idx = array_search($monthName, $labels);
+                if ($idx !== false) {
+                    $expenseData[$idx] += (float) $expRec->amount;
+                }
+            }
+
+            $totalFeeCollection = array_sum($incomeData);
+            $totalIncome = $totalFeeCollection;
+            $totalExpense = array_sum($expenseData);
+        }
+
+        return response()->json([
+            'labels' => $labels,
+            'incomeData' => $incomeData,
+            'expenseData' => $expenseData,
+            'totalIncome' => '₹ ' . number_format($totalIncome),
+            'totalExpense' => '₹ ' . number_format($totalExpense),
+        ]);
+    }
+
+    /**
+     * Change academic session/year for the current school.
+     */
+    public function changeSession(Request $request)
+    {
+        $request->validate([
+            'academic_session_id' => 'required|exists:academic_sessions,id',
+        ]);
+
+        $schoolId = auth()->user()->school_id;
+
+        // Ensure the session belongs to the school
+        $session = AcademicSession::where('school_id', $schoolId)
+            ->findOrFail($request->academic_session_id);
+
+        // Set all other sessions is_current to false
+        AcademicSession::where('school_id', $schoolId)->update(['is_current' => false]);
+
+        // Set selected session is_current to true
+        $session->is_current = true;
+        $session->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Academic session changed successfully!',
+        ]);
+    }
+
+    /**
+     * Topbar instant search for students and staff within the school.
+     */
+    public function topbarSearch(Request $request)
+    {
+        $query = trim($request->input('query'));
+        if (empty($query)) {
+            return response()->json(['students' => [], 'staff' => []]);
+        }
+
+        $schoolId = auth()->user()->school_id;
+
+        // Fetch students of this school
+        $students = Student::where('school_id', $schoolId)
+            ->where(function($q) use ($query) {
+                $q->where('first_name', 'like', "%{$query}%")
+                  ->orWhere('last_name', 'like', "%{$query}%")
+                  ->orWhere('admission_number', 'like', "%{$query}%")
+                  ->orWhere('roll_number', 'like', "%{$query}%");
+            })
+            ->limit(5)
+            ->get(['id', 'first_name', 'last_name', 'admission_number', 'roll_number', 'photo']);
+
+        // Fetch staff of this school
+        $staff = Staff::where('school_id', $schoolId)
+            ->where(function($q) use ($query) {
+                $q->where('first_name', 'like', "%{$query}%")
+                  ->orWhere('last_name', 'like', "%{$query}%")
+                  ->orWhere('employee_id', 'like', "%{$query}%")
+                  ->orWhere('email', 'like', "%{$query}%");
+            })
+            ->limit(5)
+            ->get(['id', 'first_name', 'last_name', 'employee_id', 'photo']);
+
+        return response()->json([
+            'students' => $students,
+            'staff' => $staff,
         ]);
     }
 }

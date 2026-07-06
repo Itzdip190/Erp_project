@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Traits\BelongsToSchool;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class PendingCheque extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToSchool;
 
     protected $fillable = [
         'school_id',
@@ -17,6 +19,12 @@ class PendingCheque extends Model
         'amount',
         'cheque_date',
         'status',
+        'branch',
+        'installment_no',
+        'receipt_number',
+        'entry_date',
+        'receipt_date',
+        'discount_amount',
     ];
 
     public function school()

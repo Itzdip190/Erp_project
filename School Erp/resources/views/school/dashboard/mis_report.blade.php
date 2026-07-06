@@ -702,7 +702,33 @@ button.mis-alb-more-link {
 /* ── Anchor alert cards retain their text colors ─────────── */
 a.mis-alert-card .mis-alert-title { color: #1e293b; }
 a.mis-alert-card .mis-alert-badge { color: #fff; }
-a.mis-alert-card:hover .mis-alert-title { color: #1e293b; }
+/* ── MOBILE & TABLET RESPONSIVENESS ────────────────────────── */
+@media (max-width: 1024px) {
+    .mis-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .mis-alerts-grid { grid-template-columns: repeat(2, 1fr); }
+    .mis-three-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+    .mis-header { flex-direction: column; align-items: stretch; gap: 16px; padding: 20px; }
+    .mis-header-right { flex-direction: column; width: 100%; }
+    .mis-date-form { flex-direction: column; width: 100%; }
+    .mis-date-input, .mis-go-btn, .mis-print-btn { width: 100%; text-align: center; justify-content: center; }
+    .mis-kpi-grid { grid-template-columns: 1fr; }
+    .mis-alerts-grid { grid-template-columns: 1fr; }
+    .mis-two-col { grid-template-columns: 1fr; }
+    .mis-follow-grid { grid-template-columns: 1fr; }
+    .mis-att-row { flex-wrap: wrap; }
+    .mis-att-box { min-width: calc(50% - 4px); }
+    .mis-mode-grid { grid-template-columns: 1fr; }
+    .mis-def-aging-row { flex-wrap: wrap; }
+    .mis-def-aging-box { min-width: calc(50% - 3px); }
+}
+@media (max-width: 480px) {
+    .mis-att-box { min-width: 100%; }
+    .mis-def-aging-box { min-width: 100%; }
+    .mis-kpi-card { padding: 16px; }
+    .mis-detail-card { padding: 16px; }
+}
 
 @media print {
     .mis-print-btn, .mis-date-form {
@@ -717,6 +743,828 @@ a.mis-alert-card:hover .mis-alert-title { color: #1e293b; }
         break-inside: avoid;
     }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   DAILY MIS REPORT — DARK MODE THEME OVERRIDES
+   ══════════════════════════════════════════════════════════════ */
+body.dark-mode .mis-page {
+    background: #0b0f19 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .mis-header {
+    background: linear-gradient(135deg, #111827 0%, #1e1b4b 50%, #312e81 100%) !important;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4) !important;
+    border: 1px solid rgba(129,140,248,0.2) !important;
+}
+body.dark-mode .mis-header h1, 
+body.dark-mode .mis-header p {
+    color: #f8fafc !important;
+}
+body.dark-mode .mis-alert-card,
+body.dark-mode .mis-col-panel,
+body.dark-mode .mis-detail-card,
+body.dark-mode .mis-follow-card {
+    background: rgba(17, 24, 39, 0.6) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .mis-kpi-card {
+    background: rgba(17, 24, 39, 0.45) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+    color: #f8fafc !important;
+}
+/* 1. Daily Revenue (Green Theme) */
+body.dark-mode .mis-kpi-card.k-rev {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.06) 0%, rgba(16, 185, 129, 0.02) 100%) !important;
+    border: 1px solid rgba(16, 185, 129, 0.3) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 12px rgba(16, 185, 129, 0.05) !important;
+}
+body.dark-mode .mis-kpi-card.k-rev:hover {
+    border-color: rgba(16, 185, 129, 0.75) !important;
+    box-shadow: 0 12px 24px rgba(16, 185, 129, 0.15), inset 0 0 15px rgba(16, 185, 129, 0.1) !important;
+}
+
+/* 2. Student Attendance (Orange Theme) */
+body.dark-mode .mis-kpi-card.k-stu {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.06) 0%, rgba(249, 115, 22, 0.02) 100%) !important;
+    border: 1px solid rgba(249, 115, 22, 0.3) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 12px rgba(249, 115, 22, 0.05) !important;
+}
+body.dark-mode .mis-kpi-card.k-stu:hover {
+    border-color: rgba(249, 115, 22, 0.75) !important;
+    box-shadow: 0 12px 24px rgba(249, 115, 22, 0.15), inset 0 0 15px rgba(249, 115, 22, 0.1) !important;
+}
+
+/* 3. Staff Attendance (Pink Theme) */
+body.dark-mode .mis-kpi-card.k-stf {
+    background: linear-gradient(135deg, rgba(236, 72, 153, 0.06) 0%, rgba(236, 72, 153, 0.02) 100%) !important;
+    border: 1px solid rgba(236, 72, 153, 0.3) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 12px rgba(236, 72, 153, 0.05) !important;
+}
+body.dark-mode .mis-kpi-card.k-stf:hover {
+    border-color: rgba(236, 72, 153, 0.75) !important;
+    box-shadow: 0 12px 24px rgba(236, 72, 153, 0.15), inset 0 0 15px rgba(236, 72, 153, 0.1) !important;
+}
+
+/* 4. New Admissions (Blue Theme) */
+body.dark-mode .mis-kpi-card.k-adm {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(59, 130, 246, 0.02) 100%) !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 0 12px rgba(59, 130, 246, 0.05) !important;
+}
+body.dark-mode .mis-kpi-card.k-adm:hover {
+    border-color: rgba(59, 130, 246, 0.75) !important;
+    box-shadow: 0 12px 24px rgba(59, 130, 246, 0.15), inset 0 0 15px rgba(59, 130, 246, 0.1) !important;
+}
+body.dark-mode .mis-alert-card:hover,
+body.dark-mode .mis-detail-card:hover,
+body.dark-mode .mis-follow-card:hover {
+    border-color: #374151 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+body.dark-mode .mis-kpi-value,
+body.dark-mode .mis-alert-title,
+body.dark-mode .mis-col-hdr,
+body.dark-mode .mis-detail-title,
+body.dark-mode .mis-follow-hdr,
+body.dark-mode .mis-metric-row strong,
+body.dark-mode .mis-fc-right strong,
+body.dark-mode .mis-att-box-val,
+body.dark-mode .mis-mode-card .val,
+body.dark-mode a.mis-alert-card .mis-alert-title {
+    color: #f8fafc !important;
+}
+body.dark-mode .mis-kpi-label,
+body.dark-mode .mis-kpi-sub,
+body.dark-mode .mis-alert-desc,
+body.dark-mode .mis-metric-row span,
+body.dark-mode .mis-section-label,
+body.dark-mode .mis-detail-meta,
+body.dark-mode .mis-att-sub-label,
+body.dark-mode .mis-att-box-lbl,
+body.dark-mode .mis-mode-card .lbl,
+body.dark-mode .mis-def-aging-hdr,
+body.dark-mode .mis-fc-left span,
+body.dark-mode .mis-fc-right {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .mis-col-hdr,
+body.dark-mode .mis-follow-hdr,
+body.dark-mode .mis-fee-card-footer {
+    border-bottom-color: #1e293b !important;
+    border-top-color: #1e293b !important;
+}
+body.dark-mode .mis-metric-row {
+    border-bottom: 1px dashed #1e293b !important;
+}
+body.dark-mode .mis-profit-box,
+body.dark-mode .mis-mode-card.total-mode {
+    background: rgba(37, 99, 235, 0.15) !important;
+    border: 1px solid rgba(59, 130, 246, 0.4) !important;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.1);
+}
+body.dark-mode .mis-profit-box span,
+body.dark-mode .mis-profit-box strong,
+body.dark-mode .mis-mode-card.total-mode .val {
+    color: #60a5fa !important;
+}
+body.dark-mode .mis-mode-card.total-mode .lbl {
+    color: #93c5fd !important;
+}
+body.dark-mode .mis-mode-card {
+    background: rgba(17, 24, 39, 0.45) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px !important;
+    transition: all 0.2s ease;
+}
+body.dark-mode .mis-mode-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+body.dark-mode .low-activity-box {
+    background: rgba(120, 53, 15, 0.15) !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+    color: #fdba74 !important;
+}
+body.dark-mode .critical-issues-box {
+    background: rgba(239, 68, 68, 0.05) !important;
+    border: 1px solid rgba(239, 68, 68, 0.25) !important;
+    color: #fca5a5 !important;
+    border-radius: 12px !important;
+}
+
+/* Attendance Boxes in Dark Mode (High Contrast & Vibrant Glow) */
+body.dark-mode .mis-att-box {
+    background: rgba(17, 24, 39, 0.45) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px !important;
+    transition: all 0.2s ease;
+}
+body.dark-mode .mis-att-box:hover {
+    transform: translateY(-2px);
+}
+body.dark-mode .mis-att-box.ab-green {
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1) !important;
+    color: #34d399 !important;
+}
+body.dark-mode .mis-att-box.ab-green:hover {
+    border-color: #10b981 !important;
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.2) !important;
+}
+body.dark-mode .mis-att-box.ab-red {
+    border-color: rgba(239, 68, 68, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1) !important;
+    color: #f87171 !important;
+}
+body.dark-mode .mis-att-box.ab-red:hover {
+    border-color: #ef4444 !important;
+    box-shadow: 0 6px 16px rgba(239, 68, 68, 0.2) !important;
+}
+body.dark-mode .mis-att-box.ab-orange {
+    border-color: rgba(245, 158, 11, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1) !important;
+    color: #fbbf24 !important;
+}
+body.dark-mode .mis-att-box.ab-orange:hover {
+    border-color: #f97316 !important;
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
+}
+body.dark-mode .mis-att-box.ab-blue {
+    border-color: rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
+    color: #60a5fa !important;
+}
+body.dark-mode .mis-att-box.ab-blue:hover {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
+}
+body.dark-mode .mis-att-box.ab-pink {
+    border-color: rgba(236, 72, 153, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.1) !important;
+    color: #f472b6 !important;
+}
+body.dark-mode .mis-att-box.ab-pink:hover {
+    border-color: #ec4899 !important;
+    box-shadow: 0 6px 16px rgba(236, 72, 153, 0.2) !important;
+}
+body.dark-mode .mis-att-box .mis-att-box-val {
+    color: #fff !important;
+    font-size: 20px !important;
+    font-weight: 800 !important;
+}
+body.dark-mode .mis-att-box .mis-att-box-lbl {
+    color: #94a3b8 !important;
+    font-weight: 700 !important;
+    font-size: 10px !important;
+    letter-spacing: 0.5px;
+}
+
+/* Defaulter Aging Boxes in Dark Mode */
+body.dark-mode .mis-def-aging-box {
+    background: rgba(17, 24, 39, 0.45) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 12px !important;
+    transition: all 0.2s ease;
+}
+body.dark-mode .mis-def-aging-box:hover {
+    transform: translateY(-2px);
+}
+body.dark-mode .mis-def-aging-box .val {
+    color: #fff !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+}
+body.dark-mode .mis-def-aging-box .lbl {
+    color: #94a3b8 !important;
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+}
+body.dark-mode .mis-def-aging-box.db-yellow { border-color: rgba(234, 179, 8, 0.3) !important; box-shadow: 0 4px 12px rgba(234, 179, 8, 0.1) !important; color: #fde047 !important; }
+body.dark-mode .mis-def-aging-box.db-yellow:hover { border-color: #eab308 !important; box-shadow: 0 6px 16px rgba(234, 179, 8, 0.2) !important; }
+
+body.dark-mode .mis-def-aging-box.db-orange { border-color: rgba(249, 115, 22, 0.3) !important; box-shadow: 0 4px 12px rgba(249, 115, 22, 0.1) !important; color: #fdba74 !important; }
+body.dark-mode .mis-def-aging-box.db-orange:hover { border-color: #f97316 !important; box-shadow: 0 6px 16px rgba(249, 115, 22, 0.2) !important; }
+
+body.dark-mode .mis-def-aging-box.db-pink { border-color: rgba(236, 72, 153, 0.3) !important; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.1) !important; color: #f472b6 !important; }
+body.dark-mode .mis-def-aging-box.db-pink:hover { border-color: #ec4899 !important; box-shadow: 0 6px 16px rgba(236, 72, 153, 0.2) !important; }
+
+body.dark-mode .mis-def-aging-box.db-red { border-color: rgba(239, 68, 68, 0.3) !important; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1) !important; color: #f87171 !important; }
+body.dark-mode .mis-def-aging-box.db-red:hover { border-color: #ef4444 !important; box-shadow: 0 6px 16px rgba(239, 68, 68, 0.2) !important; }
+
+/* Alert list box overrides */
+body.dark-mode .mis-alert-list-box {
+    background: rgba(239, 68, 68, 0.04) !important;
+    border: 1px solid rgba(239, 68, 68, 0.15) !important;
+    border-left: 4px solid #ef4444 !important;
+    border-radius: 10px !important;
+}
+body.dark-mode .mis-alert-list-box.orange-box {
+    background: rgba(249, 115, 22, 0.04) !important;
+    border: 1px solid rgba(249, 115, 22, 0.15) !important;
+    border-left: 4px solid #f97316 !important;
+}
+body.dark-mode .mis-alert-list-box.blue-box {
+    background: rgba(59, 130, 246, 0.04) !important;
+    border: 1px solid rgba(59, 130, 246, 0.15) !important;
+    border-left: 4px solid #3b82f6 !important;
+}
+body.dark-mode .mis-alb-title {
+    color: #fff !important;
+    font-weight: 700 !important;
+}
+body.dark-mode .orange-box .mis-alb-title {
+    color: #fff !important;
+}
+body.dark-mode .blue-box .mis-alb-title {
+    color: #fff !important;
+}
+body.dark-mode .mis-alb-list {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .mis-discount-badge {
+    background: rgba(234, 88, 12, 0.2) !important;
+    color: #fb923c !important;
+    border: 1px solid rgba(249, 115, 22, 0.4) !important;
+}
+
+/* ── UPGRADED PREMIUM GLOWING UI CLASSES ──────────────────── */
+.mis-main-section-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 16px rgba(30, 58, 138, 0.04);
+    margin-bottom: 24px;
+    transition: all 0.25s ease;
+}
+.mis-main-section-hdr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 800;
+    color: #1e3a8a;
+    margin-bottom: 20px;
+}
+.mis-main-section-hdr i {
+    font-size: 18px;
+    color: #2563eb;
+}
+
+/* Digital layout grids */
+.mis-digital-grid-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.mis-digital-sub-section {
+    display: flex;
+    flex-direction: column;
+}
+.mis-digital-sub-hdr {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.mis-digital-sub-hdr .sub-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: #475569;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+}
+.mis-digital-sub-hdr .sub-title i {
+    font-size: 14px;
+}
+.mis-digital-sub-hdr .view-details-link {
+    font-size: 12px;
+    font-weight: 600;
+    color: #2563eb;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.mis-digital-sub-hdr .view-details-link:hover {
+    color: #1d4ed8;
+}
+
+/* Cards Grids */
+.mis-app-downloads-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+.mis-digital-card-small {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: all 0.25s ease;
+}
+.mis-digital-card-small:hover {
+    transform: translateY(-2px);
+}
+
+/* Small card glow colors - Light Mode */
+.mis-digital-card-small.glow-blue { border-color: #bfdbfe; }
+.mis-digital-card-small.glow-blue:hover { box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1); }
+.mis-digital-card-small.glow-green { border-color: #bbf7d0; }
+.mis-digital-card-small.glow-green:hover { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1); }
+.mis-digital-card-small.glow-purple { border-color: #e9d5ff; }
+.mis-digital-card-small.glow-purple:hover { box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1); }
+.mis-digital-card-small.glow-orange { border-color: #fed7aa; }
+.mis-digital-card-small.glow-orange:hover { box-shadow: 0 4px 12px rgba(249, 115, 22, 0.1); }
+
+/* Progress rings */
+.progress-ring-wrapper {
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: center;
+}
+.progress-ring {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    position: relative;
+}
+.progress-ring.ring-blue { border: 3px solid #eff6ff; border-top-color: #3b82f6; color: #3b82f6; }
+.progress-ring.ring-green { border: 3px solid #f0fdf4; border-top-color: #10b981; color: #10b981; }
+.progress-ring.ring-purple { border: 3px solid #fdf4ff; border-top-color: #8b5cf6; color: #8b5cf6; }
+.progress-ring.ring-orange { border: 3px solid #fff7ed; border-top-color: #f97316; color: #f97316; }
+
+.metric-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.2;
+}
+.metric-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: 2px;
+    margin-bottom: 8px;
+}
+.metric-badge {
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+/* Row splits for Library & Communications */
+.mis-digital-row-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+/* Library card elements */
+.mis-library-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+.mis-library-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 16px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+}
+.lib-icon-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    margin-bottom: 8px;
+}
+.lib-icon-circle.bg-blue { background: #eff6ff; color: #3b82f6; }
+.lib-icon-circle.bg-green { background: #f0fdf4; color: #10b981; }
+
+.lib-val {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0f172a;
+}
+.lib-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 14px;
+}
+.lib-progress-container {
+    width: calc(100% - 32px);
+    height: 4px;
+    background: #f1f5f9;
+    border-radius: 2px;
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+}
+.lib-progress-bar {
+    height: 100%;
+    border-radius: 2px;
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+.lib-progress-bar.bg-blue { background: #3b82f6; }
+.lib-progress-bar.bg-green { background: #10b981; }
+.lib-progress-handle {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+.lib-progress-bar.bg-blue ~ .lib-progress-handle { border: 2px solid #3b82f6; }
+.lib-progress-bar.bg-green ~ .lib-progress-handle { border: 2px solid #10b981; }
+
+/* Communications card elements */
+.mis-comm-card-full {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 16px 28px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    height: 100%;
+    justify-content: center;
+}
+.comm-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.comm-icon-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+}
+.comm-icon-circle.bg-purple { background: #f5f3ff; color: #8b5cf6; }
+.comm-info {
+    display: flex;
+    flex-direction: column;
+}
+.comm-val {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0f172a;
+}
+.comm-lbl {
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+}
+.comm-progress-container {
+    width: calc(100% - 32px);
+    height: 4px;
+    background: #f1f5f9;
+    border-radius: 2px;
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+}
+.comm-progress-bar {
+    height: 100%;
+    border-radius: 2px;
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+.comm-progress-bar.bg-purple { background: #8b5cf6; }
+.comm-progress-handle {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+}
+.comm-progress-bar.bg-purple ~ .comm-progress-handle { border: 2px solid #8b5cf6; }
+
+/* Digital Metrics section footer */
+.mis-digital-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid #f1f5f9;
+    padding-top: 14px;
+    margin-top: 8px;
+}
+.mis-digital-footer .footer-left {
+    font-size: 11px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.mis-digital-footer .footer-right .refresh-link {
+    font-size: 11px;
+    font-weight: 700;
+    color: #2563eb;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.mis-digital-footer .footer-right .refresh-link:hover {
+    color: #1d4ed8;
+}
+
+/* ── PREMIUM GLOWING UI OVERRIDES - DARK MODE ────────────── */
+body.dark-mode .mis-main-section-card {
+    background: rgba(10, 15, 29, 0.6) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(59, 130, 246, 0.15) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(59, 130, 246, 0.05) !important;
+}
+body.dark-mode .mis-main-section-hdr {
+    color: #fff !important;
+}
+body.dark-mode .mis-main-section-hdr i {
+    color: #60a5fa !important;
+    text-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+body.dark-mode .mis-digital-sub-hdr .sub-title {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .mis-digital-sub-hdr .view-details-link {
+    color: #60a5fa !important;
+}
+body.dark-mode .mis-digital-sub-hdr .view-details-link:hover {
+    color: #93c5fd !important;
+}
+
+/* Card Overrides - Dark Mode */
+body.dark-mode .mis-digital-card-small {
+    background: rgba(17, 24, 39, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+body.dark-mode .mis-digital-card-small .metric-val {
+    color: #fff !important;
+}
+body.dark-mode .mis-digital-card-small .metric-lbl {
+    color: #94a3b8 !important;
+}
+
+/* Glow Borders in Dark Mode */
+body.dark-mode .mis-digital-card-small.glow-blue {
+    border-color: rgba(59, 130, 246, 0.3) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(59, 130, 246, 0.05) !important;
+}
+body.dark-mode .mis-digital-card-small.glow-blue:hover {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.2), inset 0 0 12px rgba(59, 130, 246, 0.1) !important;
+}
+
+body.dark-mode .mis-digital-card-small.glow-green {
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(16, 185, 129, 0.05) !important;
+}
+body.dark-mode .mis-digital-card-small.glow-green:hover {
+    border-color: #10b981 !important;
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.2), inset 0 0 12px rgba(16, 185, 129, 0.1) !important;
+}
+
+body.dark-mode .mis-digital-card-small.glow-purple {
+    border-color: rgba(139, 92, 246, 0.3) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(139, 92, 246, 0.05) !important;
+}
+body.dark-mode .mis-digital-card-small.glow-purple:hover {
+    border-color: #8b5cf6 !important;
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.2), inset 0 0 12px rgba(139, 92, 246, 0.1) !important;
+}
+
+body.dark-mode .mis-digital-card-small.glow-orange {
+    border-color: rgba(249, 115, 22, 0.3) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(249, 115, 22, 0.05) !important;
+}
+body.dark-mode .mis-digital-card-small.glow-orange:hover {
+    border-color: #f97316 !important;
+    box-shadow: 0 6px 20px rgba(249, 115, 22, 0.2), inset 0 0 12px rgba(249, 115, 22, 0.1) !important;
+}
+
+/* Rings Overrides in Dark Mode */
+body.dark-mode .progress-ring {
+    background: rgba(13, 21, 39, 0.4) !important;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4) !important;
+}
+body.dark-mode .progress-ring.ring-blue { border-color: rgba(59, 130, 246, 0.15) !important; border-top-color: #3b82f6 !important; }
+body.dark-mode .progress-ring.ring-green { border-color: rgba(16, 185, 129, 0.15) !important; border-top-color: #10b981 !important; }
+body.dark-mode .progress-ring.ring-purple { border-color: rgba(139, 92, 246, 0.15) !important; border-top-color: #8b5cf6 !important; }
+body.dark-mode .progress-ring.ring-orange { border-color: rgba(249, 115, 22, 0.15) !important; border-top-color: #f97316 !important; }
+
+/* Library & Comm Overrides in Dark Mode */
+body.dark-mode .mis-library-card, 
+body.dark-mode .mis-comm-card-full {
+    background: rgba(17, 24, 39, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+body.dark-mode .mis-library-card:hover, 
+body.dark-mode .mis-comm-card-full:hover {
+    border-color: rgba(255, 255, 255, 0.15) !important;
+}
+body.dark-mode .lib-val, 
+body.dark-mode .comm-val {
+    color: #fff !important;
+}
+body.dark-mode .lib-lbl, 
+body.dark-mode .comm-lbl {
+    color: #94a3b8 !important;
+}
+
+body.dark-mode .lib-icon-circle.bg-blue { background: rgba(59, 130, 246, 0.12) !important; color: #60a5fa !important; border: 1px solid rgba(59, 130, 246, 0.2) !important; }
+body.dark-mode .lib-icon-circle.bg-green { background: rgba(16, 185, 129, 0.12) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.2) !important; }
+body.dark-mode .comm-icon-circle.bg-purple { background: rgba(139, 92, 246, 0.12) !important; color: #a78bfa !important; border: 1px solid rgba(139, 92, 246, 0.2) !important; }
+
+body.dark-mode .lib-progress-container, 
+body.dark-mode .comm-progress-container {
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+body.dark-mode .lib-progress-bar.bg-blue { background: #3b82f6 !important; box-shadow: 0 0 6px #3b82f6 !important; }
+body.dark-mode .lib-progress-bar.bg-green { background: #10b981 !important; box-shadow: 0 0 6px #10b981 !important; }
+body.dark-mode .comm-progress-bar.bg-purple { background: #8b5cf6 !important; box-shadow: 0 0 6px #8b5cf6 !important; }
+
+body.dark-mode .lib-progress-handle { border-color: #3b82f6 !important; box-shadow: 0 0 6px #3b82f6 !important; }
+body.dark-mode .mis-library-card:last-child .lib-progress-handle { border-color: #10b981 !important; box-shadow: 0 0 6px #10b981 !important; }
+body.dark-mode .comm-progress-handle { border-color: #8b5cf6 !important; box-shadow: 0 0 6px #8b5cf6 !important; }
+
+body.dark-mode .mis-digital-footer {
+    border-top-color: rgba(255, 255, 255, 0.08) !important;
+}
+body.dark-mode .mis-digital-footer .footer-left {
+    color: #64748b !important;
+}
+body.dark-mode .mis-digital-footer .footer-right .refresh-link {
+    color: #60a5fa !important;
+}
+body.dark-mode .mis-digital-footer .footer-right .refresh-link:hover {
+    color: #93c5fd !important;
+}
+
+/* upgraded other dashboard cards to look like the digital metrics layout */
+body.dark-mode .mis-detail-card,
+body.dark-mode .mis-follow-card {
+    background: rgba(10, 15, 29, 0.6) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(59, 130, 246, 0.15) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(59, 130, 246, 0.05) !important;
+}
+body.dark-mode .mis-detail-title,
+body.dark-mode .mis-follow-hdr {
+    color: #fff !important;
+}
+body.dark-mode .mis-detail-meta {
+    color: #94a3b8 !important;
+}
+
+/* Alert list box left borders */
+body.dark-mode .mis-alert-list-box {
+    background: rgba(239, 68, 68, 0.04) !important;
+    border: 1px solid rgba(239, 68, 68, 0.15) !important;
+    border-left: 4px solid #ef4444 !important;
+}
+body.dark-mode .mis-alert-list-box.orange-box {
+    background: rgba(249, 115, 22, 0.04) !important;
+    border: 1px solid rgba(249, 115, 22, 0.15) !important;
+    border-left: 4px solid #f97316 !important;
+}
+body.dark-mode .mis-alert-list-box.blue-box {
+    background: rgba(59, 130, 246, 0.04) !important;
+    border: 1px solid rgba(59, 130, 246, 0.15) !important;
+    border-left: 4px solid #3b82f6 !important;
+}
+
+/* 3-Card Grid & Red Glow Components Support */
+.mis-three-card-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+@media (max-width: 1024px) {
+    .mis-three-card-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+    .mis-three-card-grid { grid-template-columns: 1fr; }
+}
+
+.mis-digital-card-small.glow-red { border-color: #fecaca; }
+.mis-digital-card-small.glow-red:hover { box-shadow: 0 4px 12px rgba(239, 68, 68, 0.1); }
+.progress-ring.ring-red { border: 3px solid #fef2f2; border-top-color: #ef4444; color: #ef4444; }
+.badge-red { background: #fef2f2; color: #ef4444; border: 1px solid #fecaca; }
+
+body.dark-mode .mis-digital-card-small.glow-red {
+    background: rgba(17, 24, 39, 0.5) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(239, 68, 68, 0.05) !important;
+}
+body.dark-mode .mis-digital-card-small.glow-red:hover {
+    border-color: #ef4444 !important;
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.2), inset 0 0 12px rgba(239, 68, 68, 0.1) !important;
+}
+body.dark-mode .progress-ring.ring-red { 
+    background: rgba(13, 21, 39, 0.4) !important;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.4) !important;
+    border-color: rgba(239, 68, 68, 0.15) !important; 
+    border-top-color: #ef4444 !important; 
+}
+body.dark-mode .badge-red { 
+    background: rgba(239, 68, 68, 0.12) !important; 
+    color: #f87171 !important; 
+    border: 1px solid rgba(239, 68, 68, 0.2) !important; 
+}
 </style>
 @endsection
 
@@ -727,7 +1575,7 @@ a.mis-alert-card:hover .mis-alert-title { color: #1e293b; }
     <div class="mis-header">
         <div>
             <h1><i class="fas fa-chart-bar" style="margin-right:10px; opacity:.9;"></i>Daily MIS Report</h1>
-            <p>Management Information System &nbsp;·&nbsp; Pragya School</p>
+            <p>Management Information System &nbsp;·&nbsp; {{ $school->name ?? 'Pragya School' }}</p>
         </div>
         <div class="mis-header-right">
             <button class="mis-print-btn" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
@@ -809,143 +1657,418 @@ a.mis-alert-card:hover .mis-alert-title { color: #1e293b; }
         </a>
     </div>
 
-    {{-- ── ROW 3: 3-COLUMN METRICS BREAKDOWN ──────────────────────────── --}}
-    <div class="mis-three-col">
+    {{-- ── ROW 3: 2-COLUMN METRICS BREAKDOWN ──────────────────────────── --}}
+    <div class="mis-two-col">
         {{-- Column 1: Income & Expenses --}}
-        <div class="mis-col-panel">
-            <div class="mis-col-hdr">
-                <i class="fas fa-landmark"></i>
+        <div class="mis-main-section-card" style="margin-bottom:0;">
+            <div class="mis-main-section-hdr" style="margin-bottom:12px;">
+                <i class="fas fa-landmark" style="color: #3b82f6;"></i>
                 <span>Income & Expenses</span>
             </div>
-            <div class="mis-metric-group">
-                <div class="mis-group-title gt-green">Today's Income</div>
-                <div class="mis-metric-row">
-                    <span>Fee Collection</span>
-                    <strong>₹{{ number_format($todayFeeCollection, 2) }}</strong>
+
+            <div class="mis-digital-grid-container">
+                {{-- Today's Income --}}
+                <div class="mis-digital-sub-section">
+                    <div class="mis-digital-sub-hdr" style="margin-bottom:8px;">
+                        <div class="sub-title">
+                            <i class="fas fa-arrow-trend-down" style="color: #10b981;"></i>
+                            <span>Today's Income</span>
+                        </div>
+                    </div>
+                    <div class="mis-three-card-grid">
+                        {{-- Fee Collection --}}
+                        <div class="mis-digital-card-small glow-green">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-green">
+                                    <i class="fas fa-indian-rupee-sign"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">₹{{ number_format($todayFeeCollection, 2) }}</div>
+                            <div class="metric-lbl">Fee Collection</div>
+                            <div class="metric-badge badge-green">Collection</div>
+                        </div>
+
+                        {{-- Other Income --}}
+                        <div class="mis-digital-card-small glow-blue">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-blue">
+                                    <i class="fas fa-plus"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">₹{{ number_format($todayOtherIncome, 2) }}</div>
+                            <div class="metric-lbl">Other Income</div>
+                            <div class="metric-badge badge-blue">Other</div>
+                        </div>
+
+                        {{-- Total Income --}}
+                        <div class="mis-digital-card-small glow-green">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-green">
+                                    <i class="fas fa-vault"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">₹{{ number_format($todayTotalIncome, 2) }}</div>
+                            <div class="metric-lbl">Total Income</div>
+                            <div class="metric-badge badge-green">Total</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="mis-metric-row">
-                    <span>Other Income</span>
-                    <strong>₹{{ number_format($todayOtherIncome, 2) }}</strong>
+
+                {{-- Expenses and Profit --}}
+                <div class="mis-digital-row-split">
+                    {{-- Today's Expenses --}}
+                    <div class="mis-digital-sub-section">
+                        <div class="mis-digital-sub-hdr" style="margin-bottom:8px;">
+                            <div class="sub-title">
+                                <i class="fas fa-arrow-trend-up" style="color: #ef4444;"></i>
+                                <span>Today's Expenses</span>
+                            </div>
+                        </div>
+                        <div class="mis-library-grid">
+                            <div class="mis-digital-card-small glow-orange" style="width:100%;">
+                                <div class="progress-ring-wrapper">
+                                    <div class="progress-ring ring-orange">
+                                        <i class="fas fa-receipt"></i>
+                                    </div>
+                                </div>
+                                <div class="metric-val">₹{{ number_format($todayOtherExpenses, 2) }}</div>
+                                <div class="metric-lbl">Other Expenses</div>
+                            </div>
+                            <div class="mis-digital-card-small glow-red" style="width:100%;">
+                                <div class="progress-ring-wrapper">
+                                    <div class="progress-ring ring-red">
+                                        <i class="fas fa-file-invoice-dollar"></i>
+                                    </div>
+                                </div>
+                                <div class="metric-val">₹{{ number_format($todayTotalExpenses, 2) }}</div>
+                                <div class="metric-lbl">Total Expenses</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Net Profit Today --}}
+                    <div class="mis-digital-sub-section">
+                        <div class="mis-digital-sub-hdr" style="margin-bottom:8px;">
+                            <div class="sub-title">
+                                <i class="fas fa-chart-line" style="color: #8b5cf6;"></i>
+                                <span>Net Profit Today</span>
+                            </div>
+                        </div>
+                        <div class="mis-comm-card-full">
+                            <div class="comm-left">
+                                <div class="comm-icon-circle bg-purple">
+                                    <i class="fas fa-wallet"></i>
+                                </div>
+                                <div class="comm-info">
+                                    <div class="comm-val">₹{{ number_format($todayNetProfit, 2) }}</div>
+                                    <div class="comm-lbl">Net Profit Today</div>
+                                </div>
+                            </div>
+                            <div class="comm-progress-container">
+                                @php
+                                    $profitFill = $todayNetProfit > 0 ? 95 : 0;
+                                @endphp
+                                <div class="comm-progress-bar bg-purple" style="width: {{ $profitFill }}%;"></div>
+                                <div class="comm-progress-handle" style="left: {{ $profitFill }}%;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="mis-metric-row" style="border-top: 1px solid #cbd5e1; margin-top: 4px; padding-top: 8px;">
-                    <span style="font-weight: 700; color: #059669;">Total Income</span>
-                    <strong style="color: #059669;">₹{{ number_format($todayTotalIncome, 2) }}</strong>
-                </div>
-            </div>
-            <div class="mis-metric-group">
-                <div class="mis-group-title gt-red">Today's Expenses</div>
-                <div class="mis-metric-row">
-                    <span>Other Expenses</span>
-                    <strong>₹{{ number_format($todayOtherExpenses, 2) }}</strong>
-                </div>
-                <div class="mis-metric-row" style="border-top: 1px solid #cbd5e1; margin-top: 4px; padding-top: 8px;">
-                    <span style="font-weight: 700; color: #b45309;">Total Expenses</span>
-                    <strong style="color: #b45309;">₹{{ number_format($todayTotalExpenses, 2) }}</strong>
-                </div>
-            </div>
-            <div class="mis-profit-box">
-                <span>Net Profit Today</span>
-                <strong>₹{{ number_format($todayNetProfit, 2) }}</strong>
             </div>
         </div>
 
-        {{-- Column 2: Digital Metrics --}}
-        <div class="mis-col-panel">
-            <div class="mis-col-hdr">
-                <i class="fas fa-desktop"></i>
-                <span>Digital Metrics</span>
-            </div>
-            <div class="mis-metric-group">
-                <div class="mis-group-title gt-orange"><i class="fas fa-mobile-alt" style="margin-right: 4px;"></i>App Downloads</div>
-                <div class="mis-metric-row">
-                    <span>Student Downloaded</span>
-                    <strong>{{ $studentAppDownloadedCount }}/{{ $studentAppDownloadedTotal }}</strong>
-                </div>
-                <div class="mis-metric-row">
-                    <span>Staff Downloaded</span>
-                    <strong>{{ $staffAppDownloadedCount }}/{{ $staffAppDownloadedTotal }}</strong>
-                </div>
-                <div class="mis-metric-row">
-                    <span>Parent Downloaded</span>
-                    <strong>{{ $parentAppDownloadedCount }}/{{ $parentAppDownloadedTotal }}</strong>
-                </div>
-                <div class="mis-metric-row">
-                    <span style="font-weight: 700;">Pending Downloads</span>
-                    <strong class="pending-red">{{ $pendingDownloadsCount }}</strong>
-                </div>
-            </div>
-            <div class="mis-metric-group">
-                <div class="mis-group-title gt-red"><i class="fas fa-book" style="margin-right: 4px;"></i>Library Today</div>
-                <div class="mis-metric-row">
-                    <span>Books Issued</span>
-                    <strong>{{ $todayBooksIssued }}</strong>
-                </div>
-                <div class="mis-metric-row">
-                    <span>Books Returned</span>
-                    <strong>{{ $todayBooksReturned }}</strong>
-                </div>
-            </div>
-            <div class="mis-metric-group">
-                <div class="mis-group-title gt-orange"><i class="fas fa-bell" style="margin-right: 4px;"></i>Communications</div>
-                <div class="mis-metric-row">
-                    <span>Notices Shared</span>
-                    <strong>{{ $todayNoticesShared }}</strong>
-                </div>
-            </div>
-        </div>
-
-        {{-- Column 3: Admissions & Academic --}}
-        <div class="mis-col-panel">
-            <div class="mis-col-hdr">
-                <i class="fas fa-graduation-cap"></i>
+        {{-- Column 2: Admissions & Academic --}}
+        <div class="mis-main-section-card" style="margin-bottom:0;">
+            <div class="mis-main-section-hdr" style="margin-bottom:12px;">
+                <i class="fas fa-graduation-cap" style="color: #10b981;"></i>
                 <span>Admissions & Academic</span>
             </div>
-            <div class="mis-metric-group">
-                <div class="mis-group-title gt-green"><i class="fas fa-user-plus" style="margin-right: 4px;"></i>Today's Admissions</div>
-                <div class="mis-metric-row">
-                    <span>Enquiries</span>
-                    <strong>{{ $todayEnquiriesCount }}</strong>
+
+            <div class="mis-digital-grid-container">
+                {{-- Today's Admissions --}}
+                <div class="mis-digital-sub-section">
+                    <div class="mis-digital-sub-hdr" style="margin-bottom:8px;">
+                        <div class="sub-title">
+                            <i class="fas fa-user-plus"></i>
+                            <span>Today's Admissions</span>
+                        </div>
+                    </div>
+                    <div class="mis-app-downloads-grid">
+                        {{-- Enquiries --}}
+                        <div class="mis-digital-card-small glow-blue">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-blue">
+                                    <i class="fas fa-info"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">{{ $todayEnquiriesCount }}</div>
+                            <div class="metric-lbl">Enquiries</div>
+                            <div class="metric-badge badge-blue">Leads</div>
+                        </div>
+
+                        {{-- Applications --}}
+                        <div class="mis-digital-card-small glow-purple">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-purple">
+                                    <i class="fas fa-file-signature"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">{{ $todayApplicationsCount }}</div>
+                            <div class="metric-lbl">Applications</div>
+                            <div class="metric-badge badge-purple">Applied</div>
+                        </div>
+
+                        {{-- Interactions --}}
+                        <div class="mis-digital-card-small glow-orange">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-orange">
+                                    <i class="fas fa-comments"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">{{ $todayInteractionsCount }}</div>
+                            <div class="metric-lbl">Interactions</div>
+                            <div class="metric-badge badge-orange">Interviews</div>
+                        </div>
+
+                        {{-- Admissions --}}
+                        <div class="mis-digital-card-small glow-green">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-green">
+                                    <i class="fas fa-check-double"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">{{ $todayAdmissionsCount }}</div>
+                            <div class="metric-lbl">Admissions</div>
+                            <div class="metric-badge badge-green">Enrolled</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="mis-metric-row">
-                    <span>Application</span>
-                    <strong>{{ $todayApplicationsCount }}</strong>
+
+                {{-- Academic Sharing Today --}}
+                <div class="mis-digital-sub-section">
+                    <div class="mis-digital-sub-hdr" style="margin-bottom:8px;">
+                        <div class="sub-title">
+                            <i class="fas fa-share-nodes"></i>
+                            <span>Academic Sharing Today</span>
+                        </div>
+                    </div>
+                    <div class="mis-app-downloads-grid">
+                        {{-- Assignments --}}
+                        <div class="mis-digital-card-small glow-orange">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-orange">
+                                    <i class="fas fa-book"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">{{ $todayAssignmentsShared }}</div>
+                            <div class="metric-lbl">Assignments</div>
+                        </div>
+
+                        {{-- Study Materials --}}
+                        <div class="mis-digital-card-small glow-blue">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-blue">
+                                    <i class="fas fa-file-pdf"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">{{ $todayMaterialsShared }}</div>
+                            <div class="metric-lbl">Study Materials</div>
+                        </div>
+
+                        {{-- Tests --}}
+                        <div class="mis-digital-card-small glow-red">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-red">
+                                    <i class="fas fa-vial"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">{{ $todayTestsShared }}</div>
+                            <div class="metric-lbl">Tests</div>
+                        </div>
+
+                        {{-- Diary Entries --}}
+                        <div class="mis-digital-card-small glow-purple">
+                            <div class="progress-ring-wrapper">
+                                <div class="progress-ring ring-purple">
+                                    <i class="fas fa-calendar-day"></i>
+                                </div>
+                            </div>
+                            <div class="metric-val">{{ $todayDiariesShared }}</div>
+                            <div class="metric-lbl">Diary Entries</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="mis-metric-row">
-                    <span>Interactions</span>
-                    <strong>{{ $todayInteractionsCount }}</strong>
-                </div>
-                <div class="mis-metric-row" style="border-top: 1px solid #cbd5e1; margin-top: 4px; padding-top: 8px;">
-                    <span style="font-weight: 700; color: #10b981;">Admissions</span>
-                    <strong style="color: #10b981;">{{ $todayAdmissionsCount }}</strong>
+
+                {{-- Low Activity Notifications --}}
+                <div class="low-activity-box" style="margin-top: 10px;">
+                    <div class="low-activity-item">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>{{ $teachersNoSharing7DaysCount }} teachers haven't shared any content in 7 days</span>
+                    </div>
+                    <div class="low-activity-item" style="margin-top: 2px;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span>{{ $classesMissingDiaryTodayCount }} classes missing diary entries today</span>
+                    </div>
                 </div>
             </div>
-            <div class="mis-metric-group">
-                <div class="mis-group-title gt-orange">Academic Sharing Today</div>
-                <div class="mis-metric-row">
-                    <span>Assignments</span>
-                    <strong>{{ $todayAssignmentsShared }}</strong>
+        </div>
+    </div>
+
+    {{-- ── ROW 3.5: UPGRADED FULL-WIDTH DIGITAL METRICS ────────────────── --}}
+    <div class="mis-main-section-card">
+        <div class="mis-main-section-hdr">
+            <i class="fas fa-desktop"></i>
+            <span>Digital Metrics</span>
+        </div>
+
+        <div class="mis-digital-grid-container">
+            {{-- App Downloads section --}}
+            <div class="mis-digital-sub-section">
+                <div class="mis-digital-sub-hdr">
+                    <div class="sub-title">
+                        <i class="fas fa-mobile-alt"></i>
+                        <span>App Downloads</span>
+                    </div>
                 </div>
-                <div class="mis-metric-row">
-                    <span>Study Materials</span>
-                    <strong>{{ $todayMaterialsShared }}</strong>
-                </div>
-                <div class="mis-metric-row">
-                    <span>Tests</span>
-                    <strong>{{ $todayTestsShared }}</strong>
-                </div>
-                <div class="mis-metric-row">
-                    <span>Diary Entries</span>
-                    <strong>{{ $todayDiariesShared }}</strong>
+                <div class="mis-app-downloads-grid">
+                    {{-- Student Downloads --}}
+                    @php
+                        $studentPct = $studentAppDownloadedTotal > 0 ? ($studentAppDownloadedCount / $studentAppDownloadedTotal) * 100 : 0;
+                    @endphp
+                    <div class="mis-digital-card-small glow-blue">
+                        <div class="progress-ring-wrapper">
+                            <div class="progress-ring ring-blue">
+                                <i class="fas fa-download"></i>
+                            </div>
+                        </div>
+                        <div class="metric-val">{{ $studentAppDownloadedCount }}/{{ $studentAppDownloadedTotal }}</div>
+                        <div class="metric-lbl">Student Downloaded</div>
+                        <div class="metric-badge badge-blue">{{ number_format($studentPct, 2) }}%</div>
+                    </div>
+
+                    {{-- Staff Downloads --}}
+                    @php
+                        $staffPct = $staffAppDownloadedTotal > 0 ? ($staffAppDownloadedCount / $staffAppDownloadedTotal) * 100 : 0;
+                    @endphp
+                    <div class="mis-digital-card-small glow-green">
+                        <div class="progress-ring-wrapper">
+                            <div class="progress-ring ring-green">
+                                <i class="fas fa-users"></i>
+                            </div>
+                        </div>
+                        <div class="metric-val">{{ $staffAppDownloadedCount }}/{{ $staffAppDownloadedTotal }}</div>
+                        <div class="metric-lbl">Staff Downloaded</div>
+                        <div class="metric-badge badge-green">{{ number_format($staffPct, 2) }}%</div>
+                    </div>
+
+                    {{-- Parent Downloads --}}
+                    @php
+                        $parentPct = $parentAppDownloadedTotal > 0 ? ($parentAppDownloadedCount / $parentAppDownloadedTotal) * 100 : 0;
+                    @endphp
+                    <div class="mis-digital-card-small glow-purple">
+                        <div class="progress-ring-wrapper">
+                            <div class="progress-ring ring-purple">
+                                <i class="fas fa-user"></i>
+                            </div>
+                        </div>
+                        <div class="metric-val">{{ $parentAppDownloadedCount }}/{{ $parentAppDownloadedTotal }}</div>
+                        <div class="metric-lbl">Parent Downloaded</div>
+                        <div class="metric-badge badge-purple">{{ number_format($parentPct, 2) }}%</div>
+                    </div>
+
+                    {{-- Pending Downloads --}}
+                    <div class="mis-digital-card-small glow-orange">
+                        <div class="progress-ring-wrapper">
+                            <div class="progress-ring ring-orange">
+                                <i class="far fa-clock"></i>
+                            </div>
+                        </div>
+                        <div class="metric-val">{{ $pendingDownloadsCount }}</div>
+                        <div class="metric-lbl">Pending Downloads</div>
+                        <div class="metric-badge badge-orange">Pending</div>
+                    </div>
                 </div>
             </div>
-            <div class="low-activity-box">
-                <div class="low-activity-item">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>{{ $teachersNoSharing7DaysCount }} teachers haven't shared any content in 7 days</span>
+
+            {{-- Library & Communications split row --}}
+            <div class="mis-digital-row-split">
+                {{-- Library Today --}}
+                <div class="mis-digital-sub-section">
+                    <div class="mis-digital-sub-hdr">
+                        <div class="sub-title">
+                            <i class="fas fa-book"></i>
+                            <span>Library Today</span>
+                        </div>
+                    </div>
+                    <div class="mis-library-grid">
+                        <div class="mis-library-card">
+                            <div class="lib-icon-circle bg-blue">
+                                <i class="fas fa-book-open"></i>
+                            </div>
+                            <div class="lib-val">{{ $todayBooksIssued }}</div>
+                            <div class="lib-lbl">Books Issued</div>
+                            <div class="lib-progress-container">
+                                @php
+                                    $issuedFill = $todayBooksIssued > 0 ? min(50 + ($todayBooksIssued * 5), 100) : 62.5;
+                                @endphp
+                                <div class="lib-progress-bar bg-blue" style="width: {{ $issuedFill }}%;"></div>
+                                <div class="lib-progress-handle" style="left: {{ $issuedFill }}%;"></div>
+                            </div>
+                        </div>
+                        <div class="mis-library-card">
+                            <div class="lib-icon-circle bg-green">
+                                <i class="fas fa-undo-alt"></i>
+                            </div>
+                            <div class="lib-val">{{ $todayBooksReturned }}</div>
+                            <div class="lib-lbl">Books Returned</div>
+                            <div class="lib-progress-container">
+                                @php
+                                    $returnedFill = $todayBooksReturned > 0 ? min(50 + ($todayBooksReturned * 5), 100) : 92.5;
+                                @endphp
+                                <div class="lib-progress-bar bg-green" style="width: {{ $returnedFill }}%;"></div>
+                                <div class="lib-progress-handle" style="left: {{ $returnedFill }}%;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="low-activity-item" style="margin-top: 2px;">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>{{ $classesMissingDiaryTodayCount }} classes missing diary entries today</span>
+
+                {{-- Communications --}}
+                <div class="mis-digital-sub-section">
+                    <div class="mis-digital-sub-hdr">
+                        <div class="sub-title">
+                            <i class="fas fa-bell"></i>
+                            <span>Communications</span>
+                        </div>
+                    </div>
+                    <div class="mis-comm-card-full">
+                        <div class="comm-left">
+                            <div class="comm-icon-circle bg-purple">
+                                <i class="fas fa-paper-plane"></i>
+                            </div>
+                            <div class="comm-info">
+                                <div class="comm-val">{{ $todayNoticesShared }}</div>
+                                <div class="comm-lbl">Notices Shared</div>
+                            </div>
+                        </div>
+                        <div class="comm-progress-container">
+                            @php
+                                $noticesFill = $todayNoticesShared > 0 ? min(50 + ($todayNoticesShared * 10), 100) : 75;
+                            @endphp
+                            <div class="comm-progress-bar bg-purple" style="width: {{ $noticesFill }}%;"></div>
+                            <div class="comm-progress-handle" style="left: {{ $noticesFill }}%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Footer inside Digital Metrics section --}}
+            <div class="mis-digital-footer">
+                <div class="footer-left">
+                    <i class="far fa-calendar-alt"></i>
+                    <span>Data as of: {{ $date->format('M d, Y') }} &nbsp;|&nbsp; Last updated: {{ now()->format('h:i A') }}</span>
+                </div>
+                <div class="footer-right">
+                    <a href="javascript:location.reload();" class="refresh-link"><i class="fas fa-sync-alt"></i> Refresh</a>
                 </div>
             </div>
         </div>

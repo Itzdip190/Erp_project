@@ -2,6 +2,17 @@
 
 @section('page-title', 'Class Timetable')
 
+@section('styles')
+<style>
+body.dark-mode .card { background: #111827 !important; border-color: #1e293b !important; color: #f8fafc !important; }
+body.dark-mode .card-hdr { border-bottom-color: #1e293b !important; }
+body.dark-mode .form-label { color: #cbd5e1 !important; }
+body.dark-mode .form-control { background: #1f2937 !important; border-color: #374151 !important; color: #f8fafc !important; }
+body.dark-mode .tbl th { background: #1f2937 !important; color: #cbd5e1 !important; }
+body.dark-mode .tbl td { color: #f8fafc !important; border-bottom-color: #1e293b !important; }
+</style>
+@endsection
+
 @section('content')
 <div class="page-hdr">
     <div class="page-hdr-left">

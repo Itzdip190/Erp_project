@@ -124,6 +124,82 @@
     .btn-outline-gold:hover {
         background: rgba(180, 83, 9, 0.05);
     }
+
+    /* ── Student Daily Attendance Dark Mode Overrides ── */
+    body.dark-mode .page-hdr h1 {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .page-hdr p {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .filter-card {
+        background-color: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode .form-label {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .form-control {
+        background-color: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .form-control:focus {
+        border-color: #4b5563 !important;
+        background-color: #1f2937 !important;
+    }
+    body.dark-mode select.form-control option {
+        background-color: #1f2937 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .btn-outline-gold {
+        background-color: #1f2937 !important;
+        border-color: #f59e0b !important;
+        color: #f59e0b !important;
+    }
+    body.dark-mode .btn-outline-gold:hover {
+        background-color: rgba(245, 158, 11, 0.2) !important;
+    }
+    body.dark-mode .btn-icon {
+        background-color: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .btn-icon:hover {
+        background-color: #374151 !important;
+        color: #ffffff !important;
+    }
+    body.dark-mode #show_logs_btn {
+        background-color: #1f2937 !important;
+        border-color: #f59e0b !important;
+        color: #f59e0b !important;
+    }
+    body.dark-mode #show_logs_btn:hover {
+        background-color: rgba(245, 158, 11, 0.2) !important;
+    }
+    body.dark-mode #attendanceSaveForm .card {
+        background-color: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode #form-buttons-container {
+        background-color: #111827 !important;
+        border-top-color: #1e293b !important;
+    }
+    body.dark-mode #btn-cancel-edit {
+        background-color: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode #btn-cancel-edit:hover {
+        background-color: #374151 !important;
+        color: #ffffff !important;
+    }
+    body.dark-mode #attendanceTableContainer {
+        background-color: #111827 !important;
+        color: #cbd5e1 !important;
+    }
 </style>
 
 <div class="page-hdr" style="margin-bottom: 20px;">
@@ -137,6 +213,23 @@
         <p style="font-size: 13px; color: var(--t3); margin: 4px 0 0 0;">Student Management</p>
     </div>
 </div>
+
+@if(session('success'))
+    <div class="alert alert-success" style="margin-bottom:20px; padding:12px 16px; border-radius:8px; background:#f0fdf4; border:1px solid #a7f3d0; color:#15803d; font-size:13px; font-weight:600;">
+        <i class="fas fa-check-circle" style="margin-right:8px;"></i>{{ session('success') }}
+    </div>
+@endif
+
+@if($errors->any())
+    <div class="alert alert-danger" style="margin-bottom:20px; padding:12px 16px; border-radius:8px; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; font-size:13px; font-weight:600;">
+        <i class="fas fa-exclamation-circle" style="margin-right:8px;"></i>
+        <ul style="margin:0; padding-left:16px;">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
 
 <!-- Filter Section -->
 <div class="filter-card">
@@ -389,6 +482,32 @@ function updateDateInputBoundaries() {
 
 // Initial boundaries setup
 updateDateInputBoundaries();
+
+// Initialize filters from URL query parameters (useful after save redirects)
+$(document).ready(function() {
+    let urlParams = new URLSearchParams(window.location.search);
+    let classId = urlParams.get('class_id');
+    let sectionId = urlParams.get('section_id');
+    let date = urlParams.get('date');
+    let academicSessionId = urlParams.get('academic_session_id');
+
+    if (academicSessionId) {
+        $('#academic_session_id').val(academicSessionId);
+        updateDateInputBoundaries();
+    }
+    if (date) {
+        $('#attendance_date').val(date);
+    }
+    if (classId) {
+        $('#class_id').val(classId).trigger('change');
+        if (sectionId) {
+            // Wait for section dropdown to populate on class change
+            setTimeout(function() {
+                $('#section_id').val(sectionId).trigger('change');
+            }, 150);
+        }
+    }
+});
 
 function triggerRetrieveStudents() {
     let sectionId = $('#section_id').val();

@@ -10,6 +10,30 @@
     </div>
 </div>
 
+@php
+    $u = auth()->user();
+    $isTeacherAccount = $u && ($u->hasRole('teacher') || $u->hasRole('staff') || $u->role === 'teacher');
+@endphp
+
+@if($isTeacherAccount)
+    @php $selectedStaff = $teachers->firstWhere('id', $teacherId); @endphp
+    <div class="card mb-4" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color:#fff; padding:20px 24px; border-radius:14px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div>
+                <h3 style="color:#fff; font-size:1.2rem; font-weight:700; margin-bottom:4px;">
+                    <i class="fas fa-calendar-alt" style="color:#f59e0b; margin-right:8px;"></i>
+                    Teaching Work Schedule for {{ $selectedStaff?->full_name ?? $u->name }}
+                </h3>
+                <p style="color:#94a3b8; font-size:0.88rem; margin:0;">
+                    Designation: {{ $selectedStaff?->designation?->name ?? 'Teacher' }} &bull; Employee ID: {{ $selectedStaff?->employee_id ?? 'N/A' }}
+                </p>
+            </div>
+            <a href="{{ route('teacher.dashboard') }}" class="btn btn-sm btn-outline-light" style="border-radius:8px; font-weight:600; color:#fff; border-color:rgba(255,255,255,0.3);">
+                <i class="fas fa-arrow-left me-1"></i> Dashboard
+            </a>
+        </div>
+    </div>
+@else
 <!-- Selector Card -->
 <div class="card">
     <div class="card-hdr">
@@ -36,6 +60,7 @@
         </form>
     </div>
 </div>
+@endif
 
 @if($teacherId)
 <div class="card">

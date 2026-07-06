@@ -439,6 +439,126 @@
     background: #f8fafc !important;
     border-color: #cbd5e1 !important;
 }
+
+/* Dark Mode overrides for wizard modal */
+body.dark-mode .step-node .step-circle {
+    background: #1f2937;
+    border-color: #374151;
+    color: #cbd5e1;
+}
+body.dark-mode .step-node.active .step-circle {
+    border-color: #ea580c;
+    color: #fff;
+    background: #ea580c;
+}
+body.dark-mode .step-node.completed .step-circle {
+    border-color: #10b981;
+    background: #10b981;
+    color: #fff;
+}
+body.dark-mode .step-label {
+    color: #94a3b8;
+}
+body.dark-mode .class-selector-card {
+    background: #1f2937;
+    border-color: #374151;
+}
+body.dark-mode .class-selector-title {
+    color: #f8fafc;
+    border-bottom-color: #374151;
+}
+body.dark-mode .section-chip-checkbox {
+    background: #1f2937;
+    border-color: #374151;
+    color: #cbd5e1;
+}
+body.dark-mode .section-chip-checkbox.selected {
+    border-color: #ea580c;
+    background: rgba(234, 88, 12, 0.15);
+    color: #fff;
+}
+body.dark-mode .periods-config-table th {
+    color: #cbd5e1;
+}
+body.dark-mode .periods-config-table td {
+    border-bottom-color: #374151;
+}
+body.dark-mode .summary-box {
+    background: #1f2937;
+    border-color: #374151;
+}
+body.dark-mode .summary-row {
+    border-bottom-color: #374151;
+}
+body.dark-mode .summary-lbl {
+    color: #cbd5e1;
+}
+body.dark-mode .summary-val {
+    color: #f8fafc;
+}
+body.dark-mode .premium-form-label {
+    background: #111827;
+    color: #cbd5e1;
+}
+body.dark-mode .premium-form-control {
+    background: #1f2937;
+    border-color: #374151;
+    color: #f8fafc;
+}
+body.dark-mode .active-toggle-container {
+    background: #1f2937;
+    border-color: #374151;
+}
+body.dark-mode .active-toggle-btn {
+    color: #cbd5e1;
+    border-right-color: #374151;
+}
+body.dark-mode .active-toggle-btn:has(input[type="radio"]:checked) {
+    background: rgba(234, 88, 12, 0.15);
+    color: #fff;
+}
+body.dark-mode .trigger-icon-left,
+body.dark-mode .trigger-icon-right {
+    color: #64748b;
+}
+body.dark-mode .select-days-dropdown-trigger {
+    background: #1f2937;
+    border-color: #374151;
+}
+body.dark-mode .select-days-dropdown-menu {
+    background: #1f2937;
+    border-color: #374151;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.5);
+}
+body.dark-mode .day-dropdown-item {
+    color: #cbd5e1;
+}
+body.dark-mode .day-dropdown-item:hover {
+    background: #374151;
+}
+body.dark-mode .day-chip {
+    background: #1e3a8a;
+    border-color: #3b82f6;
+    color: #bfdbfe;
+}
+body.dark-mode .day-chip-close {
+    color: #60a5fa;
+}
+body.dark-mode .day-chip-close:hover {
+    color: #ef4444;
+}
+body.dark-mode .btn-premium-outline {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #cbd5e1 !important;
+}
+body.dark-mode .btn-premium-outline:hover {
+    background: #374151 !important;
+}
+body.dark-mode .wizard-step-content h3,
+body.dark-mode .wizard-step-content h4 {
+    color: #f8fafc;
+}
 </style>
 
 <div class="inst-modal" id="modal-wizard">

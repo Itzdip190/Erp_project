@@ -3,6 +3,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\SchoolSignupController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -72,29 +73,6 @@ Route::get('/migrate-db', function (\Illuminate\Http\Request $request) {
         }
         return response($errorMsg, 500);
     }
-});
-
-Route::get('/deploy-git', function (\Illuminate\Http\Request $request) {
-    $expectedKey = env('DB_MIGRATE_KEY');
-    if (!$expectedKey || $request->query('key') !== $expectedKey) {
-        abort(403, 'Unauthorized.');
-    }
-
-    $output = [];
-    $returnVar = 0;
-    exec('git pull origin main 2>&1', $output, $returnVar);
-
-    if ($returnVar === 0) {
-        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
-        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-        $output[] = "[INFO] Laravel cache cleared and migrations run.";
-        $output[] = \Illuminate\Support\Facades\Artisan::output();
-    }
-
-    return response()->json([
-        'output' => $output,
-        'return_var' => $returnVar
-    ]);
 });
 
 // Fix Tables Route — directly creates staff_module_access if it doesn't exist (bypasses migration tracking)
@@ -236,11 +214,94 @@ Route::get('/debug-storage', function (\Illuminate\Http\Request $request) {
     return response($output);
 });
 
+// ─── Fix SuperAdmin Role (One-Time Use) ──────────────────────────────────────
+// Fixes 403 "User Does Not Have The Right Roles" when superadmin can log in
+// but is missing the Spatie role assignment in model_has_roles table.
+Route::get('/fix-superadmin-role', function (\Illuminate\Http\Request $request) {
+    $expectedKey = env('DB_MIGRATE_KEY');
+    if (!$expectedKey || $request->query('key') !== $expectedKey) {
+        abort(403, 'Unauthorized. Please provide a valid key.');
+    }
+
+    $output = '<h2 style="font-family:monospace">🔧 SuperAdmin Role Fix</h2>';
+    $fixed  = [];
+    $skipped = [];
+
+    try {
+        // Ensure the Spatie 'superadmin' role exists on the 'web' guard
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'superadmin', 'guard_name' => 'web']
+        );
+        $output .= '<p>✅ Spatie role "superadmin" exists (id: ' . $role->id . ')</p>';
+
+        // Find all users that should be superadmin:
+        // 1. Users with role column = 'superadmin'
+        // 2. Users with email matching superadmin@schoolcloud.com
+        $candidates = \App\Models\User::where('role', 'superadmin')
+            ->orWhere('email', 'superadmin@schoolcloud.com')
+            ->get();
+
+        if ($candidates->isEmpty()) {
+            $output .= '<p style="color:orange">⚠️ No superadmin users found by role column or email.</p>';
+        }
+
+        foreach ($candidates as $user) {
+            // Clear permission cache for this user
+            app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+
+            if (!$user->hasRole('superadmin')) {
+                $user->assignRole('superadmin');
+                // Also ensure role column is set
+                $user->update(['role' => 'superadmin']);
+                $fixed[] = $user->email . ' (id:' . $user->id . ')';
+            } else {
+                $skipped[] = $user->email . ' (already has role)';
+            }
+        }
+
+        // Clear all permission cache
+        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
+        \Illuminate\Support\Facades\Artisan::call('cache:clear');
+
+        $output .= '<p><strong>Fixed:</strong> ' . (empty($fixed) ? 'None' : implode(', ', $fixed)) . '</p>';
+        $output .= '<p><strong>Skipped:</strong> ' . (empty($skipped) ? 'None' : implode(', ', $skipped)) . '</p>';
+        $output .= '<p style="color:green;font-weight:bold">✅ Done! Try logging in to <a href="/superadmin/dashboard">/superadmin/dashboard</a> now.</p>';
+
+        return response($output, 200);
+    } catch (\Throwable $e) {
+        return response(
+            '<h2 style="color:red">❌ Fix Failed</h2><pre>' . $e->getMessage() . "\n\n" . $e->getTraceAsString() . '</pre>',
+            500
+        );
+    }
+});
+
+// School signup routes
+Route::get('/school/signup', [SchoolSignupController::class, 'showRegistrationForm'])->name('school.signup');
+Route::post('/school/signup', [SchoolSignupController::class, 'register'])->name('school.signup.submit');
+
 // Authentication routes
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1');
 Route::get('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout.post');
+Route::get('/school/exit-impersonate', [\App\Http\Controllers\SuperAdmin\SchoolController::class, 'exitImpersonate'])
+    ->name('school.exit-impersonate')
+    ->middleware('auth');
+
+Route::get('/auth-debug', function () {
+    $u = auth()->user();
+    return [
+        'authenticated' => auth()->check(),
+        'user_id' => $u?->id,
+        'email' => $u?->email,
+        'role_column' => $u?->role,
+        'spatie_roles' => $u ? $u->roles->pluck('name')->toArray() : [],
+        'is_impersonating' => session('is_impersonating', false),
+        'original_user_id' => session('original_user_id'),
+        'school_code' => session('school_code'),
+    ];
+});
 
 // Subscription Expiry Fallback
 Route::get('/subscription-expired', function () {

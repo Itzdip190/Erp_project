@@ -15,217 +15,159 @@ class ModuleRegistry
      */
     public static function all(): array
     {
-        return [
-            'overview' => [
-                'label'   => '1. Overview',
-                'icon'    => 'fa-house',
-                'features' => [
-                    'mis_report'       => 'Daily MIS Report',
-                    'admin_dashboard'  => 'Admin Dashboard',
-                ],
-            ],
-            'institute_info' => [
-                'label'   => '2. Institute Info',
-                'icon'    => 'fa-building',
-                'features' => [
-                    'basic_info'            => 'Basic Institute Info',
-                    'implementation_process'=> 'Implementation Process',
-                    'udise'                 => 'UDISE',
-                ],
-            ],
-            'admin_role_management' => [
-                'label'   => '3. Admin Role Management',
-                'icon'    => 'fa-users',
-                'features' => [
-                    'role_category'    => 'Role Category',
-                    'staff_access'     => 'Staff Access Control',
-                ],
-            ],
-            'password_management' => [
-                'label'   => '4. Password Management',
-                'icon'    => 'fa-lock',
-                'features' => [
-                    'reset_password'   => 'Reset Password',
-                ],
-            ],
-            'staff_management' => [
-                'label'   => '6. Staff Management',
-                'icon'    => 'fa-user-cog',
-                'features' => [
-                    'staff_directory'       => 'Staff Directory',
-                    'add_staff'             => 'Add Staff',
-                    'bulk_import'           => 'Bulk Staff Import',
-                    'bulk_photo'            => 'Bulk Photo Upload',
-                    'staff_attendance'      => 'Staff Attendance',
-                    'bulk_attendance'       => 'Staff Mark Bulk Attendance',
-                    'student_att_report'    => 'Student Attendance Marking Report',
-                ],
-            ],
-            'class_subject_teacher' => [
-                'label'   => '7. Class, Subject & Teacher Assignment',
-                'icon'    => 'fa-book',
-                'features' => [
-                    'class_overview'   => 'Class Overview',
-                    'add_class'        => 'Add/Modify Class',
-                    'add_subject'      => 'Add/Modify Subjects',
-                    'assign_teacher'   => 'Assign Teachers',
-                ],
-            ],
-            'timetable' => [
-                'label'   => '8. Time Table',
-                'icon'    => 'fa-calendar-days',
-                'features' => [
-                    'class_timetable'      => 'Class Timetable',
-                    'group_timetable'      => 'Group Timetable',
-                    'teacher_timetable'    => 'Teacher Timetable',
-                    'teacher_substitution' => 'Teacher Substitution',
-                ],
-            ],
-            'student_management' => [
-                'label'   => '9. Student Management',
-                'icon'    => 'fa-graduation-cap',
-                'features' => [
-                    'add_student'           => 'Add Student',
-                    'bulk_student_import'   => 'Bulk Student Import',
-                    'bulk_photo_doc'        => 'Bulk Photo/Document Upload',
-                    'optional_subject'      => 'Student Optional Subject Allocation',
-                    'student_directory'     => 'Student Directory',
-                    'admission_report'      => 'New Admission Report',
-                    'siblings'              => 'Siblings List',
-                    'student_attendance'    => 'Student Attendance',
-                    'bulk_attendance'       => 'Student Mark Bulk Attendance',
-                    'student_report'        => 'Student Report',
-                    'app_settings'          => 'Student Info Update Settings on App',
-                    'bulk_admission_no'     => 'Bulk Admission Number Change',
-                    'attendance_report'     => 'Attendance Report',
-                    'discipline'            => 'Discipline Management',
-                    'bulk_operation'        => 'Bulk Student Operation',
-                    'ptm_attendance'        => 'PTM Attendance',
-                    'cca_module'            => 'CCA Module',
-                ],
-            ],
-            'download_statistics' => [
-                'label'   => '10. Download Statistics',
-                'icon'    => 'fa-chart-pie',
-                'features' => [
-                    'student_download'  => 'Student Download Status',
-                    'staff_download'    => 'Staff Download Status',
-                    'parent_download'   => 'Parent Download Status',
-                    'student_activity'  => 'Student Activity',
-                    'staff_activity'    => 'Staff Activity',
-                    'parent_activity'   => 'Parent Activity',
-                ],
-            ],
-            'fee_management' => [
-                'label'   => '11. Fee Management',
-                'icon'    => 'fa-indian-rupee-sign',
-                'features' => [
-                    'fee_configuration'  => 'Fee Configuration',
-                    'fee_basics'         => 'Fee Basics',
-                    'class_wise_fee'     => 'Class-wise Fee',
-                    'student_wise_fee'   => 'Student-wise Fee',
-                    'optional_fee'       => 'Optional Fee Mapping',
-                    'payment_links'      => 'Payment Links',
-                    'collection_followup'=> 'Collection Follow-Up',
-                    'schedule_mapper'    => 'Student Class & Fee Schedule Mapper',
-                    'refund_fee'         => 'Refund Fee',
-                    'fee_receipts'       => 'Fee Receipts',
-                    'pending_cheques'    => 'Pending Cheques',
-                    'fee_reports'        => 'Fee Reports',
-                    'fee_invoice'        => 'Fee Invoice',
-                    'fee_invoice1'       => 'Fee Invoice 1',
-                    'bulk_upload'        => 'Fee Bulk Upload',
-                    'statement_account'  => 'Statement of Account',
-                    'xero_integration'   => 'Xero Integration',
-                ],
-            ],
-            'icard_buspass' => [
-                'label'   => '13. I Card / Bus Pass / Admit Card',
-                'icon'    => 'fa-address-card',
-                'features' => [
-                    'template_creator'  => 'Template Creator',
-                    'generate_card'     => 'Generate Card',
-                ],
-            ],
-            'digital_diary' => [
-                'label'   => '14. Digital Diary',
-                'icon'    => 'fa-book-open',
-                'features' => [
-                    'create_diary'      => 'Create Diary',
-                    'diary_report'      => 'Daily Diary Report',
-                ],
-            ],
-            'event_holiday' => [
-                'label'   => '15. Event & Holiday Management',
-                'icon'    => 'fa-calendar-check',
-                'features' => [
-                    'event_holiday'     => 'Event & Holiday Management',
-                ],
-            ],
-            'certificate_management' => [
-                'label'   => '16. Certificate Management',
-                'icon'    => 'fa-certificate',
-                'features' => [
-                    'template_creator'  => 'Certificate Template Creator',
-                    'manage_certs'      => 'Manage Certificates',
-                    'class_wise_cert'   => 'Class-wise Student Certificate',
-                    'cert_report'       => 'Certificates Report',
-                ],
-            ],
-            'leave_management' => [
-                'label'   => '17. Leave Management',
-                'icon'    => 'fa-sign-out-alt',
-                'features' => [
-                    'leave_basics'      => 'Leave Basics',
-                    'staff_leave'       => 'Staff Leave',
-                    'student_leave'     => 'Student Leave',
-                ],
-            ],
-            'communication' => [
-                'label'   => '18. Communication',
-                'icon'    => 'fa-comments',
-                'features' => [
-                    'notification_settings' => 'Notification Settings',
-                    'notice_circular'       => 'Notice / Circular',
-                    'survey'                => 'Survey',
-                    'sms'                   => 'SMS',
-                    'sms_template'          => 'SMS Template',
-                    'whatsapp'              => 'WhatsApp',
-                    'email'                 => 'E-Mail',
-                    'chat'                  => 'Chat',
-                ],
-            ],
-            'examination' => [
-                'label'   => '19. Examination',
-                'icon'    => 'fa-graduation-cap',
-                'features' => [
-                    'grade_scale'           => 'Grade Scale',
-                    'marks_entry'           => 'Marks Entry',
-                    'offline_tests'         => 'Offline Tests',
-                    'lms_tests'             => 'LMS Linked Tests',
-                    'report_card_template'  => 'Report Card Template Creator',
-                    'report_card'           => 'Report Card',
-                    'report_card_v2'        => 'Report Card v2',
-                    'marksheets_report'     => 'Marksheets and ORSS Report',
-                    'reports'               => 'Reports',
-                ],
-            ],
-            'admissions' => [
-                'label'   => '20. Admissions',
-                'icon'    => 'fa-user-plus',
-                'features' => [
-                    'admission_process'         => 'Admission Process',
-                    'admission_settings'        => 'Admission Settings',
-                    'enquiry_leads'             => 'Enquiry Leads',
-                    'application_payment'       => 'Application & Payment',
-                    'pending_documents'         => 'Pending Documents',
-                    'interaction_evaluation'    => 'Interaction and Evaluation',
-                    'admission'                 => 'Admission',
-                    'new_admission_report'      => 'New Admission Report',
-                    'daily_planner'             => 'Daily Planner',
-                    'admission_dashboard'       => 'Admission Dashboard',
-                ],
-            ],
-        ];
+        $sidebarPath = resource_path('views/layouts/sidebar_nav.blade.php');
+        if (!file_exists($sidebarPath)) {
+            return [];
+        }
+
+        $content = file_get_contents($sidebarPath);
+        $modules = [];
+
+        // Parse using regex matching each main module block: @if(StaffAccessHelper::hasAccess('module_name'))
+        $pattern = '/@if\(StaffAccessHelper::hasAccess\(\s*[\'"]([a-zA-Z0-9_-]+)[\'"]\s*\)\)(.*?)(?=@if\(StaffAccessHelper::hasAccess\(\s*[\'"][a-zA-Z0-9_-]+[\'"]\s*\)\)|$)/s';
+
+        if (preg_match_all($pattern, $content, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $moduleKey = $match[1];
+                $blockContent = $match[2];
+
+                // 1. Extract Label/Title
+                $originalTitle = '';
+                $label = '';
+                if (preg_match('/class="sb-hdr-title"[^>]*>(.*?)<\/span>/s', $blockContent, $titleMatch)) {
+                    $rawTitle = trim(strip_tags($titleMatch[1]));
+                    if (preg_match('/getLabel\(\s*[\'"][^\'"]+[\'"]\s*,\s*[\'"]([^\'"]+)[\'"]\s*\)/', $rawTitle, $labelMatch)) {
+                        $originalTitle = $labelMatch[1];
+                    } else {
+                        $originalTitle = $rawTitle;
+                    }
+                    $originalTitle = preg_replace('/^\d+\.\s+/', '', $originalTitle);
+                    $label = $originalTitle;
+                }
+
+                // 2. Extract Icon (supports fa-icon classes and img tags)
+                $icon = '';
+                if (preg_match('/class="sb-hdr-icon"[^>]*>(.*?)<\/div>/s', $blockContent, $iconDivMatch)) {
+                    $divContent = $iconDivMatch[1];
+                    if (preg_match('/<i\s+class="([^"]+)"/s', $divContent, $iMatch)) {
+                        $icon = trim($iMatch[1]);
+                    } elseif (preg_match('/<img[^>]+src="([^"]+)"/s', $divContent, $imgMatch)) {
+                        $icon = trim($imgMatch[1]);
+                    }
+                }
+                if (!$icon) {
+                    if (preg_match('/<i\s+class="([^"]*fa-[^"]+)"/s', $blockContent, $iMatch)) {
+                        $icon = trim($iMatch[1]);
+                    }
+                }
+
+                // 3. Extract Features (Submenus)
+                $features = [];
+
+                // Match features checking access: @if(StaffAccessHelper::hasAccess('module_key', 'feature_key'))
+                $featPattern = '/@if\(StaffAccessHelper::hasAccess\(\s*[\'"][^\'"]+[\'"]\s*,\s*[\'"]([a-zA-Z0-9_-]+)[\'"]\s*\)\)(.*?)(?=@if\(StaffAccessHelper::hasAccess|@endif|$)/s';
+                if (preg_match_all($featPattern, $blockContent, $featMatches, PREG_SET_ORDER)) {
+                    foreach ($featMatches as $fMatch) {
+                        $fKey = $fMatch[1];
+                        $fBlock = $fMatch[2];
+                        if (preg_match('/class="sb-submenu-label"[^>]*>(.*?)<\/span>/s', $fBlock, $lblMatch)) {
+                            $rawLbl = trim(strip_tags($lblMatch[1]));
+                            if (preg_match('/getFeatureLabel\(\s*[\'"][^\'"]+[\'"]\s*,\s*[\'"][^\'"]+[\'"]\s*,\s*[\'"]([^\'"]+)[\'"]\s*\)/', $rawLbl, $featLblMatch)) {
+                                $featLabel = $featLblMatch[1];
+                            } else {
+                                $featLabel = $rawLbl;
+                            }
+                            $features[$fKey] = $featLabel;
+                        }
+                    }
+                }
+
+                // Fallback: If no hasAccess-based features found, parse all submenu labels directly
+                if (empty($features)) {
+                    if (preg_match('/<ul class="sb-submenu"[^>]*>(.*?)<\/ul>/s', $blockContent, $submenuMatch)) {
+                        $submenuContent = $submenuMatch[1];
+                        if (preg_match_all('/class="sb-submenu-label"[^>]*>(.*?)<\/span>/s', $submenuContent, $lblMatches)) {
+                            foreach ($lblMatches[1] as $lbl) {
+                                $rawLbl = trim(strip_tags($lbl));
+                                if (preg_match('/getFeatureLabel\(\s*[\'"][^\'"]+[\'"]\s*,\s*[\'"][^\'"]+[\'"]\s*,\s*[\'"]([^\'"]+)[\'"]\s*\)/', $rawLbl, $featLblMatch)) {
+                                    $featLabel = $featLblMatch[1];
+                                } else {
+                                    $featLabel = $rawLbl;
+                                }
+                                if ($featLabel !== '') {
+                                    $featKey = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '_', $featLabel));
+                                    $featKey = trim($featKey, '_');
+                                    $features[$featKey] = $featLabel;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                $customNames = self::getCustomNames();
+                $customName = $customNames[$moduleKey] ?? null;
+
+                // Update feature names inside array with customized values if set
+                foreach ($features as $fKey => $fLabel) {
+                    $customFeatName = $customNames["{$moduleKey}:{$fKey}"] ?? null;
+                    if ($customFeatName) {
+                        $features[$fKey] = $customFeatName;
+                    }
+                }
+
+                $modules[$moduleKey] = [
+                    'label'          => $customName ?? $label,
+                    'original_title' => $customName ?? $originalTitle,
+                    'default_label'  => $label,
+                    'default_title'  => $originalTitle,
+                    'icon'           => $icon,
+                    'features'       => $features,
+                ];
+            }
+        }
+
+        return $modules;
+    }
+
+    public static function getLabel(string $moduleKey, string $defaultLabel): string
+    {
+        $customNames = self::getCustomNames();
+        $label = $customNames[$moduleKey] ?? $defaultLabel;
+        return preg_replace('/^\d+[\.\s\x{00a0}]*/u', '', $label);
+    }
+
+    /**
+     * Get customized label for a feature/page under a module.
+     */
+    public static function getFeatureLabel(string $moduleKey, string $featureKey, string $defaultLabel): string
+    {
+        $customNames = self::getCustomNames();
+        $key = "{$moduleKey}:{$featureKey}";
+        return $customNames[$key] ?? $defaultLabel;
+    }
+
+    /**
+     * Get all custom menu names.
+     */
+    public static function getCustomNames(): array
+    {
+        $path = storage_path('app/menu_names.json');
+        if (file_exists($path)) {
+            return json_decode(file_get_contents($path), true) ?: [];
+        }
+        return [];
+    }
+
+    /**
+     * Save custom menu names globally.
+     */
+    public static function saveCustomNames(array $names): void
+    {
+        $path = storage_path('app/menu_names.json');
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+        file_put_contents($path, json_encode($names, JSON_PRETTY_PRINT));
     }
 }

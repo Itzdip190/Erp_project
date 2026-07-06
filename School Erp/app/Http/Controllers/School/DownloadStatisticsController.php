@@ -231,6 +231,8 @@ class DownloadStatisticsController extends Controller
                 'mobile'       => $st->guardian_phone ?? '—',
                 'last_seen'    => $lastSeen,
                 'app_version'  => $appVersion,
+                'photo'        => $st->photo,
+                'photo_url'    => $st->photo_url,
             ];
         }
 
@@ -306,6 +308,8 @@ class DownloadStatisticsController extends Controller
                 'email'                => $st->email ?? $st->user?->email ?? '—',
                 'last_seen'            => $lastSeen,
                 'app_version'          => $appVersion,
+                'photo'                => $st->photo,
+                'photo_url'            => $st->photo_url,
             ];
         }
 

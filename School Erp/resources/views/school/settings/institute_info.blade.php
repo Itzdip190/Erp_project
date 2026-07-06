@@ -458,14 +458,77 @@
     color: #dc2626;
 }
 
-/* Animations */
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+/* Dark Mode Overrides for Institute Info */
+body.dark-mode .inst-page {
+    background: #0b0f19 !important;
+    color: #f8fafc !important;
 }
-@keyframes slideUp {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+body.dark-mode .inst-details-panel,
+body.dark-mode .inst-panel,
+body.dark-mode .inst-action-card,
+body.dark-mode .inst-modal-content {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .inst-details-hdr,
+body.dark-mode .inst-panel-hdr,
+body.dark-mode .inst-table td,
+body.dark-mode .inst-form-footer,
+body.dark-mode .inst-modal-list,
+body.dark-mode .inst-modal-list-item,
+body.dark-mode .inst-asset-col {
+    border-color: #1e293b !important;
+}
+body.dark-mode .inst-name-title,
+body.dark-mode .inst-panel-title,
+body.dark-mode .inst-card-title,
+body.dark-mode .inst-detail-val,
+body.dark-mode .inst-att-box-val,
+body.dark-mode .inst-modal-hdr h3 {
+    color: #f8fafc !important;
+}
+body.dark-mode .inst-detail-lbl,
+body.dark-mode .inst-detail-colon,
+body.dark-mode .inst-asset-lbl,
+body.dark-mode .inst-card-sub,
+body.dark-mode .inst-form-label {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .inst-asset-box {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+}
+body.dark-mode .inst-card-icon {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: #60a5fa !important;
+}
+body.dark-mode .inst-btn-social,
+body.dark-mode .inst-btn-edit,
+body.dark-mode .inst-card-btn {
+    background: #1f2937 !important;
+    color: #818cf8 !important;
+    border-color: #6366f1 !important;
+}
+body.dark-mode .inst-btn-social:hover,
+body.dark-mode .inst-btn-edit:hover,
+body.dark-mode .inst-card-btn:hover {
+    background: #6366f1 !important;
+    color: #ffffff !important;
+}
+body.dark-mode .inst-table th {
+    background: #1f2937 !important;
+    color: #cbd5e1 !important;
+}
+body.dark-mode .inst-table tr:hover td {
+    background: rgba(255,255,255,0.04) !important;
+    color: #ffffff !important;
+}
+body.dark-mode .inst-form-control {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #f8fafc !important;
 }
 </style>
 @endsection

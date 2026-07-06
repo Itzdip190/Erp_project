@@ -324,6 +324,139 @@
         margin-bottom: 12px;
         color: #cbd5e1;
     }
+
+    /* ── BULK ATTENDANCE DARK MODE OVERRIDES ── */
+    body.dark-mode .bulk-container {
+        background: #0b0f19 !important;
+        box-shadow: none !important;
+    }
+    body.dark-mode .bulk-title h1,
+    body.dark-mode .panel-header h3 {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .bulk-title p {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .filters-card,
+    body.dark-mode .data-panel {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode .panel-header {
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .filter-col label {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .filter-col input,
+    body.dark-mode .filter-col select {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .notice-banner {
+        background: rgba(37, 99, 235, 0.15) !important;
+        border-color: rgba(59, 130, 246, 0.3) !important;
+        color: #60a5fa !important;
+    }
+    body.dark-mode .bulk-grid-table th {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-color: #374151 !important;
+    }
+    body.dark-mode .bulk-grid-table td {
+        color: #f8fafc !important;
+        border-color: #1e293b !important;
+    }
+    body.dark-mode .employee-cell {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 4px 0 8px rgba(0, 0, 0, 0.4) !important;
+    }
+    body.dark-mode .bulk-grid-table tr:hover .employee-cell,
+    body.dark-mode .bulk-grid-table tr:hover td {
+        background: #1f2937 !important;
+    }
+    body.dark-mode .employee-name {
+        color: #f8fafc !important;
+        font-weight: 700 !important;
+    }
+    body.dark-mode .employee-sub {
+        color: #fbbf24 !important;
+    }
+    body.dark-mode .date-cell-container select,
+    body.dark-mode .time-input-wrapper input {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .date-cell-container select option {
+        background: #1f2937 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .time-icon {
+        color: #cbd5e1 !important;
+    }
+
+    /* Status Select Dropdown */
+    .status-select {
+        width: 100%;
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 4px 6px;
+        font-size: 11px;
+        font-weight: 700;
+        outline: none;
+        height: 28px;
+        transition: all 0.15s;
+        text-align: center;
+        cursor: pointer;
+    }
+    .status-select:focus {
+        border-color: #94a3b8;
+    }
+
+    /* Dynamic select styling colors */
+    .select-Present {
+        color: #047857 !important;
+        border-color: #a7f3d0 !important;
+        background: #f0fdf4 !important;
+    }
+    .select-Absent {
+        color: #b91c1c !important;
+        border-color: #fecaca !important;
+        background: #fef2f2 !important;
+    }
+    .select-HalfDay {
+        color: #d97706 !important;
+        border-color: #fde68a !important;
+        background: #fffbeb !important;
+    }
+    .select-Leave {
+        color: #1d4ed8 !important;
+        border-color: #bfdbfe !important;
+        background: #eff6ff !important;
+    }
+    .select-Custom_Leaves {
+        color: #be185d !important;
+        border-color: #fbcfe8 !important;
+        background: #fdf2f8 !important;
+    }
+    .select-not_marked {
+        color: #718096 !important;
+        border-color: #cbd5e1 !important;
+        background: #f8fafc !important;
+    }
+
+    /* Dark Mode equivalents */
+    body.dark-mode .select-Present { color: #34d399 !important; border-color: #065f46 !important; background: #064e3b !important; }
+    body.dark-mode .select-Absent { color: #f87171 !important; border-color: #7f1d1d !important; background: #991b1b !important; }
+    body.dark-mode .select-HalfDay { color: #fbbf24 !important; border-color: #78350f !important; background: #7c2d12 !important; }
+    body.dark-mode .select-Leave { color: #60a5fa !important; border-color: #1e3a8a !important; background: #1e3a8a !important; }
+    body.dark-mode .select-Custom_Leaves { color: #f472b6 !important; border-color: #9d174d !important; background: #831843 !important; }
+    body.dark-mode .select-not_marked { color: #9ca3af !important; border-color: #374151 !important; background: #1f2937 !important; }
 </style>
 
 <div class="bulk-container">
@@ -468,7 +601,7 @@
                                         <td>
                                             <div class="date-cell-container">
                                                 <!-- Status Select dropdown -->
-                                                <select name="attendance[{{ $staff->id }}][{{ $dateStr }}][status]">
+                                                <select name="attendance[{{ $staff->id }}][{{ $dateStr }}][status]" class="status-select" onchange="updateSelectColor(this)">
                                                     <option value="not_marked" {{ $status === 'not_marked' ? 'selected' : '' }}>Not Marked</option>
                                                     <option value="Present" {{ $status === 'Present' ? 'selected' : '' }}>Present</option>
                                                     <option value="Absent" {{ $status === 'Absent' ? 'selected' : '' }}>Absent</option>
@@ -505,4 +638,24 @@
         </div>
     </form>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    // Update color class of the select elements based on selected value
+    function updateSelectColor(selectEl) {
+        selectEl.classList.remove(
+            'select-Present', 'select-Absent', 'select-HalfDay', 
+            'select-Leave', 'select-Custom_Leaves', 'select-not_marked'
+        );
+        const val = selectEl.value.replace(' ', '_');
+        selectEl.classList.add('select-' + val);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.status-select').forEach(function(select) {
+            updateSelectColor(select);
+        });
+    });
+</script>
 @endsection

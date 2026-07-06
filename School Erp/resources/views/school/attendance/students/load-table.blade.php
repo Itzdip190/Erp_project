@@ -112,6 +112,79 @@
         background: rgba(255, 255, 255, 0.3);
         transform: scale(1.1);
     }
+
+    /* Dark Mode overrides */
+    body.dark-mode .status-btn span {
+        background-color: #1f2937;
+        border-color: #374151;
+        color: #cbd5e1;
+    }
+    body.dark-mode .status-btn span:hover {
+        background-color: #374151;
+        border-color: #4b5563;
+    }
+    body.dark-mode .status-btn.btn-p input:checked + span {
+        background-color: #10b981;
+        border-color: #10b981;
+        color: #fff;
+    }
+    body.dark-mode .status-btn.btn-hd input:checked + span {
+        background-color: #d97706;
+        border-color: #d97706;
+        color: #fff;
+    }
+    body.dark-mode .status-btn.btn-a input:checked + span {
+        background-color: #ef4444;
+        border-color: #ef4444;
+        color: #fff;
+    }
+    body.dark-mode .status-btn.btn-l input:checked + span {
+        background-color: #b45309;
+        border-color: #b45309;
+        color: #fff;
+    }
+    body.dark-mode .status-btn.btn-dl input:checked + span {
+        background-color: #ec4899;
+        border-color: #ec4899;
+        color: #fff;
+    }
+    
+    body.dark-mode .btn-clear-all {
+        border-color: #374151 !important;
+        color: #f87171 !important;
+    }
+    body.dark-mode .btn-clear-all:hover {
+        background-color: rgba(239, 68, 68, 0.1) !important;
+    }
+
+    body.dark-mode .custom-table {
+        border-color: #1e293b !important;
+    }
+    body.dark-mode .custom-table th {
+        background-color: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-bottom: 2px solid #374151 !important;
+    }
+    body.dark-mode .custom-table td {
+        color: #f8fafc !important;
+        border-bottom: 1px solid #1e293b !important;
+        background: transparent !important;
+    }
+    body.dark-mode .custom-table tr:hover td {
+        background-color: rgba(255, 255, 255, 0.04) !important;
+    }
+    body.dark-mode .student-name {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .student-roll {
+        color: #94a3b8 !important;
+    }
+    body.dark-mode td[style*="color: #475569"] {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .view-only-block {
+        color: #f8fafc !important;
+    }
 </style>
 
 <div class="edit-only-block" style="display: none; text-align: right; margin-bottom: 12px; padding: 0 16px;">
@@ -191,7 +264,7 @@
                             <input type="hidden" name="attendance[{{ $index }}][student_id]" value="{{ $student->id }}">
                             <div class="status-group">
                                 <label class="status-btn btn-p" title="Present">
-                                    <input type="radio" name="attendance[{{ $index }}][status]" value="present" class="status-radio" {{ $currentStatus === 'present' ? 'checked' : '' }} required>
+                                    <input type="radio" name="attendance[{{ $index }}][status]" value="present" class="status-radio" {{ $currentStatus === 'present' ? 'checked' : '' }}>
                                     <span>P</span>
                                 </label>
                                 <label class="status-btn btn-hd" title="Half Day">

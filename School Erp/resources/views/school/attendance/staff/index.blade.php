@@ -512,16 +512,116 @@
         pointer-events: none;
     }
 
-    /* Empty state */
-    .empty-state {
-        text-align: center;
-        padding: 48px;
-        color: #718096;
+    /* ── STAFF ATTENDANCE DARK MODE OVERRIDES ── */
+    body.dark-mode .register-container {
+        background: #0b0f19 !important;
+        box-shadow: none !important;
     }
-    .empty-state i {
-        font-size: 40px;
-        margin-bottom: 12px;
-        color: #cbd5e1;
+    body.dark-mode .register-title h1 {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .register-title p {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .datepicker-box {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+    }
+    body.dark-mode .datepicker-box label {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .datepicker-box input {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .btn-outline-gold {
+        background: #1f2937 !important;
+        color: #f59e0b !important;
+        border-color: #f59e0b !important;
+    }
+    body.dark-mode .btn-outline-gold:hover {
+        background: rgba(245, 158, 11, 0.2) !important;
+    }
+    body.dark-mode .btn-icon-only {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border: 1px solid #374151 !important;
+    }
+    body.dark-mode .btn-icon-only:hover {
+        background: #374151 !important;
+        color: #ffffff !important;
+    }
+    body.dark-mode .filters-grid {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode .filter-col label {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .filter-col input,
+    body.dark-mode .filter-col select {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .table-container {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode .premium-table th {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-bottom: 2px solid #374151 !important;
+    }
+    body.dark-mode .premium-table td {
+        color: #f8fafc !important;
+        border-bottom: 1px solid #1e293b !important;
+    }
+    body.dark-mode .premium-table tr:hover td {
+        background: rgba(255, 255, 255, 0.04) !important;
+    }
+    body.dark-mode .staff-name {
+        color: #f8fafc !important;
+        font-weight: 700 !important;
+    }
+    body.dark-mode .staff-sub {
+        color: #94a3b8 !important;
+    }
+    body.dark-mode .avatar-circle {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .bottom-bar {
+        background: #111827 !important;
+        border-top: 1px solid #1e293b !important;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5) !important;
+    }
+    body.dark-mode .outline-input-container label {
+        background: #111827 !important;
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .outline-input-container input {
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .status-pill-btn {
+        background: #1f2937 !important;
+        border-color: #374151 !important;
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .status-pill-btn:has(input:checked) {
+        color: #fff !important;
+        border-color: transparent !important;
+    }
+    body.dark-mode .pill-p:has(input:checked) { background: #10b981 !important; }
+    body.dark-mode .pill-hd:has(input:checked) { background: #007791 !important; }
+    body.dark-mode .pill-a:has(input:checked) { background: #ef4444 !important; }
+    body.dark-mode .pill-l:has(input:checked) { background: #ea580c !important; }
+    body.dark-mode .pill-cl:has(input:checked) { background: #db2777 !important; }
+    body.dark-mode .empty-state {
+        color: #cbd5e1 !important;
     }
 </style>
 

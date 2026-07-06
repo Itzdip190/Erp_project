@@ -455,7 +455,96 @@ input:checked + .tt-slider:before {
         border-top-right-radius: 12px;
     }
 }
-</style>
+
+/* ── GROUP TIMETABLE TEMPLATES DARK MODE OVERRIDES ── */
+body.dark-mode .tt-container {
+    background: #0b0f19 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .tt-academic-year-label,
+body.dark-mode .tt-col-label,
+body.dark-mode .tt-empty-sub {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .tt-academic-year-select {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .tt-academic-year-select option {
+    background: #1f2937 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .tt-row-card {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+body.dark-mode .tt-row-left-block {
+    background: linear-gradient(135deg, #111827 0%, #1e1b4b 60%, #312e81 100%) !important;
+}
+body.dark-mode .tt-col-val {
+    color: #f8fafc !important;
+}
+body.dark-mode .tt-empty {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+}
+body.dark-mode .tt-empty-title {
+    color: #f8fafc !important;
+}
+
+/* Dark Mode overrides for shared inst-modal and forms */
+body.dark-mode .inst-modal-content {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    color: #f8fafc !important;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5) !important;
+}
+body.dark-mode .inst-modal-hdr {
+    background: linear-gradient(135deg, #111827 0%, #1e1b4b 60%, #312e81 100%) !important;
+    border-bottom: 1px solid #1e293b !important;
+}
+body.dark-mode .inst-form-label {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .inst-form-control {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .inst-form-control:focus {
+    border-color: #ea580c !important;
+}
+body.dark-mode .inst-form-footer {
+    border-top-color: #1e293b !important;
+}
+body.dark-mode .inst-table {
+    color: #f8fafc !important;
+}
+body.dark-mode .inst-table th {
+    background: #1f2937 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .inst-table td {
+    border-bottom-color: #1e293b !important;
+    color: #cbd5e1 !important;
+}
+body.dark-mode .inst-table tr:hover td {
+    background: #374151 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .inst-modal-body p {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .inst-modal-body strong {
+    color: #f8fafc !important;
+}
+body.dark-mode .inst-modal-body select {
+    background-color: #1f2937 !important;
+    color: #f8fafc !important;
+    border-color: #374151 !important;
+}
 </style>
 @endsection
 

@@ -214,6 +214,9 @@ class StaffAttendanceController extends Controller
                 if ($dbStatus === 'custom_leaves' || $dbStatus === 'custom_leave') {
                     $dbStatus = 'late';
                 }
+                if ($dbStatus === 'halfday') {
+                    $dbStatus = 'half_day';
+                }
 
                 // Format check-in / check-out times
                 $clockIn = null;
@@ -516,6 +519,9 @@ class StaffAttendanceController extends Controller
                     $dbStatus = strtolower(str_replace(' ', '_', $status));
                     if ($dbStatus === 'custom_leaves' || $dbStatus === 'custom_leave') {
                         $dbStatus = 'late';
+                    }
+                    if ($dbStatus === 'halfday') {
+                        $dbStatus = 'half_day';
                     }
 
                     // Format check-in / check-out times

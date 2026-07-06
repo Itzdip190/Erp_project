@@ -126,3 +126,19 @@ Artisan::command('test:endpoints', function () {
     }
 })->purpose('Test all school admin and parent dashboard endpoints');
 
+Artisan::command('student:import {importLogId} {schoolId}', function ($importLogId, $schoolId) {
+    $this->info("Starting student import for log ID: {$importLogId}, school ID: {$schoolId}");
+    $studentNumberService = app(\App\Services\StudentNumberService::class);
+    $job = new \App\Jobs\ProcessStudentImport((int)$schoolId, (int)$importLogId, '');
+    
+    // Retrieve file_path from database
+    $log = \App\Models\ImportLog::find($importLogId);
+    if ($log) {
+        $job->filePath = $log->file_path;
+        $job->handle($studentNumberService);
+        $this->info("Import completed successfully!");
+    } else {
+        $this->error("Import log not found!");
+    }
+})->purpose('Run student bulk import in the background');
+

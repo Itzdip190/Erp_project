@@ -13,45 +13,7 @@ class CertificateManagementController extends Controller
 {
     private function ensureCertificatesSeeded($schoolId)
     {
-        if (CertificateTemplate::where('school_id', $schoolId)->count() === 0) {
-            CertificateTemplate::create([
-                'school_id' => $schoolId,
-                'name' => 'Transfer Certificate Template',
-                'type' => 'transfer',
-                'title_text' => 'SCHOOL LEAVING / TRANSFER CERTIFICATE',
-                'body_text' => 'This is to certify that [Student_Name], son/daughter of [Parent_Name], was admitted to this institution on [Admission_Date]. They have successfully cleared grade [Grade_Class] and are leaving this school on good terms.',
-            ]);
-            CertificateTemplate::create([
-                'school_id' => $schoolId,
-                'name' => 'Character Certificate Template',
-                'type' => 'character',
-                'title_text' => 'CHARACTER CERTIFICATE',
-                'body_text' => 'This is to certify that [Student_Name], bearing Admission ID [Admission_ID], is a bonafide student of this institution. During their stay, they displayed exceptional moral character, discipline, and active academic participation.',
-            ]);
-            CertificateTemplate::create([
-                'school_id' => $schoolId,
-                'name' => 'Academic Distinction Award',
-                'type' => 'custom',
-                'title_text' => 'CERTIFICATE OF ACADEMIC DISTINCTION',
-                'body_text' => 'This award is presented to [Student_Name] in recognition of outstanding academic achievements and excellent GPA standings during the academic session [Session_Name].',
-            ]);
-        }
-
-        if (StudentCertificate::where('school_id', $schoolId)->count() === 0) {
-            $students = Student::where('school_id', $schoolId)->take(3)->get();
-            $tpl = CertificateTemplate::where('school_id', $schoolId)->first();
-            if ($tpl) {
-                foreach ($students as $st) {
-                    StudentCertificate::create([
-                        'school_id' => $schoolId,
-                        'student_id' => $st->id,
-                        'certificate_template_id' => $tpl->id,
-                        'certificate_number' => 'CERT-' . rand(10000, 99999),
-                        'issue_date' => now()->subDays(5)->toDateString(),
-                    ]);
-                }
-            }
-        }
+        // No auto-seeding
     }
 
     public function templateCreator(Request $request)

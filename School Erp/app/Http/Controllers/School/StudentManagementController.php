@@ -23,7 +23,9 @@ class StudentManagementController extends Controller
 {
     public function bulkImport()
     {
-        return view('school.student.import');
+        $schoolId = auth()->user()->school_id;
+        $logs = \App\Models\ImportLog::where('school_id', $schoolId)->latest()->take(10)->get();
+        return view('school.student.import', compact('logs'));
     }
 
     public function bulkPhoto()
@@ -42,19 +44,21 @@ class StudentManagementController extends Controller
         $updated = 0;
         $matches = [];
 
+        // Fetch all students for normalization matching
+        $students = Student::where('school_id', $schoolId)->get();
+
         foreach ($request->file('photos') as $file) {
             $originalName = $file->getClientOriginalName();
             $filename = pathinfo($originalName, PATHINFO_FILENAME);
             
-            // Convert underscores to slashes to match admission number format (e.g., YIS_2026_00001 -> YIS/2026/00001)
-            $admissionNumber = str_replace('_', '/', $filename);
+            // Normalize filename: lowercase and remove non-alphanumeric
+            $normalizedFilename = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $filename));
 
-            $student = Student::where('school_id', $schoolId)
-                ->where(function ($q) use ($filename, $admissionNumber) {
-                    $q->where('admission_number', $admissionNumber)
-                      ->orWhere('admission_number', $filename);
-                })
-                ->first();
+            // Find matching student
+            $student = $students->first(function($s) use ($normalizedFilename) {
+                $normAdmission = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $s->admission_number));
+                return $normAdmission === $normalizedFilename;
+            });
 
             if ($student) {
                 if ($student->photo && Storage::disk('public')->exists($student->photo)) {
@@ -79,6 +83,14 @@ class StudentManagementController extends Controller
                     'status' => 'failed',
                 ];
             }
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Bulk photo upload complete! Updated {$updated} student profiles.",
+                'matches' => $matches
+            ]);
         }
 
         return back()->with([

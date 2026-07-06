@@ -173,8 +173,65 @@
     text-align: center; padding: 60px 24px; background: #fff;
     border-radius: 12px; border: 1px solid #e2e8f0;
 }
-
 @keyframes cttToastIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+/* ── CLASS TIMETABLE DARK MODE OVERRIDES ── */
+body.dark-mode .ctt-page {
+    background: #0b0f19 !important;
+}
+body.dark-mode .ctt-filter-bar,
+body.dark-mode .ctt-palette-wrap {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3) !important;
+}
+body.dark-mode .ctt-filter-lbl,
+body.dark-mode .ctt-palette-info,
+body.dark-mode .inst-form-label {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .ctt-select,
+body.dark-mode .inst-form-control {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .ctt-select option,
+body.dark-mode .inst-form-control option {
+    background: #1f2937 !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .ctt-btn-download,
+body.dark-mode .ctt-btn-icon,
+body.dark-mode .ctt-assign-btn {
+    background: #1f2937 !important;
+    color: #f8fafc !important;
+    border-color: #374151 !important;
+}
+body.dark-mode .ctt-btn-download:hover,
+body.dark-mode .ctt-btn-icon:hover,
+body.dark-mode .ctt-assign-btn:hover {
+    background: #374151 !important;
+}
+body.dark-mode .ctt-empty-state {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+}
+body.dark-mode .ctt-empty-title {
+    color: #f8fafc !important;
+}
+body.dark-mode .ctt-empty-sub {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .inst-modal-content {
+    background: #111827 !important;
+    border-color: #1e293b !important;
+    color: #f8fafc !important;
+}
+body.dark-mode .inst-modal-hdr {
+    background: linear-gradient(135deg, #111827 0%, #1e1b4b 60%, #312e81 100%) !important;
+    border-bottom: 1px solid #1e293b !important;
+}
 </style>
 @endsection
 

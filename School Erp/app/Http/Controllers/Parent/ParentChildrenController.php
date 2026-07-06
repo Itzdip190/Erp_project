@@ -9,7 +9,7 @@ class ParentChildrenController extends Controller
 {
     public function show(Student $student)
     {
-        if ($student->guardian_email !== auth()->user()->email) {
+        if ($student->guardian_email !== auth()->user()->email && $student->user_id !== auth()->user()->id) {
             abort(403, 'Access denied');
         }
         

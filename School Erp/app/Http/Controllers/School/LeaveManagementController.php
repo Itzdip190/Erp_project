@@ -12,37 +12,7 @@ class LeaveManagementController extends Controller
 {
     private function ensureLeavesSeeded($schoolId)
     {
-        if (LeaveApplication::where('school_id', $schoolId)->count() === 0) {
-            // Seed a few staff leave requests
-            $staff = Staff::where('school_id', $schoolId)->first();
-            if ($staff && $staff->user) {
-                LeaveApplication::create([
-                    'school_id' => $schoolId,
-                    'user_id' => $staff->user->id,
-                    'applicant_type' => 'staff',
-                    'leave_type' => 'Sick Leave',
-                    'start_date' => now()->subDays(2)->toDateString(),
-                    'end_date' => now()->addDays(1)->toDateString(),
-                    'reason' => 'Feeling unwell with a fever.',
-                    'status' => 'pending',
-                ]);
-            }
-
-            // Seed a few student leave requests
-            $student = Student::where('school_id', $schoolId)->first();
-            if ($student && $student->user) {
-                LeaveApplication::create([
-                    'school_id' => $schoolId,
-                    'user_id' => $student->user->id,
-                    'applicant_type' => 'student',
-                    'leave_type' => 'Casual Leave',
-                    'start_date' => now()->addDays(3)->toDateString(),
-                    'end_date' => now()->addDays(5)->toDateString(),
-                    'reason' => 'Attending sister\'s wedding ceremony.',
-                    'status' => 'pending',
-                ]);
-            }
-        }
+        // No auto-seeding
     }
 
     public function basics(Request $request)

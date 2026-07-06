@@ -1,3 +1,6 @@
+<!-- SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
 <aside class="sidebar" id="sidebar">
     <a href="{{ route('parent.dashboard') }}" class="sb-logo">
         <div class="sb-logo-icon"><i class="fas fa-shield-halved"></i></div>
@@ -5,6 +8,9 @@
             <strong>SchoolCloud ERP</strong>
             <span>Smart School ERP</span>
         </div>
+        <button type="button" class="sb-close-btn" onclick="closeSidebar()" aria-label="Close sidebar">
+            <i class="fas fa-xmark"></i>
+        </button>
     </a>
 
     <!-- Student Profile Card -->

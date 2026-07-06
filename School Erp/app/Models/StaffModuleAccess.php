@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Traits\BelongsToSchool;
+
 use Illuminate\Database\Eloquent\Model;
 
 class StaffModuleAccess extends Model
 {
+    use BelongsToSchool;
+
     protected $table = 'staff_module_access';
 
     protected $fillable = [

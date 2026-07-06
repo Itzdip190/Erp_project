@@ -101,10 +101,18 @@ class TimetableController extends Controller
 
     public function teacherTimetable(Request $request)
     {
-        $schoolId = auth()->user()->school_id;
+        $user = auth()->user();
+        $schoolId = $user->school_id;
         $teachers = Staff::where('school_id', $schoolId)->where('is_active', true)->get();
         
         $teacherId = $request->get('teacher_id');
+        if (!$teacherId && $user && ($user->hasRole('teacher') || $user->role === 'teacher' || $user->hasRole('staff'))) {
+            $staff = Staff::where('user_id', $user->id)->first();
+            if ($staff) {
+                $teacherId = $staff->id;
+            }
+        }
+
         $timetableData = collect();
 
         if ($teacherId) {

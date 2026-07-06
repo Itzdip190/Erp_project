@@ -485,6 +485,77 @@
         from { opacity: 0; transform: translateY(12px); }
         to   { opacity: 1; transform: translateY(0); }
     }
+
+    /* Dark Mode overrides for subjects page */
+    body.dark-mode .filter-bar {
+        background: #111827;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    body.dark-mode .filter-select,
+    body.dark-mode .filter-input {
+        background: #1f2937;
+        border-color: #374151;
+        color: #f8fafc;
+    }
+    body.dark-mode .filter-select:focus,
+    body.dark-mode .filter-input:focus {
+        background: #1f2937;
+        border-color: #e06b00;
+    }
+    body.dark-mode .btn-orange-border {
+        background: #1f2937;
+        border-color: #e06b00;
+        color: #e06b00;
+    }
+    body.dark-mode .btn-orange-border:hover {
+        background: rgba(224, 107, 0, 0.1);
+    }
+    body.dark-mode .drawer {
+        background: #111827;
+        box-shadow: -5px 0 25px rgba(0,0,0,0.4);
+    }
+    body.dark-mode .drawer-footer {
+        background: #1f2937;
+        border-top-color: #1e293b;
+    }
+    body.dark-mode .step-item {
+        background: #111827;
+    }
+    body.dark-mode .step-circle {
+        background: #1f2937;
+        color: #cbd5e1;
+        border-color: #374151;
+    }
+    body.dark-mode .custom-radio-circle {
+        border-color: #374151;
+    }
+    body.dark-mode .class-checkbox-card {
+        background: #1f2937;
+        border-color: #374151;
+        color: #f8fafc;
+    }
+    body.dark-mode .class-checkbox-card:hover {
+        background: rgba(224, 107, 0, 0.1);
+    }
+    body.dark-mode .class-checkbox-card.selected {
+        background: rgba(224, 107, 0, 0.2);
+    }
+    body.dark-mode #sortableSubjectList tr.sortable-ghost {
+        background: rgba(224, 107, 0, 0.2) !important;
+    }
+    body.dark-mode #sortableSubjectList tr.sortable-chosen {
+        background: rgba(224, 107, 0, 0.12) !important;
+    }
+    body.dark-mode #step2Content h4 {
+        color: #f8fafc;
+    }
+    body.dark-mode .drawer-body select,
+    body.dark-mode .drawer-body input,
+    body.dark-mode .drawer-body textarea {
+        background-color: #1f2937 !important;
+        color: #f8fafc !important;
+        border-color: #374151 !important;
+    }
 </style>
 
 <!-- Top Filters Card -->

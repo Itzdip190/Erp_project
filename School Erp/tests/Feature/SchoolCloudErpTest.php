@@ -159,7 +159,7 @@ class SchoolCloudErpTest extends TestCase
             ->delete("/school/students/{$student->id}");
 
         $response->assertRedirect('/school/students');
-        $this->assertTrue($student->refresh()->trashed());
+        $this->assertEquals(0, $student->refresh()->is_active);
     }
 
     /**
@@ -416,6 +416,134 @@ class SchoolCloudErpTest extends TestCase
     }
 
     /**
+     * Test school dashboard changing academic session and topbar search.
+     */
+    public function test_school_dashboard_change_session_and_topbar_search(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $schoolId = $schoolAdmin->school_id;
+
+        // Ensure we have at least two academic sessions for testing
+        $sessions = \App\Models\AcademicSession::where('school_id', $schoolId)->get();
+        if ($sessions->count() < 2) {
+            \App\Models\AcademicSession::create([
+                'school_id' => $schoolId,
+                'name' => 'Test Session 2',
+                'start_date' => now()->startOfYear(),
+                'end_date' => now()->endOfYear(),
+                'is_current' => false
+            ]);
+            $sessions = \App\Models\AcademicSession::where('school_id', $schoolId)->get();
+        }
+
+        $currentSession = $sessions->where('is_current', true)->first() ?? $sessions->first();
+        $otherSession = $sessions->where('id', '!=', $currentSession->id)->first();
+
+        // 1. Change session
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->postJson("/school/dashboard/change-session", [
+                'academic_session_id' => $otherSession->id
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Academic session changed successfully!'
+            ]);
+
+        // Assert session updated in DB
+        $this->assertTrue(
+            \App\Models\AcademicSession::find($otherSession->id)->is_current
+        );
+        $this->assertFalse(
+            \App\Models\AcademicSession::find($currentSession->id)->is_current
+        );
+
+        // Reset the current session to what it was
+        \App\Models\AcademicSession::where('school_id', $schoolId)->update(['is_current' => false]);
+        $currentSession->is_current = true;
+        $currentSession->save();
+
+        // 2. Topbar search
+        // First query without parameter
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->getJson("/school/topbar-search");
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'students' => [],
+                'staff' => []
+            ]);
+
+        // Query with a name/string
+        $student = \App\Models\Student::where('school_id', $schoolId)->first();
+        if ($student) {
+            $query = substr($student->first_name, 0, 3);
+            $response = $this->actingAs($schoolAdmin)
+                ->withHeaders(['X-School-Code' => 'YIS2024'])
+                ->getJson("/school/topbar-search?query=" . urlencode($query));
+
+            $response->assertStatus(200)
+                ->assertJsonStructure([
+                    'students',
+                    'staff'
+                ]);
+        }
+    }
+
+    /**
+     * Test school dashboard income & expense chart filter endpoint.
+     */
+    public function test_school_dashboard_income_expense_chart_endpoint(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+
+        // 1. Test default/This Year filter
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->getJson("/school/dashboard/chart/income-expense?filter=This+Year");
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'labels',
+                'incomeData',
+                'expenseData',
+                'totalIncome',
+                'totalExpense'
+            ]);
+
+        // 2. Test This Month filter
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->getJson("/school/dashboard/chart/income-expense?filter=This+Month");
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'labels',
+                'incomeData',
+                'expenseData',
+                'totalIncome',
+                'totalExpense'
+            ]);
+
+        // 3. Test Last 6 Months filter
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->getJson("/school/dashboard/chart/income-expense?filter=Last+6+Months");
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'labels',
+                'incomeData',
+                'expenseData',
+                'totalIncome',
+                'totalExpense'
+            ]);
+    }
+
+    /**
      * Test school dashboard MIS report.
      */
     public function test_school_dashboard_mis_report(): void
@@ -625,12 +753,12 @@ class SchoolCloudErpTest extends TestCase
             ->withHeaders(['X-School-Code' => 'YIS2024'])
             ->get('/school/staff/import-template');
         $response->assertStatus(200);
-        $this->assertTrue(str_contains($response->streamedContent(), 'employee_id'));
-        $this->assertTrue(str_contains($response->streamedContent(), 'alternate_phone'));
+        $this->assertTrue(str_contains($response->streamedContent(), 'Employee ID'));
+        $this->assertTrue(str_contains($response->streamedContent(), 'Phone number'));
 
         // 2. Perform Import
-        $csvContent = "employee_id,first_name,last_name,email,phone,alternate_phone,department,designation,epf_uan\n" .
-                      "EMPTEST999,Jane,Smith,jane.smith@yis.com,9876543210,9876543211,Academics,Teacher,UAN999111";
+        $csvContent = "Employee ID * (required),First Name * (required),Last Name,Email * (required),Phone number * (required),Pan Number,Adhar Number\n" .
+                      "EMPTEST999,Jane,Smith,jane.smith@yis.com,9876543210,ABCDE1234F,123456789012";
 
         $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('staff_import.csv', $csvContent);
 
@@ -651,8 +779,8 @@ class SchoolCloudErpTest extends TestCase
         $this->assertNotNull($staff);
         $this->assertEquals('Jane', $staff->first_name);
         $this->assertEquals('Smith', $staff->last_name);
-        $this->assertEquals('9876543211', $staff->additional_fields['alternate_phone']);
-        $this->assertEquals('UAN999111', $staff->additional_fields['epf_uan']);
+        $this->assertEquals('123456789012', $staff->additional_fields['aadhar_number']);
+        $this->assertEquals('ABCDE1234F', $staff->pan_number);
     }
 
     public function test_staff_bulk_attendance(): void
@@ -1301,6 +1429,763 @@ class SchoolCloudErpTest extends TestCase
             'section_id' => $student->section_id,
             'academic_session_id' => $session->id,
         ]);
+    }
+
+    public function test_superadmin_create_school_assigns_role(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+        
+        $response = $this->actingAs($superAdmin)
+            ->post('/superadmin/schools', [
+                'name' => 'Test New School',
+                'code' => 'TNS2026',
+                'phone' => '1234567890',
+                'address' => '123 Test St',
+                'custom_domain' => 'new-test-school.example.com',
+                'status' => 'active',
+                'admin_name' => 'New School Admin',
+                'admin_email' => 'admin@newtestschool.com',
+                'admin_password' => 'SecurePassword2026!',
+                'admin_password_confirmation' => 'SecurePassword2026!',
+            ]);
+
+        $response->assertRedirect('/superadmin/schools');
+
+        // Verify school was created
+        $school = School::where('code', 'TNS2026')->first();
+        $this->assertNotNull($school);
+
+        // Verify admin user was created with Spatie role and database role column
+        $adminUser = User::where('email', 'admin@newtestschool.com')->first();
+        $this->assertNotNull($adminUser);
+        $this->assertEquals($school->id, $adminUser->school_id);
+        $this->assertEquals('school_admin', $adminUser->role);
+        $this->assertTrue($adminUser->hasRole('school_admin'));
+
+        // Log out superadmin
+        $this->post('/logout');
+
+        // Verify we can login as the newly created school admin and get redirected correctly
+        $response = $this->post('/login', [
+            'email' => 'admin@newtestschool.com',
+            'password' => 'SecurePassword2026!',
+        ]);
+
+        $response->assertRedirect('/school/dashboard');
+    }
+
+    public function test_superadmin_can_view_schools_list(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+        
+        $response = $this->actingAs($superAdmin)
+            ->get('/superadmin/schools');
+
+        $response->assertStatus(200);
+        $response->assertSee('All Registered Schools');
+        $response->assertSee('Yash International School');
+        $response->assertSee('YIS2024');
+    }
+
+    public function test_superadmin_can_impersonate_school_admin(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+        $school = School::where('code', 'YIS2024')->first();
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+
+        // 1. Post to impersonate route
+        $response = $this->actingAs($superAdmin)
+            ->post("/superadmin/schools/{$school->id}/impersonate");
+
+        // 2. Assert redirect to school dashboard
+        $response->assertRedirect('/school/dashboard');
+
+        // 3. Assert current authenticated user is the school admin
+        $this->assertEquals($schoolAdmin->id, \Illuminate\Support\Facades\Auth::id());
+        $this->assertEquals('YIS2024', session('school_code'));
+    }
+
+    public function test_superadmin_can_update_school_and_reset_password(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+        $school = School::where('code', 'YIS2024')->first();
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $plan = \App\Models\Plan::where('name', 'Basic')->first();
+
+        // 1. Visit edit page
+        $response = $this->actingAs($superAdmin)
+            ->get("/superadmin/schools/{$school->id}/edit");
+        $response->assertStatus(200);
+
+        // 2. Submit update form with new name, plan, and admin password reset
+        $response = $this->actingAs($superAdmin)
+            ->put("/superadmin/schools/{$school->id}", [
+                'name' => 'Yash International School Edited',
+                'code' => 'YIS2024',
+                'phone' => '0987654321',
+                'address' => 'New Address',
+                'custom_domain' => 'new.yis.com',
+                'status' => 'active',
+                'plan_id' => $plan->id,
+                'admin_name' => 'YIS School Admin Edited',
+                'admin_email' => 'admin@yis.com',
+                'admin_password' => 'NewSecurePassword2026!',
+                'admin_password_confirmation' => 'NewSecurePassword2026!',
+            ]);
+
+        $response->assertRedirect('/superadmin/schools');
+
+        // 3. Verify changes in DB
+        $school->refresh();
+        $this->assertEquals('Yash International School Edited', $school->name);
+
+        $schoolAdmin->refresh();
+        $this->assertEquals('YIS School Admin Edited', $schoolAdmin->name);
+
+        // 4. Logout superadmin and login as school admin with new password
+        $this->post('/logout');
+
+        $response = $this->post('/login', [
+            'email' => 'admin@yis.com',
+            'password' => 'NewSecurePassword2026!',
+        ]);
+        $response->assertRedirect('/school/dashboard');
+    }
+
+    public function test_superadmin_can_toggle_school_status(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+        $school = School::where('code', 'YIS2024')->first();
+
+        $this->assertEquals('active', $school->status);
+
+        // 1. Post to toggle-status route
+        $response = $this->actingAs($superAdmin)
+            ->post("/superadmin/schools/{$school->id}/toggle-status");
+
+        $response->assertRedirect();
+        
+        $school->refresh();
+        $this->assertEquals('suspended', $school->status);
+
+        // 2. Toggle again
+        $response = $this->actingAs($superAdmin)
+            ->post("/superadmin/schools/{$school->id}/toggle-status");
+        
+        $school->refresh();
+        $this->assertEquals('active', $school->status);
+    }
+
+    public function test_superadmin_can_delete_school(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+        
+        // Create a temporary school and admin to delete
+        $school = School::create([
+            'name' => 'Delete Me School',
+            'code' => 'DEL2026',
+            'status' => 'active',
+        ]);
+        $admin = User::create([
+            'name' => 'Delete Admin',
+            'email' => 'delete_admin@school.com',
+            'password' => bcrypt('password'),
+            'school_id' => $school->id,
+        ]);
+        $admin->assignRole('school_admin');
+
+        // 1. Post to destroy route
+        $response = $this->actingAs($superAdmin)
+            ->delete("/superadmin/schools/{$school->id}");
+
+        $response->assertRedirect('/superadmin/schools');
+
+        // 2. Assert records deleted
+        $this->assertDatabaseMissing('schools', ['id' => $school->id]);
+        $this->assertDatabaseMissing('users', ['id' => $admin->id]);
+    }
+
+    public function test_superadmin_can_manage_subscription_plans(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        // 1. View plans list page
+        $response = $this->actingAs($superAdmin)->get('/superadmin/plans');
+        $response->assertStatus(200);
+
+        // 2. Create a new plan
+        $response = $this->actingAs($superAdmin)->post('/superadmin/plans', [
+            'name' => 'Ultimate Package',
+            'price' => 9999.00,
+            'duration_days' => 180,
+            'features' => ['AI Chatbot', 'Priority SMS', 'Unlimited Storage']
+        ]);
+        $response->assertRedirect('/superadmin/plans');
+        
+        $plan = Plan::where('name', 'Ultimate Package')->first();
+        $this->assertNotNull($plan);
+        $this->assertEquals(9999.00, $plan->price);
+        $this->assertEquals(180, $plan->duration_days);
+
+        // 3. Update the plan
+        $response = $this->actingAs($superAdmin)->put("/superadmin/plans/{$plan->id}", [
+            'name' => 'Ultimate Package V2',
+            'price' => 12999.00,
+            'duration_days' => 365,
+            'features' => ['AI Chatbot', 'Priority SMS', 'Uncapped Disk']
+        ]);
+        $response->assertRedirect('/superadmin/plans');
+
+        $plan->refresh();
+        $this->assertEquals('Ultimate Package V2', $plan->name);
+        $this->assertEquals(12999.00, $plan->price);
+
+        // 4. Delete the plan
+        $response = $this->actingAs($superAdmin)->delete("/superadmin/plans/{$plan->id}");
+        $response->assertRedirect('/superadmin/plans');
+        $this->assertDatabaseMissing('plans', ['id' => $plan->id]);
+    }
+
+    public function test_superadmin_can_extend_and_change_subscriptions(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+        $school = School::where('code', 'YIS2024')->first();
+        $plan = Plan::where('name', 'Basic')->first();
+
+        // 1. View subscriptions page
+        $response = $this->actingAs($superAdmin)->get('/superadmin/subscriptions');
+        $response->assertStatus(200);
+
+        // 2. Change plan for a school
+        $response = $this->actingAs($superAdmin)->post('/superadmin/subscriptions/change-plan', [
+            'school_id' => $school->id,
+            'plan_id' => $plan->id,
+        ]);
+        $response->assertRedirect('/superadmin/subscriptions');
+
+        $sub = Subscription::where('school_id', $school->id)->latest()->first();
+        $this->assertNotNull($sub);
+        $this->assertEquals($plan->id, $sub->plan_id);
+        $this->assertEquals('active', $sub->status);
+
+        // 3. Extend subscription duration by 45 days
+        $expiryBefore = \Carbon\Carbon::parse($sub->subscription_ends_at);
+        $response = $this->actingAs($superAdmin)->post('/superadmin/subscriptions/extend', [
+            'school_id' => $school->id,
+            'days' => 45,
+        ]);
+        $response->assertRedirect('/superadmin/subscriptions');
+
+        $sub->refresh();
+        $expiryAfter = \Carbon\Carbon::parse($sub->subscription_ends_at);
+        $this->assertEquals(45, $expiryBefore->diffInDays($expiryAfter));
+
+        // 4. Suspend subscription
+        $response = $this->actingAs($superAdmin)->post('/superadmin/subscriptions/cancel', [
+            'school_id' => $school->id,
+        ]);
+        $response->assertRedirect('/superadmin/subscriptions');
+
+        $sub->refresh();
+        $this->assertEquals('suspended', $sub->status);
+    }
+
+    public function test_superadmin_can_filter_orders_and_approve_manually(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+        $school = School::where('code', 'YIS2024')->first();
+        $plan = Plan::where('name', 'Basic')->first();
+
+        // Create a pending bank transfer order
+        $order = \App\Models\SubscriptionOrder::create([
+            'school_id' => $school->id,
+            'plan_id' => $plan->id,
+            'amount' => 1500.00,
+            'gateway' => 'bank_transfer',
+            'status' => 'pending',
+        ]);
+
+        // 1. View orders log page
+        $response = $this->actingAs($superAdmin)->get('/superadmin/orders');
+        $response->assertStatus(200);
+
+        // 2. Filter orders
+        $response = $this->actingAs($superAdmin)->get('/superadmin/orders?gateway=bank_transfer&status=pending');
+        $response->assertStatus(200);
+
+        // 3. Approve the order (mark completed)
+        $response = $this->actingAs($superAdmin)->put("/superadmin/orders/{$order->id}/status", [
+            'status' => 'completed',
+        ]);
+        $response->assertRedirect('/superadmin/orders');
+
+        $order->refresh();
+        $this->assertEquals('completed', $order->status);
+
+        // Verify active subscription is initialized for the school
+        $sub = Subscription::where('school_id', $school->id)->latest()->first();
+        $this->assertNotNull($sub);
+        $this->assertEquals('active', $sub->status);
+        $this->assertEquals($plan->id, $sub->plan_id);
+    }
+
+    public function test_superadmin_can_configure_payment_gateways(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        // 1. View gateways config page
+        $response = $this->actingAs($superAdmin)->get('/superadmin/gateways');
+        $response->assertStatus(200);
+
+        // 2. Save gateway settings
+        $response = $this->actingAs($superAdmin)->post('/superadmin/gateways', [
+            'stripe' => [
+                'enabled' => '1',
+                'mode' => 'sandbox',
+                'publishable_key' => 'pk_test_stripe_publishable_123',
+                'secret_key' => 'sk_test_stripe_secret_123',
+            ],
+            'razorpay' => [
+                'enabled' => '0',
+                'mode' => 'sandbox',
+                'key_id' => '',
+                'key_secret' => '',
+            ],
+            'bank_transfer' => [
+                'enabled' => '1',
+                'account_name' => 'Corporate SBI ERP Account',
+                'account_number' => '112233445566',
+                'bank_name' => 'SBI Bank',
+                'ifsc_code' => 'SBIN0009999',
+                'instructions' => 'Include school code in remarks.',
+            ],
+        ]);
+        $response->assertRedirect('/superadmin/gateways');
+
+        // Verify configuration was stored in local json file
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('local')->exists('payment_gateways.json'));
+        $content = json_decode(\Illuminate\Support\Facades\Storage::disk('local')->get('payment_gateways.json'), true);
+        
+        $this->assertTrue($content['stripe']['enabled']);
+        $this->assertEquals('pk_test_stripe_publishable_123', $content['stripe']['publishable_key']);
+        $this->assertFalse($content['razorpay']['enabled']);
+        $this->assertEquals('Corporate SBI ERP Account', $content['bank_transfer']['account_name']);
+    }
+
+    public function test_superadmin_can_manage_sms_gateways(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        $response = $this->actingAs($superAdmin)->get('/superadmin/sms-gateways');
+        $response->assertStatus(200);
+
+        $response = $this->actingAs($superAdmin)->post('/superadmin/sms-gateways', [
+            'twilio' => [
+                'enabled' => '1',
+                'account_sid' => 'AC_test_sid_123',
+                'auth_token' => 'auth_token_secret_123',
+                'sender_number' => '+15555555555',
+            ],
+            'msg91' => [
+                'enabled' => '0',
+                'auth_key' => '',
+                'sender_id' => '',
+                'route' => '4',
+            ],
+            'fast2sms' => [
+                'enabled' => '0',
+                'authorization_key' => '',
+                'sender_id' => '',
+            ],
+        ]);
+        $response->assertRedirect('/superadmin/sms-gateways');
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('local')->exists('sms_gateways.json'));
+    }
+
+    public function test_superadmin_can_manage_notification_types(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        $response = $this->actingAs($superAdmin)->get('/superadmin/notification-types');
+        $response->assertStatus(200);
+
+        $response = $this->actingAs($superAdmin)->post('/superadmin/notification-types', [
+            'attendance' => [
+                'title' => 'Custom Absent Alert',
+                'subject' => 'Absent: {student_name}',
+                'body' => 'Child {student_name} is absent today {date}',
+                'channels' => ['email'],
+            ],
+            'fee_reminder' => [
+                'title' => 'Custom Fee Alert',
+                'subject' => 'Fees: {due_amount}',
+                'body' => 'Balance: {due_amount}',
+                'channels' => ['sms'],
+            ],
+            'exam_publish' => [
+                'title' => 'Custom Exam Alert',
+                'subject' => 'Report: {exam_name}',
+                'body' => 'Results out: {student_name}',
+                'channels' => ['email', 'sms'],
+            ],
+        ]);
+        $response->assertRedirect('/superadmin/notification-types');
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('local')->exists('notification_types.json'));
+    }
+
+    public function test_superadmin_can_manage_blog_cms(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        $response = $this->actingAs($superAdmin)->get('/superadmin/blog-cms');
+        $response->assertStatus(200);
+
+        // Store
+        $response = $this->actingAs($superAdmin)->post('/superadmin/blog-cms', [
+            'title' => 'Test Announcement',
+            'summary' => 'This is a test summary.',
+            'content' => 'Full test content here.',
+            'author' => 'Test Author',
+            'status' => 'published',
+            'cover_url' => 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=200',
+        ]);
+        $response->assertRedirect('/superadmin/blog-cms');
+
+        // Check in JSON
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('local')->exists('blog_posts.json'));
+        $posts = json_decode(\Illuminate\Support\Facades\Storage::disk('local')->get('blog_posts.json'), true);
+        $testPost = collect($posts)->where('title', 'Test Announcement')->first();
+        $this->assertNotNull($testPost);
+
+        // Update
+        $response = $this->actingAs($superAdmin)->put('/superadmin/blog-cms/' . $testPost['id'], [
+            'title' => 'Updated Test Announcement',
+            'summary' => 'Updated test summary.',
+            'content' => 'Updated full test content here.',
+            'author' => 'Test Author Edited',
+            'status' => 'draft',
+            'cover_url' => 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=200',
+        ]);
+        $response->assertRedirect('/superadmin/blog-cms');
+
+        // Delete
+        $response = $this->actingAs($superAdmin)->delete('/superadmin/blog-cms/' . $testPost['id']);
+        $response->assertRedirect('/superadmin/blog-cms');
+    }
+
+    public function test_superadmin_can_manage_white_label_settings(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        $response = $this->actingAs($superAdmin)->get('/superadmin/white-label');
+        $response->assertStatus(200);
+
+        $response = $this->actingAs($superAdmin)->post('/superadmin/white-label', [
+            'app_name' => 'Custom Branding Title',
+            'logo_url' => 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=200',
+            'favicon_url' => 'https://images.unsplash.com/photo-1546410531-bb4caa6b424d?w=32',
+            'copyright_text' => 'Copyright 2026 Custom Inc.',
+            'support_email' => 'custom@branding.com',
+            'support_phone' => '1234567890',
+            'primary_color' => '#ff0000',
+            'secondary_color' => '#0000ff',
+        ]);
+        $response->assertRedirect('/superadmin/white-label');
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('local')->exists('white_label_settings.json'));
+    }
+
+    public function test_superadmin_can_manage_platform_settings(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        $response = $this->actingAs($superAdmin)->get('/superadmin/platform-settings');
+        $response->assertStatus(200);
+
+        $response = $this->actingAs($superAdmin)->post('/superadmin/platform-settings', [
+            'maintenance_mode' => '1',
+            'enable_registration' => '0',
+            'session_lifetime' => 60,
+            'smtp_host' => 'smtp.test.io',
+            'smtp_port' => 1025,
+            'smtp_username' => 'testuser',
+            'smtp_password' => 'testpass',
+            'smtp_encryption' => 'ssl',
+        ]);
+        $response->assertRedirect('/superadmin/platform-settings');
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('local')->exists('platform_settings.json'));
+    }
+
+    public function test_superadmin_profile_management(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        // 1. Can view profile page
+        $response = $this->actingAs($superAdmin)->get('/superadmin/profile');
+        $response->assertStatus(200);
+
+        // 2. Can update basic profile details
+        $response = $this->actingAs($superAdmin)->post('/superadmin/profile/update', [
+            'name' => 'Super Admin Updated Name',
+            'email' => 'updated-superadmin@schoolcloud.com',
+            'phone' => '+919999988888',
+        ]);
+        $response->assertRedirect('/superadmin/profile');
+        $superAdmin->refresh();
+        $this->assertEquals('Super Admin Updated Name', $superAdmin->name);
+        $this->assertEquals('updated-superadmin@schoolcloud.com', $superAdmin->email);
+        $this->assertEquals('+919999988888', $superAdmin->phone);
+
+        // 3. Can update password
+        $response = $this->actingAs($superAdmin)->post('/superadmin/profile/password', [
+            'current_password' => 'SuperAdminSecurePass2026!',
+            'password' => 'NewSuperAdminSecurePass2026!',
+            'password_confirmation' => 'NewSuperAdminSecurePass2026!',
+        ]);
+        $response->assertRedirect('/superadmin/profile');
+        $superAdmin->refresh();
+        $this->assertTrue(Hash::check('NewSuperAdminSecurePass2026!', $superAdmin->password));
+    }
+
+    public function test_superadmin_settings_management(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        // 1. Can view preferences page
+        $response = $this->actingAs($superAdmin)->get('/superadmin/settings');
+        $response->assertStatus(200);
+
+        // 2. Can save settings
+        $response = $this->actingAs($superAdmin)->post('/superadmin/settings/update', [
+            'timezone' => 'Asia/Kolkata',
+            'currency' => 'INR',
+            'notification_email' => '1',
+            'notification_system' => '1',
+            'default_per_page' => 25,
+            'mrr_target' => 850000,
+        ]);
+        $response->assertRedirect('/superadmin/settings');
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('local')->exists('superadmin_settings.json'));
+    }
+
+    public function test_superadmin_dashboard_report_export(): void
+    {
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+
+        $response = $this->actingAs($superAdmin)->get('/superadmin/dashboard/export-report');
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
+        $response->assertHeader('Content-Disposition', 'attachment; filename="Platform_Status_Report_' . now()->format('Y-m-d') . '.csv"');
+    }
+
+    public function test_school_admin_can_bulk_delete_students(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $schoolId = $schoolAdmin->school_id;
+
+        // Create two dummy students to delete
+        $class = SchoolClass::where('school_id', $schoolId)->first();
+        $section = Section::where('class_id', $class->id)->first();
+        $session = AcademicSession::where('school_id', $schoolId)->first();
+
+        $student1 = Student::create([
+            'school_id' => $schoolId,
+            'class_id' => $class->id,
+            'section_id' => $section->id,
+            'academic_session_id' => $session->id,
+            'admission_number' => 'DEL_TEST_01',
+            'admission_sequence' => 9991,
+            'admission_year' => 2026,
+            'first_name' => 'Delete1',
+            'last_name' => 'Student',
+            'date_of_birth' => '2015-01-01',
+            'gender' => 'male',
+            'guardian_name' => 'Guardian',
+            'guardian_phone' => '1234567890',
+            'guardian_relationship' => 'guardian',
+            'address' => 'Test Address',
+            'city' => 'Test City',
+            'state' => 'Test State',
+            'pincode' => '123456',
+            'admission_date' => '2026-06-01',
+        ]);
+
+        $student2 = Student::create([
+            'school_id' => $schoolId,
+            'class_id' => $class->id,
+            'section_id' => $section->id,
+            'academic_session_id' => $session->id,
+            'admission_number' => 'DEL_TEST_02',
+            'admission_sequence' => 9992,
+            'admission_year' => 2026,
+            'first_name' => 'Delete2',
+            'last_name' => 'Student',
+            'date_of_birth' => '2015-01-01',
+            'gender' => 'male',
+            'guardian_name' => 'Guardian',
+            'guardian_phone' => '1234567890',
+            'guardian_relationship' => 'guardian',
+            'address' => 'Test Address',
+            'city' => 'Test City',
+            'state' => 'Test State',
+            'pincode' => '123456',
+            'admission_date' => '2026-06-01',
+        ]);
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders([
+                'X-School-Code' => 'YIS2024',
+                'X-Requested-With' => 'XMLHttpRequest'
+            ])
+            ->post('/school/students/bulk-delete', [
+                'student_ids' => [$student1->id, $student2->id]
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        // Assert they are deactivated
+        $this->assertEquals(0, $student1->refresh()->is_active);
+        $this->assertEquals(0, $student2->refresh()->is_active);
+    }
+
+    public function test_school_admin_can_delete_single_student(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $schoolId = $schoolAdmin->school_id;
+
+        $class = SchoolClass::where('school_id', $schoolId)->first();
+        $section = Section::where('class_id', $class->id)->first();
+        $session = AcademicSession::where('school_id', $schoolId)->first();
+
+        $student = Student::create([
+            'school_id' => $schoolId,
+            'class_id' => $class->id,
+            'section_id' => $section->id,
+            'academic_session_id' => $session->id,
+            'admission_number' => 'DEL_SINGLE_01',
+            'admission_sequence' => 9993,
+            'admission_year' => 2026,
+            'first_name' => 'SingleDelete',
+            'last_name' => 'Student',
+            'date_of_birth' => '2015-01-01',
+            'gender' => 'male',
+            'guardian_name' => 'Guardian',
+            'guardian_phone' => '1234567890',
+            'guardian_relationship' => 'guardian',
+            'address' => 'Test Address',
+            'city' => 'Test City',
+            'state' => 'Test State',
+            'pincode' => '123456',
+            'admission_date' => '2026-06-01',
+        ]);
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->delete("/school/students/{$student->id}");
+
+        $response->assertRedirect('/school/students');
+        $this->assertEquals(0, $student->refresh()->is_active);
+    }
+
+    public function test_fee_pages_load_with_zero_data(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $schoolId = $schoolAdmin->school_id;
+
+        // Clear all fee structures, student fees, receipts, schedules, components, and fines for this school
+        \App\Models\FeeStructure::where('school_id', $schoolId)->delete();
+        \App\Models\StudentFee::where('school_id', $schoolId)->delete();
+        \App\Models\FeeReceipt::where('school_id', $schoolId)->delete();
+        \App\Models\FeeSchedule::where('school_id', $schoolId)->delete();
+        \App\Models\FeeComponent::where('school_id', $schoolId)->delete();
+        \App\Models\FeeFine::where('school_id', $schoolId)->delete();
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get('/school/fees/class-wise');
+        $response->assertStatus(200);
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get('/school/fees/schedule-mapper');
+        $response->assertStatus(200);
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get('/school/fees/receipts');
+        $response->assertStatus(200);
+    }
+
+    public function test_student_fee_schedule_mapping_and_sync(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $schoolId = $schoolAdmin->school_id;
+
+        // Clear existing students to have a clean slate
+        Student::where('school_id', $schoolId)->delete();
+
+        // 1. Get or create a session
+        $session = \App\Models\AcademicSession::firstOrCreate([
+            'school_id' => $schoolId,
+            'name' => '2025-2026',
+        ], [
+            'status' => 'active',
+            'start_date' => '2025-04-01',
+            'end_date' => '2026-03-31',
+        ]);
+
+        // 2. Create a dummy student
+        $class = SchoolClass::where('school_id', $schoolId)->first();
+        $section = Section::where('class_id', $class->id)->first();
+
+        $student = Student::create([
+            'school_id' => $schoolId,
+            'class_id' => $class->id,
+            'section_id' => $section->id,
+            'academic_session_id' => $session->id,
+            'admission_number' => 'ADM-999',
+            'admission_sequence' => 9993,
+            'admission_year' => 2026,
+            'first_name' => 'John',
+            'last_name' => 'Doe',
+            'date_of_birth' => '2015-05-15',
+            'gender' => 'Male',
+            'guardian_name' => 'Guardian',
+            'guardian_phone' => '1234567890',
+            'guardian_relationship' => 'guardian',
+            'address' => 'Test Address',
+            'city' => 'Test City',
+            'state' => 'Test State',
+            'pincode' => '123456',
+            'admission_date' => '2026-06-01',
+            'is_active' => true,
+        ]);
+
+        // 3. Create a Fee Schedule
+        $schedule = \App\Models\FeeSchedule::create([
+            'school_id' => $schoolId,
+            'academic_session_id' => $session->id,
+            'classes' => 'Class-1',
+            'no_of_installments' => 2,
+            'name' => 'Test Schedule Spec',
+            'start_date' => '2025-04-01',
+            'end_date' => '2026-03-31',
+        ]);
+
+        // 4. Post mapping request
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/fees/schedule-mapper', [
+                'student_schedules' => [
+                    $student->id => $schedule->id,
+                ],
+            ]);
+
+        $response->assertStatus(302); // Redirect back
+        
+        // Assert student was updated with the fee schedule id
+        $student->refresh();
+        $this->assertEquals($schedule->id, $student->fee_schedule_id);
     }
 }
 

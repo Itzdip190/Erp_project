@@ -36,3 +36,8 @@ Route::post('/surveys/{survey}/vote', [ParentDashboardController::class, 'voteSu
 Route::get('/chat',               [ParentDashboardController::class, 'chat'])->name('parent.chat.index');
 Route::post('/chat/send',         [ParentDashboardController::class, 'sendChatMessage'])->name('parent.chat.send');
 
+// Assignments & Study Materials
+Route::get('/assignments',      [ParentDashboardController::class, 'assignments'])->name('parent.assignments.index');
+Route::get('/study-materials',  [ParentDashboardController::class, 'studyMaterials'])->name('parent.study-materials.index');
+
+

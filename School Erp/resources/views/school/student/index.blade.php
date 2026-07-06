@@ -3,6 +3,49 @@
 @section('page-title', 'Students')
 
 @section('content')
+<style>
+    /* Custom Toggle Switch */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 22px;
+    }
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #cbd5e1;
+        transition: .3s;
+        border-radius: 22px;
+    }
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
+    input:checked + .slider {
+        background-color: #10b981;
+    }
+    input:checked + .slider:before {
+        transform: translateX(22px);
+    }
+</style>
 
 <div class="page-hdr">
     <div class="page-hdr-left">
@@ -25,23 +68,6 @@
     </div>
 </div>
 
-<!-- Bulk Import -->
-<div class="card">
-    <div class="card-hdr">
-        <h3><i class="fas fa-file-import" style="color:var(--gold);margin-right:6px;"></i>Bulk Import Students</h3>
-    </div>
-    <div class="card-body">
-        <form id="bulkImportForm" enctype="multipart/form-data" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
-            <div style="flex:1;min-width:250px;">
-                <input type="file" name="file" id="importFile" class="form-control" required accept=".csv,.xlsx">
-            </div>
-            <button type="submit" class="btn btn-accent">
-                <i class="fas fa-cloud-upload-alt"></i> Upload & Process
-            </button>
-        </form>
-        <div id="importFeedback" style="margin-top:10px;display:none;font-size:13px;"></div>
-    </div>
-</div>
 
 <!-- Filters -->
 <div class="card">
@@ -65,9 +91,15 @@
                     <label class="form-label">Section</label>
                     <select name="section_id" class="form-control">
                         <option value="">All Sections</option>
-                        @foreach($sections as $sec)
-                            <option value="{{ $sec->id }}" {{ request('section_id')==$sec->id?'selected':'' }}>{{ $sec->name }}</option>
-                        @endforeach
+                        @if(request('class_id'))
+                            @foreach($sections->where('class_id', request('class_id')) as $sec)
+                                <option value="{{ $sec->id }}" {{ request('section_id')==$sec->id?'selected':'' }}>{{ $sec->name }}</option>
+                            @endforeach
+                        @else
+                            @foreach($sections->pluck('name')->unique()->sort() as $name)
+                                <option value="{{ $name }}" {{ request('section_id')==$name?'selected':'' }}>{{ $name }}</option>
+                            @endforeach
+                        @endif
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom:0;">
@@ -99,10 +131,31 @@
     </div>
     
     <!-- Bulk Action Bar -->
-    <div class="card-hdr" style="background:var(--page);border-bottom:1px solid var(--border);padding:10px 20px;display:none;" id="bulkActionBar">
-        <div style="display:flex;align-items:center;gap:12px;">
-            <span style="font-size:12.5px;font-weight:700;color:var(--navy);" id="selectedCountText">0 students selected</span>
-            <button class="btn btn-gold" style="padding:6px 12px;font-size:11.5px;" id="btnBulkIssue"><i class="fas fa-share-square"></i> Issue Certificate</button>
+    <div class="card-hdr" style="background:var(--page);border-bottom:1px solid var(--border);padding:10px 20px;display:none;flex-direction:column;gap:8px;" id="bulkActionBar">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <span style="font-size:12.5px;font-weight:700;color:var(--navy);" id="selectedCountText">0 students selected</span>
+                @if($students->total() > $students->count())
+                    <span id="selectAllNotice" style="display:none;font-size:12.5px;color:var(--t2);">
+                        All {{ $students->count() }} students on this page are selected. 
+                        <a href="javascript:void(0)" id="btnSelectAllMatching" style="color:var(--gold);font-weight:700;text-decoration:underline;">Select all {{ $students->total() }} students in this list</a>
+                    </span>
+                    <span id="allSelectedNotice" style="display:none;font-size:12.5px;color:var(--t2);">
+                        All {{ $students->total() }} students in this list are selected. 
+                        <a href="javascript:void(0)" id="btnClearAllMatching" style="color:var(--gold);font-weight:700;text-decoration:underline;">Clear selection</a>
+                    </span>
+                @endif
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <button class="btn btn-gold" style="padding:6px 12px;font-size:11.5px;" id="btnBulkIssue"><i class="fas fa-share-square"></i> Issue Certificate</button>
+                <button class="btn btn-danger" style="padding:6px 12px;font-size:11.5px;" id="btnBulkDelete"><i class="fas fa-trash"></i> Bulk Deactivate</button>
+                @if($students->total() > 0)
+                    <button class="btn btn-danger" style="padding:6px 12px;font-size:11.5px;background-color:#c0392b;" id="btnDeleteAllMatching"><i class="fas fa-exclamation-triangle"></i> Deactivate All ({{ $students->total() }})</button>
+                @endif
+            </div>
+        </div>
+        <div style="font-size:11px;color:#d9534f;font-weight:600;margin-top:2px;">
+            <i class="fas fa-info-circle"></i> Deactivating/deleting moves students to "Inactive" status. Only the Super Admin can restore or permanently delete them.
         </div>
     </div>
 
@@ -139,11 +192,10 @@
                             <small style="color:var(--t3);font-size:11px;">{{ $student->guardian_phone }}</small>
                         </td>
                         <td>
-                            @if($student->is_active)
-                                <span class="badge badge-success"><i class="fas fa-circle" style="font-size:7px;"></i> Active</span>
-                            @else
-                                <span class="badge badge-danger"><i class="fas fa-circle" style="font-size:7px;"></i> Inactive</span>
-                            @endif
+                            <label class="switch" title="Toggle Status (Active/Inactive)">
+                                <input type="checkbox" class="status-toggle" data-id="{{ $student->id }}" {{ $student->is_active ? 'checked' : '' }}>
+                                <span class="slider"></span>
+                            </label>
                         </td>
                         <td style="text-align:right;">
                             <div style="display:inline-flex;gap:6px;align-items:center;">
@@ -199,9 +251,9 @@
                                     </div>
                                 </div>
                                 
-                                <form action="{{ route('school.students.destroy', $student->id) }}" method="POST" onsubmit="return confirm('Delete this student?');">
+                                <form action="{{ route('school.students.destroy', $student->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to deactivate this student? They will be moved to inactive status. Only the Super Admin can restore or permanently delete them.');">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-danger" style="padding:5px 9px;font-size:11px;" title="Delete"><i class="fas fa-trash"></i></button>
+                                    <button type="submit" class="btn btn-danger" style="padding:5px 9px;font-size:11px;" title="Deactivate"><i class="fas fa-trash"></i></button>
                                 </form>
                             </div>
                         </td>
@@ -341,6 +393,146 @@ $.ajaxSetup({
     }
 });
 
+// Dynamic Section dropdown filtering
+const classSelect = $('select[name="class_id"]');
+const sectionSelect = $('select[name="section_id"]');
+const allSections = @json($sections);
+const initialSection = "{{ request('section_id') }}";
+
+function updateSections() {
+    const classId = classSelect.val();
+    let currentVal = sectionSelect.val() || initialSection;
+    
+    // Resolve section ID/Name transition
+    if (currentVal && !isNaN(currentVal)) {
+        const secObj = allSections.find(sec => sec.id == currentVal);
+        if (secObj && !classId) {
+            currentVal = secObj.name;
+        }
+    } else if (classId && currentVal && isNaN(currentVal)) {
+        const secObj = allSections.find(sec => sec.class_id == classId && sec.name == currentVal);
+        if (secObj) {
+            currentVal = secObj.id;
+        }
+    }
+    
+    sectionSelect.empty();
+    sectionSelect.append('<option value="">All Sections</option>');
+    
+    if (classId) {
+        const filtered = allSections.filter(sec => sec.class_id == classId);
+        filtered.forEach(sec => {
+            const selectedAttr = (currentVal == sec.id) ? 'selected' : '';
+            sectionSelect.append(`<option value="${sec.id}" ${selectedAttr}>${sec.name}</option>`);
+        });
+    } else {
+        const uniqueNames = [];
+        allSections.forEach(sec => {
+            if (!uniqueNames.includes(sec.name)) {
+                uniqueNames.push(sec.name);
+            }
+        });
+        uniqueNames.sort();
+        uniqueNames.forEach(name => {
+            const selectedAttr = (currentVal == name) ? 'selected' : '';
+            sectionSelect.append(`<option value="${name}" ${selectedAttr}>${name}</option>`);
+        });
+    }
+}
+
+classSelect.on('change', updateSections);
+// Run on load to set initial state correctly
+updateSections();
+
+let allSelected = false;
+const currentFilters = {
+    class_id: "{{ request('class_id') }}",
+    section_id: "{{ request('section_id') }}",
+    academic_session_id: "{{ request('academic_session_id') }}",
+    is_active: "{{ request('is_active') }}",
+    search: "{{ request('search') }}"
+};
+
+// Bulk Delete Action (Deactivation)
+$('#btnBulkDelete').on('click', function() {
+    let btn = $(this);
+    let studentIds = [];
+    
+    $('.student-select:checked').each(function() {
+        studentIds.push($(this).val());
+    });
+
+    if (studentIds.length === 0 && !allSelected) {
+        showToast("No students selected.", true);
+        return;
+    }
+
+    let confirmationMsg = allSelected 
+        ? "Are you sure you want to deactivate ALL {{ $students->total() }} students matching the current filters? They will be moved to inactive status. Contact Super Admin to restore/permanently delete."
+        : "Are you sure you want to deactivate the " + studentIds.length + " selected student(s)? They will be moved to inactive status. Contact Super Admin to restore/permanently delete.";
+
+    if (!confirm(confirmationMsg)) {
+        return;
+    }
+
+    if (allSelected) {
+        // Trigger Delete All Matching flow
+        $('#btnDeleteAllMatching').trigger('click');
+        return;
+    }
+
+    btn.html('<i class="fas fa-spinner fa-spin"></i> Deactivating...').prop('disabled', true);
+
+    $.ajax({
+        url: "{{ route('school.students.bulk-delete') }}",
+        type: "POST",
+        data: {
+            student_ids: studentIds
+        },
+        success: function(response) {
+            showToast(response.message || "Selected students deactivated successfully!");
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        },
+        error: function(xhr) {
+            showToast("Failed to deactivate selected students.", true);
+            btn.html('<i class="fas fa-trash"></i> Bulk Deactivate').prop('disabled', false);
+        }
+    });
+});
+
+// Deactivate All Matching Action
+$('#btnDeleteAllMatching').on('click', function() {
+    let btn = $(this);
+    let confirmInput = prompt("This will deactivate ALL {{ $students->total() }} students matching current filters. They will be moved to Inactive status. Contact Super Admin to restore or permanently delete.\n\nPlease type 'DELETE ALL' to confirm:");
+    
+    if (confirmInput !== 'DELETE ALL') {
+        showToast("Action cancelled. Confirmation text did not match.", true);
+        return;
+    }
+
+    btn.html('<i class="fas fa-spinner fa-spin"></i> Deactivating All...').prop('disabled', true);
+
+    $.ajax({
+        url: "{{ route('school.students.bulk-delete') }}",
+        type: "POST",
+        data: $.extend({
+            delete_all: true
+        }, currentFilters),
+        success: function(response) {
+            showToast(response.message || "All matching students deactivated successfully!");
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        },
+        error: function(xhr) {
+            showToast("Failed to deactivate all matching students.", true);
+            btn.html('<i class="fas fa-exclamation-triangle"></i> Deactivate All ({{ $students->total() }})').prop('disabled', false);
+        }
+    });
+});
+
 // Single Document Issuance via AJAX
 $('.btn-issue').on('click', function() {
     let btn = $(this);
@@ -374,13 +566,42 @@ $('#bulkSelectAll').on('change', function() {
 $(document).on('change', '.student-select', function() {
     let selected = $('.student-select:checked');
     let count = selected.length;
+    let pageCount = $('.student-select').length;
 
     if (count > 0) {
         $('#selectedCountText').text(count + " student(s) selected");
         $('#bulkActionBar').css('display', 'flex');
+
+        if (count === pageCount) {
+            if (!allSelected) {
+                $('#selectAllNotice').show();
+                $('#allSelectedNotice').hide();
+            }
+        } else {
+            allSelected = false;
+            $('#selectAllNotice').hide();
+            $('#allSelectedNotice').hide();
+        }
     } else {
+        allSelected = false;
         $('#bulkActionBar').hide();
+        $('#selectAllNotice').hide();
+        $('#allSelectedNotice').hide();
     }
+});
+
+// Select All Matching Event
+$(document).on('click', '#btnSelectAllMatching', function() {
+    allSelected = true;
+    $('#selectAllNotice').hide();
+    $('#allSelectedNotice').show();
+    $('#selectedCountText').text("All {{ $students->total() }} student(s) selected");
+});
+
+// Clear All Matching Event
+$(document).on('click', '#btnClearAllMatching', function() {
+    allSelected = false;
+    $('#bulkSelectAll').prop('checked', false).trigger('change');
 });
 
 // Bulk Issue Trigger
@@ -393,6 +614,11 @@ $('#btnConfirmBulkIssue').on('click', function() {
     let type = $('#bulkDocType').val();
     let studentIds = [];
     
+    if (allSelected) {
+        showToast("Bulk document issuance is limited to page selection (max 20). Please issue by page.", true);
+        return;
+    }
+
     $('.student-select:checked').each(function() {
         studentIds.push($(this).val());
     });
@@ -426,22 +652,33 @@ $('#btnConfirmBulkIssue').on('click', function() {
     });
 });
 
-// Bulk Import Excel/CSV Submit
-$('#bulkImportForm').on('submit', function(e) {
-    e.preventDefault();
-    let fd = new FormData(this);
-    let fb = $('#importFeedback');
-    fb.show().html('<span style="color:var(--gold);"><i class="fas fa-spinner fa-spin"></i> Processing spreadsheet...</span>');
+// Toggle Status Action
+$(document).on('change', '.status-toggle', function() {
+    let checkbox = $(this);
+    let id = checkbox.data('id');
+    let isActive = checkbox.is(':checked') ? 1 : 0;
+
     $.ajax({
-        url: "{{ route('school.students.import') }}",
-        type: "POST", data: fd, processData: false, contentType: false,
-        success: function(r) {
-            fb.html(r.success
-                ? '<span style="color:var(--green);"><i class="fas fa-check-circle"></i> Import started. Processing in background. Refresh shortly.</span>'
-                : '<span style="color:var(--red);"><i class="fas fa-exclamation-circle"></i> ' + r.message + '</span>');
+        url: "/school/students/" + id + "/toggle-status",
+        type: "POST",
+        data: {
+            _token: "{{ csrf_token() }}",
+            is_active: isActive
         },
-        error: function() { fb.html('<span style="color:var(--red);"><i class="fas fa-exclamation-circle"></i> Error parsing sheet.</span>'); }
+        success: function(response) {
+            if (response.success) {
+                showToast(response.message || "Student status toggled successfully.");
+            } else {
+                checkbox.prop('checked', !isActive);
+                showToast(response.message || "Failed to toggle status.", true);
+            }
+        },
+        error: function(xhr) {
+            checkbox.prop('checked', !isActive);
+            showToast("Error updating status. Please try again.", true);
+        }
     });
 });
+
 </script>
 @endsection

@@ -2,11 +2,11 @@
 
 namespace App\Models;
 
-use App\Models\Traits\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Traits\BelongsToSchool;
 
-class ClassWiseFeeAllocation extends Model
+class ClassWiseFee extends Model
 {
     use HasFactory, BelongsToSchool;
 
@@ -18,18 +18,18 @@ class ClassWiseFeeAllocation extends Model
         'fee_schedule_id',
         'student_category_id',
         'fee_component_id',
-        'status',
+        'is_active',
         'amount',
-        'installment_amounts',
+        'installments',
     ];
 
     protected $casts = [
-        'status' => 'boolean',
+        'is_active' => 'boolean',
         'amount' => 'decimal:2',
-        'installment_amounts' => 'array',
+        'installments' => 'json',
     ];
 
-    public function session()
+    public function academicSession()
     {
         return $this->belongsTo(AcademicSession::class, 'academic_session_id');
     }
@@ -44,17 +44,17 @@ class ClassWiseFeeAllocation extends Model
         return $this->belongsTo(Section::class, 'section_id');
     }
 
-    public function schedule()
+    public function feeSchedule()
     {
         return $this->belongsTo(FeeSchedule::class, 'fee_schedule_id');
     }
 
-    public function category()
+    public function studentCategory()
     {
         return $this->belongsTo(StudentCategory::class, 'student_category_id');
     }
 
-    public function component()
+    public function feeComponent()
     {
         return $this->belongsTo(FeeComponent::class, 'fee_component_id');
     }

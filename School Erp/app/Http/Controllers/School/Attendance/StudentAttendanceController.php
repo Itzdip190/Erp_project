@@ -82,6 +82,16 @@ class StudentAttendanceController extends Controller
 
         DB::transaction(function () use ($schoolId, $data, $date, $sectionId, $sessionId, $markedBy, $section) {
             foreach ($data['attendance'] as $item) {
+                $status = isset($item['status']) ? $item['status'] : 'not_marked';
+
+                if (empty($status) || $status === 'not_marked') {
+                    StudentAttendance::where('school_id', $schoolId)
+                        ->where('student_id', $item['student_id'])
+                        ->whereDate('date', $date)
+                        ->delete();
+                    continue;
+                }
+
                 $attendance = StudentAttendance::where('school_id', $schoolId)
                     ->where('student_id', $item['student_id'])
                     ->whereDate('date', $date)
@@ -92,7 +102,7 @@ class StudentAttendanceController extends Controller
                         'section_id' => $sectionId,
                         'class_id' => $section->class_id,
                         'academic_session_id' => $sessionId,
-                        'status' => $item['status'],
+                        'status' => $status,
                         'remark' => $item['remark'] ?? null,
                         'marked_by' => $markedBy,
                         'attendance_type' => 'manual',
@@ -105,7 +115,7 @@ class StudentAttendanceController extends Controller
                         'section_id' => $sectionId,
                         'class_id' => $section->class_id,
                         'academic_session_id' => $sessionId,
-                        'status' => $item['status'],
+                        'status' => $status,
                         'remark' => $item['remark'] ?? null,
                         'marked_by' => $markedBy,
                         'attendance_type' => 'manual',
@@ -114,7 +124,12 @@ class StudentAttendanceController extends Controller
             }
         });
 
-        return redirect()->route('school.attendance.students.index')->with('success', 'Attendance marked successfully.');
+        return redirect()->route('school.attendance.students.index', [
+            'class_id' => $section->class_id,
+            'section_id' => $sectionId,
+            'date' => $date,
+            'academic_session_id' => $sessionId
+        ])->with('success', 'Attendance marked successfully.');
     }
 
     public function report(Request $request)

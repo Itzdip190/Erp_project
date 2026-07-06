@@ -19,24 +19,38 @@ use App\Http\Controllers\School\CardManagementController;
 use App\Http\Controllers\School\DigitalDiaryController;
 use App\Http\Controllers\School\EventHolidayController;
 use App\Http\Controllers\School\CertificateManagementController;
+use App\Http\Controllers\Teacher\TeacherDashboardController;
+use App\Http\Controllers\School\GalleryController;
+use App\Http\Controllers\School\AiController;
+use App\Http\Controllers\School\ExpensesController;
 use Illuminate\Support\Facades\Route;
 
 // Dashboard
 Route::get('/dashboard', [SchoolDashboardController::class, 'index'])->name('school.dashboard');
+Route::get('/teacher-dashboard', fn() => redirect()->route('teacher.dashboard'));
 Route::get('/dashboard/details', [SchoolDashboardController::class, 'getDetails'])->name('school.dashboard.details');
+Route::get('/dashboard/refresh-box', [SchoolDashboardController::class, 'refreshBox'])->name('school.dashboard.refresh-box');
 Route::post('/dashboard/send-reminder', [SchoolDashboardController::class, 'sendFeeReminder'])->name('school.dashboard.send-reminder');
 Route::get('/dashboard/chart/fee',    [SchoolDashboardController::class, 'feeChartData'])->name('school.dashboard.chart.fee');
 Route::get('/dashboard/chart/attend', [SchoolDashboardController::class, 'attendanceChartData'])->name('school.dashboard.chart.attend');
+Route::get('/dashboard/chart/income-expense', [SchoolDashboardController::class, 'incomeExpenseChartData'])->name('school.dashboard.chart.income-expense');
 Route::get('/dashboard/snapshot',     [SchoolDashboardController::class, 'snapshot'])->name('school.dashboard.snapshot');
+Route::post('/dashboard/change-session', [SchoolDashboardController::class, 'changeSession'])->name('school.dashboard.change-session');
+Route::get('/topbar-search',          [SchoolDashboardController::class, 'topbarSearch'])->name('school.topbar-search');
 Route::post('/chatbot/send',          [SchoolDashboardController::class, 'chatbotStub'])->name('school.chatbot.send');
 
 // Students Module
-Route::middleware(['check.module:students'])->group(function () {
+Route::middleware(['check.module:student_management'])->group(function () {
     Route::get('/students/import-template', [StudentController::class, 'downloadTemplate'])->name('school.students.import-template');
     Route::post('/students/import', [StudentController::class, 'bulkImport'])->name('school.students.import');
+    Route::post('/students/import-process/{importLog}', [StudentController::class, 'processImport'])->name('school.students.import-process');
+    Route::get('/students/import-progress/{importLog}', [StudentController::class, 'importProgress'])->name('school.students.import-progress');
     Route::get('/students/export', [StudentController::class, 'export'])->name('school.students.export');
     Route::get('/students/promote', [StudentController::class, 'promoteForm'])->name('school.students.promote-form');
     Route::post('/students/promote', [StudentController::class, 'promote'])->name('school.students.promote');
+    Route::post('/students/bulk-delete', [StudentController::class, 'bulkDestroy'])->name('school.students.bulk-delete');
+
+    Route::post('/students/{student}/toggle-status', [StudentController::class, 'toggleStatus'])->name('school.students.toggle-status');
 
     Route::resource('students', StudentController::class)->names([
         'index' => 'school.students.index',
@@ -50,6 +64,7 @@ Route::middleware(['check.module:students'])->group(function () {
 
     Route::get('/students/{student}/id-card', [StudentIdCardController::class, 'generate'])->name('school.students.id-card');
     Route::get('/students/{student}/admit-card', [AdmitCardController::class, 'generate'])->name('school.students.admit-card');
+    Route::get('/students/{student}/download-pdf', [StudentController::class, 'downloadAdmissionForm'])->name('school.students.download-pdf');
     Route::get('/students/{student}/certificate/{type}', [CertificateController::class, 'generate'])->name('school.students.certificate');
     Route::post('/students/{student}/issue-document', [StudentController::class, 'issueDocument'])->name('school.students.issue-document');
     Route::post('/students/bulk-issue-document', [StudentController::class, 'bulkIssueDocuments'])->name('school.students.bulk-issue-document');
@@ -70,6 +85,12 @@ Route::middleware(['check.module:attendance'])->group(function () {
     Route::get('/attendance/staff', [StaffAttendanceController::class, 'index'])->name('school.attendance.staff.index');
     Route::post('/attendance/staff', [StaffAttendanceController::class, 'store'])->name('school.attendance.staff.store');
     Route::get('/attendance/staff/report', [StaffAttendanceController::class, 'report'])->name('school.attendance.staff.report');
+
+    // Bulk Attendance
+    Route::get('/staff/bulk-attendance', [StaffAttendanceController::class, 'bulkAttendance'])->name('school.staff.bulk-attendance');
+    Route::post('/staff/bulk-attendance', [StaffAttendanceController::class, 'saveBulkAttendance'])->name('school.staff.bulk-attendance.post');
+    Route::get('/student-mgmt/bulk-attendance', [StudentManagementController::class, 'bulkAttendance'])->name('school.student-mgmt.bulk-attendance');
+    Route::post('/student-mgmt/bulk-attendance', [StudentManagementController::class, 'saveBulkAttendance'])->name('school.student-mgmt.bulk-attendance.post');
 });
 
 // Settings & Profile
@@ -111,8 +132,7 @@ Route::get('/staff/import', [\App\Http\Controllers\School\StaffController::class
 Route::post('/staff/import', [\App\Http\Controllers\School\StaffController::class, 'bulkImport'])->name('school.staff.import.post');
 Route::get('/staff/bulk-photo', [\App\Http\Controllers\School\StaffController::class, 'bulkPhotoForm'])->name('school.staff.bulk-photo');
 Route::post('/staff/bulk-photo', [\App\Http\Controllers\School\StaffController::class, 'bulkPhotoUpload'])->name('school.staff.bulk-photo.post');
-Route::get('/staff/bulk-attendance', [StaffAttendanceController::class, 'bulkAttendance'])->name('school.staff.bulk-attendance');
-Route::post('/staff/bulk-attendance', [StaffAttendanceController::class, 'saveBulkAttendance'])->name('school.staff.bulk-attendance.post');
+
 
 Route::resource('staff', \App\Http\Controllers\School\StaffController::class)->names([
     'index' => 'school.staff.index',
@@ -123,6 +143,7 @@ Route::resource('staff', \App\Http\Controllers\School\StaffController::class)->n
     'update' => 'school.staff.update',
     'destroy' => 'school.staff.destroy',
 ]);
+Route::get('/staff/{staff}/download-pdf', [\App\Http\Controllers\School\StaffController::class, 'downloadProfile'])->name('school.staff.download-pdf');
 
 // Class, Subject & Teacher Assignment Module Routes
 Route::get('/assignments/class-overview', [ClassAssignmentController::class, 'classOverview'])->name('school.assignments.class-overview');
@@ -185,8 +206,7 @@ Route::get('/student-mgmt/optional-subject', [StudentManagementController::class
 Route::post('/student-mgmt/optional-subject', [StudentManagementController::class, 'saveOptionalSubject']);
 Route::get('/student-mgmt/admission-report', [StudentManagementController::class, 'admissionReport'])->name('school.student-mgmt.admission-report');
 Route::get('/student-mgmt/siblings', [StudentManagementController::class, 'siblings'])->name('school.student-mgmt.siblings');
-Route::get('/student-mgmt/bulk-attendance', [StudentManagementController::class, 'bulkAttendance'])->name('school.student-mgmt.bulk-attendance');
-Route::post('/student-mgmt/bulk-attendance', [StudentManagementController::class, 'saveBulkAttendance'])->name('school.student-mgmt.bulk-attendance.post');
+
 Route::get('/student-mgmt/report', [StudentManagementController::class, 'studentReport'])->name('school.student-mgmt.report');
 Route::get('/student-mgmt/app-settings', [StudentManagementController::class, 'appSettings'])->name('school.student-mgmt.app-settings');
 Route::post('/student-mgmt/app-settings', [StudentManagementController::class, 'saveAppSettings']);
@@ -221,7 +241,6 @@ Route::post('/fees/configuration', [FeeManagementController::class, 'feeConfigur
 Route::match(['get', 'post'], '/fees/basics', [FeeManagementController::class, 'feeBasics'])->name('school.fees.basics');
 Route::get('/fees/class-wise', [FeeManagementController::class, 'classWiseFee'])->name('school.fees.class-wise');
 Route::post('/fees/class-wise', [FeeManagementController::class, 'classWiseFee']);
-Route::post('/fees/class-wise/save-allocation', [FeeManagementController::class, 'saveAllocation'])->name('school.fees.class-wise.save-allocation');
 Route::get('/fees/student-wise', [FeeManagementController::class, 'studentWiseFee'])->name('school.fees.student-wise');
 Route::post('/fees/student-wise', [FeeManagementController::class, 'studentWiseFee']);
 Route::get('/fees/optional-mapping', [FeeManagementController::class, 'optionalFeeMapping'])->name('school.fees.optional-mapping');
@@ -240,6 +259,7 @@ Route::post('/fees/pending-cheques', [FeeManagementController::class, 'pendingCh
 Route::get('/fees/reports', [FeeManagementController::class, 'feeReports'])->name('school.fees.reports');
 Route::get('/fees/invoice', [FeeManagementController::class, 'feeInvoice'])->name('school.fees.invoice');
 Route::get('/fees/invoice1', [FeeManagementController::class, 'feeInvoice1'])->name('school.fees.invoice1');
+Route::post('/fees/invoice1/generate', [FeeManagementController::class, 'feeInvoice1Generate'])->name('school.fees.invoice1.generate');
 Route::get('/fees/bulk-upload', [FeeManagementController::class, 'feeBulkUpload'])->name('school.fees.bulk-upload');
 Route::post('/fees/bulk-upload', [FeeManagementController::class, 'feeBulkUpload']);
 Route::get('/fees/statement-of-account', [FeeManagementController::class, 'statementOfAccount'])->name('school.fees.statement-of-account');
@@ -287,6 +307,11 @@ Route::match(['get', 'post'], '/communication/chat', [App\Http\Controllers\Schoo
 // Examination
 Route::match(['get', 'post'], '/examination/grade-scale', [App\Http\Controllers\School\ExaminationController::class, 'gradeScale'])->name('school.examination.grade-scale');
 Route::match(['get', 'post'], '/examination/marks-entry', [App\Http\Controllers\School\ExaminationController::class, 'marksEntry'])->name('school.examination.marks-entry');
+Route::get('/examination/get-class-data', [App\Http\Controllers\School\ExaminationController::class, 'getClassData'])->name('school.examination.get-class-data');
+Route::get('/examination/get-slider-data', [App\Http\Controllers\School\ExaminationController::class, 'getExamSliderData'])->name('school.examination.get-slider-data');
+Route::post('/examination/save-slider-data', [App\Http\Controllers\School\ExaminationController::class, 'saveSliderData'])->name('school.examination.save-slider-data');
+Route::post('/examination/exams/store', [App\Http\Controllers\School\ExaminationController::class, 'storeExam'])->name('school.examination.exams.store');
+Route::delete('/examination/exams/{exam}', [App\Http\Controllers\School\ExaminationController::class, 'destroyExam'])->name('school.examination.exams.destroy');
 Route::match(['get', 'post'], '/examination/offline-tests', [App\Http\Controllers\School\ExaminationController::class, 'offlineTests'])->name('school.examination.offline-tests');
 Route::match(['get', 'post'], '/examination/lms-tests', [App\Http\Controllers\School\ExaminationController::class, 'lmsTests'])->name('school.examination.lms-tests');
 Route::match(['get', 'post'], '/examination/report-card-template', [App\Http\Controllers\School\ExaminationController::class, 'reportCardTemplate'])->name('school.examination.report-card-template');
@@ -294,6 +319,7 @@ Route::match(['get', 'post'], '/examination/report-card', [App\Http\Controllers\
 Route::match(['get', 'post'], '/examination/report-card-v2', [App\Http\Controllers\School\ExaminationController::class, 'reportCardV2'])->name('school.examination.report-card-v2');
 Route::match(['get', 'post'], '/examination/marksheets-report', [App\Http\Controllers\School\ExaminationController::class, 'marksheetsReport'])->name('school.examination.marksheets-report');
 Route::match(['get', 'post'], '/examination/reports', [App\Http\Controllers\School\ExaminationController::class, 'reports'])->name('school.examination.reports');
+
 
 // Admissions
 Route::match(['get', 'post'], '/admissions/process', [App\Http\Controllers\School\AdmissionsController::class, 'process'])->name('school.admissions.process');
@@ -307,6 +333,12 @@ Route::match(['get', 'post'], '/admissions/new-admission-report', [App\Http\Cont
 Route::match(['get', 'post'], '/admissions/daily-planner', [App\Http\Controllers\School\AdmissionsController::class, 'dailyPlanner'])->name('school.admissions.daily-planner');
 Route::match(['get', 'post'], '/admissions/dashboard', [App\Http\Controllers\School\AdmissionsController::class, 'dashboard'])->name('school.admissions.dashboard');
 
+// Gallery Module
+Route::get('/gallery/events', [GalleryController::class, 'index'])->name('school.gallery.events');
+Route::post('/gallery/events', [GalleryController::class, 'storeEvent'])->name('school.gallery.events.store');
+Route::post('/gallery/achievements', [GalleryController::class, 'storeAchievement'])->name('school.gallery.achievements.store');
+Route::delete('/gallery/posts/{id}', [GalleryController::class, 'destroy'])->name('school.gallery.posts.destroy');
+
 // Implementation Tracker Module
 Route::prefix('implementation-tracker')
     ->name('implementation.')
@@ -317,6 +349,31 @@ Route::prefix('implementation-tracker')
     });
 
 
+// AI Assistant Module
+Route::get('/ai/settings',       [AiController::class, 'settings'])->name('school.ai.settings');
+Route::post('/ai/settings',      [AiController::class, 'saveSettings'])->name('school.ai.settings.save');
+Route::get('/ai/chat',           [AiController::class, 'chat'])->name('school.ai.chat');
+Route::post('/ai/chat/send',     [AiController::class, 'sendMessage'])->name('school.ai.chat.send');
 
+// Transport Management Module
+Route::get('/transport/basics', [\App\Http\Controllers\School\TransportController::class, 'basics'])->name('school.transport.basics');
+Route::match(['get', 'post'], '/transport/vehicles', [\App\Http\Controllers\School\TransportController::class, 'vehicles'])->name('school.transport.vehicles');
+Route::match(['get', 'post'], '/transport/stops', [\App\Http\Controllers\School\TransportController::class, 'stops'])->name('school.transport.stops');
+Route::match(['get', 'post'], '/transport/routes', [\App\Http\Controllers\School\TransportController::class, 'routes'])->name('school.transport.routes');
+Route::match(['get', 'post'], '/transport/vehicle-trip-mapping', [\App\Http\Controllers\School\TransportController::class, 'tripMapping'])->name('school.transport.trip-mapping');
+Route::match(['get', 'post'], '/transport/student-route-mapping', [\App\Http\Controllers\School\TransportController::class, 'studentMapping'])->name('school.transport.student-mapping');
+// Bus attendance (No PRO badge!)
+Route::match(['get', 'post'], '/transport/bus-attendance', [\App\Http\Controllers\School\TransportController::class, 'busAttendance'])->name('school.transport.bus-attendance');
+// Vehicle Expenses (No PRO badge!)
+Route::match(['get', 'post'], '/transport/vehicle-expenses', [\App\Http\Controllers\School\TransportController::class, 'expenses'])->name('school.transport.expenses');
+Route::post('/transport/delete', [\App\Http\Controllers\School\TransportController::class, 'deleteItem'])->name('school.transport.delete');
 
-
+// Expenses Control Module
+Route::middleware(['check.module:expenses_control'])->group(function () {
+    Route::get('/expenses',           [ExpensesController::class, 'index'])->name('school.expenses.index');
+    Route::get('/expenses/reports',   [ExpensesController::class, 'reports'])->name('school.expenses.reports');
+    Route::post('/expenses',          [ExpensesController::class, 'store'])->name('school.expenses.store');
+    Route::put('/expenses/{expense}', [ExpensesController::class, 'update'])->name('school.expenses.update');
+    Route::delete('/expenses/{expense}', [ExpensesController::class, 'destroy'])->name('school.expenses.destroy');
+    Route::get('/expenses/dashboard-summary', [ExpensesController::class, 'dashboardSummary'])->name('school.expenses.dashboard-summary');
+});

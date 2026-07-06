@@ -218,6 +218,98 @@
         font-weight: bold;
         border: 2px solid #dbeafe;
     }
+
+    /* Dark Mode overrides */
+    body.dark-mode .dl-title-section h1 {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .dl-title-section p {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .dl-status-tab-inactive {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-color: #374151 !important;
+    }
+    body.dark-mode .dl-status-tab-inactive:hover {
+        background: #374151 !important;
+        color: #ffffff !important;
+    }
+    body.dark-mode .dl-subgroup-tabs {
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .dl-subgroup-tab-active {
+        background: rgba(37, 99, 235, 0.15) !important;
+        color: #60a5fa !important;
+    }
+    body.dark-mode .dl-subgroup-tab-inactive {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .dl-subgroup-tab-inactive:hover {
+        background: #1f2937 !important;
+        color: #ffffff !important;
+    }
+    body.dark-mode .dl-card-filter {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode .dl-form-label {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .dl-select,
+    body.dark-mode .dl-input {
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+        background-color: #1f2937 !important;
+    }
+    body.dark-mode .dl-select:focus,
+    body.dark-mode .dl-input:focus {
+        border-color: #2563eb !important;
+        background-color: #1f2937 !important;
+    }
+    body.dark-mode .dl-select option {
+        background-color: #1f2937 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .dl-btn-outline {
+        background: #1f2937 !important;
+        color: #60a5fa !important;
+        border-color: #3b82f6 !important;
+    }
+    body.dark-mode .dl-btn-outline:hover {
+        background: rgba(59, 130, 246, 0.15) !important;
+    }
+    body.dark-mode .dl-table-card {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+    }
+    body.dark-mode .dl-table-hdr {
+        background: #1f2937 !important;
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .dl-table-hdr h3 {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .dl-badge-blue {
+        background: rgba(37, 99, 235, 0.2) !important;
+        color: #60a5fa !important;
+    }
+    body.dark-mode .dl-table td {
+        color: #cbd5e1 !important;
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .dl-table tr:hover td {
+        background: rgba(255, 255, 255, 0.04) !important;
+    }
+    body.dark-mode .dl-staff-avatar {
+        background: #1f2937 !important;
+        color: #60a5fa !important;
+        border-color: #374151 !important;
+    }
+    body.dark-mode .dl-name-text {
+        color: #f8fafc !important;
+    }
 </style>
 
 <div class="dl-module">
@@ -310,10 +402,14 @@
                             </td>
                             <td>
                                 <div style="display:flex; align-items:center; gap:12px;">
-                                    <div class="dl-staff-avatar">
-                                        {{ substr($act['name'], 0, 1) }}
-                                    </div>
-                                    <span style="font-weight: 800; color: #1e3a8a;">{{ $act['name'] }}</span>
+                                    @if(isset($act['photo']) && $act['photo'])
+                                        <img src="{{ $act['photo_url'] }}" alt="{{ $act['name'] }}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; flex-shrink:0;">
+                                    @else
+                                        <div class="dl-staff-avatar">
+                                            {{ substr($act['name'], 0, 1) }}
+                                        </div>
+                                    @endif
+                                    <span class="dl-name-text" style="font-weight: 800; color: #1e3a8a;">{{ $act['name'] }}</span>
                                 </div>
                             </td>
                             <td style="font-weight: 700; color: #334155;">

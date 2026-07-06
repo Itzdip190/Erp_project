@@ -1,7 +1,7 @@
 <!-- TOPBAR -->
 <nav class="topbar">
     <div class="topbar-left">
-        <button class="hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')">
+        <button type="button" class="hamburger" onclick="toggleSidebar()" aria-label="Toggle sidebar">
             <i class="fas fa-bars"></i>
         </button>
         <div class="greeting">

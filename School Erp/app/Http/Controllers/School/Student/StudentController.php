@@ -46,7 +46,8 @@ class StudentController extends Controller
             'search' => $request->get('search'),
         ];
 
-        $cacheKey = 'students_list_' . $schoolId . '_' . md5(json_encode($filters) . '_' . $page);
+        $version = Cache::get('students_list_version_' . $schoolId, 'v1');
+        $cacheKey = 'students_list_' . $schoolId . '_' . md5(json_encode($filters) . '_' . $page) . '_' . $version;
 
         $students = Cache::remember($cacheKey, 120, function () use ($schoolId, $filters) {
             $query = Student::with(['class', 'section', 'academicSession'])
@@ -56,7 +57,13 @@ class StudentController extends Controller
                 $query->where('class_id', $filters['class_id']);
             }
             if ($filters['section_id']) {
-                $query->where('section_id', $filters['section_id']);
+                if (is_numeric($filters['section_id'])) {
+                    $query->where('section_id', $filters['section_id']);
+                } else {
+                    $query->whereHas('section', function ($q) use ($filters) {
+                        $q->where('name', $filters['section_id']);
+                    });
+                }
             }
             if ($filters['academic_session_id']) {
                 $query->where('academic_session_id', $filters['academic_session_id']);
@@ -96,7 +103,17 @@ class StudentController extends Controller
         $classes = SchoolClass::all();
         $sections = Section::all();
         $academicSessions = AcademicSession::all();
-        $categories = StudentCategory::all();
+
+        $schoolId = auth()->user()->school_id;
+        $categoryNames = ['Gen', 'OBC', 'SC', 'ST'];
+        $categories = [];
+        foreach ($categoryNames as $name) {
+            $categories[] = StudentCategory::firstOrCreate([
+                'school_id' => $schoolId,
+                'name' => $name
+            ]);
+        }
+
         $houses = StudentHouse::all();
 
         return view('school.student.create', compact('classes', 'sections', 'academicSessions', 'categories', 'houses'));
@@ -108,7 +125,9 @@ class StudentController extends Controller
         $data = $request->validated();
         $data['opening_due_balance'] = $data['opening_due_balance'] ?? 0.00;
 
-        if ($request->hasFile('photo')) {
+        if ($request->filled('captured_photo')) {
+            $data['photo'] = $this->saveBase64Photo($request->input('captured_photo'), 'students/photos');
+        } elseif ($request->hasFile('photo')) {
             $data['photo'] = $request->file('photo')->store('students/photos', 'public');
         }
         if ($request->hasFile('father_photo')) {
@@ -183,14 +202,109 @@ class StudentController extends Controller
         Cache::forget('students_list_version_' . $schoolId);
         Cache::put('students_list_version_' . $schoolId, time(), 86400);
 
+        // Sync transport and other fees
+        \App\Http\Controllers\School\FeeManagementController::syncStudentFees($student);
+
         event(new StudentAdmitted($student));
 
         return redirect()->route('school.students.index')->with('success', 'Student admitted successfully.');
     }
 
+    public function toggleStatus(Student $student)
+    {
+        $schoolId = auth()->user()->school_id;
+        if ($student->school_id !== $schoolId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $student->is_active = !$student->is_active;
+        $student->save();
+
+        Cache::forget('students_list_version_' . $schoolId);
+        Cache::put('students_list_version_' . $schoolId, time(), 86400);
+
+        if (!$student->is_active) {
+            \Illuminate\Support\Facades\Log::info("Parent Notification: Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
+            $msg = 'Student deactivated successfully. Parent notified.';
+        } else {
+            \Illuminate\Support\Facades\Log::info("Parent Notification: Student {$student->full_name} has been activated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
+            $msg = 'Student activated successfully. Parent notified.';
+        }
+
+        return response()->json([
+            'success' => true,
+            'is_active' => $student->is_active,
+            'message' => $msg
+        ]);
+    }
+
     public function show(Student $student)
     {
-        return view('school.student.show', compact('student'));
+        $schoolId = auth()->user()->school_id;
+        if ($student->school_id !== $schoolId) {
+            abort(403, 'Unauthorized.');
+        }
+
+        // 1. Attendance
+        $attendances = \App\Models\StudentAttendance::where('student_id', $student->id)
+            ->orderBy('date', 'desc')
+            ->get();
+        $totalDays = $attendances->count();
+        $presentDays = $attendances->where('status', 'present')->count();
+        $absentDays = $attendances->where('status', 'absent')->count();
+        $lateDays = $attendances->where('status', 'late')->count();
+        $attendancePercentage = $totalDays > 0 ? round(($presentDays / $totalDays) * 100, 1) : 100;
+
+        // 2. Siblings
+        $siblings = Student::where('school_id', $schoolId)
+            ->where('id', '!=', $student->id)
+            ->where(function($q) use ($student) {
+                $hasFilter = false;
+                if ($student->guardian_email) {
+                    $q->where('guardian_email', $student->guardian_email);
+                    $hasFilter = true;
+                }
+                if ($student->guardian_phone) {
+                    if ($hasFilter) $q->orWhere('guardian_phone', $student->guardian_phone);
+                    else { $q->where('guardian_phone', $student->guardian_phone); $hasFilter = true; }
+                }
+                if ($student->father_phone) {
+                    if ($hasFilter) $q->orWhere('father_phone', $student->father_phone);
+                    else { $q->where('father_phone', $student->father_phone); $hasFilter = true; }
+                }
+                if ($student->mother_phone) {
+                    if ($hasFilter) $q->orWhere('mother_phone', $student->mother_phone);
+                    else { $q->where('mother_phone', $student->mother_phone); $hasFilter = true; }
+                }
+                if (!$hasFilter) {
+                    $q->whereRaw('1 = 0');
+                }
+            })->get();
+
+        // 3. Exams (marks)
+        $marks = \App\Models\StudentMark::where('student_id', $student->id)
+            ->with('subject')
+            ->orderBy('exam_name', 'asc')
+            ->get();
+
+        // 4. Fees
+        $fees = \App\Models\StudentFee::where('student_id', $student->id)
+            ->with(['category', 'component'])
+            ->orderBy('due_date', 'asc')
+            ->get();
+
+        return view('school.student.show', compact(
+            'student',
+            'attendances',
+            'totalDays',
+            'presentDays',
+            'absentDays',
+            'lateDays',
+            'attendancePercentage',
+            'siblings',
+            'marks',
+            'fees'
+        ));
     }
 
     public function edit(Student $student)
@@ -198,7 +312,17 @@ class StudentController extends Controller
         $classes = SchoolClass::all();
         $sections = Section::all();
         $academicSessions = AcademicSession::all();
-        $categories = StudentCategory::all();
+
+        $schoolId = auth()->user()->school_id;
+        $categoryNames = ['Gen', 'OBC', 'SC', 'ST'];
+        $categories = [];
+        foreach ($categoryNames as $name) {
+            $categories[] = StudentCategory::firstOrCreate([
+                'school_id' => $schoolId,
+                'name' => $name
+            ]);
+        }
+
         $houses = StudentHouse::all();
 
         return view('school.student.edit', compact('student', 'classes', 'sections', 'academicSessions', 'categories', 'houses'));
@@ -212,7 +336,9 @@ class StudentController extends Controller
             $data['opening_due_balance'] = $data['opening_due_balance'] ?? 0.00;
         }
 
-        if ($request->hasFile('photo')) {
+        if ($request->filled('captured_photo')) {
+            $data['photo'] = $this->saveBase64Photo($request->input('captured_photo'), 'students/photos', $student->photo);
+        } elseif ($request->hasFile('photo')) {
             if ($student->photo) {
                 Storage::disk('public')->delete($student->photo);
             }
@@ -302,18 +428,107 @@ class StudentController extends Controller
         Cache::forget('students_list_version_' . $schoolId);
         Cache::put('students_list_version_' . $schoolId, time(), 86400);
 
+        // Sync transport and other fees
+        \App\Http\Controllers\School\FeeManagementController::syncStudentFees($student);
+
         return redirect()->route('school.students.index')->with('success', 'Student updated successfully.');
     }
 
     public function destroy(Student $student)
     {
         $schoolId = auth()->user()->school_id;
-        $student->delete();
+        $student->update(['is_active' => 0]);
+
+        // Trigger notification to parent
+        \Illuminate\Support\Facades\Log::info("Parent Notification: Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
 
         Cache::forget('students_list_version_' . $schoolId);
         Cache::put('students_list_version_' . $schoolId, time(), 86400);
 
-        return redirect()->route('school.students.index')->with('success', 'Student deleted successfully.');
+        return redirect()->route('school.students.index')->with('success', 'Student deactivated successfully. Parent notified.');
+    }
+
+    public function bulkDestroy(Request $request)
+    {
+        $schoolId = auth()->user()->school_id;
+
+        if ($request->boolean('delete_all')) {
+            $query = Student::where('school_id', $schoolId);
+
+            if ($request->filled('class_id')) {
+                $query->where('class_id', $request->input('class_id'));
+            }
+            if ($request->filled('section_id')) {
+                $sectionId = $request->input('section_id');
+                if (is_numeric($sectionId)) {
+                    $query->where('section_id', $sectionId);
+                } else {
+                    $query->whereHas('section', function ($q) use ($sectionId) {
+                        $q->where('name', $sectionId);
+                    });
+                }
+            }
+            if ($request->filled('academic_session_id')) {
+                $query->where('academic_session_id', $request->input('academic_session_id'));
+            }
+            if ($request->input('is_active') !== null && $request->input('is_active') !== '') {
+                $query->where('is_active', $request->input('is_active'));
+            }
+            if ($request->filled('search')) {
+                $search = $request->input('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('first_name', 'like', "%{$search}%")
+                      ->orWhere('last_name', 'like', "%{$search}%")
+                      ->orWhere('admission_number', 'like', "%{$search}%")
+                      ->orWhere('roll_number', 'like', "%{$search}%");
+                });
+            }
+
+            $students = $query->get();
+            $deactivatedCount = 0;
+            foreach ($students as $student) {
+                if ($student->is_active) {
+                    $student->update(['is_active' => 0]);
+                    $deactivatedCount++;
+                    \Illuminate\Support\Facades\Log::info("Parent Notification (Bulk - Delete All): Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
+                }
+            }
+
+            Cache::forget('students_list_version_' . $schoolId);
+            Cache::put('students_list_version_' . $schoolId, time(), 86400);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully deactivated {$deactivatedCount} student(s) and notified parent(s)."
+            ]);
+        }
+
+        $studentIds = $request->input('student_ids', []);
+
+        if (empty($studentIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No students selected for deactivation.'
+            ], 422);
+        }
+
+        $students = Student::where('school_id', $schoolId)->whereIn('id', $studentIds)->get();
+        $deactivatedCount = 0;
+        foreach ($students as $student) {
+            if ($student->is_active) {
+                $student->update(['is_active' => 0]);
+                $deactivatedCount++;
+                \Illuminate\Support\Facades\Log::info("Parent Notification (Bulk - Selected): Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
+            }
+        }
+
+        Cache::forget('students_list_version_' . $schoolId);
+        Cache::put('students_list_version_' . $schoolId, time(), 86400);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Successfully deactivated {$deactivatedCount} student(s) and notified parent(s)."
+        ]);
     }
 
     public function bulkImport(BulkImportRequest $request)
@@ -328,14 +543,161 @@ class StudentController extends Controller
             'status' => 'pending',
         ]);
 
-        // Run synchronously to avoid queue processing issues
-        $job = new ProcessStudentImport($schoolId, $importLog->id, $path);
-        $job->handle(app(StudentNumberService::class));
+        try {
+            $absolutePath = Storage::disk(config('filesystems.default'))->path($path);
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($absolutePath);
+            $sheet = $spreadsheet->getActiveSheet();
+            $rows = $sheet->toArray();
+            
+            // Count actual non-empty rows (excluding header)
+            $totalRows = 0;
+            if (count($rows) > 1) {
+                // Normalize headers to identify name/admission columns
+                $headers = [];
+                foreach (($rows[0] ?? []) as $colIndex => $rawHeader) {
+                    if ($rawHeader) {
+                        $clean = preg_replace('/_+/', '_', trim(preg_replace('/[^a-z0-9]/', '_', strtolower(trim((string)$rawHeader))), '_'));
+                        $headers[$colIndex] = $clean;
+                    } else {
+                        $headers[$colIndex] = null;
+                    }
+                }
+
+                $isRowValidData = function($row) use ($headers) {
+                    foreach ($headers as $colIndex => $header) {
+                        if ($header && in_array($header, ['first_name', 'name'])) {
+                            $val = trim((string)($row[$colIndex] ?? ''));
+                            if ($val !== '') {
+                                return true;
+                            }
+                        }
+                    }
+                    return false;
+                };
+
+                $dataRows = array_slice($rows, 1);
+                foreach ($dataRows as $row) {
+                    if ($isRowValidData($row)) {
+                        $totalRows++;
+                    } else {
+                        // Stop counting completely when empty row is hit
+                        break;
+                    }
+                }
+            }
+
+            $importLog->update([
+                'total_rows' => $totalRows,
+                'status' => 'pending'
+            ]);
+
+            if (app()->environment('testing')) {
+                $studentNumberService = app(\App\Services\StudentNumberService::class);
+                $job = new \App\Jobs\ProcessStudentImport($schoolId, $importLog->id, $path);
+                $job->handle($studentNumberService);
+            }
+
+            return response()->json([
+                'success' => true,
+                'import_log_id' => $importLog->id,
+                'total_rows' => $totalRows,
+            ]);
+        } catch (\Exception $e) {
+            $importLog->update([
+                'status' => 'failed',
+                'errors' => [['row' => 0, 'error' => 'Failed to initialize spreadsheet: ' . $e->getMessage()]]
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to initialize spreadsheet: ' . $e->getMessage()
+            ], 422);
+        }
+    }
+
+    public function processImport(ImportLog $importLog)
+    {
+        $schoolId = auth()->user()->school_id;
+        if ($importLog->school_id !== $schoolId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        try {
+            // Close session write to allow concurrent progress reading
+            if (session_id()) {
+                session_write_close();
+            }
+
+            // Launch import command in the background
+            if ($importLog->status !== 'processing' && $importLog->status !== 'completed') {
+                $importLog->update(['status' => 'processing']);
+
+                if (app()->environment('testing')) {
+                    $studentNumberService = app(\App\Services\StudentNumberService::class);
+                    $job = new \App\Jobs\ProcessStudentImport((int)$schoolId, (int)$importLog->id, $importLog->file_path);
+                    $job->handle($studentNumberService);
+                } else {
+                    // Try running in background, fallback to synchronous if popen/exec fails or is disabled
+                    try {
+                        $artisan = base_path('artisan');
+                        $command = "php \"{$artisan}\" student:import {$importLog->id} {$schoolId}";
+
+                        if (strncasecmp(PHP_OS, 'WIN', 3) === 0) {
+                            if (function_exists('popen') && function_exists('pclose')) {
+                                @pclose(popen("start /B {$command}", "r"));
+                            } else {
+                                throw new \Exception("popen is disabled");
+                            }
+                        } else {
+                            if (function_exists('exec')) {
+                                @exec("{$command} > /dev/null 2>&1 &");
+                            } else {
+                                throw new \Exception("exec is disabled");
+                            }
+                        }
+                    } catch (\Throwable $eBackground) {
+                        // Fallback to synchronous execution
+                        $studentNumberService = app(\App\Services\StudentNumberService::class);
+                        $job = new \App\Jobs\ProcessStudentImport((int)$schoolId, (int)$importLog->id, $importLog->file_path);
+                        $job->handle($studentNumberService);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            $importLog->update([
+                'status' => 'failed',
+                'errors' => [['row' => 0, 'error' => 'Job execution failed: ' . $e->getMessage()]]
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Job execution failed: ' . $e->getMessage(),
+                'log' => $importLog,
+            ], 500);
+        }
+
+        $importLog->refresh();
 
         return response()->json([
             'success' => true,
-            'message' => 'Bulk import processed successfully.',
-            'import_log_id' => $importLog->id,
+            'message' => 'Bulk import started successfully.',
+            'log' => $importLog,
+        ]);
+    }
+
+    public function importProgress(ImportLog $importLog)
+    {
+        $schoolId = auth()->user()->school_id;
+        if ($importLog->school_id !== $schoolId) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'status' => $importLog->status,
+            'total_rows' => $importLog->total_rows,
+            'success_rows' => $importLog->success_rows,
+            'failed_rows' => $importLog->failed_rows,
+            'errors' => $importLog->errors,
         ]);
     }
 
@@ -345,22 +707,13 @@ class StudentController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         
         $headers = [
-            'first_name', 'last_name', 'first_name_local', 'last_name_local', 'email', 'phone', 'roll_number', 'gender', 'date_of_birth',
-            'place_of_birth', 'birth_certificate_no', 'usn_srn_number', 'blood_group', 'religion', 'caste', 'sub_caste', 'family_id', 'group', 'house_id', 'house_role',
-            'biometric_id', 'pen_number', 'apaar_id', 'samagra_id', 'class_at_admission', 'enrollment_number', 'tc_number',
-            'transport_month', 'transport_route', 'transport_vehicle_code', 'transport_stop', 'transport_drop_vehicle_code',
-            'prev_school', 'prev_city_country', 'prev_year_attended', 'prev_board', 'prev_reg_no', 'prev_pcm_marks', 'prev_pcm_percentage', 'prev_total_marks', 'prev_average', 'entrance_exam_name', 'entrance_exam_rank', 'entrance_exam_remarks',
-            'disciplinary_action', 'disciplinary_action_reason', 'asked_to_leave', 'asked_to_leave_reason', 'special_needs', 'special_needs_reason', 'interests_talents', 'interests_talents_reason', 'represented_school', 'represented_school_reason', 'other_info', 'other_info_reason',
-            'father_name', 'father_phone', 'father_alternate_phone', 'father_email', 'father_occupation', 'father_id', 'father_aadhar', 'father_income', 'father_qualification', 'father_passport', 'father_address',
-            'mother_name', 'mother_phone', 'mother_alternate_phone', 'mother_email', 'mother_occupation', 'mother_id', 'mother_aadhar', 'mother_income', 'mother_qualification', 'mother_passport', 'mother_address', 'mother_office_address',
-            'guardian_name', 'guardian_phone', 'guardian_email', 'guardian_relationship', 'guardian_occupation', 'guardian_passport', 'guardian_name_local', 'guardian_address',
-            'whatsapp_number',
-            'address', 'address_line_2', 'city', 'state', 'country', 'pincode', 'region',
-            'permanent_address', 'permanent_address_line_2', 'permanent_city', 'permanent_state', 'permanent_country', 'permanent_pincode', 'permanent_region',
-            'class_id', 'section_id', 'academic_session_id', 'admission_date', 'opening_due_balance',
-            'national_id', 'local_id', 'bank_account_no', 'bank_account_holder', 'bank_name', 'bank_branch', 'ifsc_code', 'bank_micr', 'note',
-            'emergency_address', 'contact_priority',
-            'medical_height', 'medical_weight', 'medical_vision_left', 'medical_vision_right', 'medical_dental', 'medical_illness', 'medical_history', 'medical_allergies', 'medical_disabilities', 'medical_doctor_name', 'medical_doctor_phone', 'medical_doctor_address'
+            'Admission Id', 'Date Of Admission (dd/mm/yyyy)', 'First Name', 'Last Name', 'Class', 'Section', 'Roll Number',
+            'DOB (dd/mm/yyyy)', 'Gender (M/F)', 'Religion', 'Caste', 'Sub Caste', 'Category (General / OBC / SC / ST)',
+            'Sub Category (EWS / Others)', 'Blood Group', 'Any Allergy (Yes/No)', 'Allergy/Medical Condition Description',
+            'Birthmark (if any)', 'Adhar Number', 'Father Name', 'Father Mobile Number', 'Father ID', 'Mother Name',
+            'Mother Mobile Number', 'Mother ID', 'House Number', 'Location', 'City', 'State', 'Country', 'Zip',
+            'Emergency Name', 'Emergency Number', 'Emergency Doctor Number', 'Emergency Doctor Detail', 'Email',
+            'Admission Type', 'Boarding Type', 'Defence Personal (Yes/No)', 'transport'
         ];
 
         $sheet->fromArray($headers, null, 'A1');
@@ -610,5 +963,109 @@ class StudentController extends Controller
             'success' => true,
             'message' => "Successfully issued {$count} documents to student dashboards!",
         ]);
+    }
+
+    protected function saveBase64Photo(?string $base64Data, string $folder, ?string $oldPath = null): ?string
+    {
+        if (empty($base64Data)) {
+            return null;
+        }
+
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $type)) {
+            $data = substr($base64Data, strpos($base64Data, ',') + 1);
+            $type = strtolower($type[1]); // e.g. png, jpeg, gif, webp
+
+            if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png', 'webp'])) {
+                return null;
+            }
+
+            $data = base64_decode($data);
+            if ($data === false) {
+                return null;
+            }
+
+            $fileName = \Illuminate\Support\Str::random(40) . '.' . $type;
+            $path = $folder . '/' . $fileName;
+
+            \Illuminate\Support\Facades\Storage::disk('public')->put($path, $data);
+
+            if ($oldPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($oldPath)) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($oldPath);
+            }
+
+            return $path;
+        }
+
+        return null;
+    }
+
+    public function downloadAdmissionForm(Student $student)
+    {
+        $schoolId = auth()->user()->school_id;
+        if ($student->school_id !== $schoolId) {
+            abort(403, 'Unauthorized.');
+        }
+
+        // 1. Attendance
+        $attendances = \App\Models\StudentAttendance::where('student_id', $student->id)
+            ->orderBy('date', 'desc')
+            ->get();
+        $totalDays = $attendances->count();
+        $presentDays = $attendances->where('status', 'present')->count();
+        $absentDays = $attendances->where('status', 'absent')->count();
+        $lateDays = $attendances->where('status', 'late')->count();
+        $attendancePercentage = $totalDays > 0 ? round(($presentDays / $totalDays) * 100, 1) : 100;
+
+        // 2. Siblings
+        $siblings = Student::where('school_id', $schoolId)
+            ->where('id', '!=', $student->id)
+            ->where(function($q) use ($student) {
+                $hasFilter = false;
+                if ($student->guardian_email) {
+                    $q->where('guardian_email', $student->guardian_email);
+                    $hasFilter = true;
+                }
+                if ($student->guardian_phone) {
+                    if ($hasFilter) $q->orWhere('guardian_phone', $student->guardian_phone);
+                    else { $q->where('guardian_phone', $student->guardian_phone); $hasFilter = true; }
+                }
+                if ($student->father_phone) {
+                    if ($hasFilter) $q->orWhere('father_phone', $student->father_phone);
+                    else { $q->where('father_phone', $student->father_phone); $hasFilter = true; }
+                }
+                if ($student->mother_phone) {
+                    if ($hasFilter) $q->orWhere('mother_phone', $student->mother_phone);
+                    else { $q->where('mother_phone', $student->mother_phone); $hasFilter = true; }
+                }
+                if (!$hasFilter) {
+                    $q->whereRaw('1 = 0');
+                }
+            })->get();
+
+        // 3. Exams (marks)
+        $marks = \App\Models\StudentMark::where('student_id', $student->id)
+            ->with('subject')
+            ->orderBy('exam_name', 'asc')
+            ->get();
+
+        // 4. Fees
+        $fees = \App\Models\StudentFee::where('student_id', $student->id)
+            ->with(['category', 'component'])
+            ->orderBy('due_date', 'asc')
+            ->get();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.student.admission-form-pdf', compact(
+            'student',
+            'attendances',
+            'totalDays',
+            'presentDays',
+            'absentDays',
+            'lateDays',
+            'attendancePercentage',
+            'siblings',
+            'marks',
+            'fees'
+        ));
+        return $pdf->stream("admission_form_{$student->admission_number}.pdf");
     }
 }

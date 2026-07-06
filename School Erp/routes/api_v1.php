@@ -32,10 +32,12 @@ Route::prefix('api/v1')->group(function () {
         Route::post('/face-login/enroll',[FaceAuthController::class,  'enroll']);
 
         // Parent
-        Route::get('/parent/children',                    [ChildrenController::class,    'index']);
-        Route::get('/parent/children/{id}/profile',       [ChildrenController::class,    'profile']);
-        Route::get('/parent/children/{id}/documents',     [ChildrenController::class,    'documents']);
-        Route::get('/parent/attendance',                  [ParentAttendanceController::class, 'index']);
+        Route::middleware(['active_student'])->group(function () {
+            Route::get('/parent/children',                    [ChildrenController::class,    'index']);
+            Route::get('/parent/children/{id}/profile',       [ChildrenController::class,    'profile']);
+            Route::get('/parent/children/{id}/documents',     [ChildrenController::class,    'documents']);
+            Route::get('/parent/attendance',                  [ParentAttendanceController::class, 'index']);
+        });
 
         // Staff
         Route::get('/staff/students',                     [StaffStudentController::class,'index']);

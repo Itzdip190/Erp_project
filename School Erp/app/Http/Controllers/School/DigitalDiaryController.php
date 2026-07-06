@@ -13,32 +13,7 @@ class DigitalDiaryController extends Controller
 {
     private function ensureDiariesSeeded($schoolId)
     {
-        if (DigitalDiary::where('school_id', $schoolId)->count() === 0) {
-            $class = SchoolClass::where('school_id', $schoolId)->first();
-            $section = Section::where('school_id', $schoolId)->first();
-            $staff = Staff::where('school_id', $schoolId)->first();
-
-            if ($class && $section && $staff) {
-                DigitalDiary::create([
-                    'school_id' => $schoolId,
-                    'class_id' => $class->id,
-                    'section_id' => $section->id,
-                    'staff_id' => $staff->id,
-                    'title' => 'Maths Homework - Exercise 5.2',
-                    'content' => 'Please solve questions 1 to 10 on page 84. To be submitted tomorrow without fail.',
-                    'diary_date' => now()->toDateString(),
-                ]);
-                DigitalDiary::create([
-                    'school_id' => $schoolId,
-                    'class_id' => $class->id,
-                    'section_id' => $section->id,
-                    'staff_id' => $staff->id,
-                    'title' => 'Science Project Work',
-                    'content' => 'Start researching for the Water Cycle diagram project. Due on Friday.',
-                    'diary_date' => now()->subDay()->toDateString(),
-                ]);
-            }
-        }
+        // No auto-seeding
     }
 
     public function createDiary(Request $request)

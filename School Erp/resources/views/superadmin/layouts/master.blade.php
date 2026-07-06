@@ -517,10 +517,50 @@
         .card-body-custom {
             padding: 1.5rem !important;
         }
+
+        /* ══════════════════════════════════════════════════════════════
+           SUPERADMIN DARK MODE THEME OVERRIDES
+           ══════════════════════════════════════════════════════════════ */
+        body.dark-mode, body.dark-mode .content-wrapper, body.dark-mode .wrapper {
+            background-color: #0b0f19 !important;
+            color: #f8fafc !important;
+        }
+        body.dark-mode .main-header {
+            background-color: #111827 !important;
+            border-bottom: 1px solid #1e293b !important;
+        }
+        body.dark-mode .main-header .nav-link, body.dark-mode .user-greeting-text, body.dark-mode .user-greeting-sub {
+            color: #f8fafc !important;
+        }
+        body.dark-mode #superadminThemeToggleBtn {
+            background: #1f2937 !important;
+            color: #f8fafc !important;
+            border: 1px solid #374151 !important;
+        }
+        body.dark-mode .card, body.dark-mode .small-box, body.dark-mode .info-box {
+            background-color: #111827 !important;
+            border: 1px solid #1e293b !important;
+            color: #f8fafc !important;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3) !important;
+        }
+        body.dark-mode h1, body.dark-mode h2, body.dark-mode h3, body.dark-mode h4, body.dark-mode h5, body.dark-mode h6, body.dark-mode .card-title, body.dark-mode th, body.dark-mode td {
+            color: #f8fafc !important;
+        }
+        body.dark-mode .table {
+            color: #f8fafc !important;
+            background-color: #1f2937 !important;
+        }
     </style>
     @yield('styles')
 </head>
 <body class="hold-transition layout-fixed layout-navbar-fixed">
+<script>
+    (function() {
+        if (localStorage.getItem('school_erp_theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+    })();
+</script>
 <div class="wrapper">
 
     <!-- Navbar -->
@@ -564,6 +604,26 @@
 <script src="{{ asset('vendor/overlayScrollbars/js/jquery.overlayScrollbars.min.js') }}"></script>
 <!-- AdminLTE App -->
 <script src="{{ asset('vendor/adminlte/dist/js/adminlte.min.js') }}"></script>
+<script>
+function toggleTheme() {
+    const isDark = document.body.classList.toggle('dark-mode');
+    localStorage.setItem('school_erp_theme', isDark ? 'dark' : 'light');
+    updateThemeIcon(isDark);
+}
+function updateThemeIcon(isDark) {
+    const icon = document.getElementById('themeToggleIcon') || document.getElementById('superadminThemeToggleIcon');
+    if (icon) {
+        icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
+        icon.style.color = isDark ? '#f59e0b' : '';
+    }
+}
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.body.classList.contains('dark-mode')) {
+        updateThemeIcon(true);
+    }
+});
+</script>
+@include('layouts.ai_chatbot')
 @yield('scripts')
 </body>
 </html>

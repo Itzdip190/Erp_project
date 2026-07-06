@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class Staff extends Model
 {
@@ -56,11 +57,28 @@ class Staff extends Model
         'full_name',
         'photo_url',
         'staff_type',
+        'detailed_age',
     ];
 
     public function getFullNameAttribute(): string
     {
         return trim("{$this->first_name} {$this->last_name}");
+    }
+
+    public function getDetailedAgeAttribute(): string
+    {
+        if (!$this->date_of_birth) {
+            return 'N/A';
+        }
+        $dob = Carbon::parse($this->date_of_birth);
+        $diff = $dob->diff(Carbon::now());
+        
+        $parts = [];
+        $parts[] = "{$diff->y} years";
+        $parts[] = "{$diff->m} months";
+        $parts[] = "{$diff->d} days";
+        
+        return implode(', ', $parts);
     }
 
     public function getPhotoUrlAttribute(): string

@@ -353,6 +353,144 @@
         padding: 0;
         margin: 0;
     }
+
+    /* Dark Mode overrides for Student Download Status */
+    body.dark-mode .dl-title-section h1 {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .dl-title-section p {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .dl-card-filter {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+    }
+    body.dark-mode .dl-form-label {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .dl-select,
+    body.dark-mode .dl-input {
+        border-color: #374151 !important;
+        color: #f8fafc !important;
+        background-color: #1f2937 !important;
+    }
+    body.dark-mode .dl-select:focus,
+    body.dark-mode .dl-input:focus {
+        border-color: #2563eb !important;
+        background-color: #1f2937 !important;
+    }
+    body.dark-mode .dl-select option {
+        background-color: #1f2937 !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .dl-btn-outline {
+        background: #1f2937 !important;
+        color: #60a5fa !important;
+        border-color: #3b82f6 !important;
+    }
+    body.dark-mode .dl-btn-outline:hover {
+        background: rgba(59, 130, 246, 0.15) !important;
+    }
+    body.dark-mode .dl-stat-card-active-blue {
+        background: rgba(37, 99, 235, 0.15) !important;
+        border-color: #2563eb !important;
+    }
+    body.dark-mode .dl-stat-card-inactive-blue {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+    }
+    body.dark-mode .stat-info .stat-num {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .stat-info .stat-label {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .dl-table-card {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+    }
+    body.dark-mode .dl-table-hdr {
+        background: #1f2937 !important;
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .dl-table-hdr h3 {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .dl-badge-blue {
+        background: rgba(37, 99, 235, 0.2) !important;
+        color: #60a5fa !important;
+    }
+    body.dark-mode .dl-table td {
+        color: #cbd5e1 !important;
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .dl-table tr:hover td {
+        background: rgba(255, 255, 255, 0.04) !important;
+    }
+    body.dark-mode .dl-student-avatar {
+        background: #1f2937 !important;
+        color: #60a5fa !important;
+        border-color: #374151 !important;
+    }
+    body.dark-mode .dl-name-text {
+        color: #f8fafc !important;
+    }
+    body.dark-mode .excel-modal-container {
+        background: #111827 !important;
+        border-color: #1e293b !important;
+    }
+    body.dark-mode .excel-menubar,
+    body.dark-mode .excel-toolbar {
+        background: #1f2937 !important;
+        border-bottom-color: #1e293b !important;
+    }
+    body.dark-mode .excel-menu-item {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode .excel-menu-item:hover {
+        background: #374151 !important;
+    }
+    body.dark-mode .excel-sheet-viewport {
+        background: #1f2937 !important;
+    }
+    body.dark-mode .excel-sheet-grid {
+        background: #111827 !important;
+    }
+    body.dark-mode .excel-sheet-grid th {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-color: #1e293b !important;
+    }
+    body.dark-mode .excel-sheet-grid td {
+        border-color: #1e293b !important;
+        color: #f8fafc !important;
+    }
+    body.dark-mode .excel-sheet-grid td.row-num {
+        background: #1f2937 !important;
+        color: #cbd5e1 !important;
+        border-color: #1e293b !important;
+    }
+    body.dark-mode .excel-sheet-grid td.active-cell {
+        background: rgba(16, 124, 65, 0.15) !important;
+    }
+    body.dark-mode .excel-sheet-grid td input {
+        color: #f8fafc !important;
+    }
+    body.dark-mode div[style*="color: #1e3a8a"],
+    body.dark-mode div[style*="color:#1e3a8a"] {
+        color: #f8fafc !important;
+    }
+    body.dark-mode td[style*="color:#64748b"],
+    body.dark-mode td[style*="color: #64748b"],
+    body.dark-mode small[style*="color: #64748b"],
+    body.dark-mode small[style*="color:#64748b"] {
+        color: #cbd5e1 !important;
+    }
+    body.dark-mode div[style*="color:#b91c1c"],
+    body.dark-mode div[style*="color: #b91c1c"] {
+        color: #f87171 !important;
+    }
 </style>
 
 <div class="dl-module">
@@ -470,11 +608,15 @@
                             </td>
                             <td>
                                 <div style="display:flex; align-items:center; gap:12px;">
-                                    <div class="dl-student-avatar">
-                                        {{ substr($st->first_name, 0, 1) }}{{ substr($st->last_name, 0, 1) }}
-                                    </div>
+                                    @if($st->photo)
+                                        <img src="{{ $st->photo_url }}" alt="{{ $st->first_name }}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; flex-shrink:0;">
+                                    @else
+                                        <div class="dl-student-avatar">
+                                            {{ substr($st->first_name, 0, 1) }}{{ substr($st->last_name, 0, 1) }}
+                                        </div>
+                                    @endif
                                     <div>
-                                        <div style="font-weight: 800; color: #1e3a8a;">{{ $st->full_name }}</div>
+                                        <div class="dl-name-text" style="font-weight: 800; color: #1e3a8a;">{{ $st->full_name }}</div>
                                         <small style="color: #64748b; font-size:12px;">Admission ID: {{ $st->admission_number }}</small>
                                     </div>
                                 </div>
