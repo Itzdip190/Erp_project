@@ -14,11 +14,17 @@ class SchoolExpense extends Model
 
     protected $fillable = [
         'school_id',
+        'expense_head_id',
+        'expense_voucher_id',
+        'voucher_payment_id',
         'title',
         'category',
         'amount',
         'expense_date',
         'payment_mode',
+        'bank_name',
+        'check_issue_date',
+        'branch',
         'description',
         'reference_no',
         'receipt_no',
@@ -28,8 +34,9 @@ class SchoolExpense extends Model
     ];
 
     protected $casts = [
-        'amount'       => 'decimal:2',
-        'expense_date' => 'date',
+        'amount'           => 'decimal:2',
+        'expense_date'     => 'date',
+        'check_issue_date' => 'date',
     ];
 
     public static function categories(): array
@@ -57,11 +64,29 @@ class SchoolExpense extends Model
 
     public function getCategoryLabelAttribute(): string
     {
+        if ($this->expenseHead) {
+            return $this->expenseHead->name;
+        }
         return self::categories()[$this->category] ?? ucfirst($this->category);
     }
 
     public function school()
     {
         return $this->belongsTo(School::class);
+    }
+
+    public function expenseHead()
+    {
+        return $this->belongsTo(ExpenseHead::class, 'expense_head_id');
+    }
+
+    public function voucher()
+    {
+        return $this->belongsTo(ExpenseVoucher::class, 'expense_voucher_id');
+    }
+
+    public function payment()
+    {
+        return $this->belongsTo(VoucherPayment::class, 'voucher_payment_id');
     }
 }

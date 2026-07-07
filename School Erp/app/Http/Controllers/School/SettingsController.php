@@ -20,7 +20,49 @@ class SettingsController extends Controller
     public function index()
     {
         $user = Auth::user();
-        return view('school.settings.index', compact('user'));
+        $school = $user->school;
+
+        // Fetch all modules from layout parsing
+        $allModules = \App\Support\ModuleRegistry::all();
+
+        // Get disabled modules
+        $disabledModules = is_array($school->disabled_modules) ? $school->disabled_modules : [];
+
+        // Order the modules
+        $defaultOrder = array_keys($allModules);
+        $sidebarOrder = is_array($school->sidebar_order) ? $school->sidebar_order : [];
+
+        $orderedKeys = array_unique(array_merge($sidebarOrder, $defaultOrder));
+
+        $modules = [];
+        foreach ($orderedKeys as $key) {
+            if (isset($allModules[$key]) && !in_array($key, $disabledModules)) {
+                $modules[$key] = $allModules[$key];
+            }
+        }
+
+        return view('school.settings.index', compact('user', 'modules'));
+    }
+
+    /**
+     * Update sidebar order.
+     */
+    public function updateSidebarOrder(Request $request)
+    {
+        $request->validate([
+            'sidebar_order' => 'required|string',
+        ]);
+
+        $school = Auth::user()->school;
+        $order = json_decode($request->sidebar_order, true);
+
+        if (is_array($order)) {
+            $school->sidebar_order = $order;
+            $school->save();
+            return back()->with('success', 'Sidebar menu order updated successfully!');
+        }
+
+        return back()->withErrors(['sidebar_order' => 'Invalid order data.']);
     }
 
     /**

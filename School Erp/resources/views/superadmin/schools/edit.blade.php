@@ -183,9 +183,46 @@ body.dark-mode .btn-sa-cancel:hover { background: #111827 !important; }
                     @error('name')<span class="form-err">{{ $message }}</span>@enderror
                 </div>
                 <div class="sa-form-group">
-                    <label>Unique Code <span>*</span></label>
+                    <label>State <span>*</span></label>
+                    <select name="state" class="sa-select" required>
+                        <option value="">Select State...</option>
+                        @foreach($states as $codeVal => $stateName)
+                            <option value="{{ $codeVal }}" {{ old('state', $school->state) == $codeVal ? 'selected' : '' }}>{{ $stateName }}</option>
+                        @endforeach
+                    </select>
+                    @error('state')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+            </div>
+
+            <div class="sa-form-row">
+                <div class="sa-form-group">
+                    <label>Unique Code (Account ID) <span>*</span></label>
                     <input type="text" name="code" class="sa-input" placeholder="e.g. OAKRIDGE" style="text-transform: uppercase;" value="{{ old('code', $school->code) }}" required>
                     @error('code')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+                <div class="sa-form-group">
+                    <label>School Board / Type <span>*</span></label>
+                    <select name="school_type" class="sa-select" required>
+                        <option value="">Select Board...</option>
+                        <option value="CBSE" {{ old('school_type', $school->school_type) == 'CBSE' ? 'selected' : '' }}>CBSE</option>
+                        <option value="CBSE PATTERN" {{ old('school_type', $school->school_type) == 'CBSE PATTERN' ? 'selected' : '' }}>CBSE PATTERN</option>
+                        <option value="ICSE" {{ old('school_type', $school->school_type) == 'ICSE' ? 'selected' : '' }}>ICSE</option>
+                        <option value="STATE BOARD" {{ old('school_type', $school->school_type) == 'STATE BOARD' ? 'selected' : '' }}>STATE BOARD</option>
+                    </select>
+                    @error('school_type')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+            </div>
+
+            <div class="sa-form-row">
+                <div class="sa-form-group">
+                    <label>Director/Principal Full Name <span>*</span></label>
+                    <input type="text" name="director_name" class="sa-input" placeholder="e.g. Dr. John Doe" value="{{ old('director_name', $school->director_name) }}" required>
+                    @error('director_name')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+                <div class="sa-form-group">
+                    <label>School Email Address <span>*</span></label>
+                    <input type="email" name="email" class="sa-input" placeholder="e.g. contact@oakridgeschool.in" value="{{ old('email', $school->email) }}" required>
+                    @error('email')<span class="form-err">{{ $message }}</span>@enderror
                 </div>
             </div>
 

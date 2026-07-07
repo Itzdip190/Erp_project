@@ -115,8 +115,12 @@ class StudentController extends Controller
         }
 
         $houses = StudentHouse::all();
+        
+        $routes = \App\Models\TransportRoute::where('school_id', $schoolId)->get();
+        $vehicles = \App\Models\Vehicle::where('school_id', $schoolId)->where('status', true)->get();
+        $stops = \App\Models\Stop::where('school_id', $schoolId)->get();
 
-        return view('school.student.create', compact('classes', 'sections', 'academicSessions', 'categories', 'houses'));
+        return view('school.student.create', compact('classes', 'sections', 'academicSessions', 'categories', 'houses', 'routes', 'vehicles', 'stops'));
     }
 
     public function store(StudentStoreRequest $request)
@@ -124,6 +128,7 @@ class StudentController extends Controller
         $schoolId = auth()->user()->school_id;
         $data = $request->validated();
         $data['opening_due_balance'] = $data['opening_due_balance'] ?? 0.00;
+        $data['admission_type'] = $request->has('is_new_admission') ? 'New Admission' : 'Old Admission';
 
         if ($request->filled('captured_photo')) {
             $data['photo'] = $this->saveBase64Photo($request->input('captured_photo'), 'students/photos');
@@ -329,13 +334,18 @@ class StudentController extends Controller
 
         $houses = StudentHouse::all();
 
-        return view('school.student.edit', compact('student', 'classes', 'sections', 'academicSessions', 'categories', 'houses'));
+        $routes = \App\Models\TransportRoute::where('school_id', $schoolId)->get();
+        $vehicles = \App\Models\Vehicle::where('school_id', $schoolId)->where('status', true)->get();
+        $stops = \App\Models\Stop::where('school_id', $schoolId)->get();
+
+        return view('school.student.edit', compact('student', 'classes', 'sections', 'academicSessions', 'categories', 'houses', 'routes', 'vehicles', 'stops'));
     }
 
     public function update(StudentUpdateRequest $request, Student $student)
     {
         $schoolId = auth()->user()->school_id;
         $data = $request->validated();
+        $data['admission_type'] = $request->has('is_new_admission') ? 'New Admission' : 'Old Admission';
         if (array_key_exists('opening_due_balance', $data)) {
             $data['opening_due_balance'] = $data['opening_due_balance'] ?? 0.00;
         }

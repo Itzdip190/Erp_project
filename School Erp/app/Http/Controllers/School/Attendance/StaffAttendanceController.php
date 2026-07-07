@@ -498,24 +498,37 @@ class StaffAttendanceController extends Controller
         $schoolId = auth()->user()->school_id;
         $markedBy = auth()->id();
 
-        DB::transaction(function () use ($schoolId, $request, $markedBy) {
-            foreach ($request->attendance as $staffId => $dates) {
-                // Verify staff exists in this school
-                $staff = Staff::where('school_id', $schoolId)->findOrFail($staffId);
+        $staffIds = array_keys($request->attendance);
+        $staffMembers = Staff::where('school_id', $schoolId)
+            ->whereIn('id', $staffIds)
+            ->get()
+            ->keyBy('id');
 
-                foreach ($dates as $dateStr => $data) {
+        $dates = [];
+        foreach ($request->attendance as $stId => $dateArr) {
+            $dates = array_unique(array_merge($dates, array_keys($dateArr)));
+        }
+
+        DB::transaction(function () use ($schoolId, $request, $markedBy, $staffIds, $dates, $staffMembers) {
+            // Delete existing records in bulk to avoid updateOrCreate checks
+            StaffAttendance::where('school_id', $schoolId)
+                ->whereIn('staff_id', $staffIds)
+                ->whereIn('date', $dates)
+                ->delete();
+
+            $insertData = [];
+            foreach ($request->attendance as $staffId => $dateArr) {
+                if (!isset($staffMembers[$staffId])) {
+                    continue;
+                }
+
+                foreach ($dateArr as $dateStr => $data) {
                     $status = isset($data['status']) ? $data['status'] : null;
 
-                    // If status is empty/null, we delete the attendance record or keep it not marked
                     if (empty($status) || $status === 'not_marked') {
-                        StaffAttendance::where('school_id', $schoolId)
-                            ->where('staff_id', $staffId)
-                            ->whereDate('date', $dateStr)
-                            ->delete();
                         continue;
                     }
 
-                    // Map status name to DB value
                     $dbStatus = strtolower(str_replace(' ', '_', $status));
                     if ($dbStatus === 'custom_leaves' || $dbStatus === 'custom_leave') {
                         $dbStatus = 'late';
@@ -524,7 +537,6 @@ class StaffAttendanceController extends Controller
                         $dbStatus = 'half_day';
                     }
 
-                    // Format check-in / check-out times
                     $clockIn = null;
                     if (!empty($data['clock_in_at'])) {
                         $clockIn = date('H:i:s', strtotime($data['clock_in_at']));
@@ -535,24 +547,156 @@ class StaffAttendanceController extends Controller
                         $clockOut = date('H:i:s', strtotime($data['clock_out_at']));
                     }
 
-                    StaffAttendance::updateOrCreate(
-                        [
-                            'school_id' => $schoolId,
-                            'staff_id'  => $staffId,
-                            'date'      => $dateStr,
-                        ],
-                        [
-                            'status'          => $dbStatus,
-                            'clock_in_at'     => $clockIn,
-                            'clock_out_at'    => $clockOut,
-                            'attendance_type' => 'manual',
-                            'marked_by'       => $markedBy,
-                        ]
-                    );
+                    $insertData[] = [
+                        'school_id' => $schoolId,
+                        'staff_id'  => $staffId,
+                        'date'      => $dateStr . ' 00:00:00',
+                        'status'          => $dbStatus,
+                        'clock_in_at'     => $clockIn,
+                        'clock_out_at'    => $clockOut,
+                        'attendance_type' => 'manual',
+                        'marked_by'       => $markedBy,
+                        'created_at'      => now(),
+                        'updated_at'      => now(),
+                    ];
+                }
+            }
+
+            if (!empty($insertData)) {
+                foreach (array_chunk($insertData, 500) as $chunk) {
+                    StaffAttendance::insert($chunk);
                 }
             }
         });
 
         return back()->with('success', 'Staff bulk attendance saved successfully!');
+    }
+
+    public function saveSliderBulkAttendance(Request $request)
+    {
+        $request->validate([
+            'from_date' => 'required|date',
+            'to_date' => 'required|date',
+            'working_days' => 'required|integer|min:1',
+            'present_days' => 'required|integer|min:0',
+            'apply_type' => 'required|string|in:all,department,staff_type',
+            'department_id' => 'required_if:apply_type,department|nullable|integer',
+            'staff_type' => 'required_if:apply_type,staff_type|nullable|string',
+        ]);
+
+        $schoolId = auth()->user()->school_id;
+        $markedBy = auth()->id();
+        $fromDate = $request->from_date;
+        $workingDays = (int)$request->working_days;
+        $presentDays = (int)$request->present_days;
+        $applyType = $request->apply_type;
+        $departmentId = $request->department_id;
+        $staffType = $request->staff_type;
+
+        // Generate exactly W working days starting from from_date, skipping weekends
+        $dates = [];
+        $current = \Carbon\Carbon::parse($fromDate);
+        while (count($dates) < $workingDays) {
+            if (!$current->isWeekend()) {
+                $dates[] = $current->toDateString();
+            }
+            $current->addDay();
+        }
+
+        // Get target staff
+        $query = Staff::where('school_id', $schoolId)->where('is_active', true);
+        
+        if ($applyType === 'department') {
+            $query->where('department_id', $departmentId);
+        } elseif ($applyType === 'staff_type') {
+            if ($staffType) {
+                $query->where(function($q) use ($staffType) {
+                    if ($staffType === 'Teaching') {
+                        $q->whereHas('designation', function($d) {
+                            $d->where('name', 'like', '%teacher%')
+                              ->orWhere('name', 'like', '%principal%');
+                        })->orWhereHas('user', function($u) {
+                            $u->where('role', 'teacher');
+                        });
+                    } elseif ($staffType === 'Driver/Supporting staff' || $staffType === 'Driver') {
+                        $q->whereHas('designation', function($d) {
+                            $d->where('name', 'like', '%driver%')
+                              ->orWhere('name', 'like', '%conductor%')
+                              ->orWhere('name', 'like', '%peon%')
+                              ->orWhere('name', 'like', '%supporting%')
+                              ->orWhere('name', 'like', '%helper%');
+                        });
+                    } elseif ($staffType === 'Admin') {
+                        $q->whereHas('designation', function($d) {
+                            $d->where('name', 'like', '%admin%')
+                              ->orWhere('name', 'like', '%director%')
+                              ->orWhere('name', 'like', '%manager%');
+                        })->orWhereHas('user', function($u) {
+                            $u->where('role', 'admin')->orWhere('role', 'school_admin');
+                        });
+                    } elseif ($staffType === 'Non Teaching' || $staffType === 'Non-Teaching') {
+                        $q->whereNot(function($qn) {
+                            $qn->whereHas('designation', function($d) {
+                                $d->where('name', 'like', '%teacher%')
+                                  ->orWhere('name', 'like', '%principal%')
+                                  ->orWhere('name', 'like', '%admin%')
+                                  ->orWhere('name', 'like', '%director%')
+                                  ->orWhere('name', 'like', '%manager%')
+                                  ->orWhere('name', 'like', '%driver%')
+                                  ->orWhere('name', 'like', '%conductor%')
+                                  ->orWhere('name', 'like', '%peon%')
+                                  ->orWhere('name', 'like', '%supporting%')
+                                  ->orWhere('name', 'like', '%helper%');
+                            });
+                        });
+                    }
+                });
+            }
+        }
+        $staffMembers = $query->get();
+
+        if ($staffMembers->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No active staff members found matching criteria.']);
+        }
+
+        DB::transaction(function () use ($schoolId, $staffMembers, $dates, $presentDays, $markedBy) {
+            $staffIds = $staffMembers->pluck('id')->toArray();
+            
+            // Delete existing records in bulk
+            StaffAttendance::where('school_id', $schoolId)
+                ->whereIn('staff_id', $staffIds)
+                ->whereIn('date', $dates)
+                ->delete();
+
+            $insertData = [];
+            foreach ($staffMembers as $staff) {
+                foreach ($dates as $index => $dateStr) {
+                    $status = ($index < $presentDays) ? 'present' : 'absent';
+                    $clockIn = ($status === 'present') ? '09:00:00' : null;
+                    $clockOut = ($status === 'present') ? '17:00:00' : null;
+
+                    $insertData[] = [
+                        'school_id' => $schoolId,
+                        'staff_id'  => $staff->id,
+                        'date'      => $dateStr . ' 00:00:00',
+                        'status'          => $status,
+                        'clock_in_at'     => $clockIn,
+                        'clock_out_at'    => $clockOut,
+                        'attendance_type' => 'manual',
+                        'marked_by'       => $markedBy,
+                        'created_at'      => now(),
+                        'updated_at'      => now(),
+                    ];
+                }
+            }
+
+            if (!empty($insertData)) {
+                foreach (array_chunk($insertData, 500) as $chunk) {
+                    StaffAttendance::insert($chunk);
+                }
+            }
+        });
+
+        return response()->json(['success' => true]);
     }
 }

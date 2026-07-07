@@ -278,6 +278,7 @@ Route::get('/fix-superadmin-role', function (\Illuminate\Http\Request $request) 
 
 // School signup routes
 Route::get('/school/signup', [SchoolSignupController::class, 'showRegistrationForm'])->name('school.signup');
+Route::get('/school/signup/next-code', [SchoolSignupController::class, 'getNextCode'])->name('school.signup.next-code');
 Route::post('/school/signup', [SchoolSignupController::class, 'register'])->name('school.signup.submit');
 
 // Authentication routes

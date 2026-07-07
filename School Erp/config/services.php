@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'superadmin_ai' => [
+        'key' => env('SUPERADMIN_AI_API_KEY'),
+        'model' => env('SUPERADMIN_AI_MODEL', 'gemini-1.5-flash'),
+        'provider' => env('SUPERADMIN_AI_PROVIDER', 'gemini'),
+    ],
+
 ];

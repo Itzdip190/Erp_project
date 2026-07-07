@@ -500,6 +500,27 @@ textarea.form-control { resize: vertical; min-height: 80px; }
     .exp-stats { grid-template-columns: 1fr 1fr; }
     .form-grid { grid-template-columns: 1fr; }
 }
+
+/* Metric cards cursor and hover styles */
+.exp-stat {
+    cursor: pointer;
+    transition: transform .22s, box-shadow .22s, border-color .22s !important;
+}
+.exp-stat:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--exp-blue-mid) !important;
+}
+.btn-icon.pay-quick:hover {
+    background: rgba(16,185,129,.1);
+}
+.btn-icon.details:hover {
+    background: rgba(59,130,246,.1);
+}
+/* Details Modal styling overrides */
+#expenseDetailsModal .exp-modal {
+    max-width: 550px;
+}
 </style>
 @endsection
 
@@ -518,28 +539,28 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 
 {{-- STAT CARDS --}}
 <div class="exp-stats">
-    <div class="exp-stat">
+    <div class="exp-stat" onclick="filterTableBy('all')" title="Show All Transactions">
         <div class="exp-stat-icon blue"><i class="fas fa-rupee-sign"></i></div>
         <div>
             <div class="exp-stat-val">₹{{ number_format($totalThisMonth, 0) }}</div>
             <div class="exp-stat-lbl">This Month</div>
         </div>
     </div>
-    <div class="exp-stat">
+    <div class="exp-stat" onclick="filterTableBy('all')" title="Show All Transactions">
         <div class="exp-stat-icon green"><i class="fas fa-database"></i></div>
         <div>
             <div class="exp-stat-val">₹{{ number_format($totalAllTime, 0) }}</div>
             <div class="exp-stat-lbl">Total Expenses</div>
         </div>
     </div>
-    <div class="exp-stat">
+    <div class="exp-stat" onclick="filterTableBy('pending')" title="Filter Pending Transactions">
         <div class="exp-stat-icon amber"><i class="fas fa-clock"></i></div>
         <div>
             <div class="exp-stat-val">₹{{ number_format($pendingAmount, 0) }}</div>
             <div class="exp-stat-lbl">Pending Amount</div>
         </div>
     </div>
-    <div class="exp-stat">
+    <div class="exp-stat" onclick="filterTableBy('all')" title="Show All Transactions">
         <div class="exp-stat-icon red"><i class="fas fa-receipt"></i></div>
         <div>
             <div class="exp-stat-val">{{ $expenseCount }}</div>
@@ -553,10 +574,10 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 <div class="exp-filter-bar">
     <i class="fas fa-filter" style="color: var(--exp-blue); font-size:14px;"></i>
     <input type="month" name="month" value="{{ $month }}" onchange="this.form.submit()">
-    <select name="category" onchange="this.form.submit()">
-        <option value="">All Categories</option>
-        @foreach($categories as $key => $label)
-            <option value="{{ $key }}" {{ $category === $key ? 'selected' : '' }}>{{ $label }}</option>
+    <select name="expense_head_id" onchange="this.form.submit()">
+        <option value="">All Expense Heads</option>
+        @foreach($expenseHeads as $head)
+            <option value="{{ $head->id }}" {{ (string)$expenseHeadId === (string)$head->id ? 'selected' : '' }}>{{ $head->name }}</option>
         @endforeach
     </select>
     <select name="status" onchange="this.form.submit()">
@@ -583,7 +604,13 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                 <div class="exp-card-hdr-icon"><i class="fas fa-list"></i></div>
                 <span class="exp-card-title">Expense Transactions</span>
             </div>
-            <span style="font-size:12px;color:var(--exp-text2);">{{ $expenses->count() }} records</span>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div style="position: relative;">
+                    <i class="fas fa-search" style="position: absolute; left: 10px; top: 10px; color: var(--exp-text2); font-size: 11px;"></i>
+                    <input type="text" id="tableSearch" placeholder="Search transactions..." style="padding: 6px 12px 6px 28px; border: 1.5px solid var(--exp-border); border-radius: 20px; font-size: 12px; outline: none; width: 180px; background: var(--exp-white); color: var(--exp-text);">
+                </div>
+                <span style="font-size:12px;color:var(--exp-text2);" id="recordsCount">{{ $expenses->count() }} records</span>
+            </div>
         </div>
         <div class="exp-table-wrap">
             @if($expenses->isEmpty())
@@ -601,7 +628,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                     <tr>
                         <th>#</th>
                         <th>Title / Payee</th>
-                        <th>Category</th>
+                        <th>Expense Head</th>
                         <th>Date</th>
                         <th>Amount</th>
                         <th>Mode</th>
@@ -611,7 +638,7 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                 </thead>
                 <tbody id="expenseTableBody">
                 @foreach($expenses as $i => $exp)
-                <tr id="row-{{ $exp->id }}">
+                <tr id="row-{{ $exp->id }}" class="expense-row" data-status="{{ $exp->status }}" data-search="{{ strtolower($exp->title . ' ' . ($exp->paid_to ?? '') . ' ' . ($exp->expenseHead->name ?? '') . ' ' . $exp->category_label) }}">
                     <td style="color:var(--exp-text2);">{{ $i + 1 }}</td>
                     <td>
                         <div style="font-weight:600;color:var(--exp-text);">{{ $exp->title }}</div>
@@ -628,6 +655,14 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                     </td>
                     <td>
                         <div class="tbl-actions">
+                            <button class="btn-icon details" title="View Details" onclick="viewExpenseDetails({{ $exp->toJson() }})" style="color: var(--exp-blue-mid); border-color: rgba(59,130,246,.2);">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            @if($exp->status === 'pending')
+                            <button class="btn-icon pay-quick" title="Mark as Paid" onclick="quickPayExpense({{ $exp->id }}, {{ $exp->toJson() }})" style="color: var(--exp-green); border-color: rgba(16,185,129,.2);">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            @endif
                             <button class="btn-icon edit" title="Edit" onclick="editExpense({{ $exp->id }}, {{ $exp->toJson() }})">
                                 <i class="fas fa-pen"></i>
                             </button>
@@ -681,16 +716,17 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                 <div class="cat-list">
                     @foreach($categoryBreakdown as $catKey => $catAmt)
                     @php
-                        $catLabel = $categories[$catKey] ?? ucfirst($catKey);
+                        $matchingHead = $expenseHeads->firstWhere('id', $catKey);
+                        $catLabel = $matchingHead ? $matchingHead->name : 'Other';
                         $catPct = $catTotal > 0 ? round(($catAmt/$catTotal)*100) : 0;
-                        $catIdx = array_search($catKey, array_keys($categories));
-                        $catColor = $catIdx !== false ? $catColors[$catIdx % count($catColors)] : '#1d4ed8';
+                        $catIdx = $loop->index;
+                        $catColor = $catColors[$catIdx % count($catColors)];
                     @endphp
                     <div class="cat-row">
-                        <div class="cat-dot" style="background:var(--exp-blue);"></div>
+                        <div class="cat-dot" style="background:{{ $catColor }};"></div>
                         <span class="cat-name">{{ $catLabel }}</span>
                         <div class="cat-bar-wrap">
-                            <div class="cat-bar-fill" style="width:{{ $catPct }}%;"></div>
+                            <div class="cat-bar-fill" style="width:{{ $catPct }}%; background:{{ $catColor }};"></div>
                         </div>
                         <span class="cat-amt">₹{{ number_format($catAmt, 0) }}</span>
                     </div>
@@ -720,11 +756,11 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                         <input type="text" class="form-control" name="title" id="fTitle" placeholder="e.g. Monthly Electricity Bill" required>
                     </div>
                     <div class="form-group">
-                        <label>Category <span>*</span></label>
-                        <select class="form-control" name="category" id="fCategory" required>
-                            <option value="">Select category</option>
-                            @foreach($categories as $key => $label)
-                            <option value="{{ $key }}">{{ $label }}</option>
+                        <label>Expense Head <span>*</span></label>
+                        <select class="form-control" name="expense_head_id" id="fExpenseHead" required>
+                            <option value="">Select Expense Head</option>
+                            @foreach($expenseHeads as $head)
+                            <option value="{{ $head->id }}">{{ $head->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -743,6 +779,22 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                             <option value="{{ $key }}">{{ $label }}</option>
                             @endforeach
                         </select>
+                    </div>
+                    <div class="form-group span2" id="chequeDetailsContainer" style="display:none; grid-column: span 2; background: rgba(241, 245, 249, 0.5); padding: 12px; border-radius: 8px; border: 1px dashed var(--exp-border); margin-bottom: 10px;">
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%;">
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <label style="font-size:11.5px; font-weight:700;">Bank Name <span style="color:var(--exp-red);">*</span></label>
+                                <input type="text" class="form-control" name="bank_name" id="fBankName" placeholder="Bank name">
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <label style="font-size:11.5px; font-weight:700;">Issue Date <span style="color:var(--exp-red);">*</span></label>
+                                <input type="date" class="form-control" name="check_issue_date" id="fCheckIssueDate">
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <label style="font-size:11.5px; font-weight:700;">Branch <span style="color:var(--exp-red);">*</span></label>
+                                <input type="text" class="form-control" name="branch" id="fBranch" placeholder="Branch">
+                            </div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>Paid To / Vendor</label>
@@ -772,6 +824,63 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+{{-- VIEW DETAILS MODAL --}}
+<div class="exp-modal-overlay" id="expenseDetailsModal">
+    <div class="exp-modal" style="max-width: 550px;">
+        <div class="exp-modal-hdr" style="background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);">
+            <h3><i class="fas fa-info-circle"></i> Expense Details</h3>
+            <button class="modal-close" onclick="closeDetailsModal()"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="exp-modal-body" style="padding: 24px;">
+            <table class="exp-table" style="border: 1px solid var(--exp-border); width: 100%; border-collapse: collapse; font-size: 13.5px;">
+                <tr>
+                    <td style="font-weight: 700; background: var(--exp-gray); width: 150px; padding: 10px; border-bottom: 1px solid var(--exp-border);">Title:</td>
+                    <td id="detTitle" style="padding: 10px; border-bottom: 1px solid var(--exp-border);"></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 700; background: var(--exp-gray); padding: 10px; border-bottom: 1px solid var(--exp-border);">Amount:</td>
+                    <td id="detAmount" style="padding: 10px; border-bottom: 1px solid var(--exp-border); color: var(--exp-blue); font-weight: 700;"></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 700; background: var(--exp-gray); padding: 10px; border-bottom: 1px solid var(--exp-border);">Expense Head:</td>
+                    <td id="detHead" style="padding: 10px; border-bottom: 1px solid var(--exp-border);"></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 700; background: var(--exp-gray); padding: 10px; border-bottom: 1px solid var(--exp-border);">Expense Date:</td>
+                    <td id="detDate" style="padding: 10px; border-bottom: 1px solid var(--exp-border);"></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 700; background: var(--exp-gray); padding: 10px; border-bottom: 1px solid var(--exp-border);">Payment Mode:</td>
+                    <td id="detMode" style="padding: 10px; border-bottom: 1px solid var(--exp-border); text-transform: uppercase;"></td>
+                </tr>
+                <tr id="detChequeRow" style="display: none;">
+                    <td style="font-weight: 700; background: var(--exp-gray); padding: 10px; border-bottom: 1px solid var(--exp-border);">Cheque details:</td>
+                    <td id="detCheque" style="padding: 10px; border-bottom: 1px solid var(--exp-border);"></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 700; background: var(--exp-gray); padding: 10px; border-bottom: 1px solid var(--exp-border);">Paid To / Vendor:</td>
+                    <td id="detPaidTo" style="padding: 10px; border-bottom: 1px solid var(--exp-border);"></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 700; background: var(--exp-gray); padding: 10px; border-bottom: 1px solid var(--exp-border);">Reference No:</td>
+                    <td id="detRef" style="padding: 10px; border-bottom: 1px solid var(--exp-border);"></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 700; background: var(--exp-gray); padding: 10px; border-bottom: 1px solid var(--exp-border);">Status:</td>
+                    <td id="detStatus" style="padding: 10px; border-bottom: 1px solid var(--exp-border);"></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 700; background: var(--exp-gray); padding: 10px;">Description:</td>
+                    <td id="detDesc" style="padding: 10px; white-space: pre-wrap;"></td>
+                </tr>
+            </table>
+            <div class="modal-footer" style="margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--exp-border);">
+                <button type="button" class="exp-btn exp-btn-outline" onclick="closeDetailsModal()">Close</button>
+            </div>
         </div>
     </div>
 </div>
@@ -832,8 +941,37 @@ const modal      = document.getElementById('expenseModal');
 const form       = document.getElementById('expenseForm');
 const modalTitle = document.getElementById('modalTitle');
 
+const chequeContainer = document.getElementById('chequeDetailsContainer');
+const fBankName = document.getElementById('fBankName');
+const fCheckIssueDate = document.getElementById('fCheckIssueDate');
+const fBranch = document.getElementById('fBranch');
+const fMode = document.getElementById('fMode');
+
+function toggleChequeFields() {
+    if (fMode.value === 'cheque') {
+        chequeContainer.style.display = 'block';
+        fBankName.required = true;
+        fCheckIssueDate.required = true;
+        fBranch.required = true;
+    } else {
+        chequeContainer.style.display = 'none';
+        fBankName.required = false;
+        fCheckIssueDate.required = false;
+        fBranch.required = false;
+    }
+}
+fMode.addEventListener('change', toggleChequeFields);
+
 function openModal() { modal.classList.add('open'); }
-function closeModal() { modal.classList.remove('open'); form.reset(); document.getElementById('expenseId').value = ''; }
+function closeModal() {
+    modal.classList.remove('open');
+    form.reset();
+    document.getElementById('expenseId').value = '';
+    chequeContainer.style.display = 'none';
+    fBankName.required = false;
+    fCheckIssueDate.required = false;
+    fBranch.required = false;
+}
 
 document.getElementById('addExpenseBtn').addEventListener('click', () => {
     modalTitle.innerHTML = '<i class="fas fa-plus-circle"></i> Add Expense';
@@ -854,10 +992,14 @@ modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
 function editExpense(id, data) {
     document.getElementById('expenseId').value = id;
     document.getElementById('fTitle').value    = data.title    || '';
-    document.getElementById('fCategory').value = data.category || '';
+    document.getElementById('fExpenseHead').value = data.expense_head_id || '';
     document.getElementById('fAmount').value   = data.amount   || '';
     document.getElementById('fDate').value     = data.expense_date ? data.expense_date.substring(0,10) : '';
     document.getElementById('fMode').value     = data.payment_mode || 'cash';
+    fBankName.value = data.bank_name || '';
+    fCheckIssueDate.value = data.check_issue_date ? data.check_issue_date.substring(0,10) : '';
+    fBranch.value = data.branch || '';
+    toggleChequeFields();
     document.getElementById('fPaidTo').value   = data.paid_to  || '';
     document.getElementById('fStatus').value   = data.status   || 'paid';
     document.getElementById('fRef').value      = data.reference_no || '';
@@ -934,6 +1076,122 @@ function showToast(msg, type = 'success') {
     el.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}" style="color:${type==='success'?'#10b981':'#ef4444'}"></i> ${msg}`;
     toast.appendChild(el);
     setTimeout(() => el.remove(), 3500);
+}
+
+// ─── SEARCH & FILTER & DETAILS MODAL ────────────────────────────────
+const searchInput = document.getElementById('tableSearch');
+const rows = document.querySelectorAll('.expense-row');
+
+let currentStatusFilter = 'all';
+
+function applyFilters() {
+    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+    let visibleCount = 0;
+    
+    rows.forEach(row => {
+        const searchVal = row.getAttribute('data-search') || '';
+        const statusVal = row.getAttribute('data-status') || '';
+        
+        const matchesSearch = !query || searchVal.includes(query);
+        const matchesStatus = currentStatusFilter === 'all' || statusVal === currentStatusFilter;
+        
+        if (matchesSearch && matchesStatus) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    const countEl = document.getElementById('recordsCount');
+    if (countEl) {
+        countEl.textContent = visibleCount + ' records';
+    }
+}
+
+function filterTableBy(status) {
+    currentStatusFilter = status;
+    
+    const stats = document.querySelectorAll('.exp-stat');
+    stats.forEach(stat => {
+        stat.style.borderColor = 'var(--exp-border)';
+        stat.style.boxShadow = 'var(--shadow-sm)';
+    });
+    
+    if (status === 'pending') {
+        const pendingCard = document.querySelector('.exp-stat:nth-child(3)');
+        if (pendingCard) {
+            pendingCard.style.borderColor = 'var(--exp-amber)';
+            pendingCard.style.boxShadow = '0 4px 12px rgba(245, 158, 11, 0.2)';
+        }
+    } else {
+        const allCard = document.querySelector('.exp-stat:nth-child(1)');
+        if (allCard) {
+            allCard.style.borderColor = 'var(--exp-blue-mid)';
+        }
+    }
+    
+    applyFilters();
+}
+
+if (searchInput) {
+    searchInput.addEventListener('input', applyFilters);
+}
+
+// Quick Pay shortcut
+function quickPayExpense(id, data) {
+    editExpense(id, data);
+    document.getElementById('fStatus').value = 'paid';
+    const refInput = document.getElementById('fRef');
+    if (refInput) {
+        setTimeout(() => refInput.focus(), 350);
+    }
+}
+
+// Details modal logic
+const detModal = document.getElementById('expenseDetailsModal');
+
+function viewExpenseDetails(exp) {
+    document.getElementById('detTitle').textContent = exp.title;
+    document.getElementById('detAmount').textContent = '₹' + parseFloat(exp.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    
+    let headName = 'Other';
+    if (exp.expense_head && exp.expense_head.name) {
+        headName = exp.expense_head.name;
+    } else if (exp.expense_head_id) {
+        const opt = document.querySelector(`#fExpenseHead option[value="${exp.expense_head_id}"]`);
+        if (opt) {
+            headName = opt.textContent;
+        }
+    }
+    document.getElementById('detHead').textContent = headName;
+    
+    const dateObj = new Date(exp.expense_date);
+    document.getElementById('detDate').textContent = dateObj.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    document.getElementById('detMode').textContent = exp.payment_mode ? exp.payment_mode.replace('_', ' ') : 'N/A';
+    
+    const chqRow = document.getElementById('detChequeRow');
+    if (exp.payment_mode === 'cheque') {
+        const issueDate = exp.check_issue_date ? new Date(exp.check_issue_date).toLocaleDateString('en-GB') : 'N/A';
+        document.getElementById('detCheque').textContent = `Bank: ${exp.bank_name || 'N/A'}, Issue Date: ${issueDate}, Branch: ${exp.branch || 'N/A'}`;
+        chqRow.style.display = '';
+    } else {
+        chqRow.style.display = 'none';
+    }
+    
+    document.getElementById('detPaidTo').textContent = exp.paid_to || '—';
+    document.getElementById('detRef').textContent = exp.reference_no || '—';
+    
+    const statusEl = document.getElementById('detStatus');
+    statusEl.innerHTML = `<span class="badge badge-${exp.status}">${exp.status.charAt(0).toUpperCase() + exp.status.slice(1)}</span>`;
+    
+    document.getElementById('detDesc').textContent = exp.description || '—';
+    
+    detModal.classList.add('open');
+}
+
+function closeDetailsModal() {
+    detModal.classList.remove('open');
 }
 </script>
 @endsection

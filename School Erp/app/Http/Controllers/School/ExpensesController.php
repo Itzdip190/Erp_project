@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SchoolExpense;
 use App\Models\VehicleExpense;
 use App\Models\FeeReceipt;
+use App\Models\ExpenseVoucher;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
@@ -20,9 +21,9 @@ class ExpensesController extends Controller
         $schoolId = auth()->user()->school_id;
 
         // Filters
-        $month    = $request->get('month', now()->format('Y-m'));
-        $category = $request->get('category', '');
-        $status   = $request->get('status', '');
+        $month         = $request->get('month', now()->format('Y-m'));
+        $expenseHeadId = $request->get('expense_head_id', '');
+        $status        = $request->get('status', '');
 
         [$year, $mon] = explode('-', $month . '-' . now()->month);
 
@@ -30,14 +31,14 @@ class ExpensesController extends Controller
             ->whereYear('expense_date', $year)
             ->whereMonth('expense_date', $mon);
 
-        if ($category) {
-            $query->where('category', $category);
+        if ($expenseHeadId) {
+            $query->where('expense_head_id', $expenseHeadId);
         }
         if ($status) {
             $query->where('status', $status);
         }
 
-        $expenses = $query->orderByDesc('expense_date')->get();
+        $expenses = $query->with('expenseHead')->orderByDesc('expense_date')->get();
 
         // Summary stats
         $totalThisMonth   = SchoolExpense::where('school_id', $schoolId)
@@ -50,9 +51,18 @@ class ExpensesController extends Controller
             ->where('status', '!=', 'cancelled')
             ->sum('amount');
 
-        $pendingAmount = SchoolExpense::where('school_id', $schoolId)
+        $vouchersDue = ExpenseVoucher::where('school_id', $schoolId)
+            ->where('approval_status', 'Approved')
+            ->get()
+            ->sum(function($v) {
+                return $v->total_due;
+            });
+
+        $pendingExpenses = SchoolExpense::where('school_id', $schoolId)
             ->where('status', 'pending')
             ->sum('amount');
+
+        $pendingAmount = $vouchersDue + $pendingExpenses;
 
         $expenseCount = SchoolExpense::where('school_id', $schoolId)
             ->whereYear('expense_date', $year)
@@ -64,10 +74,11 @@ class ExpensesController extends Controller
             ->whereYear('expense_date', $year)
             ->whereMonth('expense_date', $mon)
             ->where('status', '!=', 'cancelled')
-            ->selectRaw('category, SUM(amount) as total')
-            ->groupBy('category')
+            ->whereNotNull('expense_head_id')
+            ->selectRaw('expense_head_id, SUM(amount) as total')
+            ->groupBy('expense_head_id')
             ->get()
-            ->keyBy('category')
+            ->keyBy('expense_head_id')
             ->map(fn($r) => (float) $r->total);
 
         // Monthly trend (last 6 months)
@@ -85,6 +96,7 @@ class ExpensesController extends Controller
 
         $categories  = SchoolExpense::categories();
         $paymentModes = SchoolExpense::paymentModes();
+        $expenseHeads = \App\Models\ExpenseHead::where('school_id', $schoolId)->orderBy('name')->get();
 
         return view('school.expenses.index', compact(
             'expenses',
@@ -97,8 +109,9 @@ class ExpensesController extends Controller
             'trendData',
             'categories',
             'paymentModes',
+            'expenseHeads',
             'month',
-            'category',
+            'expenseHeadId',
             'status'
         ));
     }
@@ -109,29 +122,36 @@ class ExpensesController extends Controller
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'title'        => 'required|string|max:255',
-            'category'     => 'required|string',
-            'amount'       => 'required|numeric|min:0.01',
-            'expense_date' => 'required|date',
-            'payment_mode' => 'required|string',
-            'status'       => 'required|in:paid,pending,cancelled',
+            'title'           => 'required|string|max:255',
+            'expense_head_id' => 'required|exists:expense_heads,id',
+            'amount'          => 'required|numeric|min:0.01',
+            'expense_date'    => 'required|date',
+            'payment_mode'    => 'required|string',
+            'status'          => 'required|in:paid,pending,cancelled',
+            'bank_name'        => 'required_if:payment_mode,cheque|nullable|string|max:255',
+            'check_issue_date'  => 'required_if:payment_mode,cheque|nullable|date',
+            'branch'           => 'required_if:payment_mode,cheque|nullable|string|max:255',
         ]);
 
         $schoolId = auth()->user()->school_id;
 
         $expense = SchoolExpense::create([
-            'school_id'    => $schoolId,
-            'title'        => $request->title,
-            'category'     => $request->category,
-            'amount'       => $request->amount,
-            'expense_date' => $request->expense_date,
-            'payment_mode' => $request->payment_mode,
-            'description'  => $request->description,
-            'reference_no' => $request->reference_no,
-            'receipt_no'   => $request->receipt_no,
-            'paid_to'      => $request->paid_to,
-            'status'       => $request->status,
-            'created_by'   => auth()->id(),
+            'school_id'       => $schoolId,
+            'expense_head_id' => $request->expense_head_id,
+            'title'           => $request->title,
+            'category'        => 'other',
+            'amount'          => $request->amount,
+            'expense_date'    => $request->expense_date,
+            'payment_mode'    => $request->payment_mode,
+            'bank_name'       => $request->payment_mode === 'cheque' ? $request->bank_name : null,
+            'check_issue_date'=> $request->payment_mode === 'cheque' ? $request->check_issue_date : null,
+            'branch'          => $request->payment_mode === 'cheque' ? $request->branch : null,
+            'description'     => $request->description,
+            'reference_no'    => $request->reference_no,
+            'receipt_no'      => $request->receipt_no,
+            'paid_to'         => $request->paid_to,
+            'status'          => $request->status,
+            'created_by'      => auth()->id(),
         ]);
 
         return response()->json([
@@ -152,19 +172,33 @@ class ExpensesController extends Controller
         }
 
         $request->validate([
-            'title'        => 'required|string|max:255',
-            'category'     => 'required|string',
-            'amount'       => 'required|numeric|min:0.01',
-            'expense_date' => 'required|date',
-            'payment_mode' => 'required|string',
-            'status'       => 'required|in:paid,pending,cancelled',
+            'title'           => 'required|string|max:255',
+            'expense_head_id' => 'required|exists:expense_heads,id',
+            'amount'          => 'required|numeric|min:0.01',
+            'expense_date'    => 'required|date',
+            'payment_mode'    => 'required|string',
+            'status'          => 'required|in:paid,pending,cancelled',
+            'bank_name'        => 'required_if:payment_mode,cheque|nullable|string|max:255',
+            'check_issue_date'  => 'required_if:payment_mode,cheque|nullable|date',
+            'branch'           => 'required_if:payment_mode,cheque|nullable|string|max:255',
         ]);
 
-        $expense->update($request->only([
-            'title', 'category', 'amount', 'expense_date',
-            'payment_mode', 'description', 'reference_no',
-            'receipt_no', 'paid_to', 'status',
-        ]));
+        $expense->update([
+            'title'           => $request->title,
+            'expense_head_id' => $request->expense_head_id,
+            'category'        => 'other',
+            'amount'          => $request->amount,
+            'expense_date'    => $request->expense_date,
+            'payment_mode'    => $request->payment_mode,
+            'bank_name'       => $request->payment_mode === 'cheque' ? $request->bank_name : null,
+            'check_issue_date'=> $request->payment_mode === 'cheque' ? $request->check_issue_date : null,
+            'branch'          => $request->payment_mode === 'cheque' ? $request->branch : null,
+            'description'     => $request->description,
+            'reference_no'    => $request->reference_no,
+            'receipt_no'      => $request->receipt_no,
+            'paid_to'         => $request->paid_to,
+            'status'          => $request->status,
+        ]);
 
         return response()->json([
             'success' => true,
@@ -402,5 +436,118 @@ class ExpensesController extends Controller
             'trendIncome',
             'trendExpense'
         ));
+    }
+
+    /**
+     * Print all selected expense invoices.
+     */
+    public function printAll(Request $request)
+    {
+        $schoolId = auth()->user()->school_id;
+        $ids = explode(',', $request->query('ids', ''));
+        $perPage = (int) $request->query('per_page', 2);
+        $type = $request->query('type', 'expense');
+        
+        $expenses = [];
+        if ($type === 'voucher') {
+            $vouchers = \App\Models\ExpenseVoucher::where('school_id', $schoolId)
+                ->whereIn('id', $ids)
+                ->get();
+                
+            foreach ($vouchers as $v) {
+                $exp = SchoolExpense::where('school_id', $schoolId)
+                    ->where('expense_voucher_id', $v->id)
+                    ->orderBy('id', 'desc')
+                    ->first();
+                if (!$exp) {
+                    $exp = new SchoolExpense([
+                        'school_id' => $schoolId,
+                        'title' => 'Voucher - ' . ($v->reason ?: 'Approved Voucher'),
+                        'amount' => $v->amount,
+                        'expense_date' => $v->expense_date,
+                        'payment_mode' => 'N/A (Voucher)',
+                        'description' => $v->remarks ?: 'Approved Expense Voucher',
+                        'reference_no' => $v->voucher_no,
+                        'receipt_no' => $v->voucher_no,
+                        'paid_to' => $v->reason,
+                        'status' => 'pending',
+                    ]);
+                    $exp->setRelation('expenseHead', $v->expenseHead);
+                }
+                $exp->amount_in_words = $this->convertNumberToWords($exp->amount);
+                $expenses[] = $exp;
+            }
+        } elseif ($type === 'transfer') {
+            $transfers = \App\Models\AccountTransfer::where('school_id', $schoolId)
+                ->whereIn('id', $ids)
+                ->get();
+                
+            foreach ($transfers as $t) {
+                $exp = new SchoolExpense([
+                    'school_id' => $schoolId,
+                    'title' => 'Account Transfer',
+                    'amount' => $t->amount,
+                    'expense_date' => $t->transfer_date,
+                    'payment_mode' => 'Internal Transfer',
+                    'description' => 'Transfer from Account: ' . ($t->fromAccount->name ?? 'N/A') . ' to Account: ' . ($t->toAccount->name ?? 'N/A') . ($t->remarks ? ' (' . $t->remarks . ')' : ''),
+                    'reference_no' => 'TRF-' . str_pad($t->id, 5, '0', STR_PAD_LEFT),
+                    'receipt_no' => 'TRF-' . str_pad($t->id, 5, '0', STR_PAD_LEFT),
+                    'paid_to' => $t->toAccount->name ?? 'Recipient Account',
+                    'status' => 'paid',
+                ]);
+                $exp->amount_in_words = $this->convertNumberToWords($exp->amount);
+                $expenses[] = $exp;
+            }
+        } else {
+            $expensesList = SchoolExpense::where('school_id', $schoolId)
+                ->whereIn('id', $ids)
+                ->get();
+            foreach ($expensesList as $e) {
+                $e->amount_in_words = $this->convertNumberToWords($e->amount);
+                $expenses[] = $e;
+            }
+        }
+        
+        $school = auth()->user()->school;
+        
+        return view('school.expenses.print_all', compact('expenses', 'school', 'perPage'));
+    }
+
+    /**
+     * Private helper to convert numbers into words for printing invoices.
+     */
+    private function convertNumberToWords($number)
+    {
+        $decimal = round($number - ($no = floor($number)), 2) * 100;
+        $hundred = null;
+        $digits_length = strlen($no);
+        $i = 0;
+        $str = array();
+        $words = array(
+            0 => '', 1 => 'One', 2 => 'Two',
+            3 => 'Three', 4 => 'Four', 5 => 'Five', 6 => 'Six',
+            7 => 'Seven', 8 => 'Eight', 9 => 'Nine',
+            10 => 'Ten', 11 => 'Eleven', 12 => 'Twelve',
+            13 => 'Thirteen', 14 => 'Fourteen', 15 => 'Fifteen',
+            16 => 'Sixteen', 17 => 'Seventeen', 18 => 'Eighteen',
+            19 => 'Nineteen', 20 => 'Twenty', 30 => 'Thirty',
+            40 => 'Forty', 50 => 'Fifty', 60 => 'Sixty',
+            70 => 'Seventy', 80 => 'Eighty', 90 => 'Ninety'
+        );
+        $digits = array('', 'Hundred','Thousand','Lakh', 'Crore');
+        while( $i < $digits_length ) {
+            $divider = ($i == 2) ? 10 : 100;
+            $number = floor($no % $divider);
+            $no = floor($no / $divider);
+            $i += $divider == 10 ? 1 : 2;
+            if ($number) {
+                $plural = (($counter = count($str)) && $number > 9) ? 's' : null;
+                $hundred = ($counter == 1 && $str[0]) ? ' and ' : null;
+                $str [] = ($number < 21) ? $words[$number].' '. $digits[$counter].$plural.' '.$hundred:$words[floor($number / 10) * 10].' '.$words[$number % 10]. ' '.$digits[$counter].$plural.' '.$hundred;
+            } else $str[] = null;
+        }
+        $Rupees = implode('', array_reverse($str));
+        $paise = ($decimal > 0) ? " and " . ($words[$decimal / 10] . " " . $words[$decimal % 10]) . ' Paise' : '';
+        return ($Rupees ? $Rupees . ' Rupees ' : '') . $paise . ' Only';
     }
 }

@@ -40,21 +40,25 @@ class SchoolRequestController extends Controller
 
         try {
             DB::transaction(function () use ($schoolRequest) {
-                // 1. Create the school
+                // 1. Create the school with onboarding metadata
                 $school = School::create([
-                    'name'    => $schoolRequest->name,
-                    'code'    => strtoupper($schoolRequest->code),
-                    'phone'   => $schoolRequest->phone,
-                    'address' => $schoolRequest->address,
-                    'status'  => 'active',
+                    'name'          => $schoolRequest->name,
+                    'code'          => strtoupper($schoolRequest->code),
+                    'phone'         => $schoolRequest->phone,
+                    'address'       => $schoolRequest->address,
+                    'state'         => $schoolRequest->state,
+                    'school_type'   => $schoolRequest->school_type,
+                    'director_name' => $schoolRequest->director_name,
+                    'email'         => $schoolRequest->email,
+                    'status'        => 'active',
                 ]);
 
                 // 2. Decrypt administrator password
                 $decryptedPassword = Crypt::decryptString($schoolRequest->admin_password);
 
-                // 3. Create administrator user for the school
+                // 3. Create administrator user for the school (using director_name if admin_name not set)
                 $user = User::create([
-                    'name'      => $schoolRequest->admin_name,
+                    'name'      => $schoolRequest->admin_name ?: $schoolRequest->director_name,
                     'email'     => $schoolRequest->admin_email,
                     'password'  => Hash::make($decryptedPassword),
                     'school_id' => $school->id,
@@ -73,7 +77,18 @@ class SchoolRequestController extends Controller
                     ]);
                 }
 
-                // 5. Update request status
+                // 5. Create academic session
+                if ($schoolRequest->academic_session_name) {
+                    \App\Models\AcademicSession::create([
+                        'school_id'  => $school->id,
+                        'name'       => $schoolRequest->academic_session_name,
+                        'start_date' => $schoolRequest->academic_session_start_date,
+                        'end_date'   => $schoolRequest->academic_session_end_date,
+                        'is_current' => true,
+                    ]);
+                }
+
+                // 6. Update request status
                 $schoolRequest->update([
                     'status' => 'approved'
                 ]);

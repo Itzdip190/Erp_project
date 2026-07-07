@@ -28,6 +28,19 @@
 @endphp
 <!-- ══════════ AI ASSISTANT FLOATING CHATBOT ══════════ -->
 <style>
+@media print {
+    #robot-assistant,
+    .robot-body,
+    .chat-bubble,
+    #chat-container,
+    .chat-container,
+    .ai-chat-bubble,
+    .yash-ai-bubble,
+    .chat-window,
+    .chat-wrapper {
+        display: none !important;
+    }
+}
 /* ─── FLOATING BOT BUTTON ────────────────────────────── */
 #robot-assistant {
     position: fixed;

@@ -23,6 +23,24 @@
     --shadow:0 1px 4px rgba(0,0,0,.07);
     --shadow-lg:0 8px 32px rgba(0,0,0,.12);
 }
+@media print {
+    #robot-assistant,
+    .robot-body,
+    #custom-lang-switcher,
+    .lang-switch-wrap,
+    .lang-switch-container,
+    .skiptranslate,
+    iframe.goog-te-banner-frame,
+    .goog-te-banner-frame,
+    #goog-gt-tt,
+    .goog-tooltip,
+    .goog-te-balloon-frame,
+    #robot-chat-panel {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+}
 body{font-family:'Plus Jakarta Sans',sans-serif !important;background:var(--page);color:var(--t1);display:flex;min-height:100vh;overflow-x:hidden;}
 .w-5 { width: 1.25rem !important; }
 .h-5 { height: 1.25rem !important; }

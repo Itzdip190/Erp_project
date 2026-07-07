@@ -291,11 +291,27 @@
                                     <td>
                                         <div class="school-info-cell">
                                             <span class="school-name">{{ $req->name }}</span>
-                                            <span class="school-code">{{ $req->code }}</span>
-                                            @if($req->phone || $req->address)
+                                            <span class="school-code">
+                                                <i class="fas fa-tag mr-1"></i> {{ $req->code }}
+                                                @if($req->state) &bull; <span class="badge badge-secondary" style="font-size: 10px; background-color: #e2e8f0; color: #475569; font-weight: bold; padding: 2px 6px; border-radius: 4px;">{{ $req->state }}</span> @endif
+                                                @if($req->school_type) &bull; <span class="text-indigo" style="font-weight: 600; color: #4f46e5;">{{ $req->school_type }}</span> @endif
+                                            </span>
+                                            @if($req->director_name || $req->email || $req->phone)
                                                 <small class="text-muted mt-1">
-                                                    @if($req->phone) <i class="fas fa-phone mr-1"></i>{{ $req->phone }} @endif
-                                                    @if($req->address) &bull; <i class="fas fa-map-marker-alt mr-1"></i>{{ Str::limit($req->address, 30) }} @endif
+                                                    @if($req->director_name) <strong>Dir:</strong> {{ $req->director_name }} @endif
+                                                    @if($req->email) &bull; <i class="far fa-envelope mr-1"></i>{{ $req->email }} @endif
+                                                    @if($req->phone) &bull; <i class="fas fa-phone mr-1"></i>{{ $req->phone }} @endif
+                                                </small>
+                                            @endif
+                                            @if($req->academic_session_name)
+                                                <small class="text-primary mt-1" style="font-weight: 600; color: #2563eb;">
+                                                    <i class="far fa-calendar-alt mr-1"></i> Session: {{ $req->academic_session_name }} 
+                                                    ({{ \Carbon\Carbon::parse($req->academic_session_start_date)->format('M Y') }} - {{ \Carbon\Carbon::parse($req->academic_session_end_date)->format('M Y') }})
+                                                </small>
+                                            @endif
+                                            @if($req->address)
+                                                <small class="text-muted mt-1">
+                                                    <i class="fas fa-map-marker-alt mr-1"></i>{{ Str::limit($req->address, 50) }}
                                                 </small>
                                             @endif
                                         </div>
@@ -362,7 +378,17 @@
                                     <td>
                                         <div class="school-info-cell">
                                             <span class="school-name">{{ $req->name }}</span>
-                                            <span class="school-code">{{ $req->code }}</span>
+                                            <span class="school-code">
+                                                <i class="fas fa-tag mr-1"></i> {{ $req->code }}
+                                                @if($req->state) &bull; <span class="badge badge-secondary" style="font-size: 10px; background-color: #e2e8f0; color: #475569; font-weight: bold; padding: 2px 6px; border-radius: 4px;">{{ $req->state }}</span> @endif
+                                                @if($req->school_type) &bull; <span class="text-indigo" style="font-weight: 600; color: #4f46e5;">{{ $req->school_type }}</span> @endif
+                                            </span>
+                                            @if($req->director_name || $req->email)
+                                                <small class="text-muted mt-1">
+                                                    @if($req->director_name) <strong>Dir:</strong> {{ $req->director_name }} @endif
+                                                    @if($req->email) &bull; <i class="far fa-envelope mr-1"></i>{{ $req->email }} @endif
+                                                </small>
+                                            @endif
                                         </div>
                                     </td>
                                     <td>
@@ -417,7 +443,17 @@
                                     <td>
                                         <div class="school-info-cell">
                                             <span class="school-name">{{ $req->name }}</span>
-                                            <span class="school-code">{{ $req->code }}</span>
+                                            <span class="school-code">
+                                                <i class="fas fa-tag mr-1"></i> {{ $req->code }}
+                                                @if($req->state) &bull; <span class="badge badge-secondary" style="font-size: 10px; background-color: #e2e8f0; color: #475569; font-weight: bold; padding: 2px 6px; border-radius: 4px;">{{ $req->state }}</span> @endif
+                                                @if($req->school_type) &bull; <span class="text-indigo" style="font-weight: 600; color: #4f46e5;">{{ $req->school_type }}</span> @endif
+                                            </span>
+                                            @if($req->director_name || $req->email)
+                                                <small class="text-muted mt-1">
+                                                    @if($req->director_name) <strong>Dir:</strong> {{ $req->director_name }} @endif
+                                                    @if($req->email) &bull; <i class="far fa-envelope mr-1"></i>{{ $req->email }} @endif
+                                                </small>
+                                            @endif
                                         </div>
                                     </td>
                                     <td>

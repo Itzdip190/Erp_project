@@ -396,14 +396,8 @@
 
     <div class="card" style="border-radius: 12px; overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow);">
         <div class="card-body" style="padding: 0;">
-            <div id="attendanceTableContainer" style="padding: 20px; color: var(--t3); text-align: center; background: #fff;">
-                <div style="padding: 24px; color: var(--t2); font-weight: 500;">
-                    Select Class and Section above to view student registers.
-                </div>
-            </div>
-            
-            <!-- Bottom Buttons Container -->
-            <div id="form-buttons-container" style="padding: 16px 20px; border-top: 1px solid var(--border); background: #f8fafc; display: flex; justify-content: flex-end; align-items: center;">
+            <!-- Top Buttons Container -->
+            <div id="form-buttons-container" style="padding: 16px 20px; border-bottom: 1px solid var(--border); background: #f8fafc; display: flex; justify-content: flex-end; align-items: center;">
                 <!-- View Mode Button -->
                 <button type="button" class="btn" id="btn-mark-attendance" onclick="enterEditMode()" style="background-color: #b45309; border-color: #b45309; color: #fff; padding: 10px 24px; font-weight: 700; border-radius: 6px;">
                     MARK ATTENDANCE
@@ -416,6 +410,12 @@
                 <button type="submit" class="btn" id="btn-save-attendance" style="display: none; background-color: #b45309; border-color: #b45309; color: #fff; padding: 10px 24px; font-weight: 700; border-radius: 6px;">
                     SAVE
                 </button>
+            </div>
+
+            <div id="attendanceTableContainer" style="padding: 20px; color: var(--t3); text-align: center; background: #fff;">
+                <div style="padding: 24px; color: var(--t2); font-weight: 500;">
+                    Select Class and Section above to view student registers.
+                </div>
             </div>
         </div>
     </div>
@@ -575,10 +575,24 @@ function exitEditMode() {
     triggerRetrieveStudents();
 }
 
-// Set All status in header
+// Set All status in header (toggle style)
 function setAllStatus(status) {
-    $(`.status-btn.btn-${status === 'half_day' ? 'hd' : (status === 'duty_leave' ? 'dl' : status.charAt(0))} input`).prop('checked', true).trigger('change');
+    let className = `.status-btn.btn-${status === 'half_day' ? 'hd' : (status === 'duty_leave' ? 'dl' : status.charAt(0))} input`;
+    let radios = $(className);
+    let allChecked = true;
+    radios.each(function() {
+        if (!$(this).prop('checked')) {
+            allChecked = false;
+        }
+    });
+
+    if (allChecked) {
+        radios.prop('checked', false).trigger('change');
+    } else {
+        radios.prop('checked', true).trigger('change');
+    }
 }
+
 
 // Clear all selected radios
 function clearAllAttendance() {

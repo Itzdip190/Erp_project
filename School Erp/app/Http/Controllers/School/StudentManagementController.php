@@ -333,8 +333,14 @@ class StudentManagementController extends Controller
             }
 
             if ($family->count() > 1) {
+                $fatherName = $family->pluck('father_name')->filter()->first() ?? 'N/A';
+                $motherName = $family->pluck('mother_name')->filter()->first() ?? 'N/A';
+                $guardianName = $family->pluck('guardian_name')->filter()->first() ?? 'N/A';
+
                 $groups[] = [
-                    'guardian_name' => $student->guardian_name ?? $student->father_name ?? 'N/A',
+                    'father_name' => $fatherName,
+                    'mother_name' => $motherName,
+                    'guardian_name' => $guardianName,
                     'phone' => $student->guardian_phone ?? $student->father_phone ?? 'N/A',
                     'email' => $student->guardian_email ?? $student->father_email ?? 'N/A',
                     'students' => $family->values()
@@ -347,16 +353,30 @@ class StudentManagementController extends Controller
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             
-            $headers = ['Father Detail', 'Student Name', 'Admission ID', 'Class & Section', 'Gender', 'Status', 'Date of Admission'];
+            $headers = ['Parent Details', 'Student Name', 'Admission ID', 'Class & Section', 'Gender', 'Status', 'Date of Admission'];
             $sheet->fromArray($headers, null, 'A1');
             
             $rowIdx = 2;
             $groupNum = 1;
             foreach ($groups as $group) {
-                $fatherDetail = $groupNum . '. Phone: ' . $group['phone'] . ' | ' . $group['guardian_name'];
+                $details = [];
+                $details[] = 'Phone: ' . $group['phone'];
+                if ($group['father_name'] !== 'N/A') {
+                    $details[] = 'Father: ' . $group['father_name'];
+                }
+                if ($group['mother_name'] !== 'N/A') {
+                    $details[] = 'Mother: ' . $group['mother_name'];
+                }
+                if ($group['guardian_name'] !== 'N/A' && $group['guardian_name'] !== $group['father_name'] && $group['guardian_name'] !== $group['mother_name']) {
+                    $details[] = 'Guardian: ' . $group['guardian_name'];
+                }
+                $details[] = 'Email: ' . $group['email'];
+                
+                $parentDetail = $groupNum . '. ' . implode(' | ', $details);
+
                 foreach ($group['students'] as $idx => $student) {
                     $sheet->fromArray([
-                        $idx === 0 ? $fatherDetail : '',
+                        $idx === 0 ? $parentDetail : '',
                         $student->full_name,
                         $student->admission_number,
                         ($student->class?->name ?? 'N/A') . ' - ' . ($student->section?->name ?? 'N/A'),
@@ -514,49 +534,151 @@ class StudentManagementController extends Controller
         $classId = $request->class_id;
         $sectionId = $request->section_id;
 
-        DB::transaction(function () use ($schoolId, $request, $markedBy, $sessionId, $classId, $sectionId) {
-            foreach ($request->attendance as $studentId => $dates) {
-                // Verify student exists in this school
-                $student = Student::where('school_id', $schoolId)
-                    ->where('class_id', $classId)
-                    ->where('section_id', $sectionId)
-                    ->findOrFail($studentId);
+        // Fetch all valid students for this class/section once
+        $studentIds = array_keys($request->attendance);
+        $students = Student::where('school_id', $schoolId)
+            ->where('class_id', $classId)
+            ->where('section_id', $sectionId)
+            ->whereIn('id', $studentIds)
+            ->get()
+            ->keyBy('id');
 
-                foreach ($dates as $dateStr => $data) {
+        // Extract all dates being submitted
+        $dates = [];
+        foreach ($request->attendance as $stId => $dateArr) {
+            $dates = array_unique(array_merge($dates, array_keys($dateArr)));
+        }
+
+        DB::transaction(function () use ($schoolId, $request, $markedBy, $sessionId, $classId, $sectionId, $students, $dates) {
+            // Delete existing records in bulk to avoid updateOrCreate checks
+            StudentAttendance::where('school_id', $schoolId)
+                ->whereIn('student_id', array_keys($students->toArray()))
+                ->whereIn('date', $dates)
+                ->delete();
+
+            $insertData = [];
+            foreach ($request->attendance as $studentId => $dateArr) {
+                if (!isset($students[$studentId])) {
+                    continue;
+                }
+
+                foreach ($dateArr as $dateStr => $data) {
                     $status = isset($data['status']) ? $data['status'] : null;
 
-                    // If status is empty/null or not_marked, we delete the attendance record
                     if (empty($status) || $status === 'not_marked') {
-                        StudentAttendance::where('school_id', $schoolId)
-                            ->where('student_id', $studentId)
-                            ->whereDate('date', $dateStr)
-                            ->delete();
                         continue;
                     }
 
-                    // Map status name to DB value
                     $dbStatus = strtolower($status);
-                    
-                    StudentAttendance::updateOrCreate(
-                        [
-                            'school_id' => $schoolId,
-                            'student_id' => $studentId,
-                            'date'      => $dateStr,
-                        ],
-                        [
-                            'class_id'            => $classId,
-                            'section_id'          => $sectionId,
-                            'academic_session_id' => $sessionId,
-                            'status'              => $dbStatus,
-                            'marked_by'           => $markedBy,
-                            'attendance_type'     => 'manual',
-                        ]
-                    );
+                    $insertData[] = [
+                        'school_id' => $schoolId,
+                        'student_id' => $studentId,
+                        'date'      => $dateStr . ' 00:00:00',
+                        'class_id'            => $classId,
+                        'section_id'          => $sectionId,
+                        'academic_session_id' => $sessionId,
+                        'status'              => $dbStatus,
+                        'marked_by'           => $markedBy,
+                        'attendance_type'     => 'manual',
+                        'created_at'          => now(),
+                        'updated_at'          => now(),
+                    ];
+                }
+            }
+
+            if (!empty($insertData)) {
+                foreach (array_chunk($insertData, 500) as $chunk) {
+                    StudentAttendance::insert($chunk);
                 }
             }
         });
 
         return redirect()->back()->with('success', 'Bulk student attendance saved successfully.');
+    }
+
+    public function saveSliderBulkAttendance(Request $request)
+    {
+        $request->validate([
+            'from_date' => 'required|date',
+            'to_date' => 'required|date',
+            'working_days' => 'required|integer|min:1',
+            'present_days' => 'required|integer|min:0',
+            'apply_type' => 'required|string|in:all,class,section',
+            'class_id' => 'required_if:apply_type,class,section|nullable|integer',
+            'section_id' => 'required_if:apply_type,section|nullable|integer',
+            'academic_session_id' => 'required|integer',
+        ]);
+
+        $schoolId = auth()->user()->school_id;
+        $markedBy = auth()->id();
+        $sessionId = $request->academic_session_id;
+        $fromDate = $request->from_date;
+        $workingDays = (int)$request->working_days;
+        $presentDays = (int)$request->present_days;
+        $applyType = $request->apply_type;
+        $classId = $request->class_id;
+        $sectionId = $request->section_id;
+
+        // Generate exactly W working days starting from from_date, skipping weekends
+        $dates = [];
+        $current = \Carbon\Carbon::parse($fromDate);
+        while (count($dates) < $workingDays) {
+            if (!$current->isWeekend()) {
+                $dates[] = $current->toDateString();
+            }
+            $current->addDay();
+        }
+
+        // Get target students
+        $query = Student::where('school_id', $schoolId)->where('is_active', true);
+        if ($applyType === 'class') {
+            $query->where('class_id', $classId);
+        } elseif ($applyType === 'section') {
+            $query->where('class_id', $classId)->where('section_id', $sectionId);
+        }
+        $students = $query->get();
+
+        if ($students->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No active students found matching criteria.']);
+        }
+
+        DB::transaction(function () use ($schoolId, $students, $dates, $presentDays, $sessionId, $markedBy) {
+            $studentIds = $students->pluck('id')->toArray();
+            
+            // Delete existing records in bulk
+            StudentAttendance::where('school_id', $schoolId)
+                ->whereIn('student_id', $studentIds)
+                ->whereIn('date', $dates)
+                ->delete();
+
+            $insertData = [];
+            foreach ($students as $st) {
+                foreach ($dates as $index => $dateStr) {
+                    $status = ($index < $presentDays) ? 'present' : 'absent';
+                    $insertData[] = [
+                        'school_id' => $schoolId,
+                        'student_id' => $st->id,
+                        'date'      => $dateStr . ' 00:00:00',
+                        'class_id'            => $st->class_id,
+                        'section_id'          => $st->section_id,
+                        'academic_session_id' => $sessionId,
+                        'status'              => $status,
+                        'marked_by'           => $markedBy,
+                        'attendance_type'     => 'manual',
+                        'created_at'          => now(),
+                        'updated_at'          => now(),
+                    ];
+                }
+            }
+
+            if (!empty($insertData)) {
+                foreach (array_chunk($insertData, 500) as $chunk) {
+                    StudentAttendance::insert($chunk);
+                }
+            }
+        });
+
+        return response()->json(['success' => true]);
     }
 
     public function studentReport(Request $request)

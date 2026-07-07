@@ -170,6 +170,52 @@
             </div>
         </div>
 
+        <!-- ── Sidebar Menu Order ── -->
+        <div class="card" style="margin-top:18px;">
+            <div class="card-hdr" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <h3><i class="fas fa-arrows-up-down" style="color:var(--gold);margin-right:6px;"></i>Sidebar Menu Order</h3>
+                <span style="font-size:12px; color:var(--t2);">Drag items to reorder sidebar links</span>
+            </div>
+            <div class="card-body">
+                <form action="{{ route('school.settings.sidebar-order') }}" method="POST" id="sidebarOrderForm">
+                    @csrf
+                    @method('PUT')
+                    <input type="hidden" name="sidebar_order" id="sidebarOrderInput">
+                    
+                    <div id="dragDropList" style="display:flex; flex-direction:column; gap:10px; margin-bottom:18px;">
+                        @foreach($modules as $key => $module)
+                            <div class="draggable-item" draggable="true" data-key="{{ $key }}" style="
+                                display:flex; align-items:center; gap:12px; padding:12px 16px;
+                                background:var(--page); border:1px solid var(--border); border-radius:12px;
+                                cursor:grab; transition:all 0.2s ease; user-select:none;
+                            ">
+                                <i class="fas fa-bars" style="color:var(--t3); font-size:14px; margin-right:4px; cursor:grab;"></i>
+                                <div style="width:32px; height:32px; border-radius:10px; background:rgba(139, 92, 246, 0.1); display:flex; align-items:center; justify-content:center; color:var(--purple); flex-shrink:0;">
+                                    @if(str_contains($module['icon'] ?? '', '/'))
+                                        <img src="{{ $module['icon'] }}" style="width:18px; height:18px; object-fit:contain;">
+                                    @else
+                                        <i class="{{ $module['icon'] ?: 'fas fa-cube' }}" style="font-size:14px;"></i>
+                                    @endif
+                                </div>
+                                <div style="flex:1; display:flex; flex-direction:column;">
+                                    <span style="font-weight:700; color:var(--t1); font-size:13.5px;">{{ $module['label'] }}</span>
+                                    @if(!empty($module['features']))
+                                        <span style="font-size:11px; color:var(--t2);">
+                                            Contains: {{ implode(', ', array_slice(array_values($module['features']), 0, 4)) }}@if(count($module['features']) > 4)...@endif
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <div style="text-align:right;">
+                        <button type="submit" class="btn btn-gold" id="saveOrderBtn"><i class="fas fa-save"></i> Save Sidebar Order</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -222,5 +268,72 @@ document.getElementById('newPwd').addEventListener('input', function() {
     lbl.textContent = levels[score] || '';
     lbl.style.color  = colors[score] || '';
 });
+
+// Drag and drop sorting logic
+const list = document.getElementById('dragDropList');
+let draggingItem = null;
+
+list.addEventListener('dragstart', (e) => {
+    draggingItem = e.target.closest('.draggable-item');
+    if (draggingItem) {
+        draggingItem.classList.add('dragging');
+    }
+});
+
+list.addEventListener('dragend', (e) => {
+    if (draggingItem) {
+        draggingItem.classList.remove('dragging');
+        draggingItem = null;
+    }
+});
+
+list.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const afterElement = getDragAfterElement(list, e.clientY);
+    const dragging = document.querySelector('.dragging');
+    if (dragging) {
+        if (afterElement == null) {
+            list.appendChild(dragging);
+        } else {
+            list.insertBefore(dragging, afterElement);
+        }
+    }
+});
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.draggable-item:not(.dragging)')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+document.getElementById('sidebarOrderForm').addEventListener('submit', function(e) {
+    const items = [...document.querySelectorAll('#dragDropList .draggable-item')];
+    const order = items.map(item => item.getAttribute('data-key'));
+    document.getElementById('sidebarOrderInput').value = JSON.stringify(order);
+});
 </script>
+
+<style>
+.draggable-item {
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.draggable-item:hover {
+    border-color: var(--purple) !important;
+    background-color: rgba(139, 92, 246, 0.03) !important;
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.08);
+}
+.draggable-item.dragging {
+    opacity: 0.5;
+    border: 2px dashed var(--purple) !important;
+    background-color: rgba(139, 92, 246, 0.05) !important;
+    transform: scale(0.98);
+}
+</style>
 @endsection

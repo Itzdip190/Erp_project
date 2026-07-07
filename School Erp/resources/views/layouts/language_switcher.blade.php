@@ -40,6 +40,11 @@
     }
     
     /* Prevent Google Translate from pushing page content down */
+    @media print {
+        #custom-lang-switcher, .lang-switch-container, .skiptranslate, iframe.goog-te-banner-frame, .goog-te-banner-frame {
+            display: none !important;
+        }
+    }
     html {
         margin-top: 0px !important;
         padding-top: 0px !important;

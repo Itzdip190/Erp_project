@@ -781,12 +781,12 @@
                         @if($mode === 'edit')
                             <th style="width: 220px; text-align: left;">
                                 <div style="margin-bottom:4px;">Attendance status</div>
-                                <div style="display:flex; gap:16px; font-size:10px; font-weight:700; color:rgba(255,255,255,0.7); padding-left:4px;">
-                                    <span>P</span>
-                                    <span>HD</span>
-                                    <span>A</span>
-                                    <span>L</span>
-                                    <span>CL</span>
+                                <div style="display:flex; gap:16px; font-size:10px; font-weight:700; color:rgba(255,255,255,0.7); padding-left:4px; align-items: center;">
+                                    <button type="button" onclick="setAllStaffStatus('Present')" title="Set all to Present" style="cursor:pointer; width:22px; height:22px; border-radius:50%; border:1px solid rgba(255,255,255,0.4); background:rgba(255,255,255,0.1); color:#fff; font-size:9px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; transition:all 0.2s;">P</button>
+                                    <button type="button" onclick="setAllStaffStatus('HalfDay')" title="Set all to Half Day" style="cursor:pointer; width:22px; height:22px; border-radius:50%; border:1px solid rgba(255,255,255,0.4); background:rgba(255,255,255,0.1); color:#fff; font-size:9px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; transition:all 0.2s;">HD</button>
+                                    <button type="button" onclick="setAllStaffStatus('Absent')" title="Set all to Absent" style="cursor:pointer; width:22px; height:22px; border-radius:50%; border:1px solid rgba(255,255,255,0.4); background:rgba(255,255,255,0.1); color:#fff; font-size:9px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; transition:all 0.2s;">A</button>
+                                    <button type="button" onclick="setAllStaffStatus('Leave')" title="Set all to Leave" style="cursor:pointer; width:22px; height:22px; border-radius:50%; border:1px solid rgba(255,255,255,0.4); background:rgba(255,255,255,0.1); color:#fff; font-size:9px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; transition:all 0.2s;">L</button>
+                                    <button type="button" onclick="setAllStaffStatus('Custom Leaves')" title="Set all to Custom Leaves" style="cursor:pointer; width:22px; height:22px; border-radius:50%; border:1px solid rgba(255,255,255,0.4); background:rgba(255,255,255,0.1); color:#fff; font-size:9px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; transition:all 0.2s;">CL</button>
                                 </div>
                             </th>
                             <th style="width: 220px;">Check In</th>
@@ -995,4 +995,22 @@
     </form>
     @endif
 </div>
+
+<script>
+function setAllStaffStatus(status) {
+    let radios = $(`.status-pills-container input[type="radio"][value="${status}"]`);
+    let allChecked = true;
+    radios.each(function() {
+        if (!$(this).prop('checked')) {
+            allChecked = false;
+        }
+    });
+
+    if (allChecked) {
+        radios.prop('checked', false).trigger('change');
+    } else {
+        radios.prop('checked', true).trigger('change');
+    }
+}
+</script>
 @endsection

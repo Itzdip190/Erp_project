@@ -215,6 +215,7 @@
                     <span>Roll No: <span class="cbse-dotted-line" style="min-width:100px;">{{ $cardStudent->roll_number ?? '15' }}</span></span>
                     <span>Class/Section: <span class="cbse-dotted-line" style="min-width:140px;">{{ $cardStudent->class?->name }} / {{ $cardStudent->section?->name }}</span></span>
                 </div>
+                <div>Attendance: <span class="cbse-dotted-line" style="min-width:120px; color:#16a34a;">{{ isset($cCard['attendance_percentage']) ? $cCard['attendance_percentage'] . '%' : '100%' }}</span></div>
             </div>
 
             <div class="table-responsive-wrapper">

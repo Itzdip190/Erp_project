@@ -514,6 +514,132 @@
     body.dark-mode .empty-grid {
         color: #cbd5e1 !important;
     }
+
+    /* Bulk Attendance Slider Drawer Styles */
+    .bulk-slider-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    .bulk-slider-overlay.active {
+        display: block;
+        opacity: 1;
+    }
+    .bulk-slider-drawer {
+        position: fixed;
+        top: 0;
+        right: -480px;
+        width: 480px;
+        height: 100vh;
+        background: #ffffff;
+        box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        font-family: 'Inter', sans-serif;
+    }
+    .bulk-slider-drawer.active {
+        right: 0;
+    }
+    body.dark-mode .bulk-slider-drawer {
+        background: #111827;
+        color: #f8fafc;
+        box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+    .slider-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #023c4d;
+        color: #ffffff;
+    }
+    body.dark-mode .slider-header {
+        background: #1f2937;
+        border-bottom-color: #374151;
+    }
+    .slider-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 800;
+    }
+    .slider-header .close-btn {
+        background: none;
+        border: none;
+        color: #ffffff;
+        font-size: 24px;
+        cursor: pointer;
+        line-height: 1;
+    }
+    .slider-body {
+        flex: 1;
+        padding: 24px;
+        overflow-y: auto;
+    }
+    .slider-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f8fafc;
+    }
+    body.dark-mode .slider-footer {
+        background: #1f2937;
+        border-top-color: #374151;
+    }
+    .slider-step {
+        display: none;
+    }
+    .slider-step.active {
+        display: block;
+    }
+    .slider-field {
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+    }
+    .slider-field label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        letter-spacing: 0.5px;
+    }
+    body.dark-mode .slider-field label {
+        color: #cbd5e1;
+    }
+    .slider-input, .slider-select {
+        height: 42px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 0 14px;
+        font-size: 13.5px;
+        font-weight: 600;
+        outline: none;
+        background: #ffffff;
+        color: #1e293b;
+        transition: all 0.2s;
+    }
+    body.dark-mode .slider-input, body.dark-mode .slider-select {
+        background: #1f2937;
+        border-color: #374151;
+        color: #f8fafc;
+    }
+    .slider-input:focus, .slider-select:focus {
+        border-color: #023c4d;
+    }
 </style>
 
 <div class="bulk-container">
@@ -622,6 +748,7 @@
                         <p style="font-size:12px; color:#64748b;">{{ date('d-m-Y', strtotime($fromDate)) }} to {{ date('d-m-Y', strtotime($toDate)) }}</p>
                     </div>
                     <div class="panel-actions">
+                        <button type="button" class="btn-save-attendance" onclick="openBulkAttendanceSlider()" style="background: #023c4d; font-weight: 700; margin-right: 6px;">Bulk Attendance Slider</button>
                         <button type="button" class="btn-settings-gear"><i class="fas fa-cog"></i></button>
                         <button type="submit" class="btn-save-attendance">Save Attendance</button>
                     </div>
@@ -636,6 +763,7 @@
                                     @foreach($datesInRange as $dObj)
                                         @php
                                             $isWeekend = $dObj->isWeekend();
+                                            $dateStr = $dObj->format('Y-m-d');
                                         @endphp
                                         <th class="date-column-header {{ $isWeekend ? 'weekend-header' : '' }}">
                                             <div style="font-weight:700; color:#2d3748;">{{ $dObj->format('d M') }}</div>
@@ -645,6 +773,17 @@
                                                     <br><span style="font-size:8px; font-weight:800; color:#d97706;">Weekend</span>
                                                 @endif
                                             </div>
+                                            <!-- Set All Dropdown -->
+                                            <select class="header-status-select" onchange="setAllColumnStatus('{{ $dateStr }}', this.value)" style="width: 100%; font-size: 10px; height: 24px; padding: 2px; margin-top: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight: 700; color: #475569; background: #fff; cursor: pointer;">
+                                                <option value="">Set All</option>
+                                                <option value="present">Present</option>
+                                                <option value="absent">Absent</option>
+                                                <option value="late">Late</option>
+                                                <option value="half_day">Half Day</option>
+                                                <option value="holiday">Holiday</option>
+                                                <option value="leave">Leave</option>
+                                                <option value="duty_leave">Duty Leave</option>
+                                            </select>
                                         </th>
                                     @endforeach
                                 </tr>
@@ -681,7 +820,7 @@
                                             <td>
                                                 <div class="date-cell-container">
                                                     <!-- Status Select dropdown -->
-                                                    <select name="attendance[{{ $st->id }}][{{ $dateStr }}][status]" class="status-select" onchange="updateSelectColor(this)">
+                                                    <select name="attendance[{{ $st->id }}][{{ $dateStr }}][status]" class="status-select" data-date="{{ $dateStr }}" onchange="updateSelectColor(this)">
                                                         <option value="not_marked" {{ $status === 'not_marked' ? 'selected' : '' }}>Not Marked</option>
                                                         <option value="present" {{ $status === 'present' ? 'selected' : '' }}>Present</option>
                                                         <option value="absent" {{ $status === 'absent' ? 'selected' : '' }}>Absent</option>
@@ -719,6 +858,15 @@
 
 @section('scripts')
 <script>
+    // Set all status selects in a date column
+    function setAllColumnStatus(dateStr, status) {
+        if (!status) return;
+        document.querySelectorAll(`.status-select[data-date="${dateStr}"]`).forEach(function(select) {
+            select.value = status;
+            updateSelectColor(select);
+        });
+    }
+
     // Client-side section filter based on selected class
     function filterSections() {
         const classSelect = document.getElementById('classSelect');
@@ -752,18 +900,10 @@
         }
     }
 
-    // Update color class of the select elements based on selected value
+    // Update color class of the select elements based on selected value (optimized)
     function updateSelectColor(selectEl) {
-        // Remove all color classes
-        selectEl.classList.remove(
-            'select-present', 'select-absent', 'select-late', 
-            'select-half_day', 'select-holiday', 'select-leave', 
-            'select-duty_leave', 'select-not_marked'
-        );
-        
-        // Add current selection color class
         const val = selectEl.value;
-        selectEl.classList.add('select-' + val);
+        selectEl.className = 'status-select select-' + val;
     }
 
     // Initialize select colors on document load
@@ -773,5 +913,277 @@
             updateSelectColor(select);
         });
     });
+
+    // Slider scripts
+    let currentSliderStep = 1;
+
+    function openBulkAttendanceSlider() {
+        // Populate class select
+        let classSelect = $('#slider_class_id');
+        classSelect.empty().append('<option value="">Select Class</option>');
+        $('#classSelect option').each(function() {
+            if ($(this).val()) {
+                classSelect.append($(this).clone());
+            }
+        });
+
+        // Copy selected class value from main page
+        let currentClassVal = $('#classSelect').val();
+        if (currentClassVal) {
+            classSelect.val(currentClassVal);
+        }
+
+        // Populate sections
+        filterSliderSections();
+
+        // Copy selected section value from main page
+        let currentSectionVal = $('#sectionSelect').val();
+        if (currentSectionVal) {
+            $('#slider_section_id').val(currentSectionVal);
+        }
+
+        toggleSliderTargetFields();
+        calculateDefaultWorkingDays();
+
+        $('#bulkSliderOverlay').addClass('active');
+        $('#bulkSliderDrawer').addClass('active');
+    }
+
+    function closeBulkAttendanceSlider() {
+        $('#bulkSliderOverlay').removeClass('active');
+        $('#bulkSliderDrawer').removeClass('active');
+        currentSliderStep = 1;
+        showSliderStep(currentSliderStep);
+    }
+
+    function showSliderStep(step) {
+        $('.slider-step').removeClass('active');
+        $(`#sliderStep${step}`).addClass('active');
+        
+        if (step === 1) {
+            $('#sliderPrevBtn').hide();
+            $('#sliderNextBtn').show();
+            $('#sliderSaveBtn').hide();
+        } else {
+            $('#sliderPrevBtn').show();
+            $('#sliderNextBtn').hide();
+            $('#sliderSaveBtn').show();
+        }
+    }
+
+    function nextSliderStep() {
+        let working = parseFloat($('#slider_working_days').val()) || 0;
+        let present = parseFloat($('#slider_present_days').val()) || 0;
+        if (working <= 0) {
+            alert('Working days must be greater than 0.');
+            return;
+        }
+        if (present < 0 || present > working) {
+            alert('Present days must be between 0 and total working days.');
+            return;
+        }
+        currentSliderStep = 2;
+        showSliderStep(currentSliderStep);
+    }
+
+    function prevSliderStep() {
+        currentSliderStep = 1;
+        showSliderStep(currentSliderStep);
+    }
+
+    function toggleSliderTargetFields() {
+        let type = $('#slider_apply_type').val();
+        if (type === 'all') {
+            $('#slider_class_group').hide();
+            $('#slider_section_group').hide();
+        } else if (type === 'class') {
+            $('#slider_class_group').show();
+            $('#slider_section_group').hide();
+        } else {
+            $('#slider_class_group').show();
+            $('#slider_section_group').show();
+        }
+    }
+
+    function filterSliderSections() {
+        let classId = $('#slider_class_id').val();
+        let sectionSelect = $('#slider_section_id');
+        sectionSelect.empty().append('<option value="">Select Section</option>');
+        
+        if (classId) {
+            $('#sectionSelect option').each(function() {
+                let optionClassId = $(this).attr('data-class-id');
+                if (optionClassId == classId) {
+                    sectionSelect.append($(this).clone());
+                }
+            });
+        }
+    }
+
+    function calculateDefaultWorkingDays() {
+        let fromStr = $('#slider_from_date').val();
+        let toStr = $('#slider_to_date').val();
+        if (!fromStr || !toStr) return;
+
+        let fromDate = new Date(fromStr);
+        let toDate = new Date(toStr);
+        let count = 0;
+        let temp = new Date(fromDate);
+        while (temp <= toDate) {
+            let day = temp.getDay();
+            if (day !== 0 && day !== 6) { // Skip Sat and Sun
+                count++;
+            }
+            temp.setDate(temp.getDate() + 1);
+        }
+        $('#slider_working_days').val(count);
+        $('#slider_present_days').val(count);
+        updateSliderPercentage();
+    }
+
+    function updateSliderPercentage() {
+        let working = parseFloat($('#slider_working_days').val()) || 0;
+        let present = parseFloat($('#slider_present_days').val()) || 0;
+        let pct = 0;
+        if (working > 0) {
+            pct = Math.round((present / working) * 100);
+        }
+        $('#slider_percentage_badge').text(pct + '%');
+        if (pct >= 75) {
+            $('#slider_percentage_badge').css({'background': '#d1fae5', 'color': '#065f46'});
+        } else {
+            $('#slider_percentage_badge').css({'background': '#fee2e2', 'color': '#991b1b'});
+        }
+    }
+
+    function saveSliderBulkAttendance() {
+        let fromDate = $('#slider_from_date').val();
+        let toDate = $('#slider_to_date').val();
+        let workingDays = $('#slider_working_days').val();
+        let presentDays = $('#slider_present_days').val();
+        let applyType = $('#slider_apply_type').val();
+        let classId = $('#slider_class_id').val();
+        let sectionId = $('#slider_section_id').val();
+        let academicSessionId = $('input[name="academic_session_id"]').val() || $('#bulkFilterForm select[name="academic_session_id"]').val() || $('#academic_session_id').val();
+
+        if (applyType === 'class' && !classId) {
+            alert('Please select a class.');
+            return;
+        }
+        if (applyType === 'section' && (!classId || !sectionId)) {
+            alert('Please select class and section.');
+            return;
+        }
+
+        // Show loading state
+        let btn = $('#sliderSaveBtn');
+        btn.prop('disabled', true).text('SAVING...');
+
+        $.ajax({
+            url: "{{ route('school.student-mgmt.bulk-attendance.slider') }}",
+            type: "POST",
+            data: {
+                _token: "{{ csrf_token() }}",
+                from_date: fromDate,
+                to_date: toDate,
+                working_days: workingDays,
+                present_days: presentDays,
+                apply_type: applyType,
+                class_id: classId,
+                section_id: sectionId,
+                academic_session_id: academicSessionId
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('Attendance applied and updated successfully for targets.');
+                    closeBulkAttendanceSlider();
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + response.message);
+                    btn.prop('disabled', false).text('APPLY & SAVE');
+                }
+            },
+            error: function() {
+                alert('Network or server error. Please try again.');
+                btn.prop('disabled', false).text('APPLY & SAVE');
+            }
+        });
+    }
 </script>
+
+<!-- Slider Overlay and Drawer -->
+<div class="bulk-slider-overlay" id="bulkSliderOverlay" onclick="closeBulkAttendanceSlider()"></div>
+<div class="bulk-slider-drawer" id="bulkSliderDrawer">
+    <div class="slider-header">
+        <h3>Bulk Attendance Parameters</h3>
+        <button type="button" class="close-btn" onclick="closeBulkAttendanceSlider()">&times;</button>
+    </div>
+    
+    <div class="slider-body">
+        <!-- Step 1: Input Working & Present Days -->
+        <div class="slider-step active" id="sliderStep1">
+            <h4 style="font-weight: 700; font-size: 14px; margin-bottom: 16px; color: #023c4d;">Step 1: Set Attendance Duration & Days</h4>
+            
+            <div class="slider-field">
+                <label>From Date</label>
+                <input type="date" id="slider_from_date" class="slider-input" value="{{ $fromDate }}" onchange="calculateDefaultWorkingDays()">
+            </div>
+            
+            <div class="slider-field">
+                <label>To Date</label>
+                <input type="date" id="slider_to_date" class="slider-input" value="{{ $toDate }}" onchange="calculateDefaultWorkingDays()">
+            </div>
+
+            <div class="slider-field">
+                <label>Total Working Days</label>
+                <input type="number" id="slider_working_days" class="slider-input" value="{{ $totalDays }}" min="1" oninput="updateSliderPercentage()">
+            </div>
+
+            <div class="slider-field">
+                <label>Total Present Days</label>
+                <input type="number" id="slider_present_days" class="slider-input" value="{{ $totalDays }}" min="0" oninput="updateSliderPercentage()">
+            </div>
+
+            <div style="background: #f8fafc; border-radius: 8px; padding: 16px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                <span style="font-size: 13px; font-weight: 700; color: #475569;">Attendance Rate:</span>
+                <span id="slider_percentage_badge" style="font-size: 14px; font-weight: 800; padding: 6px 12px; border-radius: 20px; background: #d1fae5; color: #065f46;">100%</span>
+            </div>
+        </div>
+
+        <!-- Step 2: Apply to Classes & Sections -->
+        <div class="slider-step" id="sliderStep2">
+            <h4 style="font-weight: 700; font-size: 14px; margin-bottom: 16px; color: #023c4d;">Step 2: Choose Targets</h4>
+
+            <div class="slider-field">
+                <label>Apply To</label>
+                <select id="slider_apply_type" class="slider-select" onchange="toggleSliderTargetFields()">
+                    <option value="section">Specific Section</option>
+                    <option value="class">Specific Class</option>
+                    <option value="all">All Classes & Sections</option>
+                </select>
+            </div>
+
+            <div class="slider-field" id="slider_class_group">
+                <label>Select Class</label>
+                <select id="slider_class_id" class="slider-select" onchange="filterSliderSections()">
+                    <!-- Will be populated dynamically from page -->
+                </select>
+            </div>
+
+            <div class="slider-field" id="slider_section_group">
+                <label>Select Section</label>
+                <select id="slider_section_id" class="slider-select">
+                    <!-- Will be populated dynamically from page -->
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="slider-footer">
+        <button type="button" class="btn" id="sliderPrevBtn" onclick="prevSliderStep()" style="border: 1px solid #cbd5e1; background: #fff; color: #475569; padding: 10px 20px; border-radius: 6px; font-weight: 700; display: none;">BACK</button>
+        <div style="flex: 1;"></div>
+        <button type="button" class="btn" id="sliderNextBtn" onclick="nextSliderStep()" style="background: #9a3412; border-color: #9a3412; color: #fff; padding: 10px 24px; font-weight: 700; border-radius: 6px;">NEXT</button>
+        <button type="button" class="btn" id="sliderSaveBtn" onclick="saveSliderBulkAttendance()" style="background: #9a3412; border-color: #9a3412; color: #fff; padding: 10px 24px; font-weight: 700; border-radius: 6px; display: none;">APPLY & SAVE</button>
+    </div>
+</div>
 @endsection

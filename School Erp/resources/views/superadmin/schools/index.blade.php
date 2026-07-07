@@ -283,7 +283,17 @@
                             <td>
                                 <div class="school-info-cell">
                                     <span class="school-name">{{ $school->name }}</span>
-                                    <span class="school-code"><i class="fas fa-tag mr-1"></i> CODE: {{ $school->code }}</span>
+                                    <span class="school-code">
+                                        <i class="fas fa-tag mr-1"></i> CODE: {{ $school->code }}
+                                        @if($school->state) &bull; <span class="badge badge-secondary" style="font-size: 10px; background-color: #e2e8f0; color: #475569; font-weight: bold; padding: 2px 6px; border-radius: 4px;">{{ $school->state }}</span> @endif
+                                        @if($school->school_type) &bull; <span class="text-indigo" style="font-weight: 600; color: #4f46e5;">{{ $school->school_type }}</span> @endif
+                                    </span>
+                                    @if($school->director_name || $school->email)
+                                        <small class="text-muted mt-1">
+                                            @if($school->director_name) <strong>Dir:</strong> {{ $school->director_name }} @endif
+                                            @if($school->email) &bull; <i class="far fa-envelope mr-1"></i>{{ $school->email }} @endif
+                                        </small>
+                                    @endif
                                     @if($school->custom_domain)
                                         <span class="text-muted text-xs mt-1" style="font-size: 0.75rem;">
                                             <i class="fas fa-globe mr-1"></i> {{ $school->custom_domain }}

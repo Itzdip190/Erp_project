@@ -21,7 +21,9 @@
         @endif
 
         <!-- 1. Overview -->
-        @if(StaffAccessHelper::hasAccess('overview'))
+        
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('overview'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -52,7 +54,11 @@
         @endif
 
         <!-- 2. Institute Info -->
-        @if(StaffAccessHelper::hasAccess('institute_info'))
+        
+@php $modulesHtml['overview'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('institute_info'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -83,7 +89,11 @@
         @endif
 
         <!-- 3. Admin Role Management -->
-        @if(StaffAccessHelper::hasAccess('admin_role_management'))
+        
+@php $modulesHtml['institute_info'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('admin_role_management'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -114,7 +124,11 @@
         @endif
 
         <!-- 4. Password Management -->
-        @if(StaffAccessHelper::hasAccess('password_management'))
+        
+@php $modulesHtml['admin_role_management'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('password_management'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -137,7 +151,11 @@
         @endif
 
         <!-- 5. Staff Management -->
-        @if(StaffAccessHelper::hasAccess('staff_management'))
+        
+@php $modulesHtml['password_management'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('staff_management'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -184,7 +202,11 @@
         @endif
 
         <!-- 6. Class, Subject & Teacher Assignment -->
-        @if(StaffAccessHelper::hasAccess('class_subject_teacher'))
+        
+@php $modulesHtml['staff_management'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('class_subject_teacher'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -231,7 +253,11 @@
         @endif
 
         <!-- 7. Time Table -->
-        @if(StaffAccessHelper::hasAccess('timetable'))
+        
+@php $modulesHtml['class_subject_teacher'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('timetable'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -278,7 +304,11 @@
         @endif
 
         <!-- 8. Student Management -->
-        @if(StaffAccessHelper::hasAccess('student_management'))
+        
+@php $modulesHtml['timetable'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('student_management'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -373,7 +403,11 @@
         @endif
 
         <!-- 9. Attendance -->
-        @if(StaffAccessHelper::hasAccess('attendance'))
+        
+@php $modulesHtml['student_management'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('attendance'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -428,7 +462,11 @@
         @endif
 
         <!-- 9. Download Statistics -->
-        @if(StaffAccessHelper::hasAccess('download_statistics'))
+        
+@php $modulesHtml['attendance'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('download_statistics'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -491,7 +529,11 @@
         @endif
 
         <!-- 10. Fee Management -->
-        @if(StaffAccessHelper::hasAccess('fee_management'))
+        
+@php $modulesHtml['download_statistics'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('fee_management'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -588,7 +630,11 @@
         @endif
 
         <!-- 11. I Card/ Bus Pass/ Admit Card -->
-        @if(StaffAccessHelper::hasAccess('icard_buspass'))
+        
+@php $modulesHtml['fee_management'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('icard_buspass'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -619,7 +665,11 @@
         @endif
 
         <!-- 12. Transport Management -->
-        @if(StaffAccessHelper::hasAccess('transport_management'))
+        
+@php $modulesHtml['icard_buspass'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('transport_management'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -682,7 +732,11 @@
         @endif
 
         <!-- 13. Digital Diary -->
-        @if(StaffAccessHelper::hasAccess('digital_diary'))
+        
+@php $modulesHtml['transport_management'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('digital_diary'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -713,7 +767,11 @@
         @endif
 
         <!-- 14. Event & Holiday Management -->
-        @if(StaffAccessHelper::hasAccess('event_holiday'))
+        
+@php $modulesHtml['digital_diary'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('event_holiday'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -736,7 +794,11 @@
         @endif
 
         <!-- 15. Certificate Management -->
-        @if(StaffAccessHelper::hasAccess('certificate_management'))
+        
+@php $modulesHtml['event_holiday'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('certificate_management'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -783,7 +845,11 @@
         @endif
 
         <!-- 16. Leave Management -->
-        @if(StaffAccessHelper::hasAccess('leave_management'))
+        
+@php $modulesHtml['certificate_management'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('leave_management'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -822,7 +888,11 @@
         @endif
 
         <!-- 17. Communication -->
-        @if(StaffAccessHelper::hasAccess('communication'))
+        
+@php $modulesHtml['leave_management'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('communication'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -901,7 +971,11 @@
         @endif
 
         <!-- 18. Examination -->
-        @if(StaffAccessHelper::hasAccess('examination'))
+        
+@php $modulesHtml['communication'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('examination'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -964,7 +1038,11 @@
         @endif
 
         <!-- 19. Admissions -->
-        @if(StaffAccessHelper::hasAccess('admissions'))
+        
+@php $modulesHtml['examination'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('admissions'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -1059,7 +1137,11 @@
         @endif
 
         <!-- 20. Gallery -->
-        @if(StaffAccessHelper::hasAccess('gallery'))
+        
+@php $modulesHtml['admissions'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('gallery'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -1082,7 +1164,11 @@
         @endif
 
         <!-- 21. AI Assistant -->
-        @if(StaffAccessHelper::hasAccess('ai_assistant'))
+        
+@php $modulesHtml['gallery'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('ai_assistant'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
@@ -1111,27 +1197,69 @@
         @endif
 
         <!-- Expenses Control -->
-        @if(StaffAccessHelper::hasAccess('expenses_control'))
+        
+@php $modulesHtml['ai_assistant'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('expenses_control'))
         <div class="sb-group">
             <div class="sb-hdr">
                 <div class="sb-hdr-left">
                     <div class="sb-hdr-icon" style="background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%); color: #fff; border-radius: 50%;"><i class="fas fa-wallet"></i></div>
-                    <span class="sb-hdr-title">{{ App\Support\ModuleRegistry::getLabel('expenses_control', 'Expenses Control') }}</span>
+                    <span class="sb-hdr-title">{{ App\Support\ModuleRegistry::getLabel('expenses_control', 'Manage Expense') }}</span>
                 </div>
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
             <ul class="sb-submenu">
-                @if(StaffAccessHelper::hasAccess('expenses_control', 'manage_expenses'))
-                <li class="{{ (request()->is('school/expenses') && !request()->is('school/expenses/reports')) ? 'active' : '' }}">
-                    <a href="{{ route('school.expenses.index') }}">
-                        <span class="sb-submenu-label">{{ App\Support\ModuleRegistry::getFeatureLabel('expenses_control', 'manage_expenses', 'Manage Expenses') }}</span>
-                        <i class="fas fa-arrow-up-right-from-square sb-submenu-icon"></i>
+                @if(StaffAccessHelper::hasAccess('expenses_control', 'expense_heads'))
+                <li class="{{ request()->is('school/expenses/heads*') ? 'active' : '' }}">
+                    <a href="{{ route('school.expenses.heads') }}">
+                        <span class="sb-submenu-label">{{ App\Support\ModuleRegistry::getFeatureLabel('expenses_control', 'expense_heads', 'Expense Heads') }}</span>
+                        <i class="fas fa-list-ul sb-submenu-icon"></i>
                     </a>
                 </li>
-                <li class="{{ request()->is('school/expenses/reports') ? 'active' : '' }}">
+                @endif
+
+                @if(StaffAccessHelper::hasAccess('expenses_control', 'expense_vouchers'))
+                <li class="sb-submenu-header" style="padding: 6px 8px; font-weight: 700; font-size: 13px; color: var(--sidebar-text); display: flex; align-items: center; justify-content: space-between; cursor: default;">
+                    <span style="display: flex; align-items: center; gap: 6px;"><i class="fas fa-file-invoice" style="font-size: 11px; opacity: 0.8;"></i> Expense Vouchers</span>
+                    <i class="fas fa-chevron-down" style="font-size: 9px; opacity: 0.7;"></i>
+                </li>
+                <li class="{{ request()->is('school/expenses/vouchers/datewise*') ? 'active' : '' }}" style="padding-left: 15px;">
+                    <a href="{{ route('school.expenses.vouchers.datewise') }}">
+                        <span class="sb-submenu-label">— Datewise</span>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/expenses/vouchers/accountwise*') ? 'active' : '' }}" style="padding-left: 15px;">
+                    <a href="{{ route('school.expenses.vouchers.accountwise') }}">
+                        <span class="sb-submenu-label">— Accountwise</span>
+                    </a>
+                </li>
+                @endif
+
+                @if(StaffAccessHelper::hasAccess('expenses_control', 'daily_expense'))
+                <li class="{{ request()->is('school/expenses') && !request()->is('school/expenses/*') ? 'active' : '' }}">
+                    <a href="{{ route('school.expenses.index') }}">
+                        <span class="sb-submenu-label">{{ App\Support\ModuleRegistry::getFeatureLabel('expenses_control', 'daily_expense', 'Daily Expense') }}</span>
+                        <i class="fas fa-calendar-day sb-submenu-icon"></i>
+                    </a>
+                </li>
+                @endif
+
+                @if(StaffAccessHelper::hasAccess('expenses_control', 'account_transfers'))
+                <li class="{{ request()->is('school/expenses/transfers*') ? 'active' : '' }}">
+                    <a href="{{ route('school.expenses.transfers') }}">
+                        <span class="sb-submenu-label">{{ App\Support\ModuleRegistry::getFeatureLabel('expenses_control', 'account_transfers', 'Account Transfers') }}</span>
+                        <i class="fas fa-exchange-alt sb-submenu-icon"></i>
+                    </a>
+                </li>
+                @endif
+
+                @if(StaffAccessHelper::hasAccess('expenses_control', 'expense_report'))
+                <li class="{{ request()->is('school/expenses/reports*') ? 'active' : '' }}">
                     <a href="{{ route('school.expenses.reports') }}">
-                        <span class="sb-submenu-label">Expense Reports</span>
-                        <i class="fas fa-chart-pie sb-submenu-icon"></i>
+                        <span class="sb-submenu-label">{{ App\Support\ModuleRegistry::getFeatureLabel('expenses_control', 'expense_report', 'Expense Report') }}</span>
+                        <i class="fas fa-chart-line sb-submenu-icon"></i>
                     </a>
                 </li>
                 @endif
@@ -1139,5 +1267,144 @@
         </div>
         @endif
 
-</div>
+        <!-- Income Control -->
+        
+@php $modulesHtml['expenses_control'] = ob_get_clean(); @endphp
 
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('income_control'))
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon" style="background: linear-gradient(135deg, #047857 0%, #10b981 100%); color: #fff; border-radius: 50%;"><i class="fas fa-coins"></i></div>
+                    <span class="sb-hdr-title">{{ App\Support\ModuleRegistry::getLabel('income_control', 'Manage Income') }}</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                @if(StaffAccessHelper::hasAccess('income_control', 'income_heads'))
+                <li class="{{ request()->is('school/income/heads*') ? 'active' : '' }}">
+                    <a href="{{ route('school.income.heads') }}">
+                        <span class="sb-submenu-label">{{ App\Support\ModuleRegistry::getFeatureLabel('income_control', 'income_heads', 'Income Heads') }}</span>
+                        <i class="fas fa-list-ul sb-submenu-icon"></i>
+                    </a>
+                </li>
+                @endif
+
+                @if(StaffAccessHelper::hasAccess('income_control', 'income_vouchers'))
+                <li class="sb-submenu-header" style="padding: 6px 8px; font-weight: 700; font-size: 13px; color: var(--sidebar-text); display: flex; align-items: center; justify-content: space-between; cursor: default;">
+                    <span style="display: flex; align-items: center; gap: 6px;"><i class="fas fa-file-invoice-dollar" style="font-size: 11px; opacity: 0.8;"></i> Income Vouchers</span>
+                    <i class="fas fa-chevron-down" style="font-size: 9px; opacity: 0.7;"></i>
+                </li>
+                <li class="{{ request()->is('school/income/vouchers/datewise*') ? 'active' : '' }}" style="padding-left: 15px;">
+                    <a href="{{ route('school.income.vouchers.datewise') }}">
+                        <span class="sb-submenu-label">— Datewise</span>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/income/vouchers/accountwise*') ? 'active' : '' }}" style="padding-left: 15px;">
+                    <a href="{{ route('school.income.vouchers.accountwise') }}">
+                        <span class="sb-submenu-label">— Accountwise</span>
+                    </a>
+                </li>
+                @endif
+
+                @if(StaffAccessHelper::hasAccess('income_control', 'daily_income'))
+                <li class="{{ request()->is('school/income') && !request()->is('school/income/*') ? 'active' : '' }}">
+                    <a href="{{ route('school.income.index') }}">
+                        <span class="sb-submenu-label">{{ App\Support\ModuleRegistry::getFeatureLabel('income_control', 'daily_income', 'Daily Income') }}</span>
+                        <i class="fas fa-calendar-day sb-submenu-icon"></i>
+                    </a>
+                </li>
+                <li class="{{ request()->is('school/income/cash-drawer*') ? 'active' : '' }}">
+                    <a href="{{ route('school.income.cash-drawer') }}">
+                        <span class="sb-submenu-label">Cash Drawer & Counter</span>
+                        <i class="fas fa-cash-register sb-submenu-icon"></i>
+                    </a>
+                </li>
+                @endif
+
+        @if(StaffAccessHelper::hasAccess('income_control', 'income_report'))
+                <li class="{{ request()->is('school/income/reports*') ? 'active' : '' }}">
+                    <a href="{{ route('school.income.reports') }}">
+                        <span class="sb-submenu-label">{{ App\Support\ModuleRegistry::getFeatureLabel('income_control', 'income_report', 'Income Report') }}</span>
+                        <i class="fas fa-chart-line sb-submenu-icon"></i>
+                    </a>
+                </li>
+                @endif
+            </ul>
+        </div>
+        @endif
+
+        <!-- Reports Module -->
+        
+@php $modulesHtml['income_control'] = ob_get_clean(); @endphp
+
+@php ob_start(); @endphp
+@if(StaffAccessHelper::hasAccess('reports'))
+        <div class="sb-group">
+            <div class="sb-hdr">
+                <div class="sb-hdr-left">
+                    <div class="sb-hdr-icon" style="background: linear-gradient(135deg, #4f46e5 0%, #818cf8 100%); color: #fff; border-radius: 50%;"><i class="fas fa-chart-pie"></i></div>
+                    <span class="sb-hdr-title">{{ App\Support\ModuleRegistry::getLabel('reports', 'Reports') }}</span>
+                </div>
+                <i class="fas fa-chevron-down sb-hdr-arrow"></i>
+            </div>
+            <ul class="sb-submenu">
+                @if(StaffAccessHelper::hasAccess('reports', 'all_reports'))
+                <li class="{{ request()->is('school/reports*') ? 'active' : '' }}">
+                    <a href="{{ route('school.reports.index') }}">
+                        <span class="sb-submenu-label">{{ App\Support\ModuleRegistry::getFeatureLabel('reports', 'all_reports', 'All Reports') }}</span>
+                        <i class="fas fa-folder-open sb-submenu-icon"></i>
+                    </a>
+                </li>
+                @endif
+            </ul>
+        </div>
+        @endif
+
+
+@php $modulesHtml['reports'] = ob_get_clean(); @endphp
+@php
+    $school = $currentSchool ?? $school ?? (Auth::user() ? Auth::user()->school : null);
+    $sidebarOrder = $school ? ($school->sidebar_order ?? []) : [];
+    
+    // Default order based on sequence in file
+    $defaultOrder = [
+        'overview',
+        'institute_info',
+        'admin_role_management',
+        'password_management',
+        'staff_management',
+        'class_subject_teacher',
+        'timetable',
+        'student_management',
+        'attendance',
+        'download_statistics',
+        'fee_management',
+        'icard_buspass',
+        'transport_management',
+        'digital_diary',
+        'event_holiday',
+        'certificate_management',
+        'leave_management',
+        'communication',
+        'examination',
+        'admissions',
+        'gallery',
+        'ai_assistant',
+        'expenses_control',
+        'income_control',
+        'reports'
+    ];
+
+    $currentOrder = !empty($sidebarOrder) ? $sidebarOrder : $defaultOrder;
+    // Merge missing keys to prevent newly added modules from disappearing
+    $currentOrder = array_unique(array_merge($currentOrder, $defaultOrder));
+
+    foreach ($currentOrder as $key) {
+        if (isset($modulesHtml[$key])) {
+            echo $modulesHtml[$key];
+        }
+    }
+@endphp
+</div>

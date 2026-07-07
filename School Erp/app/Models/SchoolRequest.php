@@ -20,6 +20,13 @@ class SchoolRequest extends Model
         'plan_id',
         'status',
         'rejected_reason',
+        'state',
+        'school_type',
+        'director_name',
+        'email',
+        'academic_session_name',
+        'academic_session_start_date',
+        'academic_session_end_date',
     ];
 
     public function plan()

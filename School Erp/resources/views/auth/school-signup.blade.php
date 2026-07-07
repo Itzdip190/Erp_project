@@ -360,11 +360,42 @@
                                 <label class="form-label" for="name">School Name <span>*</span></label>
                                 <input type="text" class="form-control" id="name" name="name" value="{{ old('name') }}" placeholder="e.g. Greenwood International School" required>
                             </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="state">State <span>*</span></label>
+                                <select class="form-control" id="state" name="state" required>
+                                    <option value="">Select State...</option>
+                                    @foreach($states as $codeVal => $stateName)
+                                        <option value="{{ $codeVal }}" {{ old('state') == $codeVal ? 'selected' : '' }}>{{ $stateName }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                             
                             <div class="form-group">
-                                <label class="form-label" for="code">School Code <span>*</span></label>
-                                <input type="text" class="form-control" id="code" name="code" value="{{ old('code') }}" placeholder="e.g. GREENWOOD" style="text-transform: uppercase;" required>
-                                <div class="code-helper">A short code used for subdomains or custom resolution (alphanumeric, dashes).</div>
+                                <label class="form-label" for="code">Account ID (School Code) <span>*</span></label>
+                                <input type="text" class="form-control" id="code" name="code" value="{{ old('code') }}" placeholder="Select state to generate Account ID" readonly required>
+                                <div class="code-helper">Auto-generated based on the selected state (e.g. BREC001).</div>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="school_type">School Board / Type <span>*</span></label>
+                                <select class="form-control" id="school_type" name="school_type" required>
+                                    <option value="">Select Board...</option>
+                                    <option value="CBSE" {{ old('school_type') == 'CBSE' ? 'selected' : '' }}>CBSE</option>
+                                    <option value="CBSE PATTERN" {{ old('school_type') == 'CBSE PATTERN' ? 'selected' : '' }}>CBSE PATTERN</option>
+                                    <option value="ICSE" {{ old('school_type') == 'ICSE' ? 'selected' : '' }}>ICSE</option>
+                                    <option value="STATE BOARD" {{ old('school_type') == 'STATE BOARD' ? 'selected' : '' }}>STATE BOARD</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="director_name">Director/Principal Full Name <span>*</span></label>
+                                <input type="text" class="form-control" id="director_name" name="director_name" value="{{ old('director_name') }}" placeholder="e.g. Dr. John Doe" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="email">School Email Address <span>*</span></label>
+                                <input type="email" class="form-control" id="email" name="email" value="{{ old('email') }}" placeholder="e.g. contact@greenwood.com" required>
                             </div>
                             
                             <div class="form-group">
@@ -374,11 +405,11 @@
                             
                             <div class="form-group">
                                 <label class="form-label" for="address">Address</label>
-                                <textarea class="form-control" id="address" name="address" placeholder="Enter school complete postal address">{{ old('address') }}</textarea>
+                                <textarea class="form-control" id="address" name="address" placeholder="Enter school complete postal address" style="height: 100px;">{{ old('address') }}</textarea>
                             </div>
                         </div>
 
-                        <!-- Right side: Admin Details -->
+                        <!-- Right side: Admin & Session Details -->
                         <div>
                             <div class="section-title">
                                 <i class="fas fa-user-shield"></i> Administrator Account
@@ -420,6 +451,26 @@
                                     <input type="password" class="form-control" id="admin_password_confirmation" name="admin_password_confirmation" placeholder="Repeat the password" required>
                                     <i class="fas fa-eye password-toggle" id="toggleConfirmPassword"></i>
                                 </div>
+                            </div>
+
+                            <!-- Academic Session Onboarding Details -->
+                            <div class="section-title" style="margin-top: 28px;">
+                                <i class="fas fa-calendar-alt"></i> School Academic Session
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="academic_session_name">Academic Session Name <span>*</span></label>
+                                <input type="text" class="form-control" id="academic_session_name" name="academic_session_name" value="{{ old('academic_session_name', date('Y') . '-' . (date('Y') + 1)) }}" placeholder="e.g. 2026-2027" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="academic_session_start_date">Session Start Date <span>*</span></label>
+                                <input type="date" class="form-control" id="academic_session_start_date" name="academic_session_start_date" value="{{ old('academic_session_start_date', date('Y-04-01')) }}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="academic_session_end_date">Session End Date <span>*</span></label>
+                                <input type="date" class="form-control" id="academic_session_end_date" name="academic_session_end_date" value="{{ old('academic_session_end_date', date('Y-03-31', strtotime('+1 year'))) }}" required>
                             </div>
                         </div>
 
@@ -490,6 +541,54 @@
                     if (btnSubmit) {
                         btnSubmit.disabled = true;
                         btnSubmit.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+                    }
+                });
+            }
+
+            // AJAX call to get next school code from selected state
+            const stateSelect = document.getElementById('state');
+            const codeInput = document.getElementById('code');
+            
+            if (stateSelect && codeInput) {
+                stateSelect.addEventListener('change', function() {
+                    const stateVal = this.value;
+                    if (!stateVal) {
+                        codeInput.value = '';
+                        return;
+                    }
+                    
+                    codeInput.value = 'Generating...';
+                    
+                    fetch(`/school/signup/next-code?state=${stateVal}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data && data.code) {
+                                codeInput.value = data.code;
+                            } else {
+                                codeInput.value = '';
+                            }
+                        })
+                        .catch(err => {
+                            console.error('Error fetching next code:', err);
+                            codeInput.value = '';
+                        });
+                });
+            }
+
+            // Sync Director Name to Admin Name
+            const directorInput = document.getElementById('director_name');
+            const adminNameInput = document.getElementById('admin_name');
+            
+            if (directorInput && adminNameInput) {
+                let userInteractedWithAdminName = false;
+                
+                adminNameInput.addEventListener('input', function() {
+                    userInteractedWithAdminName = true;
+                });
+                
+                directorInput.addEventListener('input', function() {
+                    if (!userInteractedWithAdminName) {
+                        adminNameInput.value = this.value;
                     }
                 });
             }

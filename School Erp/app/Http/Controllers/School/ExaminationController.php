@@ -585,6 +585,11 @@ class ExaminationController extends Controller
         }
 
         if ($student) {
+            $studentAtts = \App\Models\StudentAttendance::where('student_id', $student->id)->get();
+            $totalMarked = $studentAtts->count();
+            $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
+                + ($studentAtts->where('status', 'half_day')->count() * 0.5);
+            $attendancePct = $totalMarked > 0 ? round(($presentCount / $totalMarked) * 100, 1) : 100.0;
             $marksQuery = StudentMark::where('school_id', $schoolId)
                 ->where('student_id', $student->id)
                 ->with('subject');
@@ -631,11 +636,18 @@ class ExaminationController extends Controller
             $stMarksRaw = $stMarksQuery->get();
             $stMarksUnique = $stMarksRaw->unique('subject_id')->values();
 
+            $studentAtts = \App\Models\StudentAttendance::where('student_id', $st->id)->get();
+            $totalMarked = $studentAtts->count();
+            $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
+                + ($studentAtts->where('status', 'half_day')->count() * 0.5);
+            $attPct = $totalMarked > 0 ? round(($presentCount / $totalMarked) * 100, 1) : 100.0;
+
             if ($stMarksUnique->isNotEmpty()) {
                 $classReportCards->push([
                     'student' => $st,
                     'marks' => $stMarksUnique,
-                    'has_marks' => true
+                    'has_marks' => true,
+                    'attendance_percentage' => $attPct,
                 ]);
             }
 
@@ -736,6 +748,11 @@ class ExaminationController extends Controller
         }
 
         if ($student) {
+            $studentAtts = \App\Models\StudentAttendance::where('student_id', $student->id)->get();
+            $totalMarked = $studentAtts->count();
+            $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
+                + ($studentAtts->where('status', 'half_day')->count() * 0.5);
+            $attendancePct = $totalMarked > 0 ? round(($presentCount / $totalMarked) * 100, 1) : 100.0;
             $marksQuery = StudentMark::where('school_id', $schoolId)
                 ->where('student_id', $student->id)
                 ->with('subject');
@@ -780,11 +797,18 @@ class ExaminationController extends Controller
             $stMarksRaw = $stMarksQuery->get();
             $stMarksUnique = $stMarksRaw->unique('subject_id')->values();
 
+            $studentAtts = \App\Models\StudentAttendance::where('student_id', $st->id)->get();
+            $totalMarked = $studentAtts->count();
+            $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
+                + ($studentAtts->where('status', 'half_day')->count() * 0.5);
+            $attPct = $totalMarked > 0 ? round(($presentCount / $totalMarked) * 100, 1) : 100.0;
+
             if ($stMarksUnique->isNotEmpty()) {
                 $classReportCards->push([
                     'student' => $st,
                     'marks' => $stMarksUnique,
-                    'has_marks' => true
+                    'has_marks' => true,
+                    'attendance_percentage' => $attPct,
                 ]);
             }
 

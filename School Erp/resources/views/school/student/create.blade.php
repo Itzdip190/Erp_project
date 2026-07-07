@@ -283,7 +283,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Aadhaar Number (National ID)</label>
-                                    <input type="text" name="national_id" class="form-control" value="{{ old('national_id') }}">
+                                    <input type="text" id="national_id_input" name="national_id" class="form-control" value="{{ old('national_id') }}" maxlength="12" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="12-digit Aadhaar number">
                                 </div>
                                 <div class="form-group">
                                     <label class="form-label">Blood Group</label>
@@ -338,300 +338,6 @@
                 </div>
             </div>
 
-            <!-- 2. ACADEMIC & FEE SCHEDULE DETAILS -->
-            <div class="accordion-item active">
-                <div class="accordion-header">
-                    <h3><i class="fas fa-graduation-cap" style="color:var(--gold);"></i> Academic & Fee Schedule Details <span class="required-badge">*</span></h3>
-                    <i class="fas fa-chevron-down accordion-icon"></i>
-                </div>
-                <div class="accordion-body">
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label class="form-label">Class <span>*</span></label>
-                            <select name="class_id" class="form-control" required>
-                                <option value="">Select Class</option>
-                                @foreach($classes as $cls)
-                                    <option value="{{ $cls->id }}" {{ old('class_id') == $cls->id ? 'selected' : '' }}>{{ $cls->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Section <span>*</span></label>
-                            <select name="section_id" class="form-control" required>
-                                <option value="">Select Section (Select Class first)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Academic Year <span>*</span></label>
-                            <select name="academic_session_id" class="form-control" required>
-                                <option value="">Select Session</option>
-                                @foreach($academicSessions as $ses)
-                                    <option value="{{ $ses->id }}" {{ old('academic_session_id', $ses->is_current ? $ses->id : '') == $ses->id ? 'selected' : '' }}>{{ $ses->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label class="form-label">Date of Admission <span>*</span></label>
-                            <input type="date" name="admission_date" class="form-control" value="{{ old('admission_date', date('Y-m-d')) }}" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Roll Number</label>
-                            <input type="text" name="roll_number" class="form-control" value="{{ old('roll_number') }}" placeholder="Auto-generated if blank">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Biometric ID</label>
-                            <input type="text" name="biometric_id" class="form-control" value="{{ old('biometric_id') }}">
-                        </div>
-                    </div>
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label class="form-label">PEN Number</label>
-                            <input type="text" name="pen_number" class="form-control" value="{{ old('pen_number') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Apaar ID</label>
-                            <input type="text" name="apaar_id" class="form-control" value="{{ old('apaar_id') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Samagra ID</label>
-                            <input type="text" name="samagra_id" class="form-control" value="{{ old('samagra_id') }}">
-                        </div>
-                    </div>
-                    <div class="grid-4">
-                        <div class="form-group">
-                            <label class="form-label">Class at time of Admission</label>
-                            <input type="text" name="class_at_admission" class="form-control" value="{{ old('class_at_admission') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Enrollment Number</label>
-                            <input type="text" name="enrollment_number" class="form-control" value="{{ old('enrollment_number') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">TC Number</label>
-                            <input type="text" name="tc_number" class="form-control" value="{{ old('tc_number') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Opening Due Balance</label>
-                            <input type="number" step="0.01" name="opening_due_balance" class="form-control" value="{{ old('opening_due_balance', '0.00') }}">
-                        </div>
-                    </div>
-                    <div class="grid-3" style="margin-top:16px;">
-                        <div class="form-group">
-                            <label class="form-label">Admission Type</label>
-                             <select name="admission_type" class="form-control">
-                                <option value="">Select Admission Type</option>
-                                <option value="New Admission" {{ old('admission_type') === 'New Admission' ? 'selected' : '' }}>New Admission</option>
-                                <option value="Old Admission" {{ old('admission_type') === 'Old Admission' ? 'selected' : '' }}>Old Admission</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Boarding Type</label>
-                            <select name="boarding_type" class="form-control">
-                                <option value="">Select Boarding Type</option>
-                                <option value="Day Scholar" {{ old('boarding_type') === 'Day Scholar' ? 'selected' : '' }}>Day Scholar</option>
-                                <option value="Hosteler" {{ old('boarding_type') === 'Hosteler' ? 'selected' : '' }}>Hosteler</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Defence Personal? (Yes/No)</label>
-                            <select name="defence_personal" class="form-control">
-                                <option value="0" {{ old('defence_personal') == '0' ? 'selected' : '' }}>No</option>
-                                <option value="1" {{ old('defence_personal') == '1' ? 'selected' : '' }}>Yes</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 3. TRANSPORT DETAILS -->
-            <div class="accordion-item">
-                <div class="accordion-header">
-                    <h3><i class="fas fa-bus" style="color:var(--gold);"></i> Transport Details</h3>
-                    <i class="fas fa-chevron-down accordion-icon"></i>
-                </div>
-                <div class="accordion-body">
-                    <div class="form-group" style="margin-bottom: 20px;">
-                        <label class="form-label">Select Month</label>
-                        <input type="text" name="transport_month" class="form-control" value="{{ old('transport_month') }}" placeholder="e.g. June 2026">
-                    </div>
-                    
-                    <div style="display:flex; gap:30px; margin-bottom:20px;">
-                        <label class="radio-option">
-                            <input type="checkbox" id="pickup_enabled"> Pick Up
-                        </label>
-                        <label class="radio-option">
-                            <input type="checkbox" id="drop_enabled"> Drop
-                        </label>
-                    </div>
-
-                    <div id="pickup_fields" style="display:none; border-top:1px solid var(--border); padding-top:20px; margin-bottom:20px;">
-                        <div class="grid-3">
-                            <div class="form-group">
-                                <label class="form-label">Select Route</label>
-                                <input type="text" name="transport_route" class="form-control" value="{{ old('transport_route') }}">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Select Vehicle Code</label>
-                                <input type="text" name="transport_vehicle_code" class="form-control" value="{{ old('transport_vehicle_code') }}">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Select Stop</label>
-                                <input type="text" name="transport_stop" class="form-control" value="{{ old('transport_stop') }}">
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="drop_fields" style="display:none; border-top:1px solid var(--border); padding-top:20px;">
-                        <div class="grid-3">
-                            <div class="form-group">
-                                <label class="form-label">Select Vehicle Code (Drop)</label>
-                                <input type="text" name="transport_drop_vehicle_code" class="form-control" value="{{ old('transport_drop_vehicle_code') }}">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 4. PREVIOUS SCHOOL/COLLEGE DETAILS -->
-            <div class="accordion-item">
-                <div class="accordion-header">
-                    <h3><i class="fas fa-university" style="color:var(--gold);"></i> Previous School / College Details</h3>
-                    <i class="fas fa-chevron-down accordion-icon"></i>
-                </div>
-                <div class="accordion-body">
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label class="form-label">Previous School Name</label>
-                            <input type="text" name="prev_school" class="form-control" value="{{ old('prev_school') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">City / Country</label>
-                            <input type="text" name="prev_city_country" class="form-control" value="{{ old('prev_city_country') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Year Attended</label>
-                            <input type="text" name="prev_year_attended" class="form-control" value="{{ old('prev_year_attended') }}" placeholder="YYYY">
-                        </div>
-                    </div>
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label class="form-label">Board</label>
-                            <input type="text" name="prev_board" class="form-control" value="{{ old('prev_board') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Previous Registration Number</label>
-                            <input type="text" name="prev_reg_no" class="form-control" value="{{ old('prev_reg_no') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">PCM Marks</label>
-                            <input type="text" name="prev_pcm_marks" class="form-control" value="{{ old('prev_pcm_marks') }}">
-                        </div>
-                    </div>
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label class="form-label">PCM %</label>
-                            <input type="text" name="prev_pcm_percentage" class="form-control" value="{{ old('prev_pcm_percentage') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Total Marks</label>
-                            <input type="text" name="prev_total_marks" class="form-control" value="{{ old('prev_total_marks') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Average</label>
-                            <input type="text" name="prev_average" class="form-control" value="{{ old('prev_average') }}">
-                        </div>
-                    </div>
-                    <div class="grid-3" style="border-bottom:1px solid var(--border); padding-bottom:20px; margin-bottom:20px;">
-                        <div class="form-group">
-                            <label class="form-label">Entrance Exam Name</label>
-                            <input type="text" name="entrance_exam_name" class="form-control" value="{{ old('entrance_exam_name') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Entrance Exam Rank</label>
-                            <input type="text" name="entrance_exam_rank" class="form-control" value="{{ old('entrance_exam_rank') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Entrance Exam Remarks</label>
-                            <input type="text" name="entrance_exam_remarks" class="form-control" value="{{ old('entrance_exam_remarks') }}">
-                        </div>
-                    </div>
-
-                    <!-- Questionnaire items -->
-                    <div class="checklist-question">
-                        <div class="checklist-question-label">Has the student ever been involved in any serious disciplinary action?</div>
-                        <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="disciplinary_action" value="1" {{ old('disciplinary_action') == '1' ? 'checked' : '' }}> Yes</label>
-                            <label class="radio-option"><input type="radio" name="disciplinary_action" value="0" {{ old('disciplinary_action', '0') == '0' ? 'checked' : '' }}> No</label>
-                        </div>
-                        <div class="form-group conditional-reason-box" id="disciplinary_action_box">
-                            <label class="form-label">If yes, add the reason</label>
-                            <input type="text" name="disciplinary_action_reason" class="form-control" value="{{ old('disciplinary_action_reason') }}">
-                        </div>
-                    </div>
-
-                    <div class="checklist-question">
-                        <div class="checklist-question-label">Has the student ever been asked to leave school?</div>
-                        <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="asked_to_leave" value="1" {{ old('asked_to_leave') == '1' ? 'checked' : '' }}> Yes</label>
-                            <label class="radio-option"><input type="radio" name="asked_to_leave" value="0" {{ old('asked_to_leave', '0') == '0' ? 'checked' : '' }}> No</label>
-                        </div>
-                        <div class="form-group conditional-reason-box" id="asked_to_leave_box">
-                            <label class="form-label">If yes, add the reason</label>
-                            <input type="text" name="asked_to_leave_reason" class="form-control" value="{{ old('asked_to_leave_reason') }}">
-                        </div>
-                    </div>
-
-                    <div class="checklist-question">
-                        <div class="checklist-question-label">Does the student have any special educational needs?</div>
-                        <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="special_needs" value="1" {{ old('special_needs') == '1' ? 'checked' : '' }}> Yes</label>
-                            <label class="radio-option"><input type="radio" name="special_needs" value="0" {{ old('special_needs', '0') == '0' ? 'checked' : '' }}> No</label>
-                        </div>
-                        <div class="form-group conditional-reason-box" id="special_needs_box">
-                            <label class="form-label">If yes, add the reason</label>
-                            <input type="text" name="special_needs_reason" class="form-control" value="{{ old('special_needs_reason') }}">
-                        </div>
-                    </div>
-
-                    <div class="checklist-question">
-                        <div class="checklist-question-label">Does the student have any interests or talents?</div>
-                        <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="interests_talents" value="1" {{ old('interests_talents') == '1' ? 'checked' : '' }}> Yes</label>
-                            <label class="radio-option"><input type="radio" name="interests_talents" value="0" {{ old('interests_talents', '0') == '0' ? 'checked' : '' }}> No</label>
-                        </div>
-                        <div class="form-group conditional-reason-box" id="interests_talents_box">
-                            <label class="form-label">If yes, add the reason</label>
-                            <input type="text" name="interests_talents_reason" class="form-control" value="{{ old('interests_talents_reason') }}">
-                        </div>
-                    </div>
-
-                    <div class="checklist-question">
-                        <div class="checklist-question-label">Has the student represented his/her school in sports or any other events?</div>
-                        <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="represented_school" value="1" {{ old('represented_school') == '1' ? 'checked' : '' }}> Yes</label>
-                            <label class="radio-option"><input type="radio" name="represented_school" value="0" {{ old('represented_school', '0') == '0' ? 'checked' : '' }}> No</label>
-                        </div>
-                        <div class="form-group conditional-reason-box" id="represented_school_box">
-                            <label class="form-label">If yes, add the reason</label>
-                            <input type="text" name="represented_school_reason" class="form-control" value="{{ old('represented_school_reason') }}">
-                        </div>
-                    </div>
-
-                    <div class="checklist-question">
-                        <div class="checklist-question-label">Other relevant information?</div>
-                        <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="other_info" value="1" {{ old('other_info') == '1' ? 'checked' : '' }}> Yes</label>
-                            <label class="radio-option"><input type="radio" name="other_info" value="0" {{ old('other_info', '0') == '0' ? 'checked' : '' }}> No</label>
-                        </div>
-                        <div class="form-group conditional-reason-box" id="other_info_box">
-                            <label class="form-label">If yes, add the reason</label>
-                            <input type="text" name="other_info_reason" class="form-control" value="{{ old('other_info_reason') }}">
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- 5. FAMILY DETAILS -->
             <div class="accordion-item active">
@@ -809,102 +515,41 @@
                 </div>
             </div>
 
-            <!-- 6. GUARDIAN DETAILS -->
+
+            <!-- 3. ACADEMIC YEAR DETAILS -->
             <div class="accordion-item active">
                 <div class="accordion-header">
-                    <h3><i class="fas fa-user-shield" style="color:var(--gold);"></i> Guardian Details <span class="required-badge">*</span></h3>
+                    <h3><i class="fas fa-graduation-cap" style="color:var(--gold);"></i> Academic Year Details <span class="required-badge">*</span></h3>
                     <i class="fas fa-chevron-down accordion-icon"></i>
                 </div>
                 <div class="accordion-body">
-                    <div class="grid-3">
+<div class="grid-3">
                         <div class="form-group">
-                            <label class="form-label">Guardian Name <span>*</span></label>
-                            <input type="text" name="guardian_name" class="form-control" value="{{ old('guardian_name') }}" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Guardian Name (Local)</label>
-                            <input type="text" name="guardian_name_local" class="form-control" value="{{ old('guardian_name_local') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Guardian Mobile Number <span>*</span></label>
-                            <input type="text" name="guardian_phone" class="form-control" value="{{ old('guardian_phone') }}" required placeholder="10-digit mobile number">
-                        </div>
-                    </div>
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label class="form-label">Relationship <span>*</span></label>
-                            <select name="guardian_relationship" class="form-control" required>
-                                <option value="">Select Relation</option>
-                                <option value="father" {{ old('guardian_relationship') === 'father' ? 'selected' : '' }}>Father</option>
-                                <option value="mother" {{ old('guardian_relationship') === 'mother' ? 'selected' : '' }}>Mother</option>
-                                <option value="guardian" {{ old('guardian_relationship') === 'guardian' ? 'selected' : '' }}>Other Guardian</option>
+                            <label class="form-label">Class <span>*</span></label>
+                            <select name="class_id" class="form-control" required>
+                                <option value="">Select Class</option>
+                                @foreach($classes as $cls)
+                                    <option value="{{ $cls->id }}" {{ old('class_id') == $cls->id ? 'selected' : '' }}>{{ $cls->name }}</option>
+                                @endforeach
                             </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Guardian Email (creates Parent Portal account)</label>
-                            <input type="email" name="guardian_email" class="form-control" value="{{ old('guardian_email') }}">
+                            <label class="form-label">Section <span>*</span></label>
+                            <select name="section_id" class="form-control" required>
+                                <option value="">Select Section (Select Class first)</option>
+                            </select>
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Guardian Occupation</label>
-                            <input type="text" name="guardian_occupation" class="form-control" value="{{ old('guardian_occupation') }}">
+                            <label class="form-label">Academic Year <span>*</span></label>
+                            <select name="academic_session_id" class="form-control" required>
+                                <option value="">Select Session</option>
+                                @foreach($academicSessions as $ses)
+                                    <option value="{{ $ses->id }}" {{ old('academic_session_id', $ses->is_current ? $ses->id : '') == $ses->id ? 'selected' : '' }}>{{ $ses->name }}</option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label class="form-label">Guardian Passport Number</label>
-                            <input type="text" name="guardian_passport" class="form-control" value="{{ old('guardian_passport') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Guardian Photo</label>
-                            <input type="file" name="guardian_photo" class="form-control" accept="image/*">
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-top:15px;">
-                        <label class="form-label">Guardian Address</label>
-                        <input type="text" name="guardian_address" class="form-control" value="{{ old('guardian_address') }}">
-                    </div>
-                </div>
-            </div>
-
-            <!-- 7. EMERGENCY CONTACT DETAILS -->
-            <div class="accordion-item">
-                <div class="accordion-header">
-                    <h3><i class="fas fa-ambulance" style="color:var(--gold);"></i> Emergency Contact Details</h3>
-                    <i class="fas fa-chevron-down accordion-icon"></i>
-                </div>
-                <div class="accordion-body">
-                    <div class="grid-3">
-                        <div class="form-group">
-                            <label class="form-label">Emergency Contact Name</label>
-                            <input type="text" name="emergency_name" class="form-control" value="{{ old('emergency_name') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Emergency Contact Number</label>
-                            <input type="text" name="emergency_number" class="form-control" value="{{ old('emergency_number') }}">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Emergency Address</label>
-                            <input type="text" name="emergency_address" class="form-control" value="{{ old('emergency_address') }}">
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 8. COMMUNICATION WITH SCHOOL -->
-            <div class="accordion-item">
-                <div class="accordion-header">
-                    <h3><i class="fas fa-comment-alt" style="color:var(--gold);"></i> Communication With School</h3>
-                    <i class="fas fa-chevron-down accordion-icon"></i>
-                </div>
-                <div class="accordion-body">
-                    <div class="form-group">
-                        <label class="form-label" style="font-weight:600; margin-bottom:10px;">Priority to contact for school matters</label>
-                        <div class="radio-group">
-                            <label class="radio-option"><input type="radio" name="contact_priority" value="father" {{ old('contact_priority') === 'father' ? 'checked' : '' }}> Father</label>
-                            <label class="radio-option"><input type="radio" name="contact_priority" value="mother" {{ old('contact_priority') === 'mother' ? 'checked' : '' }}> Mother</label>
-                            <label class="radio-option"><input type="radio" name="contact_priority" value="guardian" {{ old('contact_priority', 'guardian') === 'guardian' ? 'checked' : '' }}> Guardian</label>
-                        </div>
-                    </div>
+                    
                 </div>
             </div>
 
@@ -1006,6 +651,160 @@
                 </div>
             </div>
 
+
+            <!-- 3. TRANSPORT DETAILS -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <h3><i class="fas fa-bus" style="color:var(--gold);"></i> Transport Details</h3>
+                    <i class="fas fa-chevron-down accordion-icon"></i>
+                </div>
+                <div class="accordion-body">
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <label class="form-label">Select Month</label>
+                        <input type="text" name="transport_month" class="form-control" value="{{ old('transport_month') }}" placeholder="e.g. June 2026">
+                    </div>
+                    
+                    <div style="display:flex; gap:30px; margin-bottom:20px;">
+                        <label class="radio-option">
+                            <input type="checkbox" id="pickup_enabled"> Pick Up
+                        </label>
+                        <label class="radio-option">
+                            <input type="checkbox" id="drop_enabled"> Drop
+                        </label>
+                    </div>
+
+                    <div id="pickup_fields" style="display:none; border-top:1px solid var(--border); padding-top:20px; margin-bottom:20px;">
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Select Route</label>
+                                <select name="transport_route" class="form-control">
+                                    <option value="">Select Route</option>
+                                    @foreach($routes as $route)
+                                        <option value="{{ $route->name }}" {{ old('transport_route', '') === $route->name ? 'selected' : '' }}>{{ $route->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Select Vehicle Code</label>
+                                <select name="transport_vehicle_code" class="form-control">
+                                    <option value="">Select Vehicle Code</option>
+                                    @foreach($vehicles as $vehicle)
+                                        <option value="{{ $vehicle->vehicle_no }}" {{ old('transport_vehicle_code', '') === $vehicle->vehicle_no ? 'selected' : '' }}>{{ $vehicle->vehicle_no }} ({{ $vehicle->driver_name }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Select Stop</label>
+                                <select name="transport_stop" class="form-control">
+                                    <option value="">Select Stop</option>
+                                    @foreach($stops as $stop)
+                                        <option value="{{ $stop->name }}" {{ old('transport_stop', '') === $stop->name ? 'selected' : '' }}>{{ $stop->name }} (₹{{ $stop->fare }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="drop_fields" style="display:none; border-top:1px solid var(--border); padding-top:20px;">
+                        <div class="grid-3">
+                            <div class="form-group">
+                                <label class="form-label">Select Vehicle Code (Drop)</label>
+                                <select name="transport_drop_vehicle_code" class="form-control">
+                                    <option value="">Select Vehicle Code (Drop)</option>
+                                    @foreach($vehicles as $vehicle)
+                                        <option value="{{ $vehicle->vehicle_no }}" {{ old('transport_drop_vehicle_code', '') === $vehicle->vehicle_no ? 'selected' : '' }}>{{ $vehicle->vehicle_no }} ({{ $vehicle->driver_name }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- 6. GUARDIAN DETAILS -->
+            <div class="accordion-item active">
+                <div class="accordion-header">
+                    <h3><i class="fas fa-user-shield" style="color:var(--gold);"></i> Guardian Details <span class="required-badge">*</span></h3>
+                    <i class="fas fa-chevron-down accordion-icon"></i>
+                </div>
+                <div class="accordion-body">
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Guardian Name <span>*</span></label>
+                            <input type="text" name="guardian_name" class="form-control" value="{{ old('guardian_name') }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Guardian Name (Local)</label>
+                            <input type="text" name="guardian_name_local" class="form-control" value="{{ old('guardian_name_local') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Guardian Mobile Number <span>*</span></label>
+                            <input type="text" name="guardian_phone" class="form-control" value="{{ old('guardian_phone') }}" required placeholder="10-digit mobile number">
+                        </div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Relationship <span>*</span></label>
+                            <select name="guardian_relationship" class="form-control" required>
+                                <option value="">Select Relation</option>
+                                <option value="father" {{ old('guardian_relationship') === 'father' ? 'selected' : '' }}>Father</option>
+                                <option value="mother" {{ old('guardian_relationship') === 'mother' ? 'selected' : '' }}>Mother</option>
+                                <option value="guardian" {{ old('guardian_relationship') === 'guardian' ? 'selected' : '' }}>Other Guardian</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Guardian Email (creates Parent Portal account)</label>
+                            <input type="email" name="guardian_email" class="form-control" value="{{ old('guardian_email') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Guardian Occupation</label>
+                            <input type="text" name="guardian_occupation" class="form-control" value="{{ old('guardian_occupation') }}">
+                        </div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Guardian Passport Number</label>
+                            <input type="text" name="guardian_passport" class="form-control" value="{{ old('guardian_passport') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Guardian Photo</label>
+                            <input type="file" name="guardian_photo" class="form-control" accept="image/*">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top:15px;">
+                        <label class="form-label">Guardian Address</label>
+                        <input type="text" name="guardian_address" class="form-control" value="{{ old('guardian_address') }}">
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- 7. EMERGENCY CONTACT DETAILS -->
+            <div class="accordion-item">
+                <div class="accordion-header">
+                    <h3><i class="fas fa-ambulance" style="color:var(--gold);"></i> Emergency Contact Details</h3>
+                    <i class="fas fa-chevron-down accordion-icon"></i>
+                </div>
+                <div class="accordion-body">
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Emergency Contact Name</label>
+                            <input type="text" name="emergency_name" class="form-control" value="{{ old('emergency_name') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Emergency Contact Number</label>
+                            <input type="text" name="emergency_number" class="form-control" value="{{ old('emergency_number') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Emergency Address</label>
+                            <input type="text" name="emergency_address" class="form-control" value="{{ old('emergency_address') }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
             <!-- 10. BANK DETAILS -->
             <div class="accordion-item">
                 <div class="accordion-header">
@@ -1048,13 +847,235 @@
                 </div>
             </div>
 
-            <!-- 11. MEDICAL HEALTH RECORD -->
-            <div class="accordion-item">
+
+            <!-- 9. ADMISSION DETAILS -->
+            <div class="accordion-item active">
                 <div class="accordion-header">
-                    <h3><i class="fas fa-heartbeat" style="color:var(--gold);"></i> Medical Health Record</h3>
+                    <h3><i class="fas fa-file-invoice" style="color:var(--gold);"></i> Admission Details</h3>
                     <i class="fas fa-chevron-down accordion-icon"></i>
                 </div>
                 <div class="accordion-body">
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Date of Admission <span>*</span></label>
+                            <input type="date" name="admission_date" class="form-control" value="{{ old('admission_date', date('Y-m-d')) }}" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Roll Number</label>
+                            <input type="text" name="roll_number" class="form-control" value="{{ old('roll_number') }}" placeholder="Auto-generated if blank">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Biometric ID</label>
+                            <input type="text" name="biometric_id" class="form-control" value="{{ old('biometric_id') }}">
+                        </div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">PEN Number</label>
+                            <input type="text" id="pen_number_input" name="pen_number" class="form-control" value="{{ old('pen_number') }}" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="11-digit PEN number">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Apaar ID</label>
+                            <input type="text" id="apaar_id_input" name="apaar_id" class="form-control" value="{{ old('apaar_id') }}" maxlength="11" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="11-digit Apaar ID">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Samagra ID</label>
+                            <input type="text" name="samagra_id" class="form-control" value="{{ old('samagra_id') }}">
+                        </div>
+                    </div>
+                    <div class="grid-4">
+                        <div class="form-group">
+                            <label class="form-label">Class at time of Admission</label>
+                            <input type="text" name="class_at_admission" class="form-control" value="{{ old('class_at_admission') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Enrollment Number</label>
+                            <input type="text" name="enrollment_number" class="form-control" value="{{ old('enrollment_number') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">TC Number</label>
+                            <input type="text" name="tc_number" class="form-control" value="{{ old('tc_number') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Opening Due Balance</label>
+                            <input type="number" step="0.01" name="opening_due_balance" class="form-control" value="{{ old('opening_due_balance', '0.00') }}">
+                        </div>
+                    </div>
+                    <div class="grid-3" style="margin-top:16px;">
+                        <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 28px;">
+                                <input type="checkbox" id="new_admission_tick" name="is_new_admission" value="1" {{ old('is_new_admission') ? 'checked' : '' }} style="width: 18px; height: 18px; accent-color: var(--gold); cursor: pointer;">
+                                <label for="new_admission_tick" class="form-label" style="margin: 0; cursor: pointer; font-weight: 600;">New Admission?</label>
+                            </div>
+                        <div class="form-group">
+                            <label class="form-label">Boarding Type</label>
+                            <select name="boarding_type" class="form-control">
+                                <option value="">Select Boarding Type</option>
+                                <option value="Day Scholar" {{ old('boarding_type') === 'Day Scholar' ? 'selected' : '' }}>Day Scholar</option>
+                                <option value="Hosteler" {{ old('boarding_type') === 'Hosteler' ? 'selected' : '' }}>Hosteler</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Defence Personal? (Yes/No)</label>
+                            <select name="defence_personal" class="form-control">
+                                <option value="0" {{ old('defence_personal') == '0' ? 'selected' : '' }}>No</option>
+                                <option value="1" {{ old('defence_personal') == '1' ? 'selected' : '' }}>Yes</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+                    
+                    <div style="font-size:14px; font-weight:700; color:var(--navy); margin-top:25px; margin-bottom:15px; border-bottom:2px solid var(--border); padding-bottom:5px;"><i class="fas fa-comment-alt"></i> Communication with School</div>
+                                <!-- 8. COMMUNICATION WITH SCHOOL -->
+            
+                    <div class="form-group">
+                        <label class="form-label" style="font-weight:600; margin-bottom:10px;">Priority to contact for school matters</label>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="contact_priority" value="father" {{ old('contact_priority') === 'father' ? 'checked' : '' }}> Father</label>
+                            <label class="radio-option"><input type="radio" name="contact_priority" value="mother" {{ old('contact_priority') === 'mother' ? 'checked' : '' }}> Mother</label>
+                            <label class="radio-option"><input type="radio" name="contact_priority" value="guardian" {{ old('contact_priority', 'guardian') === 'guardian' ? 'checked' : '' }}> Guardian</label>
+                        </div>
+                    </div>
+                
+
+                    <div style="font-size:14px; font-weight:700; color:var(--navy); margin-top:25px; margin-bottom:15px; border-bottom:2px solid var(--border); padding-bottom:5px;"><i class="fas fa-university"></i> Previous School Details</div>
+                                <!-- 4. PREVIOUS SCHOOL/COLLEGE DETAILS -->
+            
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Previous School Name</label>
+                            <input type="text" name="prev_school" class="form-control" value="{{ old('prev_school') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">City / Country</label>
+                            <input type="text" name="prev_city_country" class="form-control" value="{{ old('prev_city_country') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Year Attended</label>
+                            <input type="text" name="prev_year_attended" class="form-control" value="{{ old('prev_year_attended') }}" placeholder="YYYY">
+                        </div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">Board</label>
+                            <input type="text" name="prev_board" class="form-control" value="{{ old('prev_board') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Previous Registration Number</label>
+                            <input type="text" name="prev_reg_no" class="form-control" value="{{ old('prev_reg_no') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">PCM Marks</label>
+                            <input type="text" name="prev_pcm_marks" class="form-control" value="{{ old('prev_pcm_marks') }}">
+                        </div>
+                    </div>
+                    <div class="grid-3">
+                        <div class="form-group">
+                            <label class="form-label">PCM %</label>
+                            <input type="text" name="prev_pcm_percentage" class="form-control" value="{{ old('prev_pcm_percentage') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Total Marks</label>
+                            <input type="text" name="prev_total_marks" class="form-control" value="{{ old('prev_total_marks') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Average</label>
+                            <input type="text" name="prev_average" class="form-control" value="{{ old('prev_average') }}">
+                        </div>
+                    </div>
+                    <div class="grid-3" style="border-bottom:1px solid var(--border); padding-bottom:20px; margin-bottom:20px;">
+                        <div class="form-group">
+                            <label class="form-label">Entrance Exam Name</label>
+                            <input type="text" name="entrance_exam_name" class="form-control" value="{{ old('entrance_exam_name') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Entrance Exam Rank</label>
+                            <input type="text" name="entrance_exam_rank" class="form-control" value="{{ old('entrance_exam_rank') }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Entrance Exam Remarks</label>
+                            <input type="text" name="entrance_exam_remarks" class="form-control" value="{{ old('entrance_exam_remarks') }}">
+                        </div>
+                    </div>
+
+                    <!-- Questionnaire items -->
+                    <div class="checklist-question">
+                        <div class="checklist-question-label">Has the student ever been involved in any serious disciplinary action?</div>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="disciplinary_action" value="1" {{ old('disciplinary_action') == '1' ? 'checked' : '' }}> Yes</label>
+                            <label class="radio-option"><input type="radio" name="disciplinary_action" value="0" {{ old('disciplinary_action', '0') == '0' ? 'checked' : '' }}> No</label>
+                        </div>
+                        <div class="form-group conditional-reason-box" id="disciplinary_action_box">
+                            <label class="form-label">If yes, add the reason</label>
+                            <input type="text" name="disciplinary_action_reason" class="form-control" value="{{ old('disciplinary_action_reason') }}">
+                        </div>
+                    </div>
+
+                    <div class="checklist-question">
+                        <div class="checklist-question-label">Has the student ever been asked to leave school?</div>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="asked_to_leave" value="1" {{ old('asked_to_leave') == '1' ? 'checked' : '' }}> Yes</label>
+                            <label class="radio-option"><input type="radio" name="asked_to_leave" value="0" {{ old('asked_to_leave', '0') == '0' ? 'checked' : '' }}> No</label>
+                        </div>
+                        <div class="form-group conditional-reason-box" id="asked_to_leave_box">
+                            <label class="form-label">If yes, add the reason</label>
+                            <input type="text" name="asked_to_leave_reason" class="form-control" value="{{ old('asked_to_leave_reason') }}">
+                        </div>
+                    </div>
+
+                    <div class="checklist-question">
+                        <div class="checklist-question-label">Does the student have any special educational needs?</div>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="special_needs" value="1" {{ old('special_needs') == '1' ? 'checked' : '' }}> Yes</label>
+                            <label class="radio-option"><input type="radio" name="special_needs" value="0" {{ old('special_needs', '0') == '0' ? 'checked' : '' }}> No</label>
+                        </div>
+                        <div class="form-group conditional-reason-box" id="special_needs_box">
+                            <label class="form-label">If yes, add the reason</label>
+                            <input type="text" name="special_needs_reason" class="form-control" value="{{ old('special_needs_reason') }}">
+                        </div>
+                    </div>
+
+                    <div class="checklist-question">
+                        <div class="checklist-question-label">Does the student have any interests or talents?</div>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="interests_talents" value="1" {{ old('interests_talents') == '1' ? 'checked' : '' }}> Yes</label>
+                            <label class="radio-option"><input type="radio" name="interests_talents" value="0" {{ old('interests_talents', '0') == '0' ? 'checked' : '' }}> No</label>
+                        </div>
+                        <div class="form-group conditional-reason-box" id="interests_talents_box">
+                            <label class="form-label">If yes, add the reason</label>
+                            <input type="text" name="interests_talents_reason" class="form-control" value="{{ old('interests_talents_reason') }}">
+                        </div>
+                    </div>
+
+                    <div class="checklist-question">
+                        <div class="checklist-question-label">Has the student represented his/her school in sports or any other events?</div>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="represented_school" value="1" {{ old('represented_school') == '1' ? 'checked' : '' }}> Yes</label>
+                            <label class="radio-option"><input type="radio" name="represented_school" value="0" {{ old('represented_school', '0') == '0' ? 'checked' : '' }}> No</label>
+                        </div>
+                        <div class="form-group conditional-reason-box" id="represented_school_box">
+                            <label class="form-label">If yes, add the reason</label>
+                            <input type="text" name="represented_school_reason" class="form-control" value="{{ old('represented_school_reason') }}">
+                        </div>
+                    </div>
+
+                    <div class="checklist-question">
+                        <div class="checklist-question-label">Other relevant information?</div>
+                        <div class="radio-group">
+                            <label class="radio-option"><input type="radio" name="other_info" value="1" {{ old('other_info') == '1' ? 'checked' : '' }}> Yes</label>
+                            <label class="radio-option"><input type="radio" name="other_info" value="0" {{ old('other_info', '0') == '0' ? 'checked' : '' }}> No</label>
+                        </div>
+                        <div class="form-group conditional-reason-box" id="other_info_box">
+                            <label class="form-label">If yes, add the reason</label>
+                            <input type="text" name="other_info_reason" class="form-control" value="{{ old('other_info_reason') }}">
+                        </div>
+                    </div>
+                
+
+                    <div style="font-size:14px; font-weight:700; color:var(--navy); margin-top:25px; margin-bottom:15px; border-bottom:2px solid var(--border); padding-bottom:5px;"><i class="fas fa-heartbeat"></i> Medical Health Record</div>
+                                <!-- 11. MEDICAL HEALTH RECORD -->
+            
                     <div class="grid-4">
                         <div class="form-group">
                             <label class="form-label">Height (cm)</label>
@@ -1120,9 +1141,9 @@
                         <label class="form-label">Doctor's Clinic Address</label>
                         <input type="text" name="medical_doctor_address" class="form-control" value="{{ old('medical_doctor_address') }}">
                     </div>
+                
                 </div>
             </div>
-
             <!-- SUBMIT BUTTON -->
             <div style="margin-top:30px;">
                 <button type="submit" class="btn btn-gold" style="width: 100%; justify-content: center; padding: 12px; font-size: 13.5px;">
@@ -1180,7 +1201,7 @@
             $('#pickup_fields').slideDown(200);
         } else {
             $('#pickup_fields').slideUp(200);
-            $('#pickup_fields').find('input').val('');
+            $('#pickup_fields').find('input, select').val('');
         }
     });
     $('#drop_enabled').on('change', function() {
@@ -1188,7 +1209,7 @@
             $('#drop_fields').slideDown(200);
         } else {
             $('#drop_fields').slideUp(200);
-            $('#drop_fields').find('input').val('');
+            $('#drop_fields').find('input, select').val('');
         }
     });
 

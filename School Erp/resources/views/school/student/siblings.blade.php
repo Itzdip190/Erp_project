@@ -2,6 +2,14 @@
 
 @section('title', 'Siblings List')
 
+@section('styles')
+<style>
+    .sibling-row:hover {
+        background-color: rgba(217, 119, 6, 0.04) !important;
+    }
+</style>
+@endsection
+
 @section('content')
 <div class="page-hdr" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
     <div class="page-hdr-left" style="display:flex; align-items:center; gap:10px;">
@@ -133,7 +141,7 @@
         <table style="width:100%; border-collapse:collapse; text-align:left;">
             <thead>
                 <tr style="background:#023e4f; color:#fff; border-bottom:2px solid var(--border);">
-                    <th style="padding:14px 16px; font-size:12px; font-weight:700; text-transform:capitalize;">Father Detail</th>
+                    <th style="padding:14px 16px; font-size:12px; font-weight:700; text-transform:capitalize;">Parent Details</th>
                     <th style="padding:14px 16px; font-size:12px; font-weight:700; text-transform:capitalize;">Student Name</th>
                     <th style="padding:14px 16px; font-size:12px; font-weight:700; text-transform:capitalize;">Admission ID</th>
                     <th style="padding:14px 16px; font-size:12px; font-weight:700; text-transform:capitalize;">Class & Section</th>
@@ -145,19 +153,37 @@
             <tbody>
                 @php $groupIndex = 1; @endphp
                 @forelse($groups as $group)
+                    @php
+                        $groupBg = ($groupIndex % 2 === 0) ? '#f8fafc' : '#ffffff';
+                        $parentBg = ($groupIndex % 2 === 0) ? '#f1f5f9' : '#f8fafc';
+                    @endphp
                     @foreach($group['students'] as $idx => $student)
-                        <tr style="border-bottom:1px solid #f1f5f9; hover:background:#f8fafc;">
+                        @php
+                            $isLastOfGroup = ($idx === count($group['students']) - 1);
+                            $rowBorderBottom = $isLastOfGroup ? 'border-bottom: 3px solid #cbd5e1;' : 'border-bottom: 1px solid #e2e8f0;';
+                        @endphp
+                        <tr class="sibling-row" style="background: {{ $groupBg }}; {{ $rowBorderBottom }} transition: background 0.15s ease;">
                             @if($idx === 0)
-                                <td rowspan="{{ count($group['students']) }}" style="padding:14px 16px; font-size:13px; font-weight:600; color:#1e293b; background:#f8fafc; border-right:1px solid #e2e8f0; vertical-align:top;">
+                                <td rowspan="{{ count($group['students']) }}" style="padding:14px 16px; font-size:13px; font-weight:600; color:#1e293b; background:{{ $parentBg }}; border-right:1px solid #cbd5e1; border-bottom: 3px solid #cbd5e1; vertical-align:top;">
                                     <div style="display:flex; flex-direction:column; gap:6px;">
                                         <div style="display:flex; align-items:center; gap:6px;">
                                             <span style="font-weight:800; color:#334155;">{{ $groupIndex }}.</span>
                                             <i class="fas fa-phone" style="color:#d97706; font-size:12px;"></i>
-                                            <span style="color:#0f172a;">{{ $group['phone'] }}</span>
+                                            <span style="color:#0f172a; font-weight:700;">{{ $group['phone'] }}</span>
                                         </div>
-                                        <div style="font-size:11px; color:#64748b; font-weight:500;">
-                                            <div>{{ $group['guardian_name'] }}</div>
-                                            <div style="font-style:italic;">{{ $group['email'] }}</div>
+                                        <div style="font-size:11px; color:#475569; display:flex; flex-direction:column; gap:3px; margin-top:2px;">
+                                            @if($group['father_name'] && $group['father_name'] !== 'N/A')
+                                                <div><strong style="color:#334155;">Father:</strong> {{ $group['father_name'] }}</div>
+                                            @endif
+                                            @if($group['mother_name'] && $group['mother_name'] !== 'N/A')
+                                                <div><strong style="color:#334155;">Mother:</strong> {{ $group['mother_name'] }}</div>
+                                            @endif
+                                            @if($group['guardian_name'] && $group['guardian_name'] !== 'N/A' && $group['guardian_name'] !== $group['father_name'] && $group['guardian_name'] !== $group['mother_name'])
+                                                <div><strong style="color:#334155;">Guardian:</strong> {{ $group['guardian_name'] }}</div>
+                                            @endif
+                                            <div style="font-style:italic; margin-top:2px; color:#64748b;">
+                                                <i class="far fa-envelope" style="font-size:10px; margin-right:4px;"></i>{{ $group['email'] }}
+                                            </div>
                                         </div>
                                     </div>
                                 </td>

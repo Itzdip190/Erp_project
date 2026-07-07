@@ -23,6 +23,8 @@ use App\Http\Controllers\Teacher\TeacherDashboardController;
 use App\Http\Controllers\School\GalleryController;
 use App\Http\Controllers\School\AiController;
 use App\Http\Controllers\School\ExpensesController;
+use App\Http\Controllers\School\IncomesController;
+use App\Http\Controllers\School\ReportsController;
 use Illuminate\Support\Facades\Route;
 
 // Dashboard
@@ -91,12 +93,15 @@ Route::middleware(['check.module:attendance'])->group(function () {
     Route::post('/staff/bulk-attendance', [StaffAttendanceController::class, 'saveBulkAttendance'])->name('school.staff.bulk-attendance.post');
     Route::get('/student-mgmt/bulk-attendance', [StudentManagementController::class, 'bulkAttendance'])->name('school.student-mgmt.bulk-attendance');
     Route::post('/student-mgmt/bulk-attendance', [StudentManagementController::class, 'saveBulkAttendance'])->name('school.student-mgmt.bulk-attendance.post');
+    Route::post('/student-mgmt/bulk-attendance/slider', [StudentManagementController::class, 'saveSliderBulkAttendance'])->name('school.student-mgmt.bulk-attendance.slider');
+    Route::post('/staff/bulk-attendance/slider', [StaffAttendanceController::class, 'saveSliderBulkAttendance'])->name('school.staff.bulk-attendance.slider');
 });
 
 // Settings & Profile
 Route::get('/settings', [SettingsController::class, 'index'])->name('school.settings.index');
 Route::put('/settings/profile', [SettingsController::class, 'updateProfile'])->name('school.settings.profile');
 Route::put('/settings/password', [SettingsController::class, 'changePassword'])->name('school.settings.password');
+Route::put('/settings/sidebar-order', [SettingsController::class, 'updateSidebarOrder'])->name('school.settings.sidebar-order');
 
 // Overview Features
 Route::get('/dashboard/mis-report', [SchoolDashboardController::class, 'misReport'])->name('school.dashboard.mis-report');
@@ -372,8 +377,75 @@ Route::post('/transport/delete', [\App\Http\Controllers\School\TransportControll
 Route::middleware(['check.module:expenses_control'])->group(function () {
     Route::get('/expenses',           [ExpensesController::class, 'index'])->name('school.expenses.index');
     Route::get('/expenses/reports',   [ExpensesController::class, 'reports'])->name('school.expenses.reports');
+    Route::get('/expenses/print-all', [ExpensesController::class, 'printAll'])->name('school.expenses.print-all');
     Route::post('/expenses',          [ExpensesController::class, 'store'])->name('school.expenses.store');
     Route::put('/expenses/{expense}', [ExpensesController::class, 'update'])->name('school.expenses.update');
     Route::delete('/expenses/{expense}', [ExpensesController::class, 'destroy'])->name('school.expenses.destroy');
     Route::get('/expenses/dashboard-summary', [ExpensesController::class, 'dashboardSummary'])->name('school.expenses.dashboard-summary');
+
+    // Expense Heads
+    Route::get('/expenses/heads', [App\Http\Controllers\School\ExpenseHeadsController::class, 'index'])->name('school.expenses.heads');
+    Route::post('/expenses/heads', [App\Http\Controllers\School\ExpenseHeadsController::class, 'store'])->name('school.expenses.heads.store');
+    Route::put('/expenses/heads/{head}', [App\Http\Controllers\School\ExpenseHeadsController::class, 'update'])->name('school.expenses.heads.update');
+    Route::delete('/expenses/heads/{head}', [App\Http\Controllers\School\ExpenseHeadsController::class, 'destroy'])->name('school.expenses.heads.destroy');
+
+    // Expense Vouchers
+    Route::get('/expenses/vouchers/datewise', [App\Http\Controllers\School\ExpenseVouchersController::class, 'datewise'])->name('school.expenses.vouchers.datewise');
+    Route::get('/expenses/vouchers/accountwise', [App\Http\Controllers\School\ExpenseVouchersController::class, 'accountwise'])->name('school.expenses.vouchers.accountwise');
+    Route::get('/expenses/vouchers/export', [App\Http\Controllers\School\ExpenseVouchersController::class, 'export'])->name('school.expenses.vouchers.export');
+    Route::post('/expenses/vouchers', [App\Http\Controllers\School\ExpenseVouchersController::class, 'storeVoucher'])->name('school.expenses.vouchers.store');
+    Route::post('/expenses/vouchers/{voucher}/payments', [App\Http\Controllers\School\ExpenseVouchersController::class, 'storePayment'])->name('school.expenses.vouchers.store-payment');
+    Route::post('/expenses/vouchers/{voucher}/reject', [App\Http\Controllers\School\ExpenseVouchersController::class, 'rejectVoucher'])->name('school.expenses.vouchers.reject');
+    Route::delete('/expenses/vouchers/{voucher}', [App\Http\Controllers\School\ExpenseVouchersController::class, 'destroyVoucher'])->name('school.expenses.vouchers.destroy');
+
+    // Transfers
+    Route::get('/expenses/transfers', [App\Http\Controllers\School\AccountTransfersController::class, 'index'])->name('school.expenses.transfers');
+    Route::post('/expenses/transfers', [App\Http\Controllers\School\AccountTransfersController::class, 'store'])->name('school.expenses.transfers.store');
 });
+
+// Income Control Module
+Route::middleware(['check.module:income_control'])->group(function () {
+    // Autocomplete & Cash Drawer (defined before route with parameters to avoid collisions)
+    Route::get('/income/search-payer', [IncomesController::class, 'searchPayer'])->name('school.income.search-payer');
+    Route::get('/income/cash-drawer',  [IncomesController::class, 'cashDrawer'])->name('school.income.cash-drawer');
+    Route::get('/income/print-all',    [IncomesController::class, 'printAll'])->name('school.income.print-all');
+
+    // Daily Income (index, store, update, delete)
+    Route::get('/income',              [IncomesController::class, 'index'])->name('school.income.index');
+    Route::get('/income/reports',      [IncomesController::class, 'reports'])->name('school.income.reports');
+    Route::post('/income',             [IncomesController::class, 'store'])->name('school.income.store');
+    Route::get('/income/{id}/invoice', [IncomesController::class, 'invoice'])->name('school.income.invoice');
+    Route::get('/income/vouchers/{id}/invoice', [IncomesController::class, 'voucherInvoice'])->name('school.income.vouchers.invoice');
+    Route::put('/income/{income}',     [IncomesController::class, 'update'])->name('school.income.update');
+    Route::delete('/income/{income}',  [IncomesController::class, 'destroy'])->name('school.income.destroy');
+    Route::get('/income/dashboard-summary', [IncomesController::class, 'dashboardSummary'])->name('school.income.dashboard-summary');
+
+    // Income Heads
+    Route::get('/income/heads',              [App\Http\Controllers\School\IncomeHeadsController::class, 'index'])->name('school.income.heads');
+    Route::post('/income/heads',             [App\Http\Controllers\School\IncomeHeadsController::class, 'store'])->name('school.income.heads.store');
+    Route::put('/income/heads/{head}',       [App\Http\Controllers\School\IncomeHeadsController::class, 'update'])->name('school.income.heads.update');
+    Route::put('/income/heads/{head}/update-budget', [App\Http\Controllers\School\IncomeHeadsController::class, 'updateBudget'])->name('school.income.heads.update-budget');
+    Route::delete('/income/heads/{head}',    [App\Http\Controllers\School\IncomeHeadsController::class, 'destroy'])->name('school.income.heads.destroy');
+
+    // Income Vouchers
+    Route::get('/income/vouchers/datewise',     [App\Http\Controllers\School\IncomeVouchersController::class, 'datewise'])->name('school.income.vouchers.datewise');
+    Route::get('/income/vouchers/accountwise',  [App\Http\Controllers\School\IncomeVouchersController::class, 'accountwise'])->name('school.income.vouchers.accountwise');
+    Route::get('/income/vouchers/export',       [App\Http\Controllers\School\IncomeVouchersController::class, 'export'])->name('school.income.vouchers.export');
+    Route::post('/income/vouchers',             [App\Http\Controllers\School\IncomeVouchersController::class, 'storeVoucher'])->name('school.income.vouchers.store');
+    Route::post('/income/vouchers/{voucher}/payments', [App\Http\Controllers\School\IncomeVouchersController::class, 'storePayment'])->name('school.income.vouchers.store-payment');
+    Route::post('/income/vouchers/{voucher}/reject',   [App\Http\Controllers\School\IncomeVouchersController::class, 'rejectVoucher'])->name('school.income.vouchers.reject');
+    Route::delete('/income/vouchers/{voucher}',        [App\Http\Controllers\School\IncomeVouchersController::class, 'destroyVoucher'])->name('school.income.vouchers.destroy');
+});
+
+// ─── Reports Module ───────────────────────────────────────────────────────────
+Route::get('/reports',                [ReportsController::class, 'index'])          ->name('school.reports.index');
+Route::get('/reports/detail/{type}',  [ReportsController::class, 'detailReport'])   ->name('school.reports.detail');
+Route::get('/reports/students',       [ReportsController::class, 'studentReport'])  ->name('school.reports.student');
+Route::get('/reports/attendance',     [ReportsController::class, 'attendanceReport'])->name('school.reports.attendance');
+Route::get('/reports/fees',           [ReportsController::class, 'feeReport'])      ->name('school.reports.fees');
+Route::get('/reports/siblings',       [ReportsController::class, 'siblingReport'])  ->name('school.reports.siblings');
+Route::get('/reports/income',         [ReportsController::class, 'incomeReport'])   ->name('school.reports.income');
+Route::get('/reports/expenses',       [ReportsController::class, 'expenseReport'])  ->name('school.reports.expenses');
+Route::get('/reports/sections',       [ReportsController::class, 'getSections'])    ->name('school.reports.sections');
+
+

@@ -21,6 +21,7 @@ use App\Models\FcmDeviceToken;
 use App\Models\StudentDocument;
 use App\Models\OfflineTest;
 use App\Models\SchoolExpense;
+use App\Models\SchoolIncome;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\View\View;
@@ -46,7 +47,10 @@ class SchoolDashboardController extends Controller
 
         // Accounts counts
         $totalFeeCollection = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
-        $totalIncome = $totalFeeCollection;
+        $totalSchoolIncome  = (float) SchoolIncome::where('school_id', $schoolId)
+            ->where('status', '!=', 'cancelled')
+            ->sum('amount');
+        $totalIncome  = $totalFeeCollection + $totalSchoolIncome;
         $totalExpense = (float) SchoolExpense::where('school_id', $schoolId)
             ->where('status', '!=', 'cancelled')
             ->sum('amount');
@@ -150,6 +154,18 @@ class SchoolDashboardController extends Controller
             $idx = array_search($monthName, $months);
             if ($idx !== false) {
                 $incomeData[$idx] += (int) $payment->paid_amount;
+            }
+        }
+
+        // Add general school incomes (income_control module) to incomeData
+        $schoolIncomeRecords = SchoolIncome::where('school_id', $schoolId)
+            ->where('status', '!=', 'cancelled')
+            ->get();
+        foreach ($schoolIncomeRecords as $incRec) {
+            $monthName = Carbon::parse($incRec->income_date)->format('F');
+            $idx = array_search($monthName, $months);
+            if ($idx !== false) {
+                $incomeData[$idx] += (float) $incRec->amount;
             }
         }
 

@@ -175,9 +175,46 @@ body.dark-mode .btn-sa-cancel:hover { background: #111827 !important; }
                     @error('name')<span class="form-err">{{ $message }}</span>@enderror
                 </div>
                 <div class="sa-form-group">
-                    <label>Unique Code <span>*</span></label>
-                    <input type="text" name="code" class="sa-input" placeholder="e.g. OAKRIDGE" style="text-transform: uppercase;" value="{{ old('code') }}" required>
+                    <label>State <span>*</span></label>
+                    <select name="state" class="sa-select" required>
+                        <option value="">Select State...</option>
+                        @foreach($states as $codeVal => $stateName)
+                            <option value="{{ $codeVal }}" {{ old('state') == $codeVal ? 'selected' : '' }}>{{ $stateName }}</option>
+                        @endforeach
+                    </select>
+                    @error('state')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+            </div>
+
+            <div class="sa-form-row">
+                <div class="sa-form-group">
+                    <label>Unique Code (Account ID) <span>*</span></label>
+                    <input type="text" name="code" class="sa-input" placeholder="Select state to generate ID" value="{{ old('code') }}" readonly required>
                     @error('code')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+                <div class="sa-form-group">
+                    <label>School Board / Type <span>*</span></label>
+                    <select name="school_type" class="sa-select" required>
+                        <option value="">Select Board...</option>
+                        <option value="CBSE" {{ old('school_type') == 'CBSE' ? 'selected' : '' }}>CBSE</option>
+                        <option value="CBSE PATTERN" {{ old('school_type') == 'CBSE PATTERN' ? 'selected' : '' }}>CBSE PATTERN</option>
+                        <option value="ICSE" {{ old('school_type') == 'ICSE' ? 'selected' : '' }}>ICSE</option>
+                        <option value="STATE BOARD" {{ old('school_type') == 'STATE BOARD' ? 'selected' : '' }}>STATE BOARD</option>
+                    </select>
+                    @error('school_type')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+            </div>
+
+            <div class="sa-form-row">
+                <div class="sa-form-group">
+                    <label>Director/Principal Full Name <span>*</span></label>
+                    <input type="text" name="director_name" class="sa-input" placeholder="e.g. Dr. John Doe" value="{{ old('director_name') }}" required>
+                    @error('director_name')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+                <div class="sa-form-group">
+                    <label>School Email Address <span>*</span></label>
+                    <input type="email" name="email" class="sa-input" placeholder="e.g. contact@oakridgeschool.in" value="{{ old('email') }}" required>
+                    @error('email')<span class="form-err">{{ $message }}</span>@enderror
                 </div>
             </div>
 
@@ -224,7 +261,34 @@ body.dark-mode .btn-sa-cancel:hover { background: #111827 !important; }
                 @error('address')<span class="form-err">{{ $message }}</span>@enderror
             </div>
 
-            {{-- 2. Admin Account Information --}}
+            {{-- 2. Academic Session Information --}}
+            <div class="sa-form-section-title" style="margin-top:28px;">Academic Session Details</div>
+
+            <div class="sa-form-row">
+                <div class="sa-form-group">
+                    <label>Academic Session Name <span>*</span></label>
+                    <input type="text" name="academic_session_name" class="sa-input" placeholder="e.g. 2026-2027" value="{{ old('academic_session_name', date('Y') . '-' . (date('Y') + 1)) }}" required>
+                    @error('academic_session_name')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+                <div class="sa-form-group">
+                    <label>Session Start Date <span>*</span></label>
+                    <input type="date" name="academic_session_start_date" class="sa-input" value="{{ old('academic_session_start_date', date('Y-04-01')) }}" required>
+                    @error('academic_session_start_date')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+            </div>
+
+            <div class="sa-form-row">
+                <div class="sa-form-group">
+                    <label>Session End Date <span>*</span></label>
+                    <input type="date" name="academic_session_end_date" class="sa-input" value="{{ old('academic_session_end_date', date('Y-03-31', strtotime('+1 year'))) }}" required>
+                    @error('academic_session_end_date')<span class="form-err">{{ $message }}</span>@enderror
+                </div>
+                <div class="sa-form-group">
+                    <!-- balanced space -->
+                </div>
+            </div>
+
+            {{-- 3. Admin Account Information --}}
             <div class="sa-form-section-title" style="margin-top:28px;">Administrative Account</div>
 
             <div class="sa-form-row">
@@ -262,4 +326,52 @@ body.dark-mode .btn-sa-cancel:hover { background: #111827 !important; }
         </div>
     </form>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const stateSelect = document.querySelector('select[name="state"]');
+        const codeInput = document.querySelector('input[name="code"]');
+        
+        if (stateSelect && codeInput) {
+            stateSelect.addEventListener('change', function() {
+                const stateVal = this.value;
+                if (!stateVal) {
+                    codeInput.value = '';
+                    return;
+                }
+                
+                codeInput.value = 'Generating...';
+                
+                fetch(`/school/signup/next-code?state=${stateVal}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.code) {
+                            codeInput.value = data.code;
+                        } else {
+                            codeInput.value = '';
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Error fetching next code:', err);
+                        codeInput.value = '';
+                    });
+            });
+        }
+
+        const directorInput = document.querySelector('input[name="director_name"]');
+        const adminNameInput = document.querySelector('input[name="admin_name"]');
+        
+        if (directorInput && adminNameInput) {
+            let userInteracted = false;
+            adminNameInput.addEventListener('input', function() {
+                userInteracted = true;
+            });
+            directorInput.addEventListener('input', function() {
+                if (!userInteracted) {
+                    adminNameInput.value = this.value;
+                }
+            });
+        }
+    });
+</script>
 @endsection

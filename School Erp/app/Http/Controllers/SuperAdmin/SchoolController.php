@@ -37,7 +37,8 @@ class SchoolController extends Controller
     public function create(): View
     {
         $plans = \App\Models\Plan::all();
-        return view('superadmin.schools.create', compact('plans'));
+        $states = \App\Models\School::getStatesList();
+        return view('superadmin.schools.create', compact('plans', 'states'));
     }
 
     // ─── Store New School ──────────────────────────────────────
@@ -45,6 +46,10 @@ class SchoolController extends Controller
     {
         $validated = $request->validate([
             'name'           => 'required|string|max:255',
+            'state'          => 'nullable|string|size:2',
+            'school_type'    => 'nullable|string|in:CBSE,CBSE PATTERN,ICSE,STATE BOARD',
+            'director_name'  => 'nullable|string|max:255',
+            'email'          => 'nullable|email|max:255',
             'code'           => 'required|string|max:50|unique:schools,code',
             'phone'          => 'nullable|string|max:20',
             'address'        => 'nullable|string|max:500',
@@ -55,6 +60,10 @@ class SchoolController extends Controller
             'admin_name'     => 'required|string|max:100',
             'admin_email'    => 'required|email|unique:users,email',
             'admin_password' => 'required|string|min:8|confirmed',
+            // Session
+            'academic_session_name'       => 'nullable|string|max:100',
+            'academic_session_start_date' => 'nullable|date',
+            'academic_session_end_date'   => 'nullable|date|after_or_equal:academic_session_start_date',
         ]);
 
         // Create school
@@ -63,6 +72,10 @@ class SchoolController extends Controller
             'code'          => strtoupper($validated['code']),
             'phone'         => $validated['phone'] ?? null,
             'address'       => $validated['address'] ?? null,
+            'state'         => $validated['state'] ?? 'MH',
+            'school_type'   => $validated['school_type'] ?? 'CBSE',
+            'director_name' => $validated['director_name'] ?? $validated['admin_name'],
+            'email'         => $validated['email'] ?? $validated['admin_email'],
             'custom_domain' => $validated['custom_domain'] ?? null,
             'status'        => $validated['status'],
         ]);
@@ -87,6 +100,19 @@ class SchoolController extends Controller
                 'subscription_ends_at' => now()->addYear(),
             ]);
         }
+
+        // Create academic session
+        $sessionName = $validated['academic_session_name'] ?? (date('Y') . '-' . (date('Y') + 1));
+        $sessionStart = $validated['academic_session_start_date'] ?? date('Y-04-01');
+        $sessionEnd = $validated['academic_session_end_date'] ?? date('Y-03-31', strtotime('+1 year'));
+
+        \App\Models\AcademicSession::create([
+            'school_id'  => $school->id,
+            'name'       => $sessionName,
+            'start_date' => $sessionStart,
+            'end_date'   => $sessionEnd,
+            'is_current' => true,
+        ]);
 
         return redirect()->route('superadmin.schools.index')
             ->with('success', "School \"{$school->name}\" created successfully! Admin login: {$validated['admin_email']}");
@@ -151,9 +177,10 @@ class SchoolController extends Controller
             ->first();
 
         $plans = \App\Models\Plan::all();
+        $states = \App\Models\School::getStatesList();
         $currentSub = $school->subscriptions()->latest()->first();
 
-        return view('superadmin.schools.edit', compact('school', 'admin', 'plans', 'currentSub'));
+        return view('superadmin.schools.edit', compact('school', 'admin', 'plans', 'currentSub', 'states'));
     }
 
     // ─── Update School Details ─────────────────────────────────
@@ -167,6 +194,10 @@ class SchoolController extends Controller
 
         $validated = $request->validate([
             'name'           => 'required|string|max:255',
+            'state'          => 'nullable|string|size:2',
+            'school_type'    => 'nullable|string|in:CBSE,CBSE PATTERN,ICSE,STATE BOARD',
+            'director_name'  => 'nullable|string|max:255',
+            'email'          => 'nullable|email|max:255',
             'code'           => 'required|string|max:50|unique:schools,code,' . $school->id,
             'phone'          => 'nullable|string|max:20',
             'address'        => 'nullable|string|max:500',
@@ -185,6 +216,10 @@ class SchoolController extends Controller
             'code'          => strtoupper($validated['code']),
             'phone'         => $validated['phone'] ?? null,
             'address'       => $validated['address'] ?? null,
+            'state'         => $validated['state'] ?? ($school->state ?? 'MH'),
+            'school_type'   => $validated['school_type'] ?? ($school->school_type ?? 'CBSE'),
+            'director_name' => $validated['director_name'] ?? ($school->director_name ?? $validated['admin_name']),
+            'email'         => $validated['email'] ?? ($school->email ?? $validated['admin_email']),
             'custom_domain' => $validated['custom_domain'] ?? null,
             'status'        => $validated['status'],
         ]);

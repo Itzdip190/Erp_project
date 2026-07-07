@@ -457,6 +457,132 @@
     body.dark-mode .select-Leave { color: #60a5fa !important; border-color: #1e3a8a !important; background: #1e3a8a !important; }
     body.dark-mode .select-Custom_Leaves { color: #f472b6 !important; border-color: #9d174d !important; background: #831843 !important; }
     body.dark-mode .select-not_marked { color: #9ca3af !important; border-color: #374151 !important; background: #1f2937 !important; }
+
+    /* Bulk Attendance Slider Drawer Styles */
+    .bulk-slider-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    .bulk-slider-overlay.active {
+        display: block;
+        opacity: 1;
+    }
+    .bulk-slider-drawer {
+        position: fixed;
+        top: 0;
+        right: -480px;
+        width: 480px;
+        height: 100vh;
+        background: #ffffff;
+        box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        font-family: 'Inter', sans-serif;
+    }
+    .bulk-slider-drawer.active {
+        right: 0;
+    }
+    body.dark-mode .bulk-slider-drawer {
+        background: #111827;
+        color: #f8fafc;
+        box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+    .slider-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #023c4d;
+        color: #ffffff;
+    }
+    body.dark-mode .slider-header {
+        background: #1f2937;
+        border-bottom-color: #374151;
+    }
+    .slider-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 800;
+    }
+    .slider-header .close-btn {
+        background: none;
+        border: none;
+        color: #ffffff;
+        font-size: 24px;
+        cursor: pointer;
+        line-height: 1;
+    }
+    .slider-body {
+        flex: 1;
+        padding: 24px;
+        overflow-y: auto;
+    }
+    .slider-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f8fafc;
+    }
+    body.dark-mode .slider-footer {
+        background: #1f2937;
+        border-top-color: #374151;
+    }
+    .slider-step {
+        display: none;
+    }
+    .slider-step.active {
+        display: block;
+    }
+    .slider-field {
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+    }
+    .slider-field label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        letter-spacing: 0.5px;
+    }
+    body.dark-mode .slider-field label {
+        color: #cbd5e1;
+    }
+    .slider-input, .slider-select {
+        height: 42px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 0 14px;
+        font-size: 13.5px;
+        font-weight: 600;
+        outline: none;
+        background: #ffffff;
+        color: #1e293b;
+        transition: all 0.2s;
+    }
+    body.dark-mode .slider-input, body.dark-mode .slider-select {
+        background: #1f2937;
+        border-color: #374151;
+        color: #f8fafc;
+    }
+    .slider-input:focus, .slider-select:focus {
+        border-color: #023c4d;
+    }
 </style>
 
 <div class="bulk-container">
@@ -525,9 +651,12 @@
         @csrf
         
         <div class="data-panel">
-            <div class="panel-header">
+            <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h3>Attendance Data ({{ $staffMembers->count() }} staff members)</h3>
-                <button type="submit" class="btn-save-attendance">Save Attendance</button>
+                <div style="display:flex; gap:10px;">
+                    <button type="button" class="btn-save-attendance" onclick="openBulkAttendanceSlider()" style="background: #023c4d; font-weight: 700;">Bulk Attendance Slider</button>
+                    <button type="submit" class="btn-save-attendance">Save Attendance</button>
+                </div>
             </div>
 
             <div class="grid-scroll-wrapper">
@@ -537,9 +666,21 @@
                             <tr>
                                 <th class="employee-cell">Employee Details</th>
                                 @foreach($datesInRange as $dObj)
+                                    @php
+                                        $dateStr = $dObj->format('Y-m-d');
+                                    @endphp
                                     <th class="date-column-header">
                                         <div style="font-weight:700; color:#2d3748;">{{ $dObj->format('d M') }}</div>
                                         <div style="color:#b45309; font-size:10px; font-weight:700; margin-top:2px; text-transform:uppercase;">{{ $dObj->format('D') }}</div>
+                                        <!-- Set All Dropdown -->
+                                        <select class="header-status-select" onchange="setAllColumnStatus('{{ $dateStr }}', this.value)" style="width: 100%; font-size: 10px; height: 24px; padding: 2px; margin-top: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-weight: 700; color: #475569; background: #fff; cursor: pointer;">
+                                            <option value="">Set All</option>
+                                            <option value="Present">Present</option>
+                                            <option value="Absent">Absent</option>
+                                            <option value="HalfDay">HalfDay</option>
+                                            <option value="Leave">Leave</option>
+                                            <option value="Custom Leaves">Custom Leaves</option>
+                                        </select>
                                     </th>
                                 @endforeach
                             </tr>
@@ -601,7 +742,7 @@
                                         <td>
                                             <div class="date-cell-container">
                                                 <!-- Status Select dropdown -->
-                                                <select name="attendance[{{ $staff->id }}][{{ $dateStr }}][status]" class="status-select" onchange="updateSelectColor(this)">
+                                                <select name="attendance[{{ $staff->id }}][{{ $dateStr }}][status]" class="status-select" data-date="{{ $dateStr }}" onchange="updateSelectColor(this)">
                                                     <option value="not_marked" {{ $status === 'not_marked' ? 'selected' : '' }}>Not Marked</option>
                                                     <option value="Present" {{ $status === 'Present' ? 'selected' : '' }}>Present</option>
                                                     <option value="Absent" {{ $status === 'Absent' ? 'selected' : '' }}>Absent</option>
@@ -642,14 +783,19 @@
 
 @section('scripts')
 <script>
-    // Update color class of the select elements based on selected value
+    // Set all status selects in a date column
+    function setAllColumnStatus(dateStr, status) {
+        if (!status) return;
+        document.querySelectorAll(`.status-select[data-date="${dateStr}"]`).forEach(function(select) {
+            select.value = status;
+            updateSelectColor(select);
+        });
+    }
+
+    // Update color class of the select elements based on selected value (optimized)
     function updateSelectColor(selectEl) {
-        selectEl.classList.remove(
-            'select-Present', 'select-Absent', 'select-HalfDay', 
-            'select-Leave', 'select-Custom_Leaves', 'select-not_marked'
-        );
         const val = selectEl.value.replace(' ', '_');
-        selectEl.classList.add('select-' + val);
+        selectEl.className = 'status-select select-' + val;
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -657,5 +803,266 @@
             updateSelectColor(select);
         });
     });
+
+    // Slider scripts
+    let currentSliderStep = 1;
+
+    function openBulkAttendanceSlider() {
+        // Populate departments select
+        let deptSelect = $('#slider_department_id');
+        deptSelect.empty().append('<option value="">Select Department</option>');
+        $('select[name="department_id"] option').each(function() {
+            if ($(this).val()) {
+                deptSelect.append($(this).clone());
+            }
+        });
+
+        // Copy selected department value from main page
+        let currentDeptVal = $('select[name="department_id"]').val();
+        if (currentDeptVal) {
+            deptSelect.val(currentDeptVal);
+        }
+
+        // Populate staff types
+        let typeSelect = $('#slider_staff_type');
+        typeSelect.empty().append('<option value="">Select Staff Type</option>');
+        $('select[name="staff_type"] option').each(function() {
+            if ($(this).val()) {
+                typeSelect.append($(this).clone());
+            }
+        });
+
+        // Copy selected staff type value from main page
+        let currentTypeVal = $('select[name="staff_type"]').val();
+        if (currentTypeVal) {
+            typeSelect.val(currentTypeVal);
+        }
+
+        toggleSliderTargetFields();
+        calculateDefaultWorkingDays();
+
+        $('#bulkSliderOverlay').addClass('active');
+        $('#bulkSliderDrawer').addClass('active');
+    }
+
+    function closeBulkAttendanceSlider() {
+        $('#bulkSliderOverlay').removeClass('active');
+        $('#bulkSliderDrawer').removeClass('active');
+        currentSliderStep = 1;
+        showSliderStep(currentSliderStep);
+    }
+
+    function showSliderStep(step) {
+        $('.slider-step').removeClass('active');
+        $(`#sliderStep${step}`).addClass('active');
+        
+        if (step === 1) {
+            $('#sliderPrevBtn').hide();
+            $('#sliderNextBtn').show();
+            $('#sliderSaveBtn').hide();
+        } else {
+            $('#sliderPrevBtn').show();
+            $('#sliderNextBtn').hide();
+            $('#sliderSaveBtn').show();
+        }
+    }
+
+    function nextSliderStep() {
+        let working = parseFloat($('#slider_working_days').val()) || 0;
+        let present = parseFloat($('#slider_present_days').val()) || 0;
+        if (working <= 0) {
+            alert('Working days must be greater than 0.');
+            return;
+        }
+        if (present < 0 || present > working) {
+            alert('Present days must be between 0 and total working days.');
+            return;
+        }
+        currentSliderStep = 2;
+        showSliderStep(currentSliderStep);
+    }
+
+    function prevSliderStep() {
+        currentSliderStep = 1;
+        showSliderStep(currentSliderStep);
+    }
+
+    function toggleSliderTargetFields() {
+        let type = $('#slider_apply_type').val();
+        if (type === 'all') {
+            $('#slider_department_group').hide();
+            $('#slider_staff_type_group').hide();
+        } else if (type === 'department') {
+            $('#slider_department_group').show();
+            $('#slider_staff_type_group').hide();
+        } else {
+            $('#slider_department_group').hide();
+            $('#slider_staff_type_group').show();
+        }
+    }
+
+    function calculateDefaultWorkingDays() {
+        let fromStr = $('#slider_from_date').val();
+        let toStr = $('#slider_to_date').val();
+        if (!fromStr || !toStr) return;
+
+        let fromDate = new Date(fromStr);
+        let toDate = new Date(toStr);
+        let count = 0;
+        let temp = new Date(fromDate);
+        while (temp <= toDate) {
+            let day = temp.getDay();
+            if (day !== 0 && day !== 6) { // Skip Sat and Sun
+                count++;
+            }
+            temp.setDate(temp.getDate() + 1);
+        }
+        $('#slider_working_days').val(count);
+        $('#slider_present_days').val(count);
+        updateSliderPercentage();
+    }
+
+    function updateSliderPercentage() {
+        let working = parseFloat($('#slider_working_days').val()) || 0;
+        let present = parseFloat($('#slider_present_days').val()) || 0;
+        let pct = 0;
+        if (working > 0) {
+            pct = Math.round((present / working) * 100);
+        }
+        $('#slider_percentage_badge').text(pct + '%');
+        if (pct >= 75) {
+            $('#slider_percentage_badge').css({'background': '#d1fae5', 'color': '#065f46'});
+        } else {
+            $('#slider_percentage_badge').css({'background': '#fee2e2', 'color': '#991b1b'});
+        }
+    }
+
+    function saveSliderBulkAttendance() {
+        let fromDate = $('#slider_from_date').val();
+        let toDate = $('#slider_to_date').val();
+        let workingDays = $('#slider_working_days').val();
+        let presentDays = $('#slider_present_days').val();
+        let applyType = $('#slider_apply_type').val();
+        let departmentId = $('#slider_department_id').val();
+        let staffType = $('#slider_staff_type').val();
+
+        if (applyType === 'department' && !departmentId) {
+            alert('Please select a department.');
+            return;
+        }
+        if (applyType === 'staff_type' && !staffType) {
+            alert('Please select a staff type.');
+            return;
+        }
+
+        // Show loading state
+        let btn = $('#sliderSaveBtn');
+        btn.prop('disabled', true).text('SAVING...');
+
+        $.ajax({
+            url: "{{ route('school.staff.bulk-attendance.slider') }}",
+            type: "POST",
+            data: {
+                _token: "{{ csrf_token() }}",
+                from_date: fromDate,
+                to_date: toDate,
+                working_days: workingDays,
+                present_days: presentDays,
+                apply_type: applyType,
+                department_id: departmentId,
+                staff_type: staffType
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('Attendance applied and updated successfully for targets.');
+                    closeBulkAttendanceSlider();
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + response.message);
+                    btn.prop('disabled', false).text('APPLY & SAVE');
+                }
+            },
+            error: function() {
+                alert('Network or server error. Please try again.');
+                btn.prop('disabled', false).text('APPLY & SAVE');
+            }
+        });
+    }
 </script>
+
+<!-- Slider Overlay and Drawer -->
+<div class="bulk-slider-overlay" id="bulkSliderOverlay" onclick="closeBulkAttendanceSlider()"></div>
+<div class="bulk-slider-drawer" id="bulkSliderDrawer">
+    <div class="slider-header">
+        <h3>Bulk Attendance Parameters</h3>
+        <button type="button" class="close-btn" onclick="closeBulkAttendanceSlider()">&times;</button>
+    </div>
+    
+    <div class="slider-body">
+        <!-- Step 1: Input Working & Present Days -->
+        <div class="slider-step active" id="sliderStep1">
+            <h4 style="font-weight: 700; font-size: 14px; margin-bottom: 16px; color: #023c4d;">Step 1: Set Attendance Duration & Days</h4>
+            
+            <div class="slider-field">
+                <label>From Date</label>
+                <input type="date" id="slider_from_date" class="slider-input" value="{{ $fromDate }}" onchange="calculateDefaultWorkingDays()">
+            </div>
+            
+            <div class="slider-field">
+                <label>To Date</label>
+                <input type="date" id="slider_to_date" class="slider-input" value="{{ $toDate }}" onchange="calculateDefaultWorkingDays()">
+            </div>
+
+            <div class="slider-field">
+                <label>Total Working Days</label>
+                <input type="number" id="slider_working_days" class="slider-input" value="{{ $totalDays }}" min="1" oninput="updateSliderPercentage()">
+            </div>
+
+            <div class="slider-field">
+                <label>Total Present Days</label>
+                <input type="number" id="slider_present_days" class="slider-input" value="{{ $totalDays }}" min="0" oninput="updateSliderPercentage()">
+            </div>
+
+            <div style="background: #f8fafc; border-radius: 8px; padding: 16px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                <span style="font-size: 13px; font-weight: 700; color: #475569;">Attendance Rate:</span>
+                <span id="slider_percentage_badge" style="font-size: 14px; font-weight: 800; padding: 6px 12px; border-radius: 20px; background: #d1fae5; color: #065f46;">100%</span>
+            </div>
+        </div>
+
+        <!-- Step 2: Apply to Departments & Types -->
+        <div class="slider-step" id="sliderStep2">
+            <h4 style="font-weight: 700; font-size: 14px; margin-bottom: 16px; color: #023c4d;">Step 2: Choose Targets</h4>
+
+            <div class="slider-field">
+                <label>Apply To</label>
+                <select id="slider_apply_type" class="slider-select" onchange="toggleSliderTargetFields()">
+                    <option value="staff_type">Specific Staff Type</option>
+                    <option value="department">Specific Department</option>
+                    <option value="all">All Staff members</option>
+                </select>
+            </div>
+
+            <div class="slider-field" id="slider_department_group" style="display:none;">
+                <label>Select Department</label>
+                <select id="slider_department_id" class="slider-select">
+                    <!-- Will be populated dynamically from page -->
+                </select>
+            </div>
+
+            <div class="slider-field" id="slider_staff_type_group">
+                <label>Select Staff Type</label>
+                <select id="slider_staff_type" class="slider-select">
+                    <!-- Will be populated dynamically from page -->
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="slider-footer">
+        <button type="button" class="btn" id="sliderPrevBtn" onclick="prevSliderStep()" style="border: 1px solid #cbd5e1; background: #fff; color: #475569; padding: 10px 20px; border-radius: 6px; font-weight: 700; display: none;">BACK</button>
+        <div style="flex: 1;"></div>
+        <button type="button" class="btn" id="sliderNextBtn" onclick="nextSliderStep()" style="background: #9a3412; border-color: #9a3412; color: #fff; padding: 10px 24px; font-weight: 700; border-radius: 6px;">NEXT</button>
+        <button type="button" class="btn" id="sliderSaveBtn" onclick="saveSliderBulkAttendance()" style="background: #9a3412; border-color: #9a3412; color: #fff; padding: 10px 24px; font-weight: 700; border-radius: 6px; display: none;">APPLY & SAVE</button>
+    </div>
+</div>
 @endsection
