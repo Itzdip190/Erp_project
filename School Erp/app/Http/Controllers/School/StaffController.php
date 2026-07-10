@@ -475,10 +475,36 @@ class StaffController extends Controller
                 continue;
             }
 
-            // Skip if duplicate email or employee ID
-            if (User::where('email', $email)->exists() || Staff::where('school_id', $schoolId)->where('employee_id', $empId)->exists()) {
+            // Check if duplicate email or employee ID on active records, and find soft-deleted staff
+            $existingStaff = Staff::withTrashed()->where('school_id', $schoolId)->where('employee_id', $empId)->first();
+            $existingUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)->where('email', $email)->first();
+
+            if ($existingStaff && !$existingStaff->trashed()) {
                 $skipped++;
                 continue;
+            }
+
+            if ($existingUser) {
+                // If the user exists globally but belongs to a different school, skip to avoid email conflicts
+                if ($existingUser->school_id !== $schoolId) {
+                    $skipped++;
+                    continue;
+                }
+
+                // If it's a staff user but NOT linked to this employee ID, skip it
+                $isLinkedToDifferentStaff = Staff::where('user_id', $existingUser->id)
+                    ->where('employee_id', '!=', $empId)
+                    ->exists();
+
+                if ($isLinkedToDifferentStaff) {
+                    $skipped++;
+                    continue;
+                }
+            }
+
+            // Restore soft-deleted staff if exists
+            if ($existingStaff && $existingStaff->trashed()) {
+                $existingStaff->restore();
             }
 
             // 1. Resolve Department
@@ -495,17 +521,7 @@ class StaffController extends Controller
                 'name'      => $desgName
             ]);
 
-            // 3. Create linked User
-            $user = User::create([
-                'name'      => trim($firstName . ' ' . $lastName),
-                'email'     => $email,
-                'phone'     => $phone ?: null,
-                'password'  => Hash::make('Welcome@2026!'),
-                'school_id' => $schoolId,
-                'is_active' => true,
-            ]);
-
-            // Assign Spatie Role based on Designation
+            // Resolve Spatie Role based on Designation
             $roleName = 'teacher';
             $lowerDesg = strtolower($desgName);
             if (str_contains($lowerDesg, 'admin') || str_contains($lowerDesg, 'principal')) {
@@ -515,7 +531,37 @@ class StaffController extends Controller
             } elseif (str_contains($lowerDesg, 'driver')) {
                 $roleName = 'driver';
             }
-            $user->assignRole($roleName);
+
+            // 3. Create or reuse linked User
+            $user = null;
+            if ($existingStaff && $existingStaff->user_id) {
+                $user = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)->find($existingStaff->user_id);
+            }
+            if (!$user && $existingUser) {
+                $user = $existingUser;
+            }
+
+            if ($user) {
+                $user->update([
+                    'name'      => trim($firstName . ' ' . $lastName),
+                    'email'     => $email,
+                    'phone'     => $phone ?: $user->phone,
+                    'is_active' => true,
+                ]);
+            } else {
+                $user = User::create([
+                    'name'      => trim($firstName . ' ' . $lastName),
+                    'email'     => $email,
+                    'phone'     => $phone ?: null,
+                    'password'  => Hash::make('Welcome@2026!'),
+                    'school_id' => $schoolId,
+                    'is_active' => true,
+                ]);
+            }
+
+            if (!$user->hasRole($roleName)) {
+                $user->assignRole($roleName);
+            }
 
             // 4. Group JSON additional fields
             $additionalFields = [
@@ -573,8 +619,8 @@ class StaffController extends Controller
                 $address = null;
             }
 
-            // 5. Create Staff Profile
-            $staff = Staff::create([
+            // 5. Create or Update Staff Profile
+            $staffData = [
                 'school_id'           => $schoolId,
                 'user_id'             => $user->id,
                 'employee_id'         => $empId,
@@ -602,7 +648,14 @@ class StaffController extends Controller
                 'pan_number'          => $val($row, 'pan_number') ?: null,
                 'is_active'           => true,
                 'additional_fields'   => $additionalFields,
-            ]);
+            ];
+
+            if ($existingStaff) {
+                $existingStaff->update($staffData);
+                $staff = $existingStaff;
+            } else {
+                $staff = Staff::create($staffData);
+            }
             $staff->designations()->sync([$desg->id]);
 
             $imported++;

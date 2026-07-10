@@ -1,137 +1,136 @@
 @extends('layouts.app')
-
-@section('page-title', 'Transport Basics')
-
+@section('page-title', 'Transport Dashboard')
 @section('content')
+@include('school.transport.partials.tp-styles')
+
 <div class="page-hdr">
     <div class="page-hdr-left">
-        <h1><i class="fas fa-bus" style="color:var(--gold);margin-right:8px;"></i>Transport Management Dashboard</h1>
-        <p>Overview of school fleet operations, stops, routes, mapped student tracking, and maintenance logs</p>
+        <h1><i class="fas fa-bus-alt" style="color:var(--gold);margin-right:8px;"></i>Transport Hub</h1>
+        <p>Fleet overview, student assignments, routes, and maintenance at a glance</p>
+    </div>
+    <div class="page-hdr-right">
+        <a href="{{ route('school.transport.vehicles') }}" class="btn btn-gold"><i class="fas fa-plus"></i><span>Add Vehicle</span></a>
     </div>
 </div>
 
-<!-- Fleet KPI Stats -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">
-    <!-- Vehicles Card -->
-    <div class="card" style="border-left: 4px solid #2563eb; background: #ffffff;">
-        <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; padding: 24px;">
-            <div>
-                <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Vehicles (Fleet)</div>
-                <div style="font-size: 28px; font-weight: 800; color: #1e3a8a;">{{ $vehiclesCount }}</div>
-            </div>
-            <div style="font-size: 32px; color: #2563eb; background: #eff6ff; padding: 12px; border-radius: 12px;">
-                <i class="fas fa-truck-monster"></i>
-            </div>
+@if(session('success'))
+<div class="alert alert-success"><i class="fas fa-check-circle"></i> {{ session('success') }}</div>
+@endif
+
+<!-- ── KPI Stats ────────────────────────────────────────────── -->
+<div class="tp-stats">
+    <div class="tp-stat" style="--sc:#2563eb;--sb:#eff6ff;">
+        <div class="tp-stat-icon"><i class="fas fa-bus-alt"></i></div>
+        <div>
+            <div class="tp-stat-label">Fleet</div>
+            <div class="tp-stat-val">{{ $vehiclesCount }}</div>
         </div>
     </div>
-
-    <!-- Routes Card -->
-    <div class="card" style="border-left: 4px solid #10b981; background: #ffffff;">
-        <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; padding: 24px;">
-            <div>
-                <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Active Routes</div>
-                <div style="font-size: 28px; font-weight: 800; color: #10b981;">{{ $routesCount }}</div>
-            </div>
-            <div style="font-size: 32px; color: #10b981; background: #ecfdf5; padding: 12px; border-radius: 12px;">
-                <i class="fas fa-route"></i>
-            </div>
+    <div class="tp-stat" style="--sc:#1d4ed8;--sb:#dbeafe;">
+        <div class="tp-stat-icon"><i class="fas fa-route"></i></div>
+        <div>
+            <div class="tp-stat-label">Routes</div>
+            <div class="tp-stat-val">{{ $routesCount }}</div>
         </div>
     </div>
-
-    <!-- Stops Card -->
-    <div class="card" style="border-left: 4px solid #d97706; background: #ffffff;">
-        <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; padding: 24px;">
-            <div>
-                <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Bus Stops</div>
-                <div style="font-size: 28px; font-weight: 800; color: #d97706;">{{ $stopsCount }}</div>
-            </div>
-            <div style="font-size: 32px; color: #d97706; background: #fffbeb; padding: 12px; border-radius: 12px;">
-                <i class="fas fa-map-marker-alt"></i>
-            </div>
+    <div class="tp-stat" style="--sc:#0ea5e9;--sb:#e0f2fe;">
+        <div class="tp-stat-icon"><i class="fas fa-map-marker-alt"></i></div>
+        <div>
+            <div class="tp-stat-label">Stops</div>
+            <div class="tp-stat-val">{{ $stopsCount }}</div>
         </div>
     </div>
-
-    <!-- Mapped Students Card -->
-    <div class="card" style="border-left: 4px solid #8b5cf6; background: #ffffff;">
-        <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; padding: 24px;">
-            <div>
-                <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Mapped Students</div>
-                <div style="font-size: 28px; font-weight: 800; color: #8b5cf6;">{{ $mappedStudentsCount }}</div>
-            </div>
-            <div style="font-size: 32px; color: #8b5cf6; background: #f5f3ff; padding: 12px; border-radius: 12px;">
-                <i class="fas fa-user-graduate"></i>
-            </div>
+    <div class="tp-stat" style="--sc:#7c3aed;--sb:#f5f3ff;">
+        <div class="tp-stat-icon"><i class="fas fa-user-graduate"></i></div>
+        <div>
+            <div class="tp-stat-label">Students</div>
+            <div class="tp-stat-val">{{ $mappedStudentsCount }}</div>
         </div>
     </div>
-
-    <!-- Total Expenses Card -->
-    <div class="card" style="border-left: 4px solid #ef4444; background: #ffffff;">
-        <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; padding: 24px;">
-            <div>
-                <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px;">Expenses (INR)</div>
-                <div style="font-size: 26px; font-weight: 800; color: #ef4444;">₹{{ number_format($totalExpenses, 2) }}</div>
-            </div>
-            <div style="font-size: 32px; color: #ef4444; background: #fef2f2; padding: 12px; border-radius: 12px;">
-                <i class="fas fa-wallet"></i>
-            </div>
+    <div class="tp-stat" style="--sc:#0ea5e9;--sb:#e0f2fe;">
+        <div class="tp-stat-icon"><i class="fas fa-wallet"></i></div>
+        <div>
+            <div class="tp-stat-label">Expenses</div>
+            <div class="tp-stat-val" style="font-size:18px;">₹{{ number_format($totalExpenses,0) }}</div>
+        </div>
+    </div>
+    <div class="tp-stat" style="--sc:#2563eb;--sb:#eff6ff;">
+        <div class="tp-stat-icon"><i class="fas fa-calendar-check"></i></div>
+        <div>
+            <div class="tp-stat-label">Trips</div>
+            <div class="tp-stat-val">{{ $tripsCount }}</div>
         </div>
     </div>
 </div>
 
-<div class="grid-2" style="margin-top: 20px;">
-    <!-- Shortcuts -->
-    <div class="card">
-        <div class="card-hdr">
-            <h3><i class="fas fa-cog" style="color:var(--gold);margin-right:6px;"></i>Quick Fleet Management Actions</h3>
+<!-- ── Quick Actions + Recent Expenses ────────────────────────── -->
+<div class="grid-2" style="margin-bottom: 24px;">
+    <!-- Quick actions -->
+    <div class="card" style="border-radius:16px; border:1px solid var(--border); overflow:hidden;">
+        <div class="tp-card-hdr">
+            <h3><i class="fas fa-bolt" style="color:var(--gold);margin-right:6px;"></i>Quick Actions</h3>
         </div>
-        <div class="card-body" style="padding: 24px;">
-            <p style="font-size:13.5px; color:#64748b; margin-bottom:20px;">Easily jump to specific transport modules to update settings, manage buses, map routes, record attendance, and log expenses.</p>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                <a href="{{ route('school.transport.vehicles') }}" class="btn btn-outline" style="padding:16px; border-radius:12px; flex-direction:column; text-align:center; gap:8px;">
-                    <i class="fas fa-bus-alt" style="font-size:20px; color:#2563eb;"></i>
-                    <strong style="color:var(--navy);font-size:13px;">Manage Vehicles</strong>
+        <div class="card-body" style="padding:20px;">
+            <div class="tp-quick-grid">
+                <a href="{{ route('school.transport.vehicles') }}" class="tp-quick-btn" style="--qc:#2563eb;--qbg:#eff6ff;">
+                    <i class="fas fa-bus-alt"></i><span>Vehicles</span>
                 </a>
-                <a href="{{ route('school.transport.routes') }}" class="btn btn-outline" style="padding:16px; border-radius:12px; flex-direction:column; text-align:center; gap:8px;">
-                    <i class="fas fa-route" style="font-size:20px; color:#10b981;"></i>
-                    <strong style="color:var(--navy);font-size:13px;">Manage Routes</strong>
+                <a href="{{ route('school.transport.routes') }}" class="tp-quick-btn" style="--qc:#16a34a;--qbg:#f0fdf4;">
+                    <i class="fas fa-route"></i><span>Routes</span>
                 </a>
-                <a href="{{ route('school.transport.student-mapping') }}" class="btn btn-outline" style="padding:16px; border-radius:12px; flex-direction:column; text-align:center; gap:8px;">
-                    <i class="fas fa-user-friends" style="font-size:20px; color:#8b5cf6;"></i>
-                    <strong style="color:var(--navy);font-size:13px;">Student Mapping</strong>
+                <a href="{{ route('school.transport.stops') }}" class="tp-quick-btn" style="--qc:#d97706;--qbg:#fffbeb;">
+                    <i class="fas fa-map-marker-alt"></i><span>Stops</span>
                 </a>
-                <a href="{{ route('school.transport.bus-attendance') }}" class="btn btn-outline" style="padding:16px; border-radius:12px; flex-direction:column; text-align:center; gap:8px;">
-                    <i class="fas fa-calendar-check" style="font-size:20px; color:#d97706;"></i>
-                    <strong style="color:var(--navy);font-size:13px;">Mark Bus Attendance</strong>
+                <a href="{{ route('school.transport.student-mapping') }}" class="tp-quick-btn" style="--qc:#7c3aed;--qbg:#f5f3ff;">
+                    <i class="fas fa-user-tag"></i><span>Assign Students</span>
+                </a>
+                <a href="{{ route('school.transport.bus-attendance') }}" class="tp-quick-btn" style="--qc:#0ea5e9;--qbg:#e0f2fe;">
+                    <i class="fas fa-calendar-check"></i><span>Bus Attendance</span>
+                </a>
+                <a href="{{ route('school.transport.expenses') }}" class="tp-quick-btn" style="--qc:#ef4444;--qbg:#fef2f2;">
+                    <i class="fas fa-receipt"></i><span>Expenses</span>
                 </a>
             </div>
         </div>
     </div>
 
-    <!-- Fleet Status Card -->
-    <div class="card">
-        <div class="card-hdr">
-            <h3><i class="fas fa-circle-info" style="color:var(--gold);margin-right:6px;"></i>System Status & Settings</h3>
+    <!-- Recent expenses -->
+    <div class="card" style="border-radius:16px; border:1px solid var(--border); overflow:hidden;">
+        <div class="tp-card-hdr">
+            <h3><i class="fas fa-receipt" style="color:var(--gold);margin-right:6px;"></i>Recent Expenses</h3>
+            <a href="{{ route('school.transport.expenses') }}" style="font-size:13px;color:#2563eb;font-weight:700;text-decoration:none;transition: color 0.15s;" onmouseover="this.style.color='#1d4ed8'" onmouseout="this.style.color='#2563eb'">View All →</a>
         </div>
-        <div class="card-body" style="padding: 24px;">
-            <div style="display:flex; flex-direction:column; gap:16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
-                    <span style="font-weight:600; font-size:13px;">Transport Module Integration</span>
-                    <span class="badge badge-success" style="background:#dcfce7; color:#15803d; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px;">ACTIVE</span>
+        <div class="card-body" style="padding:0;">
+            @forelse($recentExpenses as $ex)
+            <div style="display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border); transition: background-color 0.15s;" onmouseover="this.style.backgroundColor='rgba(37,99,235,0.01)'" onmouseout="this.style.backgroundColor='transparent'">
+                <div style="width:40px;height:40px;border-radius:10px;background:#fef2f2;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="fas fa-gas-pump" style="color:#ef4444;font-size:16px;"></i>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
-                    <span style="font-weight:600; font-size:13px;">Basic Fees Integration Status</span>
-                    <span class="badge badge-info" style="background:#e0f2fe; color:#0369a1; padding:4px 10px; border-radius:12px; font-weight:700; font-size:11px;">AUTO-SYNC ENABLED</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:13.5px;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;">{{ $ex->expense_type }}</div>
+                    <div style="font-size:12px;color:var(--t2);font-weight:500;">{{ $ex->vehicle?->vehicle_no }} &middot; {{ $ex->date->format('d M, Y') }}</div>
                 </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #f1f5f9; padding-bottom:10px;">
-                    <span style="font-weight:600; font-size:13px;">Standard Dispatch Route</span>
-                    <span style="font-size:13px; color:#64748b; font-weight:500;">School Main Campus Hub</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:10px;">
-                    <span style="font-weight:600; font-size:13px;">Support Desk Phone</span>
-                    <span style="font-size:13px; color:#2563eb; font-weight:700;">+91 99887 76655</span>
-                </div>
+                <div style="font-weight:800;font-size:15px;color:#ef4444;white-space:nowrap;">₹{{ number_format($ex->amount,0) }}</div>
             </div>
+            @empty
+            <div class="tp-empty"><i class="fas fa-receipt"></i><p>No expenses logged yet</p></div>
+            @endforelse
         </div>
     </div>
 </div>
+
+<!-- ── Transport Fee Policy Banner ─────────────────────────────── -->
+<div class="tp-alert-info">
+    <i class="fas fa-info-circle"></i>
+    <div>
+        <strong style="font-size:14.5px;display:block;margin-bottom:4px;font-weight:700;">Transport Fee Policy — Opt-In Only</strong>
+        <span style="font-size:13px;opacity:.95;line-height:1.6;font-weight:500;">
+            Transport fees are <strong>only charged to students with an assigned route</strong>.
+            Students without a route assignment are never billed for transport.
+            Assign routes in <a href="{{ route('school.transport.student-mapping') }}" style="color:#fff;text-decoration:underline;font-weight:700;transition:opacity 0.15s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">Student Route Mapping →</a>
+        </span>
+    </div>
+</div>
+
 @endsection
+

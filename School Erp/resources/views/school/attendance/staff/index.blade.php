@@ -623,6 +623,185 @@
     body.dark-mode .empty-state {
         color: #cbd5e1 !important;
     }
+
+    /* Excel Export Slider Drawer Styles */
+    .excel-slider-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    .excel-slider-overlay.active {
+        display: block;
+        opacity: 1;
+    }
+    .excel-slider-drawer {
+        position: fixed;
+        top: 0;
+        right: -80%;
+        width: 80%;
+        height: 100vh;
+        background: #ffffff;
+        box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        flex-direction: column;
+        font-family: 'Inter', sans-serif;
+    }
+    .excel-slider-drawer.active {
+        right: 0;
+    }
+    body.dark-mode .excel-slider-drawer {
+        background: #111827;
+        color: #f8fafc;
+        box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    }
+    .excel-slider-drawer .slider-header {
+        padding: 20px 24px;
+        border-bottom: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #023c4d;
+        color: #ffffff;
+    }
+    body.dark-mode .excel-slider-drawer .slider-header {
+        background: #1f2937;
+        border-bottom-color: #374151;
+    }
+    .excel-slider-drawer .slider-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 800;
+        color: #ffffff;
+    }
+    .excel-slider-drawer .slider-header .close-btn {
+        background: none;
+        border: none;
+        color: #ffffff;
+        font-size: 24px;
+        cursor: pointer;
+        line-height: 1;
+    }
+    .excel-slider-drawer .slider-body {
+        flex: 1;
+        padding: 24px;
+        overflow-y: auto;
+    }
+    .excel-slider-drawer .slider-footer {
+        padding: 16px 24px;
+        border-top: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #f8fafc;
+    }
+    body.dark-mode .excel-slider-drawer .slider-footer {
+        background: #1f2937;
+        border-top-color: #374151;
+    }
+    .excel-slider-drawer .slider-field {
+        margin-bottom: 20px;
+        display: flex;
+        flex-direction: column;
+        text-align: left;
+    }
+    .excel-slider-drawer .slider-field label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+        letter-spacing: 0.5px;
+    }
+    body.dark-mode .excel-slider-drawer .slider-field label {
+        color: #cbd5e1;
+    }
+    .excel-slider-drawer .slider-input, .excel-slider-drawer .slider-select {
+        height: 42px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 0 14px;
+        font-size: 13.5px;
+        font-weight: 600;
+        outline: none;
+        background: #ffffff;
+        color: #1e293b;
+        transition: all 0.2s;
+        width: 100%;
+    }
+    body.dark-mode .excel-slider-drawer .slider-input, body.dark-mode .excel-slider-drawer .slider-select {
+        background: #1f2937;
+        border-color: #374151;
+        color: #f8fafc;
+    }
+
+    /* Excel Grid Spreadsheet styling */
+    .excel-preview-table {
+        border-collapse: collapse;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 11px;
+        background: #fff;
+        width: 100%;
+    }
+    .excel-preview-table th, .excel-preview-table td {
+        border: 1px solid #cbd5e1;
+        padding: 6px 8px;
+        min-width: 50px;
+        white-space: nowrap;
+        text-align: left;
+    }
+    .excel-preview-table thead tr:first-child th {
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 800;
+        text-align: center;
+        border-bottom: 2px solid #cbd5e1;
+        font-size: 9px;
+    }
+    .excel-preview-table thead tr:nth-child(2) th {
+        background: #e2e8f0;
+        color: #1e293b;
+        font-weight: 700;
+        text-align: center;
+    }
+    .excel-preview-table tbody td.row-num {
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 800;
+        text-align: center;
+        border-right: 2px solid #cbd5e1;
+        font-size: 9px;
+    }
+    body.dark-mode .excel-preview-table {
+        background: #111827;
+    }
+    body.dark-mode .excel-preview-table th, body.dark-mode .excel-preview-table td {
+        border-color: #374151;
+        color: #cbd5e1;
+    }
+    body.dark-mode .excel-preview-table thead tr:first-child th {
+        background: #1f2937;
+        color: #9ca3af;
+        border-bottom-color: #374151;
+    }
+    body.dark-mode .excel-preview-table thead tr:nth-child(2) th {
+        background: #374151;
+        color: #f8fafc;
+    }
+    body.dark-mode .excel-preview-table tbody td.row-num {
+        background: #1f2937;
+        color: #9ca3af;
+        border-right-color: #374151;
+    }
 </style>
 
 <div class="register-container">
@@ -643,21 +822,23 @@
                 </div>
 
                 <!-- Academic Year dropdown -->
-                <div class="datepicker-box" style="width: 180px;">
+                <div class="datepicker-box" style="width: 220px;">
                     <label>Academic Year</label>
-                    <select name="academic_year" style="border:none; outline:none; font-size:13px; font-weight:700; color:#1a202c; padding:0; background:transparent;" onchange="document.getElementById('filterForm').submit();">
-                        <option value="2025-2026">Apr 2025 - Mar 2026</option>
+                    <select name="academic_session_id" style="border:none; outline:none; font-size:13px; font-weight:700; color:#1a202c; padding:0; background:transparent; width: 100%;" onchange="document.getElementById('filterForm').submit();">
+                        @foreach($academicSessions as $ses)
+                            <option value="{{ $ses->id }}" {{ $sessionId == $ses->id ? 'selected' : '' }}>{{ $ses->name }}</option>
+                        @endforeach
                     </select>
                 </div>
 
                 <!-- Gold outlined buttons -->
-                <a href="{{ route('school.attendance.staff.report', ['export' => 'excel', 'department_id' => $departmentId ?: 1]) }}" class="btn-outline-gold">
+                <button type="button" id="btn-staff-view-excel" class="btn-outline-gold" style="cursor: pointer;">
                     <i class="fas fa-file-excel"></i> View Excel
-                </a>
+                </button>
                 
-                <a href="{{ route('school.attendance.staff.report', ['export' => 'excel', 'department_id' => $departmentId ?: 1]) }}" class="btn-outline-gold">
+                <button type="button" id="btn-staff-download" class="btn-outline-gold" style="cursor: pointer;">
                     <i class="fas fa-download"></i> Download
-                </a>
+                </button>
 
                 <button type="button" class="btn-outline-gold">
                     <i class="fas fa-fingerprint"></i> Biometric Report
@@ -984,7 +1165,8 @@
                 'from_date' => $date,
                 'to_date' => $date,
                 'staff_type' => ($staffType === 'All staffs' ? 'Teaching' : $staffType),
-                'department_id' => $departmentId
+                'department_id' => $departmentId,
+                'academic_session_id' => $sessionId
             ]) }}" class="btn-outline-gold" style="border-color:#9a3412; color:#9a3412; font-weight:800; padding:10px 20px; border-radius:4px; height: 38px; display:inline-flex; align-items:center;">
                 Multi-Day Bulk Attendance
             </a>
@@ -996,6 +1178,63 @@
     @endif
 </div>
 
+<!-- Excel Export Slider Overlay and Drawer -->
+<div class="excel-slider-overlay" id="excelSliderOverlay" onclick="closeExcelSlider()"></div>
+<div class="excel-slider-drawer" id="excelSliderDrawer">
+    <div class="slider-header">
+        <h3>Excel Export Options</h3>
+        <button type="button" class="close-btn" onclick="closeExcelSlider()">&times;</button>
+    </div>
+    
+    <div class="slider-body">
+        <div style="display: flex; gap: 16px;">
+            <div class="slider-field" style="flex: 1;">
+                <label>Export Type</label>
+                <select id="slider_export_type" class="slider-select" onchange="toggleSliderFields()">
+                    <option value="daily">Daily Attendance Register</option>
+                    <option value="monthly">Monthly Attendance Summary</option>
+                </select>
+            </div>
+            
+            <div class="slider-field" id="slider_month_group" style="display: none; flex: 1;">
+                <label>Select Month</label>
+                <select id="slider_month" class="slider-select">
+                    @for ($m = 1; $m <= 12; $m++)
+                        <option value="{{ sprintf('%02d', $m) }}" {{ date('m') == $m ? 'selected' : '' }}>{{ date('F', mktime(0, 0, 0, $m, 1)) }}</option>
+                    @endfor
+                </select>
+            </div>
+
+            <div class="slider-field" id="slider_year_group" style="display: none; flex: 1;">
+                <label>Select Year</label>
+                <select id="slider_year" class="slider-select">
+                    @for ($y = date('Y') - 2; $y <= date('Y') + 2; $y++)
+                        <option value="{{ $y }}" {{ date('Y') == $y ? 'selected' : '' }}>{{ $y }}</option>
+                    @endfor
+                </select>
+            </div>
+        </div>
+
+        <!-- Live Spreadsheet Preview Grid -->
+        <div class="slider-field" style="margin-top: 20px;">
+            <label>Live Spreadsheet Preview</label>
+            <div id="excel_preview_container" style="overflow: auto; max-height: 480px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; padding: 2px;">
+                <div style="padding: 24px; text-align: center; color: #64748b; font-weight: 600;">
+                    Select parameters to load preview.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="slider-footer">
+        <button type="button" class="btn btn-outline" onclick="closeExcelSlider()" style="border: 1px solid #cbd5e1; background: #fff; color: #475569; padding: 10px 20px; border-radius: 6px; font-weight: 700;">CANCEL</button>
+        <button type="button" class="btn" id="sliderDownloadBtn" onclick="downloadExcelFromSlider()" style="background: #9a3412; border-color: #9a3412; color: #fff; padding: 10px 24px; font-weight: 700; border-radius: 6px;">DOWNLOAD EXCEL</button>
+    </div>
+</div>
+
+@endsection
+
+@section('scripts')
 <script>
 function setAllStaffStatus(status) {
     let radios = $(`.status-pills-container input[type="radio"][value="${status}"]`);
@@ -1012,5 +1251,152 @@ function setAllStaffStatus(status) {
         radios.prop('checked', true).trigger('change');
     }
 }
+
+// Excel Export Slider functions
+function openExcelSlider() {
+    $('#excelSliderOverlay').addClass('active');
+    $('#excelSliderDrawer').addClass('active');
+    loadSpreadsheetPreview();
+}
+
+function closeExcelSlider() {
+    $('#excelSliderOverlay').removeClass('active');
+    $('#excelSliderDrawer').removeClass('active');
+}
+
+function toggleSliderFields() {
+    let type = $('#slider_export_type').val();
+    if (type === 'monthly') {
+        $('#slider_month_group').show();
+        $('#slider_year_group').show();
+    } else {
+        $('#slider_month_group').hide();
+        $('#slider_year_group').hide();
+    }
+}
+
+function loadSpreadsheetPreview() {
+    let type = $('#slider_export_type').val();
+    let date = "{{ $date }}";
+    let departmentId = "{{ $departmentId }}";
+    let staffType = "{{ $staffType }}";
+    let status = "{{ $status }}";
+    let search = "{{ $search }}";
+    let sessionId = "{{ $sessionId }}";
+    let month = $('#slider_month').val();
+    let year = $('#slider_year').val();
+    
+    let container = $('#excel_preview_container');
+    container.html('<div style="padding:24px;text-align:center;font-weight:600;color:#64748b;"><i class="fas fa-spinner fa-spin" style="font-size:18px;color:#9a3412;margin-right:8px;"></i> Loading Excel preview...</div>');
+    
+    $.ajax({
+        url: "{{ route('school.attendance.staff.preview') }}",
+        type: "GET",
+        data: {
+            type: type,
+            date: date,
+            department_id: departmentId,
+            staff_type: staffType,
+            status: status,
+            search: search,
+            month: month,
+            year: year,
+            academic_session_id: sessionId
+        },
+        success: function(response) {
+            if (response.success) {
+                let html = '<table class="excel-preview-table"><thead>';
+                
+                // Row 1: Excel letter headers (A, B, C...)
+                html += '<tr><th></th>';
+                response.headers.forEach(h => {
+                    html += `<th>${h}</th>`;
+                });
+                html += '</tr>';
+                
+                // Row 2: Header names
+                html += '<tr><th></th>';
+                response.columns.forEach(c => {
+                    html += `<th>${c}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+                
+                // Data rows
+                response.rows.forEach((r, idx) => {
+                    html += `<tr><td class="row-num">${idx + 1}</td>`;
+                    r.forEach(cell => {
+                        html += `<td>${cell ?? ''}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                
+                html += '</tbody></table>';
+                container.html(html);
+            } else {
+                container.html('<div style="padding:24px;text-align:center;color:#ef4444;font-weight:600;">Failed to load preview.</div>');
+            }
+        },
+        error: function() {
+            container.html('<div style="padding:24px;text-align:center;color:#ef4444;font-weight:600;">Error fetching preview.</div>');
+        }
+    });
+}
+
+function downloadExcelFromSlider() {
+    let type = $('#slider_export_type').val();
+    let date = "{{ $date }}";
+    let departmentId = "{{ $departmentId }}";
+    let staffType = "{{ $staffType }}";
+    let status = "{{ $status }}";
+    let search = "{{ $search }}";
+    let sessionId = "{{ $sessionId }}";
+    let month = $('#slider_month').val();
+    let year = $('#slider_year').val();
+    
+    let url = "{{ route('school.attendance.staff.export') }}?type=" + type + 
+              "&date=" + date + 
+              "&department_id=" + departmentId + 
+              "&staff_type=" + staffType + 
+              "&status=" + status + 
+              "&search=" + search +
+              "&academic_session_id=" + sessionId;
+              
+    if (type === 'monthly') {
+        url += "&month=" + month + "&year=" + year;
+    }
+    
+    window.location.href = url;
+    closeExcelSlider();
+}
+
+// Bind slider field change events & click buttons on document ready
+$(document).ready(function() {
+    $('#slider_export_type, #slider_month, #slider_year').on('change', function() {
+        loadSpreadsheetPreview();
+    });
+
+    $('#btn-staff-view-excel').on('click', function() {
+        openExcelSlider();
+    });
+
+    $('#btn-staff-download').on('click', function() {
+        let date = "{{ $date }}";
+        let departmentId = "{{ $departmentId }}";
+        let staffType = "{{ $staffType }}";
+        let status = "{{ $status }}";
+        let search = "{{ $search }}";
+        let sessionId = "{{ $sessionId }}";
+        
+        let url = "{{ route('school.attendance.staff.export') }}?type=daily" + 
+                  "&date=" + date + 
+                  "&department_id=" + departmentId + 
+                  "&staff_type=" + staffType + 
+                  "&status=" + status + 
+                  "&search=" + search +
+                  "&academic_session_id=" + sessionId;
+                  
+        window.location.href = url;
+    });
+});
 </script>
 @endsection

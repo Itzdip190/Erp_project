@@ -232,9 +232,13 @@
         padding: 10px 8px;
     }
 
-    /* Highlight weekend column headers */
-    .bulk-grid-table th.weekend-header {
-        background: #fef3c7; /* Light gold background for Sunday */
+    /* Highlight ONLY Sunday column headers as holiday */
+    .bulk-grid-table th.sunday-header {
+        background: #fef3c7;
+    }
+    /* Saturday stays white/normal (working day) */
+    .bulk-grid-table th.saturday-header {
+        background: #f8fafc;
     }
 
     .bulk-grid-table td {
@@ -450,9 +454,12 @@
     body.dark-mode .bulk-grid-table th.date-column-header {
         border-left-color: #374151 !important;
     }
-    body.dark-mode .bulk-grid-table th.weekend-header {
+    body.dark-mode .bulk-grid-table th.sunday-header {
         background: rgba(180, 83, 9, 0.2) !important;
         color: #f59e0b !important;
+    }
+    body.dark-mode .bulk-grid-table th.saturday-header {
+        background: #1f2937 !important;
     }
     body.dark-mode .bulk-grid-table td {
         border-bottom-color: #1e293b !important;
@@ -666,16 +673,6 @@
     <div class="filters-card">
         <form id="bulkFilterForm" method="GET" action="{{ route('school.student-mgmt.bulk-attendance') }}">
             <div class="filters-grid">
-                <!-- Academic Year Dropdown -->
-                <div class="filter-col">
-                    <label>Academic Year *</label>
-                    <select name="academic_session_id" onchange="document.getElementById('bulkFilterForm').submit();">
-                        @foreach($academicSessions as $ses)
-                            <option value="{{ $ses->id }}" {{ $sessionId == $ses->id ? 'selected' : '' }}>{{ $ses->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
                 <!-- Select Class -->
                 <div class="filter-col">
                     <label>Select Class *</label>
@@ -715,6 +712,16 @@
                     <label>Search Student</label>
                     <input type="text" name="search" placeholder="Search students" value="{{ $search }}" onchange="document.getElementById('bulkFilterForm').submit();">
                 </div>
+
+                <!-- Academic Year Dropdown (next to Search) -->
+                <div class="filter-col">
+                    <label>Academic Year *</label>
+                    <select name="academic_session_id" onchange="document.getElementById('bulkFilterForm').submit();">
+                        @foreach($academicSessions as $ses)
+                            <option value="{{ $ses->id }}" {{ $sessionId == $ses->id ? 'selected' : '' }}>{{ $ses->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
         </form>
     </div>
@@ -728,10 +735,10 @@
             $sectionName = $selectedSection ? $selectedSection->name : 'N/A';
         @endphp
         <div class="notice-banner">
-            <p style="font-size:14px; font-weight:700; color:#1e40af; margin-bottom:6px;">Date Range: {{ date('d-m-Y', strtotime($fromDate)) }} to {{ date('d-m-Y', strtotime($toDate)) }} ({{ $totalDays }} days total - {{ $weekdays }} weekdays, {{ $weekends }} weekends)</p>
+            <p style="font-size:14px; font-weight:700; color:#1e40af; margin-bottom:6px;">Date Range: {{ date('d-m-Y', strtotime($fromDate)) }} to {{ date('d-m-Y', strtotime($toDate)) }} ({{ $totalDays }} days total — {{ $weekdays }} working days, {{ $weekends }} Sundays)</p>
             <p style="font-weight:600; color:#1e40af;">Class: {{ $className }} - {{ $sectionName }}</p>
             <p style="font-weight:600; color:#1e40af;">{{ $academicYearText }}</p>
-            <p style="color:#d97706; font-size:12px; font-weight:700;"><i class="fas fa-exclamation-triangle"></i> Maximum allowed range: 31 days • Attendance data will load automatically</p>
+            <p style="color:#d97706; font-size:12px; font-weight:700;"><i class="fas fa-info-circle"></i> Saturday = Working Day &nbsp;|&nbsp; Sunday = Holiday (auto-marked)</p>
         </div>
 
         <!-- Main Attendance Grid Form -->
@@ -762,15 +769,20 @@
                                     <th class="student-cell">Student Details</th>
                                     @foreach($datesInRange as $dObj)
                                         @php
-                                            $isWeekend = $dObj->isWeekend();
+                                            $isSunday   = ($dObj->dayOfWeek === 0);
+                                            $isSaturday = ($dObj->dayOfWeek === 6);
                                             $dateStr = $dObj->format('Y-m-d');
+                                            $headerClass = $isSunday ? 'sunday-header' : ($isSaturday ? 'saturday-header' : '');
                                         @endphp
-                                        <th class="date-column-header {{ $isWeekend ? 'weekend-header' : '' }}">
+                                        <th class="date-column-header {{ $headerClass }}">
                                             <div style="font-weight:700; color:#2d3748;">{{ $dObj->format('d M') }}</div>
-                                            <div style="color:#b45309; font-size:10px; font-weight:700; margin-top:2px; text-transform:uppercase;">
+                                            <div style="font-size:10px; font-weight:700; margin-top:2px; text-transform:uppercase;
+                                                {{ $isSunday ? 'color:#d97706;' : ($isSaturday ? 'color:#047857;' : 'color:#b45309;') }}">
                                                 {{ $dObj->format('D') }}
-                                                @if($isWeekend)
-                                                    <br><span style="font-size:8px; font-weight:800; color:#d97706;">Weekend</span>
+                                                @if($isSunday)
+                                                    <br><span style="font-size:8px; font-weight:800; color:#d97706;">Holiday</span>
+                                                @elseif($isSaturday)
+                                                    <br><span style="font-size:8px; font-weight:800; color:#047857;">Working</span>
                                                 @endif
                                             </div>
                                             <!-- Set All Dropdown -->
@@ -813,11 +825,13 @@
                                         
                                         @foreach($datesInRange as $dObj)
                                             @php
-                                                $dateStr = $dObj->format('Y-m-d');
-                                                $record = isset($attendanceMatrix[$st->id][$dateStr]) ? $attendanceMatrix[$st->id][$dateStr] : null;
-                                                $status = $record ? $record->status : 'not_marked';
+                                                $isSunday = ($dObj->dayOfWeek === 0);
+                                                $dateStr  = $dObj->format('Y-m-d');
+                                                $record   = isset($attendanceMatrix[$st->id][$dateStr]) ? $attendanceMatrix[$st->id][$dateStr] : null;
+                                                // Sunday defaults to 'holiday' if not already marked
+                                                $status   = $record ? $record->status : ($isSunday ? 'holiday' : 'not_marked');
                                             @endphp
-                                            <td>
+                                            <td {{ $isSunday ? 'style=background:#fffbeb;' : '' }}>
                                                 <div class="date-cell-container">
                                                     <!-- Status Select dropdown -->
                                                     <select name="attendance[{{ $st->id }}][{{ $dateStr }}][status]" class="status-select" data-date="{{ $dateStr }}" onchange="updateSelectColor(this)">

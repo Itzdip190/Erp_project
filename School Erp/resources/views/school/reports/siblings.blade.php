@@ -81,19 +81,36 @@
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>Guardian Contact</th>
-                    <th>Children</th>
+                    <th><i class="fas fa-phone" style="color:#7c3aed;"></i> Phone No.</th>
+                    <th><i class="fas fa-user-tie" style="color:#7c3aed;"></i> Father Name</th>
+                    <th><i class="fas fa-envelope" style="color:#7c3aed;"></i> Email</th>
                     <th>Students</th>
                     <th>Classes</th>
+                    <th>Count</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($siblingGroups as $i => $group)
+                @php
+                    $firstStudent = $group->first();
+                    $fatherName = $group->pluck('father_name')->filter()->first() ?? '—';
+                    $guardianPhone = $firstStudent->guardian_phone ?? '—';
+                    $guardianEmail = $firstStudent->guardian_email ?? $firstStudent->father_email ?? '—';
+                @endphp
                 <tr>
-                    <td>{{ $i + 1 }}</td>
-                    <td style="font-family:monospace; font-weight:700; color:#7c3aed;">{{ $group->first()->guardian_phone }}</td>
+                    <td style="font-weight:700; color:#7c3aed;">{{ $i + 1 }}</td>
                     <td>
-                        <span class="sr-badge sr-badge-info">{{ $group->count() }} children</span>
+                        <span style="font-family:monospace; font-weight:700; color:#7c3aed; font-size:13px;">
+                            {{ $guardianPhone }}
+                        </span>
+                    </td>
+                    <td style="font-weight:600; color:var(--sr-text);">{{ $fatherName }}</td>
+                    <td>
+                        @if($guardianEmail !== '—')
+                        <a href="mailto:{{ $guardianEmail }}" style="color:#7c3aed; font-size:12px; word-break:break-all;">{{ $guardianEmail }}</a>
+                        @else
+                        <span style="color:var(--sr-text2);">—</span>
+                        @endif
                     </td>
                     <td>
                         @foreach($group as $student)
@@ -108,10 +125,13 @@
                         <div style="font-size:12px; color:var(--sr-text2);">{{ optional($student->class)->name ?? '—' }} / {{ optional($student->section)->name ?? '—' }}</div>
                         @endforeach
                     </td>
+                    <td>
+                        <span class="sr-badge sr-badge-info">{{ $group->count() }} children</span>
+                    </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5">
+                    <td colspan="7">
                         <div class="sr-empty">
                             <i class="fas fa-people-group"></i>
                             <p>No sibling groups found. Students sharing the same guardian phone are grouped as siblings.</p>
@@ -147,14 +167,44 @@ new Chart(document.getElementById('sizeChart'), {
 });
 
 function downloadTableCSV() {
-    const table = document.getElementById('mainDataTable');
-    let csv = [];
-    for (let r of table.rows) {
-        let row = [];
-        for (let c of r.cells) row.push('"' + c.innerText.replace(/"/g,'""').trim() + '"');
-        csv.push(row.join(','));
-    }
-    const blob = new Blob([csv.join('\n')], { type:'text/csv' });
+    // Build CSV with separate columns: #, Phone No., Father Name, Email, Student Name, Admission No, Class/Section
+    const siblingGroups = @json($siblingGroups->map(function($group) {
+        $first = $group->first();
+        return [
+            'phone'       => $first->guardian_phone ?? '',
+            'father_name' => $group->pluck('father_name')->filter()->first() ?? '',
+            'email'       => $first->guardian_email ?? $first->father_email ?? '',
+            'students'    => $group->map(fn($s) => [
+                'name'    => $s->first_name . ' ' . $s->last_name,
+                'admno'   => $s->admission_number,
+                'class'   => optional($s->class)->name . ' / ' . optional($s->section)->name,
+                'gender'  => $s->gender,
+                'status'  => $s->is_active ? 'Active' : 'Inactive',
+            ])->values()
+        ];
+    })->values());
+
+    const headers = ['#', 'Phone Number', 'Father Name', 'Email', 'Student Name', 'Admission No.', 'Class & Section', 'Gender', 'Status'];
+    let rows = [headers.map(h => '"' + h + '"').join(',')];
+
+    siblingGroups.forEach((group, gi) => {
+        group.students.forEach((student, si) => {
+            const row = [
+                si === 0 ? (gi + 1) : '',
+                si === 0 ? group.phone    : '',
+                si === 0 ? group.father_name : '',
+                si === 0 ? group.email    : '',
+                student.name,
+                student.admno,
+                student.class,
+                student.gender,
+                student.status,
+            ];
+            rows.push(row.map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(','));
+        });
+    });
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'sibling_report_{{ now()->format("Y-m-d") }}.csv';

@@ -161,9 +161,12 @@ body.dark-mode .btn-sa-cancel:hover { background: #111827 !important; }
                 <p>Update school parameters, administrative details, credentials, and active subscription package</p>
             </div>
         </div>
-        <div>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <a href="{{ route('superadmin.schools.inactive-students', $school->id) }}" class="btn-sa-cancel" style="background:#fee2e2; border-color:#fca5a5; color:#ef4444; font-size:12px; padding:8px 14px; border-radius:10px; display:inline-flex; align-items:center; gap:6px;">
                 <i class="fas fa-user-slash"></i> Inactive Students ({{ \App\Models\Student::where('school_id', $school->id)->where('is_active', 0)->count() }})
+            </a>
+            <a href="{{ route('superadmin.schools.reset-data', $school->id) }}" class="btn-sa-cancel" style="background:#fef2f2; border-color:#f87171; color:#b91c1c; font-size:12px; padding:8px 14px; border-radius:10px; display:inline-flex; align-items:center; gap:6px; font-weight:800;">
+                <i class="fas fa-database"></i> Reset School Data
             </a>
         </div>
     </div>

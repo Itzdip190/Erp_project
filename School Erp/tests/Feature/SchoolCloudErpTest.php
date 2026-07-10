@@ -783,6 +783,60 @@ class SchoolCloudErpTest extends TestCase
         $this->assertEquals('ABCDE1234F', $staff->pan_number);
     }
 
+    public function test_staff_bulk_delete_and_reimport(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+
+        // 1. Perform Import first to create staff + user
+        $csvContent = "Employee ID * (required),First Name * (required),Last Name,Email * (required),Phone number * (required),Pan Number,Adhar Number\n" .
+                      "EMPTEST888,Bob,Builder,bob.builder.staff@yis.com,9876543215,ABCDE1234F,123456789012";
+
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('staff_import.csv', $csvContent);
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/staff/import', [
+                'csv_file' => $file
+            ]);
+
+        $response->assertRedirect();
+
+        // Verify Staff & User exist
+        $staff = \App\Models\Staff::where('employee_id', 'EMPTEST888')->first();
+        $this->assertNotNull($staff);
+        $user = $staff->user;
+        $this->assertNotNull($user);
+
+        // Delete the staff profile (simulates destroy method)
+        $staff->delete(); // Soft delete
+        $user->delete();  // Hard delete user
+
+        // Verify they are deleted/soft-deleted
+        $this->assertNull(\App\Models\Staff::where('employee_id', 'EMPTEST888')->first());
+        $this->assertNotNull(\App\Models\Staff::withTrashed()->where('employee_id', 'EMPTEST888')->first());
+        $this->assertNull(User::where('email', 'bob.builder.staff@yis.com')->first());
+
+        // 2. Re-import the exact same data to verify it restores and updates
+        $fileReimport = \Illuminate\Http\UploadedFile::fake()->createWithContent('staff_import.csv', $csvContent);
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/staff/import', [
+                'csv_file' => $fileReimport
+            ]);
+
+        $response->assertRedirect();
+
+        // Verify Staff is restored and user is created/re-linked
+        $restoredStaff = \App\Models\Staff::where('employee_id', 'EMPTEST888')->first();
+        $this->assertNotNull($restoredStaff);
+        $this->assertNull($restoredStaff->deleted_at);
+
+        $recreatedUser = $restoredStaff->user;
+        $this->assertNotNull($recreatedUser);
+        $this->assertEquals('bob.builder.staff@yis.com', $recreatedUser->email);
+    }
+
     public function test_staff_bulk_attendance(): void
     {
         $schoolAdmin = User::where('email', 'admin@yis.com')->first();
@@ -1361,6 +1415,80 @@ class SchoolCloudErpTest extends TestCase
         $this->assertEquals($class->id, $student->class_id);
     }
 
+    public function test_student_bulk_delete_and_reimport(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $superAdmin = User::where('email', 'superadmin@schoolcloud.com')->first();
+        $class = SchoolClass::where('school_id', $schoolAdmin->school_id)->first();
+        $section = Section::where('class_id', $class->id)->first();
+        $session = AcademicSession::where('school_id', $schoolAdmin->school_id)->first();
+
+        // 1. Perform Import first to create student + student user + parent user
+        $csvContent = "first_name,last_name,gender,date_of_birth,guardian_name,guardian_phone,guardian_relationship,address,city,state,pincode,class_id,section_id,academic_session_id,admission_date,email\n" .
+                      "Bob,Builder,male,2015-08-20,Richard Builder,9876543225,father,456 Main St,Metropolis,NY,10001,{$class->id},{$section->id},{$session->id},2026-06-01,bob.builder@student.yis.com";
+
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('students_import.csv', $csvContent);
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders([
+                'X-School-Code' => 'YIS2024',
+                'X-Requested-With' => 'XMLHttpRequest'
+            ])
+            ->post('/school/students/import', [
+                'file' => $file
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        // Verify Student & User exist
+        $student = Student::where('first_name', 'Bob')->first();
+        $this->assertNotNull($student);
+        $this->assertNotNull($student->user_id);
+        $studentUserId = $student->user_id;
+
+        $studentUser = User::find($studentUserId);
+        $this->assertNotNull($studentUser);
+        $this->assertEquals('bob.builder@student.yis.com', $studentUser->email);
+
+        // Deactivate student (so they become inactive for deletion)
+        $student->update(['is_active' => false]);
+
+        // 2. Perform Permanent Bulk Delete via SuperAdmin
+        $response = $this->actingAs($superAdmin)
+            ->post("/superadmin/schools/{$schoolAdmin->school_id}/inactive-students/delete", [
+                'student_ids' => [$student->id]
+            ]);
+        $response->assertRedirect();
+
+        // Verify Student & Student User are deleted
+        $this->assertNull(Student::find($student->id));
+        $this->assertNull(User::find($studentUserId));
+
+        // 3. Re-import the exact same data to verify it works without unique constraint error
+        $fileReimport = \Illuminate\Http\UploadedFile::fake()->createWithContent('students_import.csv', $csvContent);
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders([
+                'X-School-Code' => 'YIS2024',
+                'X-Requested-With' => 'XMLHttpRequest'
+            ])
+            ->post('/school/students/import', [
+                'file' => $fileReimport
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        // Verify Student & Student User were created successfully again
+        $reimportedStudent = Student::where('first_name', 'Bob')->first();
+        $this->assertNotNull($reimportedStudent);
+        $this->assertNotNull($reimportedStudent->user_id);
+        $reimportedStudentUser = User::find($reimportedStudent->user_id);
+        $this->assertNotNull($reimportedStudentUser);
+        $this->assertEquals('bob.builder@student.yis.com', $reimportedStudentUser->email);
+    }
+
     public function test_student_bulk_photo_upload(): void
     {
         \Illuminate\Support\Facades\Storage::fake('public');
@@ -1444,9 +1572,7 @@ class SchoolCloudErpTest extends TestCase
                 'custom_domain' => 'new-test-school.example.com',
                 'status' => 'active',
                 'admin_name' => 'New School Admin',
-                'admin_email' => 'admin@newtestschool.com',
-                'admin_password' => 'SecurePassword2026!',
-                'admin_password_confirmation' => 'SecurePassword2026!',
+                'email' => 'admin@newtestschool.com',
             ]);
 
         $response->assertRedirect('/superadmin/schools');
@@ -1468,7 +1594,7 @@ class SchoolCloudErpTest extends TestCase
         // Verify we can login as the newly created school admin and get redirected correctly
         $response = $this->post('/login', [
             'email' => 'admin@newtestschool.com',
-            'password' => 'SecurePassword2026!',
+            'password' => 'test@123',
         ]);
 
         $response->assertRedirect('/school/dashboard');
@@ -2187,7 +2313,629 @@ class SchoolCloudErpTest extends TestCase
         $student->refresh();
         $this->assertEquals($schedule->id, $student->fee_schedule_id);
     }
+
+    public function test_school_signup_submits_successfully(): void
+    {
+        $response = $this->post('/school/signup', [
+            'name'          => 'Greenwood Test School',
+            'director_name' => 'Dr. Greenwood Admin',
+            'school_type'   => 'CBSE',
+            'email'         => 'contact@greenwoodtest.com',
+            'phone'         => '+91 99999 88888',
+        ]);
+
+        $response->assertRedirect(route('school.signup'));
+        $response->assertSessionHas('success');
+
+        // Assert database record exists in school_requests
+        $this->assertDatabaseHas('school_requests', [
+            'name'          => 'Greenwood Test School',
+            'director_name' => 'Dr. Greenwood Admin',
+            'school_type'   => 'CBSE',
+            'email'         => 'contact@greenwoodtest.com',
+            'admin_name'    => 'Dr. Greenwood Admin',
+            'admin_email'   => 'contact@greenwoodtest.com',
+            'status'        => 'pending',
+        ]);
+    }
+
+    public function test_student_profile_360_and_pdf_download(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $schoolId = $schoolAdmin->school_id;
+        $student = Student::where('school_id', $schoolId)->first();
+
+        // 1. Test student show profile 360 page loads and passes all variables
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get("/school/students/{$student->id}");
+
+        $response->assertStatus(200);
+        $response->assertViewHasAll([
+            'student',
+            'attendances',
+            'totalDays',
+            'presentDays',
+            'absentDays',
+            'lateDays',
+            'attendancePercentage',
+            'siblings',
+            'marks',
+            'fees',
+            'refunds',
+            'receipts',
+            'busAttendances',
+            'offlineTests',
+            'leaves',
+        ]);
+
+        // 2. Test student download admission form PDF
+        $response2 = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get("/school/students/{$student->id}/download-pdf");
+        $response2->assertStatus(200);
+
+        // 3. Test student download form-only PDF
+        $response3 = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get("/school/students/{$student->id}/download-pdf?type=form_only");
+        $response3->assertStatus(200);
+    }
+
+    /**
+     * Test transport opted student fees applicability and student mapping updates.
+     */
+    public function test_transport_opted_student_fees_applicability(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $schoolId = $schoolAdmin->school_id;
+        $student = Student::where('school_id', $schoolId)->first();
+
+        // 1. Verify default state - transport not opted
+        $student->update([
+            'transport_opted' => false,
+            'transport_route' => null,
+            'transport_pick_fare' => 500,
+            'transport_drop_fare' => 500
+        ]);
+        $this->assertFalse($student->hasTransportAssigned());
+        $this->assertEquals(0, $student->transportTotalFare);
+
+        // 2. Verify state when opted and route assigned
+        $student->update([
+            'transport_opted' => true,
+            'transport_route' => 'Route A',
+            'transport_route_id' => 1
+        ]);
+        $this->assertTrue($student->hasTransportAssigned());
+        $this->assertEquals(1000, $student->transportTotalFare);
+
+        // 3. Test POST student mapping update
+        $route = \App\Models\TransportRoute::firstOrCreate(
+            ['school_id' => $schoolId, 'name' => 'Route Z'],
+            ['pick_fare' => 600, 'drop_fare' => 400]
+        );
+
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/transport/student-route-mapping', [
+                'student_id' => $student->id,
+                'transport_route_id' => $route->id,
+                'transport_route' => $route->name,
+                'transport_pick_fare' => 600,
+                'transport_drop_fare' => 400,
+                'transport_pickup_location' => 'Pickup Spot Z',
+                'transport_drop_location' => 'Drop Spot Z',
+                'transport_pickup_time' => '08:00',
+                'transport_drop_time' => '16:00',
+                'transport_calendar_start' => '2026-07-09',
+                'transport_month' => 'July 2026'
+            ]);
+
+        $response->assertRedirect();
+        
+        $student->refresh();
+        $this->assertTrue($student->transport_opted);
+        $this->assertEquals('Route Z', $student->transport_route);
+        $this->assertEquals(600, $student->transport_pick_fare);
+        $this->assertEquals(400, $student->transport_drop_fare);
+        $this->assertEquals(1000, $student->transportTotalFare);
+        $this->assertTrue($student->hasTransportAssigned());
+
+        // 4. Clear/Opt-out student transport
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/transport/student-route-mapping', [
+                'student_id' => $student->id,
+                'transport_route_id' => '',
+                'transport_route' => ''
+            ]);
+
+        $response->assertRedirect();
+        
+        $student->refresh();
+        $this->assertFalse($student->transport_opted);
+        $this->assertNull($student->transport_route);
+        $this->assertEquals(0, $student->transportTotalFare);
+        $this->assertFalse($student->hasTransportAssigned());
+    }
+
+    /**
+     * Test vehicle expense syncing to general school expenses report.
+     */
+    public function test_vehicle_expense_sync_to_school_expenses_report(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $schoolId = $schoolAdmin->school_id;
+        
+        $vehicle = \App\Models\Vehicle::firstOrCreate(
+            ['school_id' => $schoolId, 'vehicle_no' => 'MH-12-TP-9999'],
+            ['capacity' => 40, 'status' => true]
+        );
+
+        // 1. Create a VehicleExpense via POST
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/transport/vehicle-expenses', [
+                'vehicle_id' => $vehicle->id,
+                'expense_type' => 'Custom Repair',
+                'amount' => 4500.00,
+                'date' => '2026-07-09',
+                'description' => 'Replaced bus front bumper'
+            ]);
+
+        $response->assertRedirect();
+
+        $vehicleExpense = \App\Models\VehicleExpense::where('vehicle_id', $vehicle->id)->where('expense_type', 'Custom Repair')->first();
+        $this->assertNotNull($vehicleExpense);
+        $this->assertNotNull($vehicleExpense->school_expense_id);
+
+        $schoolExpense = \App\Models\SchoolExpense::find($vehicleExpense->school_expense_id);
+        $this->assertNotNull($schoolExpense);
+        $this->assertEquals('transport', $schoolExpense->category);
+        $this->assertEquals(4500.00, $schoolExpense->amount);
+        $this->assertEquals('2026-07-09', $schoolExpense->expense_date->format('Y-m-d'));
+        $this->assertStringContainsString('Vehicle Expense: Custom Repair', $schoolExpense->title);
+
+        // 2. Update the VehicleExpense via POST (with ID)
+        $response2 = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/transport/vehicle-expenses', [
+                'id' => $vehicleExpense->id,
+                'vehicle_id' => $vehicle->id,
+                'expense_type' => 'Custom Repair - Updated',
+                'amount' => 5000.00,
+                'date' => '2026-07-10',
+                'description' => 'Replaced bus front bumper and side mirrors'
+            ]);
+
+        $response2->assertRedirect();
+        
+        $schoolExpense->refresh();
+        $this->assertEquals(5000.00, $schoolExpense->amount);
+        $this->assertEquals('2026-07-10', $schoolExpense->expense_date->format('Y-m-d'));
+        $this->assertStringContainsString('Vehicle Expense: Custom Repair - Updated', $schoolExpense->title);
+
+        // 3. Delete the VehicleExpense
+        $response3 = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/transport/delete', [
+                'id' => $vehicleExpense->id,
+                'type' => 'expense'
+            ]);
+
+        $response3->assertRedirect();
+
+        $this->assertNull(\App\Models\VehicleExpense::find($vehicleExpense->id));
+        $this->assertNull(\App\Models\SchoolExpense::find($schoolExpense->id));
+    }
+
+    /**
+     * Test that refunding and then cancelling a refund preserves the fee structure exactly.
+     */
+    public function test_refund_cancellation_preserves_fee_structure(): void
+    {
+        $schoolAdmin = \App\Models\User::where('email', 'admin@yis.com')->first();
+        $student = \App\Models\Student::where('school_id', $schoolAdmin->school_id)->first();
+        $academicSession = \App\Models\AcademicSession::where('school_id', $schoolAdmin->school_id)->where('is_current', true)->first();
+
+        // 1. Create a FeeComponent
+        $feeComponent = \App\Models\FeeComponent::create([
+            'school_id' => $student->school_id,
+            'academic_session_id' => $academicSession->id,
+            'head_name' => 'Tuition Fee Head Test',
+            'component_name' => 'Tuition Fee Component Test',
+            'admission_type' => 'both',
+            'gender' => 'both'
+        ]);
+
+        // 2. Create a FeeSchedule if none exists
+        $feeSchedule = \App\Models\FeeSchedule::where('school_id', $student->school_id)->first();
+        if (!$feeSchedule) {
+            $feeSchedule = \App\Models\FeeSchedule::create([
+                'school_id' => $student->school_id,
+                'academic_session_id' => $academicSession->id,
+                'classes' => json_encode(['Class 9', 'Class 10']),
+                'no_of_installments' => 1,
+                'name' => 'General Schedule Test',
+                'start_date' => '2026-04-01',
+                'end_date' => '2027-03-31'
+            ]);
+        }
+
+        $category = \App\Models\StudentCategory::where('school_id', $student->school_id)->first();
+        if (!$category) {
+            $category = \App\Models\StudentCategory::create([
+                'school_id' => $student->school_id,
+                'name' => 'Day boarding'
+            ]);
+        }
+
+        // 3. Create a ClassWiseFee record for this student's class
+        $classWiseFee = \App\Models\ClassWiseFee::create([
+            'school_id' => $student->school_id,
+            'academic_session_id' => $academicSession->id,
+            'class_id' => $student->class_id,
+            'section_id' => null,
+            'fee_schedule_id' => $feeSchedule->id,
+            'student_category_id' => $category->id,
+            'fee_component_id' => $feeComponent->id,
+            'is_active' => true,
+            'amount' => 1500.00,
+            'installments' => [
+                [
+                    'installment_no' => 1,
+                    'amount' => 1500.00,
+                    'date_range' => '01/04/2026 - 30/04/2026'
+                ]
+            ]
+        ]);
+
+        // Clean slate for student
+        \App\Models\StudentFee::where('student_id', $student->id)->delete();
+        \App\Models\FeeInvoice::where('student_id', $student->id)->delete();
+        \App\Models\FeeRefund::where('student_id', $student->id)->delete();
+
+        // Update student schedule ID to match
+        $student->fee_schedule_id = $feeSchedule->id;
+        $student->save();
+
+        // 1. Sync student fees
+        \App\Http\Controllers\School\FeeManagementController::syncStudentFees($student);
+        $fees = \App\Models\StudentFee::where('student_id', $student->id)->get();
+        $totalOriginal = $fees->sum('amount');
+        
+        $this->assertGreaterThan(0, $totalOriginal);
+
+        // 2. Pay 1500 on the first fee component
+        $firstFee = $fees->first();
+        $firstFee->paid_amount = 1500.00;
+        $firstFee->status = 'paid';
+        $firstFee->save();
+
+        // Create the corresponding payment invoice
+        $paymentInvoice = \App\Models\FeeInvoice::create([
+            'school_id' => 1,
+            'student_id' => $student->id,
+            'created_by' => $schoolAdmin->id,
+            'invoice_number' => 'INV-1-TEST-PAY',
+            'installment_no' => $firstFee->installment_no,
+            'type' => 'payment',
+            'status' => 'paid',
+            'amount' => 1500.00,
+            'payment_mode' => 'cash',
+            'payment_date' => now()->toDateString(),
+        ]);
+
+        // 3. Process a refund of 500
+        $responseRefund = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/fees/student-wise', [
+                'action' => 'process_refund',
+                'student_id' => $student->id,
+                'refund_date' => now()->toDateString(),
+                'slip_no' => 'REF-999998',
+                'payment_mode' => 'cash',
+                'reason' => 'Test Refund Action',
+                'fee_ids' => [$firstFee->id],
+                'amount' => 500
+            ]);
+
+        $responseRefund->assertRedirect();
+        
+        // Assert fee record paid amount remains unchanged (1500) under the new model
+        $firstFee->refresh();
+        $this->assertEquals(1500.00, $firstFee->paid_amount);
+        $this->assertEquals('paid', $firstFee->status);
+
+        // Assert FeeRefund log is created
+        $refundLog = \App\Models\FeeRefund::where('student_id', $student->id)->first();
+        $this->assertNotNull($refundLog);
+        $this->assertEquals(500.00, $refundLog->amount);
+
+        // Assert FeeInvoice of type refund is created
+        $refundInvoice = \App\Models\FeeInvoice::where('student_id', $student->id)->where('type', 'refund')->first();
+        $this->assertNotNull($refundInvoice);
+        $this->assertEquals('refunded', $refundInvoice->status);
+
+        // 4. Cancel the refund
+        $responseCancel = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/fees/student-wise', [
+                'action' => 'cancel_invoice',
+                'student_id' => $student->id,
+                'invoice_no' => $refundInvoice->invoice_number,
+                'remarks' => 'Cancel Test Refund Action',
+                'installment_no' => $firstFee->installment_no
+            ]);
+
+        $responseCancel->assertRedirect();
+
+        // 5. Assertions
+        $firstFee->refresh();
+        $refundInvoice->refresh();
+
+        // Paid amount must remain 1500.00 (untouched)
+        $this->assertEquals(1500.00, $firstFee->paid_amount);
+        // Status of the component must still be 'paid'
+        $this->assertEquals('paid', $firstFee->status);
+        // Refund invoice status must be 'cancelled'
+        $this->assertEquals('cancelled', $refundInvoice->status);
+        // The FeeRefund log must be deleted
+        $this->assertNull(\App\Models\FeeRefund::find($refundLog->id));
+
+        // Sync again and verify total fees and installments are completely unchanged
+        \App\Http\Controllers\School\FeeManagementController::syncStudentFees($student);
+        $finalFees = \App\Models\StudentFee::where('student_id', $student->id)->get();
+        $this->assertEquals($totalOriginal, $finalFees->sum('amount'));
+    }
+
+    /**
+     * Test cancellation of legacy refunds by slip_no where no FeeInvoice record exists.
+     */
+    public function test_legacy_refund_cancellation_by_slip_no(): void
+    {
+        $schoolAdmin = \App\Models\User::where('email', 'admin@yis.com')->first();
+        $student = \App\Models\Student::where('school_id', $schoolAdmin->school_id)->first();
+        $academicSession = \App\Models\AcademicSession::where('school_id', $schoolAdmin->school_id)->where('is_current', true)->first();
+
+        // 1. Create a FeeComponent
+        $feeComponent = \App\Models\FeeComponent::create([
+            'school_id' => $student->school_id,
+            'academic_session_id' => $academicSession->id,
+            'head_name' => 'Legacy Fee Head Test',
+            'component_name' => 'Legacy Fee Component Test',
+            'admission_type' => 'both',
+            'gender' => 'both'
+        ]);
+
+        // 2. Create a FeeSchedule if none exists
+        $feeSchedule = \App\Models\FeeSchedule::where('school_id', $student->school_id)->first();
+        if (!$feeSchedule) {
+            $feeSchedule = \App\Models\FeeSchedule::create([
+                'school_id' => $student->school_id,
+                'academic_session_id' => $academicSession->id,
+                'classes' => json_encode(['Class 9', 'Class 10']),
+                'no_of_installments' => 1,
+                'name' => 'General Schedule Test',
+                'start_date' => '2026-04-01',
+                'end_date' => '2027-03-31'
+            ]);
+        }
+
+        $category = \App\Models\StudentCategory::where('school_id', $student->school_id)->first();
+        if (!$category) {
+            $category = \App\Models\StudentCategory::create([
+                'school_id' => $student->school_id,
+                'name' => 'Day boarding'
+            ]);
+        }
+
+        // 3. Create a ClassWiseFee record for this student's class
+        $classWiseFee = \App\Models\ClassWiseFee::create([
+            'school_id' => $student->school_id,
+            'academic_session_id' => $academicSession->id,
+            'class_id' => $student->class_id,
+            'section_id' => null,
+            'fee_schedule_id' => $feeSchedule->id,
+            'student_category_id' => $category->id,
+            'fee_component_id' => $feeComponent->id,
+            'is_active' => true,
+            'amount' => 1500.00,
+            'installments' => [
+                [
+                    'installment_no' => 1,
+                    'amount' => 1500.00,
+                    'date_range' => '01/04/2026 - 30/04/2026'
+                ]
+            ]
+        ]);
+
+        // Clean slate for student
+        \App\Models\StudentFee::where('student_id', $student->id)->delete();
+        \App\Models\FeeInvoice::where('student_id', $student->id)->delete();
+        \App\Models\FeeRefund::where('student_id', $student->id)->delete();
+
+        // Update student schedule ID to match
+        $student->fee_schedule_id = $feeSchedule->id;
+        $student->save();
+
+        // Sync student fees
+        \App\Http\Controllers\School\FeeManagementController::syncStudentFees($student);
+        $fees = \App\Models\StudentFee::where('student_id', $student->id)->get();
+        $this->assertCount(1, $fees);
+        $firstFee = $fees->first();
+
+        // Pay 1500 on the first fee component
+        $firstFee->paid_amount = 1500.00;
+        $firstFee->status = 'paid';
+        $firstFee->save();
+
+        // Create legacy FeeRefund directly in database (no FeeInvoice created)
+        $refundLog = \App\Models\FeeRefund::create([
+            'school_id'      => $student->school_id,
+            'student_id'     => $student->id,
+            'student_fee_id' => $firstFee->id,
+            'amount'         => 500.00,
+            'refund_date'    => now()->toDateString(),
+            'reason'         => "Legacy Refund",
+            'slip_no'        => 'REF-LEGACY-123456',
+            'payment_mode'   => 'cash'
+        ]);
+
+        // Cancel the legacy refund using its slip_no
+        $responseCancel = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->post('/school/fees/student-wise', [
+                'action' => 'cancel_invoice',
+                'student_id' => $student->id,
+                'invoice_no' => 'REF-LEGACY-123456',
+                'remarks' => 'Cancel Legacy Refund Remarks',
+                'installment_no' => $firstFee->installment_no
+            ]);
+
+        $responseCancel->assertRedirect();
+
+        // Assert FeeRefund log is deleted
+        $this->assertNull(\App\Models\FeeRefund::find($refundLog->id));
+
+        // Assert cancel_refund FeeInvoice entry is created to record the ledger entry
+        $cancelInvoice = \App\Models\FeeInvoice::where('student_id', $student->id)
+            ->where('type', 'cancel_refund')
+            ->first();
+        $this->assertNotNull($cancelInvoice);
+        $this->assertEquals(500.00, $cancelInvoice->amount);
+        $this->assertEquals('cancelled', $cancelInvoice->status);
+
+        // Paid amount and status remain untouched
+        $firstFee->refresh();
+        $this->assertEquals(1500.00, $firstFee->paid_amount);
+        $this->assertEquals('paid', $firstFee->status);
+    }
+
+    /**
+     * Test that the student-invoices AJAX endpoint resolves successfully for both payment and refund invoices.
+     */
+    public function test_get_student_invoices_endpoint_resolves_without_error(): void
+    {
+        $schoolAdmin = \App\Models\User::where('email', 'admin@yis.com')->first();
+        $student = \App\Models\Student::where('school_id', $schoolAdmin->school_id)->first();
+        $academicSession = \App\Models\AcademicSession::where('school_id', $schoolAdmin->school_id)->where('is_current', true)->first();
+
+        // 1. Create a FeeComponent
+        $feeComponent = \App\Models\FeeComponent::create([
+            'school_id' => $student->school_id,
+            'academic_session_id' => $academicSession->id,
+            'head_name' => 'Tuition Fee Head Test',
+            'component_name' => 'Tuition Fee Component Test',
+            'admission_type' => 'both',
+            'gender' => 'both'
+        ]);
+
+        // 2. Query/Create FeeCategory and FeeSchedule
+        $feeCategory = \App\Models\FeeCategory::where('school_id', $student->school_id)->first();
+        if (!$feeCategory) {
+            $feeCategory = \App\Models\FeeCategory::create([
+                'school_id' => $student->school_id,
+                'name' => 'Tuition Fee Category'
+            ]);
+        }
+
+        $feeSchedule = \App\Models\FeeSchedule::where('school_id', $student->school_id)->first();
+        if (!$feeSchedule) {
+            $feeSchedule = \App\Models\FeeSchedule::create([
+                'school_id' => $student->school_id,
+                'academic_session_id' => $academicSession->id,
+                'classes' => json_encode(['Class 9', 'Class 10']),
+                'no_of_installments' => 1,
+                'name' => 'General Schedule Test',
+                'start_date' => '2026-04-01',
+                'end_date' => '2027-03-31'
+            ]);
+        }
+
+        // 3. Create student fee
+        $studentFee = \App\Models\StudentFee::create([
+            'school_id' => $student->school_id,
+            'student_id' => $student->id,
+            'fee_category_id' => $feeCategory->id,
+            'fee_schedule_id' => $feeSchedule->id,
+            'fee_component_id' => $feeComponent->id,
+            'installment_no' => 1,
+            'amount' => 1000.00,
+            'paid_amount' => 1000.00,
+            'due_date' => now()->toDateString(),
+            'status' => 'paid',
+        ]);
+
+        // 3. Create a payment invoice (flat array layout)
+        \App\Models\FeeInvoice::create([
+            'school_id' => $student->school_id,
+            'student_id' => $student->id,
+            'created_by' => $schoolAdmin->id,
+            'invoice_number' => 'INV-PAY-123',
+            'installment_no' => 1,
+            'type' => 'payment',
+            'status' => 'paid',
+            'amount' => 1000.00,
+            'payment_mode' => 'cash',
+            'payment_date' => now()->toDateString(),
+            'payment_details' => json_encode([
+                [
+                    'student_fee_id' => $studentFee->id,
+                    'component_name' => 'Tuition Fee Component Test',
+                    'installment_no' => 1,
+                    'amount_paid' => 1000.00
+                ]
+            ])
+        ]);
+
+        // 4. Create a refund invoice (nested components layout)
+        \App\Models\FeeInvoice::create([
+            'school_id' => $student->school_id,
+            'student_id' => $student->id,
+            'created_by' => $schoolAdmin->id,
+            'invoice_number' => 'INV-REF-123',
+            'installment_no' => 1,
+            'type' => 'refund',
+            'status' => 'refunded',
+            'amount' => 500.00,
+            'payment_mode' => 'cash',
+            'payment_date' => now()->toDateString(),
+            'payment_details' => json_encode([
+                'slip_no' => 'REF-SLIP-123',
+                'components' => [
+                    [
+                        'student_fee_id' => $studentFee->id,
+                        'component_name' => 'Tuition Fee Component Test',
+                        'installment_no' => 1,
+                        'amount_paid' => 500.00
+                    ]
+                ]
+            ])
+        ]);
+
+        // 5. Query the endpoint
+        $response = $this->actingAs($schoolAdmin)
+            ->withHeaders(['X-School-Code' => 'YIS2024'])
+            ->get("/school/fees/student-invoices/{$student->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+
+        // Confirm both invoices are returned and parsed
+        $invoices = $response->json('invoices');
+        $this->assertCount(2, $invoices);
+        
+        // Confirm first invoice components are parsed
+        $this->assertCount(1, $invoices[0]['components']);
+        
+        // Confirm second invoice (refund) components are parsed and don't throw error
+        $this->assertCount(1, $invoices[1]['components']);
+    }
 }
+
+
 
 
 

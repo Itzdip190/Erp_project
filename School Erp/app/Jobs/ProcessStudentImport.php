@@ -431,12 +431,20 @@ class ProcessStudentImport implements ShouldQueue
                     
                     $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
                     if (!empty($mappedData['email'])) {
-                        $studentEmail = $mappedData['email'];
+                        $studentEmail = strtolower(trim((string)$mappedData['email']));
                     }
 
                     $studentUser = null;
                     if ($existingStudent && $existingStudent->user_id) {
-                        $studentUser = User::find($existingStudent->user_id);
+                        $studentUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)->find($existingStudent->user_id);
+                    }
+
+                    if (!$studentUser) {
+                        // Fallback: Check if user already exists by email in the same school (e.g. orphaned from previous student deletions)
+                        $studentUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                            ->where('school_id', $this->schoolId)
+                            ->where('email', $studentEmail)
+                            ->first();
                     }
 
                     if ($studentUser) {
@@ -446,17 +454,21 @@ class ProcessStudentImport implements ShouldQueue
                             'phone' => $mappedData['guardian_phone'] ?? $studentUser->phone,
                         ]);
                     } else {
-                        // Make sure studentEmail is unique globally if it's generated
-                        if (empty($mappedData['email'])) {
-                            $emailExists = User::where('email', $studentEmail)->exists();
-                            if ($emailExists) {
-                                $suffix = 1;
-                                do {
-                                    $suffix++;
-                                    $testEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '_' . $suffix . '@student.yis.com';
-                                } while (User::where('email', $testEmail)->exists());
-                                $studentEmail = $testEmail;
-                            }
+                        // Make sure studentEmail is unique globally
+                        $emailExistsGlobally = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                            ->where('email', $studentEmail)
+                            ->exists();
+
+                        if ($emailExistsGlobally) {
+                            $suffix = 1;
+                            $emailParts = explode('@', $studentEmail);
+                            $emailLocal = $emailParts[0];
+                            $emailDomain = $emailParts[1] ?? 'student.yis.com';
+                            do {
+                                $suffix++;
+                                $testEmail = $emailLocal . '_' . $suffix . '@' . $emailDomain;
+                            } while (User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)->where('email', $testEmail)->exists());
+                            $studentEmail = $testEmail;
                         }
 
                         $studentUser = User::create([
@@ -477,23 +489,45 @@ class ProcessStudentImport implements ShouldQueue
                         $parentEmail = $mappedData['guardian_email'];
                         if (empty($parentEmail)) {
                             $parentEmail = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $mappedData['father_name'] ?? 'father')) . '.' . $cleanAdmissionId . '@parent.yis.com';
+                        } else {
+                            $parentEmail = strtolower(trim((string)$parentEmail));
                         }
                         
-                        $parentUser = User::where('school_id', $this->schoolId)
-                            ->where(function($q) use ($parentEmail, $parentPhone) {
-                                $q->where('email', $parentEmail);
-                                if (!empty($parentPhone)) {
-                                    $q->orWhere('phone', $parentPhone);
-                                }
-                            })->first();
+                        $cleanParentPhone = null;
+                        if (!empty($parentPhone)) {
+                            $digitsOnly = preg_replace('/[^0-9]/', '', $parentPhone);
+                            $isPlaceholder = in_array(strtolower(trim($parentPhone)), ['n.a.', 'na', 'n/a', 'none', 'null', 'nil', 'placeholder', 'no', 'not available']);
+                            if (strlen($digitsOnly) >= 7 && !$isPlaceholder && !preg_match('/^(0|1|2|3|4|5|6|7|8|9)\1+$/', $digitsOnly)) {
+                                $cleanParentPhone = $parentPhone;
+                            }
+                        }
+
+                        $parentUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                            ->where('school_id', $this->schoolId)
+                            ->where('email', $parentEmail)
+                            ->first();
+
+                        if (!$parentUser && !empty($cleanParentPhone)) {
+                            $parentUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                                ->where('school_id', $this->schoolId)
+                                ->where('phone', $cleanParentPhone)
+                                ->first();
+                        }
 
                         if (!$parentUser) {
-                            if (empty($mappedData['guardian_email']) && User::where('email', $parentEmail)->exists()) {
+                            $parentEmailExistsGlobally = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                                ->where('email', $parentEmail)
+                                ->exists();
+
+                            if ($parentEmailExistsGlobally) {
                                 $suffix = 1;
+                                $emailParts = explode('@', $parentEmail);
+                                $emailLocal = $emailParts[0];
+                                $emailDomain = $emailParts[1] ?? 'parent.yis.com';
                                 do {
                                     $suffix++;
-                                    $testEmail = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $mappedData['father_name'] ?? 'father')) . '.' . $cleanAdmissionId . '_' . $suffix . '@parent.yis.com';
-                                } while (User::where('email', $testEmail)->exists());
+                                    $testEmail = $emailLocal . '_' . $suffix . '@' . $emailDomain;
+                                } while (User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)->where('email', $testEmail)->exists());
                                 $parentEmail = $testEmail;
                             }
 

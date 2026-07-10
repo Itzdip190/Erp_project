@@ -205,6 +205,82 @@
         .assign-info h4{font-size:13px;font-weight:700;color:var(--t1);}
         .assign-info p{font-size:11px;color:var(--t3);}
         .assign-sub-badge{padding:4px 10px;border-radius:20px;background:var(--green-light);color:var(--green);font-size:11px;font-weight:700;}
+
+        /* ── GREETING ALERT BANNER STYLES ── */
+        .db-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .followup-alert-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(99, 102, 241, 0.05));
+            border: 1.5px solid rgba(124, 58, 237, 0.25);
+            border-radius: 24px;
+            padding: 0 18px;
+            height: 44px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 2px 12px rgba(124, 58, 237, 0.08);
+            flex: 1;
+            max-width: 680px;
+        }
+        .followup-slider {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .followup-slide {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            height: 44px;
+            flex-shrink: 0;
+            width: 100%;
+        }
+        .greeting-clock-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(124, 58, 237, 0.12);
+            border-radius: 20px;
+            padding: 3px 10px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        #greeting-clock {
+            font-family: 'Courier New', monospace;
+            font-size: 12.5px;
+            font-weight: 800;
+            color: #7c3aed;
+            letter-spacing: 1px;
+        }
+        .greeting-clock-icon {
+            color: #7c3aed;
+            font-size: 11px;
+            animation: clock-tick 1s steps(1) infinite;
+        }
+        @keyframes clock-tick {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .typewriter-cursor::after {
+            content: '|';
+            color: #7c3aed;
+            animation: blink-cursor 0.8s step-end infinite;
+            font-weight: 400;
+        }
+        @keyframes blink-cursor {
+            from, to { color: transparent }
+            50% { color: #7c3aed; }
+        }
     </style>
 </head>
 <body>
@@ -294,6 +370,35 @@
 
         <!-- Content Area -->
         <main class="content-area">
+
+            <!-- ══ GREETING ALERT BANNER ══ -->
+            <div class="db-header-row" style="margin-bottom: 24px;">
+                <div class="followup-alert-box">
+                    <div class="followup-slider" id="followupSlider">
+                        <!-- Slide 1: Greeting with clock -->
+                        <div class="followup-slide">
+                            <i id="greeting-icon" class="fas fa-sun" style="color:#7c3aed;font-size:14px;"></i>
+                            <span id="greeting-text" class="typewriter-cursor" style="font-weight:700;color:#7c3aed;font-family:'Plus Jakarta Sans',sans-serif;">Good day, {{ $user->name }}! 👋</span>
+                            <div class="greeting-clock-wrap" style="margin-left:auto;">
+                                <i class="fas fa-clock greeting-clock-icon"></i>
+                                <span id="greeting-clock" style="font-family:'Courier New',monospace;font-size:12.5px;font-weight:800;color:#7c3aed;letter-spacing:1px;">00:00:00 AM</span>
+                            </div>
+                        </div>
+                        <!-- Slide for Today's Events (if any) -->
+                        @if(isset($todayEvents) && $todayEvents->count() > 0)
+                            @foreach($todayEvents as $evt)
+                                <div class="followup-slide" style="justify-content: space-between; width: 100%;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <i class="fas fa-calendar-day" style="color: #ef4444; font-size: 14px;"></i>
+                                        <span style="font-weight: 700; color: #7c3aed;">Today is: {{ $evt->title }} 🎉</span>
+                                    </div>
+                                    <span style="background: {{ $evt->is_holiday ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)' }}; color: {{ $evt->is_holiday ? '#ef4444' : '#10b981' }}; font-size: 10px; padding: 2px 8px; border-radius:12px; font-weight:700;">{{ $evt->is_holiday ? 'Holiday' : 'Event' }}</span>
+                                </div>
+                            @endforeach
+                        @endif
+                    </div>
+                </div>
+            </div>
 
             @if(session('success'))
                 <div style="background:var(--green-light);border:1px solid #bbf7d0;color:#065f46;padding:14px 20px;border-radius:14px;margin-bottom:24px;font-weight:600;">
@@ -492,10 +597,10 @@
                                 <i class="fas fa-calendar-days" style="color:var(--purple);"></i>
                                 <span>My Timetable</span>
                             </a>
-                            <a href="{{ Route::has('school.communication.notice') ? route('school.communication.notice') : '#' }}" class="qa-btn">
-                                <i class="fas fa-bullhorn" style="color:var(--orange);"></i>
-                                <span>Announcements</span>
-                            </a>
+                             <a href="{{ Route::has('teacher.notices.index') ? route('teacher.notices.index') : '#' }}" class="qa-btn">
+                                 <i class="fas fa-bullhorn" style="color:var(--orange);"></i>
+                                 <span>Announcements</span>
+                             </a>
                             <a href="{{ Route::has('school.diary.create') ? route('school.diary.create') : '#' }}" class="qa-btn">
                                 <i class="fas fa-book-open" style="color:var(--green);"></i>
                                 <span>Digital Diary</span>
@@ -590,6 +695,107 @@
                 }
             }
         });
+
+        // ── GREETING SLIDER WITH CLOCK & TYPEWRITER ERASE (Teacher Portal) ──
+        const hour = new Date().getHours();
+        let greeting = 'Good night';
+        let greetEmoji = '🌙';
+        let greetIcon = 'fa-moon';
+        
+        if (hour >= 5 && hour < 12)  { greeting = 'Good morning';   greetEmoji = '☀️'; greetIcon = 'fa-sun'; }
+        else if (hour >= 12 && hour < 14) { greeting = 'Good afternoon'; greetEmoji = '🌤️'; greetIcon = 'fa-cloud-sun'; }
+        else if (hour >= 14 && hour < 18) { greeting = 'Good evening'; greetEmoji = '🌇'; greetIcon = 'fa-cloud-sun'; }
+        else if (hour >= 18 && hour < 21) { greeting = 'Good evening'; greetEmoji = '🌆'; greetIcon = 'fa-sunset'; }
+
+        const greetingText = document.getElementById('greeting-text');
+        const greetingIcon = document.getElementById('greeting-icon');
+
+        if (greetingText) {
+            greetingText.textContent = `${greeting}, {{ $user->name }}! 👋`;
+        }
+        if (greetingIcon) {
+            greetingIcon.className = `fas ${greetIcon}`;
+        }
+
+        // Live Clock
+        const clockEl = document.getElementById('greeting-clock');
+        function updateClock() {
+            if (!clockEl) return;
+            const now = new Date();
+            const hh = String(now.getHours()).padStart(2, '0');
+            const mm = String(now.getMinutes()).padStart(2, '0');
+            const ss = String(now.getSeconds()).padStart(2, '0');
+            const ampm = now.getHours() >= 12 ? 'PM' : 'AM';
+            const hh12 = String(now.getHours() % 12 || 12).padStart(2, '0');
+            clockEl.textContent = `${hh12}:${mm}:${ss} ${ampm}`;
+        }
+        updateClock();
+        setInterval(updateClock, 1000);
+
+        // Auto Slider with typewriter erase
+        let currentSlide = 0;
+        const slider = document.getElementById('followupSlider');
+        const greetEl = document.getElementById('greeting-text');
+        const SLIDE_HEIGHT = 44; // px
+
+        function typewriterErase(el, fullText, onDone) {
+            if (!el) { if (onDone) onDone(); return; }
+            el.classList.remove('typewriter-cursor');
+            let i = fullText.length;
+            const eraseInterval = setInterval(() => {
+                i--;
+                el.textContent = fullText.substring(0, i);
+                if (i <= 0) {
+                    clearInterval(eraseInterval);
+                    el.textContent = '';
+                    if (onDone) onDone();
+                }
+            }, 45);
+        }
+
+        function typewriterType(el, text, onDone) {
+            if (!el) { if (onDone) onDone(); return; }
+            el.textContent = '';
+            el.classList.add('typewriter-cursor');
+            let i = 0;
+            const typeInterval = setInterval(() => {
+                i++;
+                el.textContent = text.substring(0, i);
+                if (i >= text.length) {
+                    clearInterval(typeInterval);
+                    if (onDone) onDone();
+                }
+            }, 55);
+        }
+
+        const activeGreetText = `${greeting}, {{ $user->name }}! 👋`;
+
+        if (slider) {
+            const slidesCount = slider.children.length;
+            if (slidesCount > 1) {
+                setInterval(() => {
+                    if (currentSlide === 0) {
+                        if (greetEl) {
+                            typewriterErase(greetEl, greetEl.textContent, () => {
+                                currentSlide = (currentSlide + 1) % slidesCount;
+                                slider.style.transform = `translateY(-${currentSlide * SLIDE_HEIGHT}px)`;
+                            });
+                        } else {
+                            currentSlide = (currentSlide + 1) % slidesCount;
+                            slider.style.transform = `translateY(-${currentSlide * SLIDE_HEIGHT}px)`;
+                        }
+                    } else {
+                        currentSlide = (currentSlide + 1) % slidesCount;
+                        slider.style.transform = `translateY(-${currentSlide * SLIDE_HEIGHT}px)`;
+                        if (currentSlide === 0) {
+                            setTimeout(() => {
+                                if (greetEl) typewriterType(greetEl, activeGreetText, null);
+                            }, 700);
+                        }
+                    }
+                }, 5000);
+            }
+        }
     </script>
 </body>
 </html>

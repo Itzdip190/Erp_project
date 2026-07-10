@@ -47,7 +47,60 @@ class CommunicationController extends Controller
             return back()->with('success', 'Notice bulletin published successfully!');
         }
 
-        $notices = Notice::where('school_id', $schoolId)->orderBy('created_at', 'desc')->get();
+        $today = \Carbon\Carbon::today();
+        $now = \Carbon\Carbon::now();
+
+        // 1. Get Notices
+        $dbNotices = Notice::where('school_id', $schoolId)->get()->map(function ($n) use ($now) {
+            $isToday = $n->created_at->between($now->copy()->startOfDay(), $now->copy()->endOfDay());
+            return (object) [
+                'id' => 'notice_' . $n->id,
+                'title' => $n->title,
+                'content' => $n->content,
+                'target_audience' => $n->target_audience,
+                'type' => 'Notice',
+                'created_at' => $n->created_at,
+                'date_label' => $n->created_at->format('M j, Y — g:i A'),
+                'is_today' => $isToday
+            ];
+        });
+
+        // 2. Get Holidays
+        $dbHolidays = \App\Models\Event::where('school_id', $schoolId)
+            ->where('is_holiday', true)
+            ->get()
+            ->map(function ($h) use ($today) {
+                $isToday = ($today->toDateString() >= $h->start_date && $today->toDateString() <= $h->end_date);
+                return (object) [
+                    'id' => 'holiday_' . $h->id,
+                    'title' => $h->title . ' (Official School Holiday)',
+                    'content' => $h->description ?? 'School closed.',
+                    'target_audience' => 'all',
+                    'type' => 'Holiday',
+                    'created_at' => $h->created_at ?? \Carbon\Carbon::parse($h->start_date),
+                    'date_label' => \Carbon\Carbon::parse($h->start_date)->format('M j, Y') . ($h->start_date !== $h->end_date ? ' to ' . \Carbon\Carbon::parse($h->end_date)->format('M j, Y') : ''),
+                    'is_today' => $isToday
+                ];
+            });
+
+        // Combine and Sort
+        $typePriority = ['Holiday' => 3, 'Notice' => 2, 'Event' => 1];
+        $notices = $dbNotices->concat($dbHolidays)->sort(function ($a, $b) use ($typePriority) {
+            // 1. is_today first
+            if ($a->is_today && !$b->is_today) return -1;
+            if (!$a->is_today && $b->is_today) return 1;
+
+            // 2. type priority
+            $pA = $typePriority[$a->type] ?? 0;
+            $pB = $typePriority[$b->type] ?? 0;
+            if ($pA !== $pB) {
+                return $pB <=> $pA; // Descending
+            }
+
+            // 3. created_at desc
+            return $b->created_at <=> $a->created_at;
+        });
+
         return view('school.communication.notice', compact('notices'));
     }
 

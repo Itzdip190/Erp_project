@@ -20,6 +20,9 @@ class FeeManagementController extends Controller
 {
     private function ensureFeesSeeded($schoolId)
     {
+        if (!$schoolId) {
+            return;
+        }
         // Only seed FeeConfiguration so system parameters are initialized, 
         // but do not seed any demo categories, class fee structures, student fees, receipts, cheques, or payment links.
         if (\App\Models\FeeConfiguration::where('school_id', $schoolId)->count() === 0) {
@@ -36,7 +39,11 @@ class FeeManagementController extends Controller
                 'default_payment_mode' => 'Cash',
                 'discount_label' => 'Discount',
                 'payment_url_enabled' => true,
-                'payment_url' => 'https://online.edutinker.com/form/student/fees?schoolId=' . $schoolId . '&schoolName=' . $schoolName,
+                'payment_url' => null,
+                'show_installment_components_on_invoice' => false,
+                'show_due_on_invoice' => true,
+                'invoice_title' => 'Fee Invoice',
+                'transport_invoice_title' => 'Transport Invoice',
                 'add_fee_due' => true,
                 'add_fee_discount' => true,
                 'add_fee_balance' => true,
@@ -142,6 +149,10 @@ class FeeManagementController extends Controller
                     
                     'note_enabled' => $request->has('note_enabled'),
                     'note_text' => $request->input('note_text'),
+                    'show_installment_components_on_invoice' => $request->has('show_installment_components_on_invoice'),
+                    'show_due_on_invoice' => $request->has('show_due_on_invoice'),
+                    'invoice_title' => $request->input('invoice_title', 'Fee Invoice'),
+                    'transport_invoice_title' => $request->input('transport_invoice_title', 'Transport Invoice'),
                     
                     // Other configuration toggles
                     'show_zero_paid_component' => $request->has('show_zero_paid_component'),
@@ -195,8 +206,7 @@ class FeeManagementController extends Controller
         }
 
         $config = \App\Models\FeeConfiguration::where('school_id', $schoolId)->first();
-        $categories = FeeCategory::where('school_id', $schoolId)->get();
-        return view('school.fees.configuration', compact('categories', 'config'));
+        return view('school.fees.configuration', compact('config'));
     }
 
     public function feeBasics(Request $request)
@@ -261,6 +271,7 @@ class FeeManagementController extends Controller
                     'head_name' => 'required|string|max:100',
                     'component_name' => 'required|string|max:100',
                     'academic_session_id' => 'required|exists:academic_sessions,id',
+                    'fee_schedule_id' => 'required|exists:fee_schedules,id',
                     'admission_type' => 'required|string',
                     'gender' => 'required|string',
                 ]);
@@ -268,6 +279,7 @@ class FeeManagementController extends Controller
                 \App\Models\FeeComponent::create([
                     'school_id' => $schoolId,
                     'academic_session_id' => $request->academic_session_id,
+                    'fee_schedule_id' => $request->fee_schedule_id,
                     'head_name' => $request->head_name,
                     'component_name' => $request->component_name,
                     'admission_type' => $request->admission_type,
@@ -283,6 +295,7 @@ class FeeManagementController extends Controller
                     'academic_session_id' => 'required|exists:academic_sessions,id',
                     'remarks' => 'nullable|string',
                     'amount' => 'required|numeric|min:0',
+                    'type' => 'nullable|in:flat,percentage',
                     'classes' => 'required|array',
                     'student_ids' => 'nullable|array',
                 ]);
@@ -294,6 +307,7 @@ class FeeManagementController extends Controller
                     'remarks' => $request->remarks,
                     'classes_installments' => json_encode($request->classes),
                     'amount' => $request->amount,
+                    'type' => $request->type ?? 'flat',
                     'student_ids' => $request->has('student_ids') ? json_encode($request->student_ids) : null,
                 ]);
 
@@ -360,11 +374,33 @@ class FeeManagementController extends Controller
                 } elseif ($type === 'component') {
                     \App\Models\FeeComponent::where('school_id', $schoolId)->where('id', $id)->delete();
                 } elseif ($type === 'discount') {
-                    \App\Models\FeeDiscount::where('school_id', $schoolId)->where('id', $id)->delete();
+                    $discount = \App\Models\FeeDiscount::where('school_id', $schoolId)->where('id', $id)->first();
+                    if ($discount) {
+                        \Illuminate\Support\Facades\DB::table('deleted_concessions')->insert([
+                            'school_id' => $schoolId,
+                            'concession_name' => $discount->name,
+                            'deleted_by' => auth()->user()->name ?? 'Administrator',
+                            'date' => now()->toDateString(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                        $discount->delete();
+                    }
                 } elseif ($type === 'misc_fee') {
                     \App\Models\MiscFee::where('school_id', $schoolId)->where('id', $id)->delete();
                 } elseif ($type === 'fine') {
-                    \App\Models\FeeFine::where('school_id', $schoolId)->where('id', $id)->delete();
+                    $fine = \App\Models\FeeFine::where('school_id', $schoolId)->where('id', $id)->first();
+                    if ($fine) {
+                        \Illuminate\Support\Facades\DB::table('deleted_fines')->insert([
+                            'school_id' => $schoolId,
+                            'fine_name' => $fine->name,
+                            'deleted_by' => auth()->user()->name ?? 'Administrator',
+                            'date' => now()->toDateString(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                        $fine->delete();
+                    }
                 }
 
                 return back()->with('success', 'Item deleted successfully!');
@@ -405,7 +441,7 @@ class FeeManagementController extends Controller
 
         // Fetch list items for tables
         $schedules = \App\Models\FeeSchedule::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->get();
-        $components = \App\Models\FeeComponent::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->get();
+        $components = \App\Models\FeeComponent::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->with('schedule')->get();
         $discounts = \App\Models\FeeDiscount::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->get();
         $miscFees = \App\Models\MiscFee::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->get();
         $fines = \App\Models\FeeFine::where('school_id', $schoolId)->where('academic_session_id', $selectedSession->id)->get();
@@ -691,6 +727,36 @@ class FeeManagementController extends Controller
                         ->where('fee_schedule_id', $classWiseFee->fee_schedule_id)
                         ->first();
 
+                    // Resolve the correct active invoice number for this installment
+                    $activeInvoiceNo = \App\Models\StudentFee::where('school_id', $schoolId)
+                        ->where('student_id', $student->id)
+                        ->where('installment_no', $instNo)
+                        ->whereNotNull('invoice_no')
+                        ->value('invoice_no');
+                    
+                    if (!$activeInvoiceNo) {
+                        $existingInvoices = \App\Models\StudentFee::withoutGlobalScope('active')
+                            ->where('school_id', $schoolId)
+                            ->where('student_id', $student->id)
+                            ->where('installment_no', $instNo)
+                            ->distinct()
+                            ->pluck('invoice_no')
+                            ->filter()
+                            ->toArray();
+                        
+                        if (empty($existingInvoices)) {
+                            $activeInvoiceNo = 'INV-' . $instNo;
+                        } else {
+                            $maxSuffix = 1;
+                            foreach ($existingInvoices as $invNo) {
+                                if (preg_match('/INV-\d+-(\d+)/i', $invNo, $m)) {
+                                    $maxSuffix = max($maxSuffix, (int)$m[1]);
+                                }
+                            }
+                            $activeInvoiceNo = 'INV-' . $instNo . '-' . ($maxSuffix + 1);
+                        }
+                    }
+
                     if ($studentFee) {
                         $paidAmount = $studentFee->paid_amount;
                         $status = 'pending';
@@ -703,6 +769,8 @@ class FeeManagementController extends Controller
                             'amount'           => $instAmount,
                             'due_date'         => $dueDate,
                             'status'           => $status,
+                            'invoice_no'       => $studentFee->invoice_no ?: $activeInvoiceNo,
+                            'invoice_status'   => 'active',
                         ]);
                     } else {
                         \App\Models\StudentFee::create([
@@ -716,6 +784,8 @@ class FeeManagementController extends Controller
                             'paid_amount'      => 0.00,
                             'due_date'         => $dueDate,
                             'status'           => 'pending',
+                            'invoice_no'       => $activeInvoiceNo,
+                            'invoice_status'   => 'active',
                         ]);
                     }
                 }
@@ -745,6 +815,42 @@ class FeeManagementController extends Controller
     {
         $schoolId = $student->school_id;
 
+        // 1. Delete duplicate pending records created by the global scope bug
+        $refundedFees = \App\Models\StudentFee::withoutGlobalScope('active')
+            ->where('student_id', $student->id)
+            ->where(function($q) {
+                $q->where('status', 'refunded')
+                  ->orWhere('invoice_status', 'refunded');
+            })
+            ->get();
+        
+        foreach ($refundedFees as $refFee) {
+            \App\Models\StudentFee::withoutGlobalScope('active')
+                ->where('student_id', $student->id)
+                ->where('fee_component_id', $refFee->fee_component_id)
+                ->where('installment_no', $refFee->installment_no)
+                ->where('id', '!=', $refFee->id)
+                ->where('paid_amount', 0)
+                ->where('status', 'pending')
+                ->delete();
+        }
+
+        // 2. Auto-heal / migrate database to the new refund model:
+        // For any student fee with status 'refunded', restore its paid amount from FeeRefund logs
+        foreach ($refundedFees as $sf) {
+            $sfFresh = \App\Models\StudentFee::withoutGlobalScope('active')->find($sf->id);
+            if ($sfFresh && ($sfFresh->status === 'refunded' || $sfFresh->invoice_status === 'refunded')) {
+                // Find the total amount refunded for this component
+                $refAmt = \App\Models\FeeRefund::where('student_fee_id', $sfFresh->id)->sum('amount');
+                if ($refAmt > 0) {
+                    $sfFresh->paid_amount = $sfFresh->paid_amount + $refAmt;
+                }
+                $sfFresh->status = $sfFresh->paid_amount >= ($sfFresh->amount - $sfFresh->instant_discount_amount) ? 'paid' : ($sfFresh->paid_amount > 0 ? 'partially_paid' : 'pending');
+                $sfFresh->invoice_status = 'active';
+                $sfFresh->save();
+            }
+        }
+
         $studentScheduleId = $student->fee_schedule_id;
         if (!$studentScheduleId) {
             // Find a schedule that covers this student's class — strictly within the school
@@ -772,19 +878,24 @@ class FeeManagementController extends Controller
                     }
                 }
             }
-            if (!$matchedSchedule) {
-                $matchedSchedule = \App\Models\FeeSchedule::where('school_id', $schoolId)->first();
-            }
+            // Do NOT fall back to the first available schedule.
+            // If no schedule matches this student's class, skip fee sync
+            // to prevent phantom fee rows from accumulating.
             $studentScheduleId = $matchedSchedule ? $matchedSchedule->id : null;
             // Persist so future syncs are consistent
             if ($studentScheduleId && !$student->fee_schedule_id) {
                 $student->fee_schedule_id = $studentScheduleId;
                 $student->save();
             }
+            // No matching schedule → stop here, do not create fees
+            if (!$studentScheduleId) {
+                return;
+            }
         }
 
         // Delete unpaid student fees that do not belong to the student's active schedule
-        \App\Models\StudentFee::where('student_id', $student->id)
+        \App\Models\StudentFee::withoutGlobalScope('active')
+            ->where('student_id', $student->id)
             ->where(function($q) use ($studentScheduleId) {
                 if ($studentScheduleId) {
                     $q->where('fee_schedule_id', '!=', $studentScheduleId)
@@ -792,6 +903,7 @@ class FeeManagementController extends Controller
                 }
             })
             ->where('paid_amount', 0)
+            ->where('status', '!=', 'refunded')
             ->delete();
 
         // 1. Get all active ClassWiseFee structures for this student's class
@@ -844,15 +956,19 @@ class FeeManagementController extends Controller
 
         $activeComponentIds = $classWiseFees->pluck('fee_component_id')->toArray();
         if (count($activeComponentIds) > 0) {
-            \App\Models\StudentFee::where('student_id', $student->id)
+            \App\Models\StudentFee::withoutGlobalScope('active')
+                ->where('student_id', $student->id)
                 ->where('fee_schedule_id', $studentScheduleId)
                 ->whereNotIn('fee_component_id', $activeComponentIds)
                 ->where('paid_amount', 0)
+                ->where('status', '!=', 'refunded')
                 ->delete();
         } else {
-            \App\Models\StudentFee::where('student_id', $student->id)
+            \App\Models\StudentFee::withoutGlobalScope('active')
+                ->where('student_id', $student->id)
                 ->where('fee_schedule_id', $studentScheduleId)
                 ->where('paid_amount', 0)
+                ->where('status', '!=', 'refunded')
                 ->delete();
         }
 
@@ -893,17 +1009,68 @@ class FeeManagementController extends Controller
                 }
 
                 // Find or create StudentFee for this specific installment
-                $studentFee = \App\Models\StudentFee::where('school_id', $schoolId)
+                $studentFee = \App\Models\StudentFee::withoutGlobalScope('active')
+                    ->where('school_id', $schoolId)
                     ->where('student_id', $student->id)
                     ->where('fee_component_id', $classWiseFee->fee_component_id)
                     ->where('installment_no', $instNo)
                     ->where('fee_schedule_id', $studentScheduleId)
                     ->first();
 
+                // Resolve the correct active invoice number for this installment
+                $activeInvoiceNo = \App\Models\StudentFee::withoutGlobalScope('active')
+                    ->where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->where('installment_no', $instNo)
+                    ->whereNotNull('invoice_no')
+                    ->value('invoice_no');
+                
+                if (!$activeInvoiceNo) {
+                    $existingInvoices = \App\Models\StudentFee::withoutGlobalScope('active')
+                        ->where('school_id', $schoolId)
+                        ->where('student_id', $student->id)
+                        ->where('installment_no', $instNo)
+                        ->distinct()
+                        ->pluck('invoice_no')
+                        ->filter()
+                        ->toArray();
+                    
+                    if (empty($existingInvoices)) {
+                        $activeInvoiceNo = 'INV-' . $instNo;
+                    } else {
+                        $maxSuffix = 1;
+                        foreach ($existingInvoices as $invNo) {
+                            if (preg_match('/INV-\d+-(\d+)/i', $invNo, $m)) {
+                                $maxSuffix = max($maxSuffix, (int)$m[1]);
+                            }
+                        }
+                        $activeInvoiceNo = 'INV-' . $instNo . '-' . ($maxSuffix + 1);
+                    }
+                }
+
                 if ($studentFee) {
                     $paidAmount = $studentFee->paid_amount;
                     $status = 'pending';
-                    if ($paidAmount >= $instAmount) {
+                    if ($studentFee->status === 'refunded' && $paidAmount == 0) {
+                        $status = $studentFee->invoice_status === 'cancelled' ? 'pending' : 'refunded';
+                    } elseif ($paidAmount == 0 && $studentFee->status !== 'paid') {
+                        // Check if a refund record links directly to this fee
+                        // (handles fees whose 'refunded' status was incorrectly reset)
+                        $wasRefunded = \App\Models\FeeRefund::where('school_id', $schoolId)
+                            ->where('student_id', $student->id)
+                            ->where(function($q) use ($studentFee) {
+                                $q->where('student_fee_id', $studentFee->id)
+                                  ->orWhere(function($q2) use ($studentFee) {
+                                      // Legacy: no student_fee_id stored — match by installment in reason
+                                      $q2->whereNull('student_fee_id')
+                                         ->where('reason', 'like', '%Installment ' . $studentFee->installment_no . ')');
+                                  });
+                            })
+                            ->exists();
+                        if ($wasRefunded) {
+                            $status = $studentFee->invoice_status === 'cancelled' ? 'pending' : 'refunded';
+                        }
+                    } elseif ($paidAmount >= $instAmount) {
                         $status = 'paid';
                     } elseif ($paidAmount > 0) {
                         $status = 'partially_paid';
@@ -914,6 +1081,8 @@ class FeeManagementController extends Controller
                         'amount' => $instAmount,
                         'due_date' => $dueDate,
                         'status' => $status,
+                        'invoice_no' => $studentFee->invoice_no ?: $activeInvoiceNo,
+                        'invoice_status' => 'active',
                     ]);
                 } else {
                     \App\Models\StudentFee::create([
@@ -927,6 +1096,8 @@ class FeeManagementController extends Controller
                         'paid_amount' => 0.00,
                         'due_date' => $dueDate,
                         'status' => 'pending',
+                        'invoice_no' => $activeInvoiceNo,
+                        'invoice_status' => 'active',
                     ]);
                 }
             }
@@ -937,10 +1108,130 @@ class FeeManagementController extends Controller
                 ->where('fee_component_id', $classWiseFee->fee_component_id)
                 ->whereNotIn('installment_no', $activeInstallmentNos)
                 ->where('paid_amount', 0)
+                ->where('status', '!=', 'refunded')
                 ->delete();
         }
 
         // Transport automatic deletion removed to allow class-wise transport fee components to apply by default
+        
+        // Sync active discounts
+        $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->get();
+        $currentSession = $academicSessions->where('is_current', true)->first() ?? $academicSessions->first();
+        if ($currentSession) {
+            self::syncStudentDiscounts($student, $currentSession->id);
+        }
+    }
+
+    public static function syncStudentDiscounts($student, $sessionId)
+    {
+        $schoolId = $student->school_id;
+
+        // 1. Get all FeeDiscount records for this session & school
+        $discounts = \App\Models\FeeDiscount::where('school_id', $schoolId)
+            ->where('academic_session_id', $sessionId)
+            ->get();
+
+        // Filter discounts applicable to this student
+        $applicableDiscounts = $discounts->filter(function($d) use ($student) {
+            // Check student_ids
+            if ($d->student_ids) {
+                $studentIds = json_decode($d->student_ids, true);
+                if (is_array($studentIds) && in_array($student->id, $studentIds)) {
+                    return true;
+                }
+            } else {
+                // If student_ids is empty/null, check if class-specific or global
+                if ($d->classes_installments) {
+                    $classes = json_decode($d->classes_installments, true);
+                    $className = optional($student->class)->name;
+                    if (is_array($classes) && $className && in_array($className, $classes)) {
+                        return true;
+                    }
+                } else {
+                    // Global (all classes and all students)
+                    return true;
+                }
+            }
+            return false;
+        });
+
+        // 2. Load all student fees for this session
+        $studentFees = StudentFee::where('school_id', $schoolId)
+            ->where('student_id', $student->id)
+            ->whereHas('feeSchedule', function($q) use ($sessionId) {
+                $q->where('academic_session_id', $sessionId);
+            })
+            ->get();
+
+        // 3. Reset instant discounts on completely unpaid installments
+        // Build a set of installment_nos that have at least one fee with paid_amount > 0
+        // so we do NOT reset discounts on the zero-paid siblings in those installments
+        $partiallyPaidInstallments = $studentFees
+            ->where('paid_amount', '>', 0)
+            ->pluck('installment_no')
+            ->unique()
+            ->toArray();
+
+        foreach ($studentFees as $sf) {
+            if ($sf->paid_amount == 0 && !in_array($sf->installment_no, $partiallyPaidInstallments)) {
+                $sf->instant_discount_amount = 0.00;
+                $sf->instant_discount_type = null;
+                $sf->save();
+            }
+        }
+
+        // 4. Apply each applicable FeeDiscount to unpaid installments
+        // Only re-apply to fees whose installment is NOT partially paid
+        foreach ($applicableDiscounts as $d) {
+            $discountVal = floatval($d->amount);
+            $unpaidFees = $studentFees->where('paid_amount', 0)
+                ->filter(function($sf) use ($partiallyPaidInstallments) {
+                    return !in_array($sf->installment_no, $partiallyPaidInstallments);
+                });
+            if ($d->installment_no) {
+                $unpaidFees = $unpaidFees->where('installment_no', $d->installment_no);
+            }
+
+            if ($unpaidFees->isEmpty()) continue;
+
+            if ($d->type === 'percentage') {
+                foreach ($unpaidFees as $sf) {
+                    $discountForThis = round($sf->amount * $discountVal / 100, 2);
+                    $sf->instant_discount_amount += $discountForThis;
+                    $sf->instant_discount_type = 'percentage';
+                    
+                    $due = max(0, $sf->amount - $sf->instant_discount_amount);
+                    if ($sf->status === 'refunded' && $sf->paid_amount == 0) {
+                        $sf->status = 'refunded';
+                    } else {
+                        $sf->status = $sf->paid_amount >= $due ? 'paid' : ($sf->paid_amount > 0 ? 'partially_paid' : 'pending');
+                    }
+                    $sf->save();
+                }
+            } else {
+                // Flat discount distribution
+                $remaining = $discountVal;
+                foreach ($unpaidFees as $sf) {
+                    if ($remaining <= 0) break;
+                    $due = max(0, $sf->amount - $sf->instant_discount_amount);
+                    if ($due <= 0) continue;
+                    
+                    $applied = min($remaining, $due);
+                    $sf->instant_discount_amount += $applied;
+                    $sf->instant_discount_type = 'flat';
+                    
+                    $dueAfter = max(0, $sf->amount - $sf->instant_discount_amount);
+                    if ($sf->status === 'refunded' && $sf->paid_amount == 0) {
+                        $sf->status = 'refunded';
+                    } else {
+                        $sf->status = $sf->paid_amount >= $dueAfter ? 'paid' : ($sf->paid_amount > 0 ? 'partially_paid' : 'pending');
+                    }
+                    $sf->save();
+                    
+                    $remaining -= $applied;
+                }
+            }
+        }
     }
 
 
@@ -1096,87 +1387,501 @@ class FeeManagementController extends Controller
                 }
 
                 // Normal/immediate payment (cash, online, bank transfer)
-                if ($request->student_fee_id) {
-                    $sf = StudentFee::where('school_id', $schoolId)->findOrFail($request->student_fee_id);
-                    $discount = floatval($request->input('_computed_discount', 0));
-                    if ($discount > 0) {
-                        $sf->instant_discount_amount += $discount;
-                        $sf->instant_discount_type = $request->input('_computed_discount_type');
-                    }
+                $invoiceNo = \Illuminate\Support\Facades\DB::transaction(function() use ($request, $schoolId, $receiptDate, $receiptNo, $paymentMode, $rawAmountPaid, $effectiveDiscount, $discountType) {
+                    $detailsArray = [];
+                    $instNo = 1;
                     
-                    $newPaid = $sf->paid_amount + $request->amount_paid;
-                    $due = max(0, $sf->amount - $sf->instant_discount_amount);
-                    $sf->paid_amount = min($newPaid, $due);
-                    $sf->status = $sf->paid_amount >= $due ? 'paid' : 'partially_paid';
-                    $sf->save();
-                    
-                    $studentId = $sf->student_id;
-                } else {
-                    $studentId = $request->student_id;
-                    $instNo = $request->installment_no;
-                    $amountToDistribute = floatval($request->amount_paid);
-                    $discount = floatval($request->input('_computed_discount', 0));
-                    $discountType = $request->input('_computed_discount_type');
-
-                    $feesToPay = StudentFee::where('school_id', $schoolId)
-                        ->where('student_id', $studentId)
-                        ->where('installment_no', $instNo)
-                        ->where('status', '!=', 'paid')
-                        ->orderBy('id', 'asc')
-                        ->get();
+                    if ($request->student_fee_id) {
+                        $sf = StudentFee::where('school_id', $schoolId)->findOrFail($request->student_fee_id);
+                        $discount = floatval($effectiveDiscount);
+                        if ($discount > 0) {
+                            $sf->instant_discount_amount += $discount;
+                            $sf->instant_discount_type = $discountType;
+                        }
                         
-                    if ($feesToPay->isEmpty()) {
+                        $newPaid = $sf->paid_amount + $request->amount_paid;
+                        $due = max(0, $sf->amount - $sf->instant_discount_amount);
+                        $sf->paid_amount = min($newPaid, $due);
+                        $sf->status = $sf->paid_amount >= $due ? 'paid' : 'partially_paid';
+                        $sf->save();
+                        
+                        $studentId = $sf->student_id;
+                        $instNo = $sf->installment_no;
+                        
+                        $detailsArray[] = [
+                            'student_fee_id' => $sf->id,
+                            'component_name' => $sf->component ? $sf->component->component_name : ($sf->category ? $sf->category->name : 'Fee'),
+                            'installment_no' => $sf->installment_no,
+                            'amount_paid' => $request->amount_paid,
+                        ];
+                    } else {
+                        $studentId = $request->student_id;
+                        $instNo = $request->installment_no ?: 1;
+                        $amountToDistribute = floatval($request->amount_paid);
+                        $discount = floatval($effectiveDiscount);
+
                         $feesToPay = StudentFee::where('school_id', $schoolId)
                             ->where('student_id', $studentId)
                             ->where('installment_no', $instNo)
+                            ->where('status', '!=', 'paid')
                             ->orderBy('id', 'asc')
                             ->get();
-                    }
+                            
+                        if ($feesToPay->isEmpty()) {
+                            $feesToPay = StudentFee::where('school_id', $schoolId)
+                                ->where('student_id', $studentId)
+                                ->where('installment_no', $instNo)
+                                ->orderBy('id', 'asc')
+                                ->get();
+                        }
 
-                    // Distribute discount first
-                    $discountToDistribute = $discount;
-                    if ($discountToDistribute > 0 && $feesToPay->isNotEmpty()) {
+                        // Distribute discount first
+                        $discountToDistribute = $discount;
+                        if ($discountToDistribute > 0 && $feesToPay->isNotEmpty()) {
+                            foreach ($feesToPay as $sf) {
+                                if ($discountToDistribute <= 0) break;
+                                $dueBeforeDiscount = max(0, $sf->amount - $sf->instant_discount_amount - $sf->paid_amount);
+                                if ($dueBeforeDiscount <= 0) continue;
+                                $discountForThis = min($discountToDistribute, $dueBeforeDiscount);
+                                $sf->instant_discount_amount += $discountForThis;
+                                $sf->instant_discount_type = $discountType;
+                                $sf->save();
+                                $discountToDistribute -= $discountForThis;
+                            }
+                        }
+
+                        // Distribute paid amount
                         foreach ($feesToPay as $sf) {
-                            if ($discountToDistribute <= 0) break;
-                            $dueBeforeDiscount = max(0, $sf->amount - $sf->instant_discount_amount - $sf->paid_amount);
-                            if ($dueBeforeDiscount <= 0) continue;
-                            $discountForThis = min($discountToDistribute, $dueBeforeDiscount);
-                            $sf->instant_discount_amount += $discountForThis;
-                            $sf->instant_discount_type = $discountType;
+                            if ($amountToDistribute <= 0) break;
+                            $due = max(0, $sf->amount - $sf->instant_discount_amount - $sf->paid_amount);
+                            if ($due <= 0) continue;
+                            $paymentForThis = min($amountToDistribute, $due);
+                            $sf->paid_amount += $paymentForThis;
+                            $sf->status = $sf->paid_amount >= ($sf->amount - $sf->instant_discount_amount) ? 'paid' : 'partially_paid';
                             $sf->save();
-                            $discountToDistribute -= $discountForThis;
+                            $amountToDistribute -= $paymentForThis;
+
+                            $detailsArray[] = [
+                                'student_fee_id' => $sf->id,
+                                'component_name' => $sf->component ? $sf->component->component_name : ($sf->category ? $sf->category->name : 'Fee'),
+                                'installment_no' => $sf->installment_no,
+                                'amount_paid' => $paymentForThis,
+                            ];
                         }
                     }
 
-                    // Distribute paid amount
-                    foreach ($feesToPay as $sf) {
-                        if ($amountToDistribute <= 0) break;
-                        $due = max(0, $sf->amount - $sf->instant_discount_amount - $sf->paid_amount);
-                        if ($due <= 0) continue;
-                        $paymentForThis = min($amountToDistribute, $due);
-                        $sf->paid_amount += $paymentForThis;
-                        $sf->status = $sf->paid_amount >= ($sf->amount - $sf->instant_discount_amount) ? 'paid' : 'partially_paid';
-                        $sf->save();
-                        $amountToDistribute -= $paymentForThis;
+                    // Create legacy receipt for backward compatibility
+                    FeeReceipt::create([
+                        'school_id'      => $schoolId,
+                        'student_id'     => $studentId,
+                        'receipt_number' => $receiptNo,
+                        'amount_paid'    => $request->amount_paid,
+                        'discount_amount'=> $effectiveDiscount,
+                        'discount_type'  => $discountType,
+                        'payment_mode'   => $paymentMode,
+                        'transaction_id' => $request->transaction_id,
+                        'payment_date'   => $receiptDate,
+                        'payment_details'=> json_encode($detailsArray),
+                    ]);
+
+                    // Generate unique collision-free invoice number
+                    $invNo = null;
+                    $attempts = 0;
+                    while ($attempts < 3) {
+                        $invNo = 'INV-' . $instNo . '-PAY-' . now()->format('YmdHisu') . '-' . rand(10, 99);
+                        if (!\App\Models\FeeInvoice::where('invoice_number', $invNo)->exists()) {
+                            break;
+                        }
+                        $attempts++;
+                    }
+
+                    // Create the FeeInvoice audit log record
+                    \App\Models\FeeInvoice::create([
+                        'school_id' => $schoolId,
+                        'student_id' => $studentId,
+                        'created_by' => auth()->id(),
+                        'invoice_number' => $invNo,
+                        'installment_no' => $instNo,
+                        'type' => 'payment',
+                        'status' => 'paid',
+                        'amount' => $request->amount_paid,
+                        'discount_amount' => $effectiveDiscount,
+                        'payment_mode' => $paymentMode,
+                        'payment_date' => $receiptDate,
+                        'payment_details' => json_encode($detailsArray),
+                        'remarks' => $request->transaction_id ? ('Transaction ID: ' . $request->transaction_id) : 'Fee Payment',
+                    ]);
+
+                    return $invNo;
+                });
+
+                // Flash new invoice number for print dialog
+                session()->flash('print_receipt_no', $invoiceNo);
+
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true, 
+                        'message' => 'Payment collected successfully!', 
+                        'receipt_number' => $invoiceNo
+                    ]);
+                }
+                return back()->with('success', 'Fee Payment collected successfully!')->with('print_receipt_no', $invoiceNo);
+            }
+
+            if ($action === 'apply_discount') {
+                $request->validate([
+                    'student_id'     => 'required|exists:students,id',
+                    'name'           => 'required|string|max:100',
+                    'type'           => 'required|in:flat,percentage',
+                    'amount'         => 'required|numeric|min:0.01',
+                    'remarks'        => 'nullable|string',
+                    'installment_no' => 'nullable|integer|min:1|max:12',
+                ]);
+
+                $studentId = $request->student_id;
+                $student = Student::where('school_id', $schoolId)->findOrFail($studentId);
+                
+                // Get selected session
+                $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->get();
+                $currentSession = $academicSessions->where('is_current', true)->first() ?? $academicSessions->first();
+                $selectedSessionId = $request->input('academic_session_id', $currentSession->id);
+
+                // Create FeeDiscount
+                \App\Models\FeeDiscount::create([
+                    'school_id' => $schoolId,
+                    'academic_session_id' => $selectedSessionId,
+                    'name' => $request->name,
+                    'remarks' => $request->remarks,
+                    'amount' => $request->amount,
+                    'type' => $request->type,
+                    'student_ids' => json_encode([$studentId]),
+                    'installment_no' => $request->installment_no,
+                ]);
+
+                // Sync/load fees first to ensure everything is correct (which will run syncStudentDiscounts)
+                self::syncStudentFees($student);
+
+                return back()->with('success', 'Discount applied successfully!');
+            }
+
+            if ($action === 'process_refund') {
+                $request->validate([
+                    'student_id'    => 'required|exists:students,id',
+                    'refund_date'   => 'required|date',
+                    'slip_no'       => 'required|string',
+                    'payment_mode'  => 'required|string',
+                    'bank_date'     => 'nullable|date',
+                    'bank_name'     => 'nullable|string',
+                    'reason'        => 'required|string|max:200',
+                    'fee_ids'       => 'required|array',
+                    'fee_ids.*'     => 'exists:student_fees,id',
+                    'amount'        => 'required|numeric|min:1',
+                ]);
+
+                $studentId = $request->student_id;
+                
+                $invoiceNo = \Illuminate\Support\Facades\DB::transaction(function() use ($request, $schoolId, $studentId) {
+                    $requestedRefundAmt = floatval($request->amount);
+                    $remainingRefundAmount = $requestedRefundAmt;
+                    $totalRefAmt = 0;
+                    $instNo = 1;
+                    $detailsArray = [];
+
+                    foreach ($request->fee_ids as $feeId) {
+                        if ($remainingRefundAmount <= 0) break;
+
+                        $sf = StudentFee::withoutGlobalScope('active')->where('school_id', $schoolId)->where('student_id', $studentId)->findOrFail($feeId);
+                        
+                        // Calculate maximum remaining paid amount that can be refunded
+                        $alreadyRefunded = FeeRefund::where('student_fee_id', $sf->id)->sum('amount');
+                        $maxRefundable = max(0, $sf->paid_amount - $alreadyRefunded);
+
+                        if ($maxRefundable <= 0) continue;
+
+                        $refThisComp = min($maxRefundable, $remainingRefundAmount);
+                        $remainingRefundAmount -= $refThisComp;
+                        $totalRefAmt += $refThisComp;
+                        $instNo = $sf->installment_no;
+
+                        $detailsArray[] = [
+                            'student_fee_id' => $sf->id,
+                            'component_name' => $sf->component ? $sf->component->component_name : ($sf->category ? $sf->category->name : 'Fee'),
+                            'installment_no' => $sf->installment_no,
+                            'amount_paid' => $refThisComp,
+                        ];
+
+                        // Record legacy refund
+                        FeeRefund::create([
+                            'school_id'      => $schoolId,
+                            'student_id'     => $studentId,
+                            'student_fee_id' => $sf->id,
+                            'amount'         => $refThisComp,
+                            'refund_date'    => $request->refund_date,
+                            'reason'         => $request->reason . " (Refunded: " . ($sf->component ? $sf->component->component_name : 'Fee') . " - Installment " . $sf->installment_no . ")",
+                            'slip_no'        => $request->slip_no,
+                            'payment_mode'   => $request->payment_mode,
+                            'bank_date'      => $request->bank_date,
+                            'bank_name'      => $request->bank_name,
+                        ]);
+
+                        // We do NOT modify the StudentFee paid_amount or status anymore
+                        // so the main fees stay completely unchanged!
+                    }
+
+                    // Generate unique collision-free invoice number
+                    $invNo = null;
+                    $attempts = 0;
+                    while ($attempts < 3) {
+                        $invNo = 'INV-' . $instNo . '-REF-' . now()->format('YmdHisu') . '-' . rand(10, 99);
+                        if (!\App\Models\FeeInvoice::where('invoice_number', $invNo)->exists()) {
+                            break;
+                        }
+                        $attempts++;
+                    }
+
+                    // Create FeeInvoice for refund
+                    \App\Models\FeeInvoice::create([
+                        'school_id' => $schoolId,
+                        'student_id' => $studentId,
+                        'created_by' => auth()->id(),
+                        'invoice_number' => $invNo,
+                        'installment_no' => $instNo,
+                        'type' => 'refund',
+                        'status' => 'refunded',
+                        'amount' => $totalRefAmt,
+                        'discount_amount' => 0.00,
+                        'payment_mode' => $request->payment_mode,
+                        'payment_date' => $request->refund_date,
+                        'payment_details' => json_encode([
+                            'slip_no' => $request->slip_no,
+                            'components' => $detailsArray
+                        ]),
+                        'remarks' => $request->reason,
+                    ]);
+
+                    return $invNo;
+                });
+
+                return back()->with('success', 'Fee refund processed successfully!')->with('print_refund_slip', $invoiceNo);
+            }
+
+            if ($action === 'cancel_invoice') {
+                $request->validate([
+                    'student_id'     => 'required|exists:students,id',
+                    'installment_no' => 'required|integer',
+                    'invoice_no'     => 'required|string',
+                    'remarks'        => 'required|string|max:200',
+                ]);
+
+                $studentId = $request->student_id;
+                $instNo = $request->installment_no;
+                $invoiceNo = $request->invoice_no;
+
+                $invoiceToCancel = \App\Models\FeeInvoice::where('school_id', $schoolId)
+                    ->where('student_id', $studentId)
+                    ->where('invoice_number', $invoiceNo)
+                    ->first();
+
+                if (!$invoiceToCancel) {
+                    $legacyRefunds = \App\Models\FeeRefund::where('school_id', $schoolId)
+                        ->where('student_id', $studentId)
+                        ->where('slip_no', $invoiceNo)
+                        ->get();
+
+                    if ($legacyRefunds->isEmpty()) {
+                        return back()->with('error', 'Invoice record not found.');
+                    }
+
+                    $newInvoiceNo = \Illuminate\Support\Facades\DB::transaction(function() use ($legacyRefunds, $schoolId, $studentId, $instNo, $request, $invoiceNo) {
+                        $attempts = 0;
+                        $invNo = null;
+                        while ($attempts < 3) {
+                            $invNo = 'INV-' . $instNo . '-RCN-' . now()->format('YmdHisu') . '-' . rand(10, 99);
+                            if (!\App\Models\FeeInvoice::where('invoice_number', $invNo)->exists()) {
+                                break;
+                            }
+                            $attempts++;
+                        }
+
+                        $totalAmount = $legacyRefunds->sum('amount');
+
+                        \App\Models\FeeInvoice::create([
+                            'school_id' => $schoolId,
+                            'student_id' => $studentId,
+                            'created_by' => auth()->id(),
+                            'invoice_number' => $invNo,
+                            'related_invoice_number' => $invoiceNo,
+                            'installment_no' => $instNo,
+                            'type' => 'cancel_refund',
+                            'status' => 'cancelled',
+                            'amount' => $totalAmount,
+                            'discount_amount' => 0.00,
+                            'payment_mode' => $legacyRefunds->first()->payment_mode ?? 'cash',
+                            'payment_date' => now()->toDateString(),
+                            'remarks' => $request->remarks,
+                        ]);
+
+                        foreach ($legacyRefunds as $ref) {
+                            $ref->delete();
+                        }
+
+                        return $invNo;
+                    });
+
+                    if ($request->wantsJson()) {
+                        return response()->json([
+                            'success' => true, 
+                            'message' => 'Refund cancelled successfully!', 
+                            'receipt_number' => $newInvoiceNo
+                        ]);
+                    }
+                    return back()->with('success', 'Refund cancelled successfully!')->with('print_receipt_no', $newInvoiceNo);
+                }
+
+                // Idempotency: prevent double cancelling
+                if ($invoiceToCancel->status === 'cancelled') {
+                    return back()->with('error', 'This invoice is already cancelled.');
+                }
+
+                $newInvoiceNo = \Illuminate\Support\Facades\DB::transaction(function() use ($invoiceToCancel, $schoolId, $studentId, $instNo, $request) {
+                    if ($invoiceToCancel->type === 'payment') {
+                        // Reverse/subtract the paid amounts from student fees
+                        if (!empty($invoiceToCancel->payment_details)) {
+                            $decoded = json_decode($invoiceToCancel->payment_details, true);
+                            if (is_array($decoded)) {
+                                $compList = isset($decoded['components']) && is_array($decoded['components']) 
+                                    ? $decoded['components'] 
+                                    : $decoded;
+                                
+                                foreach ($compList as $item) {
+                                    if (!is_array($item)) continue;
+                                    $sfId = $item['student_fee_id'] ?? null;
+                                    if ($sfId) {
+                                        $sf = StudentFee::withoutGlobalScope('active')->find($sfId);
+                                        if ($sf) {
+                                            $sf->paid_amount = max(0, $sf->paid_amount - ($item['amount_paid'] ?? 0));
+                                            $sf->status = $sf->paid_amount >= ($sf->amount - $sf->instant_discount_amount) ? 'paid' : ($sf->paid_amount > 0 ? 'partially_paid' : 'pending');
+                                            $sf->save();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Also mark legacy receipt as cancelled
+                        $receipt = FeeReceipt::withoutGlobalScope('active')
+                            ->where('school_id', $schoolId)
+                            ->where('student_id', $studentId)
+                            ->where('receipt_number', $invoiceToCancel->invoice_number)
+                            ->first();
+                        if ($receipt) {
+                            $receipt->status = 'cancelled';
+                            $receipt->save();
+                        }
+
+                        // Mark original payment invoice as cancelled
+                        $invoiceToCancel->status = 'cancelled';
+                        $invoiceToCancel->save();
+                    } elseif ($invoiceToCancel->type === 'refund') {
+                        // Reverse the refund: delete FeeRefund entries and restore StudentFee
+                        $details = json_decode($invoiceToCancel->payment_details, true);
+                        $slipNo = is_array($details) ? ($details['slip_no'] ?? null) : null;
+                        
+                        $refunds = collect();
+                        if ($slipNo) {
+                            $refunds = FeeRefund::where('student_id', $studentId)
+                                ->where('slip_no', $slipNo)
+                                ->get();
+                        }
+                        if ($refunds->isEmpty()) {
+                            $refunds = FeeRefund::where('student_id', $studentId)
+                                ->where('slip_no', $invoiceToCancel->invoice_number)
+                                ->get();
+                        }
+                        if ($refunds->isEmpty() && is_array($details)) {
+                            $components = $details['components'] ?? $details;
+                            if (is_array($components)) {
+                                $feeIds = array_column($components, 'student_fee_id');
+                                if (!empty($feeIds)) {
+                                    $refunds = FeeRefund::where('student_id', $studentId)
+                                        ->whereIn('student_fee_id', $feeIds)
+                                        ->where('refund_date', $invoiceToCancel->payment_date)
+                                        ->get();
+                                }
+                            }
+                        }
+
+                        foreach ($refunds as $ref) {
+                            $ref->delete();
+                        }
+
+                        // Mark original refund invoice as cancelled
+                        $invoiceToCancel->status = 'cancelled';
+                        $invoiceToCancel->save();
+                    }
+
+                    return $invoiceToCancel->invoice_number;
+                });
+
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true, 
+                        'message' => 'Invoice cancelled successfully!', 
+                        'receipt_number' => $newInvoiceNo
+                    ]);
+                }
+                return back()->with('success', 'Invoice cancelled successfully!')->with('print_receipt_no', $newInvoiceNo);
+            }
+
+            if ($action === 'remove_discount') {
+                $request->validate([
+                    'student_id'  => 'required|exists:students,id',
+                    'discount_id' => 'required|exists:fee_discounts,id',
+                ]);
+
+                $studentId = $request->student_id;
+                $student = Student::where('school_id', $schoolId)->findOrFail($studentId);
+                $discount = \App\Models\FeeDiscount::where('school_id', $schoolId)->findOrFail($request->discount_id);
+
+                if ($discount->student_ids) {
+                    $studentIds = json_decode($discount->student_ids, true);
+                    if (is_array($studentIds)) {
+                        $studentIds = array_diff($studentIds, [$studentId]);
+                        if (empty($studentIds)) {
+                            $discount->delete();
+                        } else {
+                            $discount->student_ids = json_encode(array_values($studentIds));
+                            $discount->save();
+                        }
+                    } else {
+                        $discount->delete();
+                    }
+                } else {
+                    // For class-wide/global discount, convert student_ids list to include everyone in class except this student
+                    $className = optional($student->class)->name;
+                    if ($className) {
+                        $classes = $discount->classes_installments ? json_decode($discount->classes_installments, true) : [];
+                        // If the discount is indeed applicable to this student's class
+                        if (empty($classes) || in_array($className, $classes)) {
+                            // Find all students in class except this one
+                            $otherStudentIds = Student::where('school_id', $schoolId)
+                                ->where('class_id', $student->class_id)
+                                ->where('id', '!=', $studentId)
+                                ->pluck('id')
+                                ->toArray();
+                            
+                            $discount->student_ids = json_encode($otherStudentIds);
+                            $discount->save();
+                        }
+                    } else {
+                        $discount->delete();
                     }
                 }
 
-                FeeReceipt::create([
-                    'school_id'      => $schoolId,
-                    'student_id'     => $studentId,
-                    'receipt_number' => $receiptNo,
-                    'amount_paid'    => $request->amount_paid,
-                    'discount_amount'=> $request->input('_computed_discount', 0),
-                    'discount_type'  => $request->input('_computed_discount_type'),
-                    'payment_mode'   => $paymentMode,
-                    'transaction_id' => $request->transaction_id,
-                    'payment_date'   => $receiptDate,
-                ]);
+                // Re-sync fees (which will run syncStudentDiscounts and recalculate)
+                self::syncStudentFees($student);
 
-                if ($request->wantsJson()) {
-                    return response()->json(['success' => true, 'message' => 'Payment collected successfully!']);
-                }
-                return back()->with('success', 'Fee Payment collected successfully!');
+                return back()->with('success', 'Discount removed successfully!');
             }
         }
 
@@ -1224,6 +1929,7 @@ class FeeManagementController extends Controller
         $studentFees   = collect();
         $feeScheduleName = null;
         $appliedDiscounts = [];
+        $refunds = collect();
 
         if ($viewStudentId) {
             $viewStudent = Student::where('school_id', $schoolId)
@@ -1258,10 +1964,28 @@ class FeeManagementController extends Controller
                 $appliedDiscounts = \App\Models\FeeDiscount::where('school_id', $schoolId)
                     ->where('academic_session_id', $selectedSession->id)
                     ->get()
-                    ->filter(function ($d) use ($viewStudentId) {
-                        $ids = json_decode($d->student_ids ?? '[]', true);
-                        return empty($ids) || in_array($viewStudentId, $ids);
+                    ->filter(function ($d) use ($viewStudent) {
+                        // Check student_ids
+                        if ($d->student_ids) {
+                            $studentIds = json_decode($d->student_ids, true);
+                            return is_array($studentIds) && in_array($viewStudent->id, $studentIds);
+                        } else {
+                            // If student_ids is empty/null, check if class-specific or global
+                            if ($d->classes_installments) {
+                                $classes = json_decode($d->classes_installments, true);
+                                $className = optional($viewStudent->class)->name;
+                                return is_array($classes) && $className && in_array($className, $classes);
+                            } else {
+                                // Global
+                                return true;
+                            }
+                        }
                     });
+                
+                $refunds = \App\Models\FeeRefund::where('school_id', $schoolId)
+                    ->where('student_id', $viewStudent->id)
+                    ->orderByDesc('id')
+                    ->get();
             }
         }
 
@@ -1282,7 +2006,7 @@ class FeeManagementController extends Controller
         // ─── LIST: students with fee summary ────────────────────────────
         $query = Student::where('school_id', $schoolId)
             ->with(['class', 'section', 'studentFees' => function ($q) use ($schoolId) {
-                $q->where('school_id', $schoolId);
+                $q->where('school_id', $schoolId)->with('feeSchedule');
             }]);
 
         if ($selectedClassId) {
@@ -1327,7 +2051,8 @@ class FeeManagementController extends Controller
             'studentFees',
             'feeScheduleName',
             'appliedDiscounts',
-            'search'
+            'search',
+            'refunds'
         ));
     }
 
@@ -1569,7 +2294,7 @@ class FeeManagementController extends Controller
         $classes = SchoolClass::where('school_id', $schoolId)->get();
         $sections = \App\Models\Section::where('school_id', $schoolId)->get()->unique('name');
 
-        $query = FeeReceipt::where('school_id', $schoolId)->with(['student.class', 'student.section']);
+        $query = FeeReceipt::withoutGlobalScope('active')->where('school_id', $schoolId)->with(['student.class', 'student.section']);
 
         if ($request->filled('class_id')) {
             $query->whereHas('student', function($q) use ($request) {
@@ -1619,57 +2344,103 @@ class FeeManagementController extends Controller
 
             $cheque = PendingCheque::where('school_id', $schoolId)->findOrFail($request->cheque_id);
             if ($request->action === 'clear') {
-                $cheque->status = 'cleared';
-                $cheque->save();
+                \Illuminate\Support\Facades\DB::transaction(function() use ($cheque, $schoolId) {
+                    $cheque->status = 'cleared';
+                    $cheque->save();
 
-                // Generate Receipt
-                FeeReceipt::create([
-                    'school_id' => $schoolId,
-                    'student_id' => $cheque->student_id,
-                    'receipt_number' => $cheque->receipt_number ?: ('REC-' . rand(100000, 999999)),
-                    'amount_paid' => $cheque->amount,
-                    'payment_mode' => 'cheque',
-                    'transaction_id' => $cheque->cheque_number,
-                    'payment_date' => $cheque->receipt_date ?: now()->toDateString(),
-                ]);
+                    // Generate Receipt
+                    $receiptNum = $cheque->receipt_number ?: ('REC-' . rand(100000, 999999));
 
-                // Update corresponding student fees for that installment!
-                $installmentNo = $cheque->installment_no;
-                $feesToPay = StudentFee::where('school_id', $schoolId)
-                    ->where('student_id', $cheque->student_id);
-                if ($installmentNo) {
-                    $feesToPay->where('installment_no', $installmentNo);
-                }
-                $feesToPay = $feesToPay->where('status', '!=', 'paid')
-                    ->orderBy('id', 'asc')
-                    ->get();
-                
-                if ($feesToPay->isEmpty()) {
+                    // Update corresponding student fees for that installment!
+                    $installmentNo = $cheque->installment_no;
                     $feesToPay = StudentFee::where('school_id', $schoolId)
                         ->where('student_id', $cheque->student_id);
                     if ($installmentNo) {
                         $feesToPay->where('installment_no', $installmentNo);
                     }
-                    $feesToPay = $feesToPay->orderBy('id', 'asc')->get();
-                }
+                    $feesToPay = $feesToPay->where('status', '!=', 'paid')
+                        ->orderBy('id', 'asc')
+                        ->get();
+                    
+                    if ($feesToPay->isEmpty()) {
+                        $feesToPay = StudentFee::where('school_id', $schoolId)
+                            ->where('student_id', $cheque->student_id);
+                        if ($installmentNo) {
+                            $feesToPay->where('installment_no', $installmentNo);
+                        }
+                        $feesToPay = $feesToPay->orderBy('id', 'asc')->get();
+                    }
 
-                $amountToDistribute = floatval($cheque->amount);
-                foreach ($feesToPay as $sf) {
-                    if ($amountToDistribute <= 0) break;
-                    $due = $sf->amount - $sf->paid_amount;
-                    if ($due <= 0) continue;
-                    $paymentForThis = min($amountToDistribute, $due);
-                    $sf->paid_amount += $paymentForThis;
-                    $sf->status = $sf->paid_amount >= $sf->amount ? 'paid' : 'partially_paid';
-                    $sf->save();
-                    $amountToDistribute -= $paymentForThis;
-                }
-                if ($amountToDistribute > 0 && $feesToPay->isNotEmpty()) {
-                    $first = $feesToPay->first();
-                    $first->paid_amount += $amountToDistribute;
-                    $first->status = 'paid';
-                    $first->save();
-                }
+                    $detailsArray = [];
+                    $amountToDistribute = floatval($cheque->amount);
+                    foreach ($feesToPay as $sf) {
+                        if ($amountToDistribute <= 0) break;
+                        $due = $sf->amount - $sf->paid_amount;
+                        if ($due <= 0) continue;
+                        $paymentForThis = min($amountToDistribute, $due);
+                        $sf->paid_amount += $paymentForThis;
+                        $sf->status = $sf->paid_amount >= $sf->amount ? 'paid' : 'partially_paid';
+                        $sf->save();
+                        $amountToDistribute -= $paymentForThis;
+
+                        $detailsArray[] = [
+                            'student_fee_id' => $sf->id,
+                            'component_name' => $sf->component ? $sf->component->component_name : ($sf->category ? $sf->category->name : 'Fee'),
+                            'installment_no' => $sf->installment_no,
+                            'amount_paid' => $paymentForThis,
+                        ];
+                    }
+                    if ($amountToDistribute > 0 && $feesToPay->isNotEmpty()) {
+                        $first = $feesToPay->first();
+                        $first->paid_amount += $amountToDistribute;
+                        $first->status = 'paid';
+                        $first->save();
+
+                        if (!empty($detailsArray)) {
+                            $detailsArray[count($detailsArray) - 1]['amount_paid'] += $amountToDistribute;
+                        }
+                    }
+
+                    FeeReceipt::create([
+                        'school_id' => $schoolId,
+                        'student_id' => $cheque->student_id,
+                        'receipt_number' => $receiptNum,
+                        'amount_paid' => $cheque->amount,
+                        'payment_mode' => 'cheque',
+                        'transaction_id' => $cheque->cheque_number,
+                        'payment_date' => $cheque->receipt_date ?: now()->toDateString(),
+                        'payment_details' => json_encode($detailsArray),
+                    ]);
+
+                    // Generate unique collision-free invoice number
+                    $invNo = null;
+                    $attempts = 0;
+                    $instNo = $installmentNo ?: 1;
+                    while ($attempts < 3) {
+                        $invNo = 'INV-' . $instNo . '-PAY-' . now()->format('YmdHisu') . '-' . rand(10, 99);
+                        if (!\App\Models\FeeInvoice::where('invoice_number', $invNo)->exists()) {
+                            break;
+                        }
+                        $attempts++;
+                    }
+
+                    // Create the FeeInvoice audit log record
+                    \App\Models\FeeInvoice::create([
+                        'school_id' => $schoolId,
+                        'student_id' => $cheque->student_id,
+                        'created_by' => auth()->id(),
+                        'invoice_number' => $invNo,
+                        'installment_no' => $instNo,
+                        'type' => 'payment',
+                        'status' => 'paid',
+                        'amount' => $cheque->amount,
+                        'discount_amount' => 0.00,
+                        'payment_mode' => 'cheque',
+                        'payment_date' => $cheque->receipt_date ?: now()->toDateString(),
+                        'payment_details' => json_encode($detailsArray),
+                        'remarks' => 'Cheque Clearance (Cheque No: ' . $cheque->cheque_number . ')',
+                    ]);
+                });
 
                 return back()->with('success', 'Cheque cleared successfully! Fee receipt generated.');
             } else {
@@ -1711,15 +2482,424 @@ class FeeManagementController extends Controller
     public function feeInvoice(Request $request)
     {
         $schoolId = auth()->user()->school_id;
-        $this->seedInvoice1Data($schoolId);
         $this->ensureFeesSeeded($schoolId);
 
         $school = \App\Models\School::find($schoolId);
-        $students = Student::where('school_id', $schoolId)->with(['class', 'section'])->get();
-        $fees = StudentFee::where('school_id', $schoolId)->with(['category', 'student', 'component', 'feeSchedule'])->get();
+        $students = Student::where('school_id', $schoolId)
+            ->with(['class', 'section'])
+            ->select('id', 'first_name', 'last_name', 'admission_number', 'father_name', 'class_id', 'section_id')
+            ->get();
+        $classes = \App\Models\SchoolClass::where('school_id', $schoolId)->get();
         $config = \App\Models\FeeConfiguration::where('school_id', $schoolId)->first();
 
-        return view('school.fees.invoice', compact('students', 'fees', 'config', 'school'));
+        return view('school.fees.invoice', compact('students', 'classes', 'config', 'school'));
+    }
+
+    public function getStudentInvoices($studentId)
+    {
+        $schoolId = auth()->user()->school_id;
+        $student = Student::where('school_id', $schoolId)->with(['class', 'section'])->findOrFail($studentId);
+
+        $invoices = \App\Models\FeeInvoice::where('school_id', $schoolId)
+            ->where('student_id', $studentId)
+            ->orderBy('id', 'desc')
+            ->get()
+            ->map(function($invoice) use ($schoolId, $studentId) {
+                // Compute current active due for this installment
+                $activeDue = StudentFee::where('school_id', $schoolId)
+                    ->where('student_id', $studentId)
+                    ->where('installment_no', $invoice->installment_no)
+                    ->get()
+                    ->sum(function($sf) {
+                        return max(0, $sf->amount - $sf->instant_discount_amount - $sf->paid_amount);
+                    });
+
+                $status = $invoice->status;
+                if ($status === 'paid' && $activeDue > 0) {
+                    $status = 'partially_paid';
+                }
+
+                $components = [];
+                if (!empty($invoice->payment_details)) {
+                    $decoded = json_decode($invoice->payment_details, true);
+                    if (is_array($decoded)) {
+                        $compList = isset($decoded['components']) && is_array($decoded['components']) 
+                            ? $decoded['components'] 
+                            : $decoded;
+                        
+                        foreach ($compList as $comp) {
+                            if (!is_array($comp) || !isset($comp['student_fee_id'])) continue;
+                            
+                            $sf = StudentFee::withoutGlobalScope('active')->find($comp['student_fee_id']);
+                            $origAmt = $sf ? $sf->amount : ($comp['amount_paid'] ?? 0);
+                            $disc = $sf ? $sf->instant_discount_amount : 0;
+                            $due = $sf ? max(0, $sf->amount - $sf->instant_discount_amount - $sf->paid_amount) : 0;
+
+                            $components[] = [
+                                'name' => $comp['component_name'] ?? 'Fee Component',
+                                'amount' => $origAmt,
+                                'discount' => $disc,
+                                'paid' => $comp['amount_paid'] ?? 0,
+                                'status' => $invoice->status,
+                                'due' => $due,
+                            ];
+                        }
+                    }
+                }
+                
+                if (empty($components)) {
+                    $components[] = [
+                        'name' => 'Installment ' . $invoice->installment_no,
+                        'amount' => $invoice->amount + $invoice->discount_amount,
+                        'discount' => $invoice->discount_amount,
+                        'paid' => $invoice->amount,
+                        'status' => $invoice->status,
+                        'due' => $activeDue,
+                    ];
+                }
+
+                return [
+                    'installment_no' => $invoice->installment_no,
+                    'invoice_no' => $invoice->invoice_number,
+                    'total' => $invoice->amount + $invoice->discount_amount,
+                    'discount' => $invoice->discount_amount,
+                    'paid' => ($invoice->type === 'payment') ? $invoice->amount : 0,
+                    'due' => $activeDue,
+                    'status' => $status,
+                    'invoice_status' => $invoice->status,
+                    'components' => $components,
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'student' => [
+                'id' => $student->id,
+                'name' => $student->full_name,
+                'admission_number' => $student->admission_number,
+                'class' => optional($student->class)->name,
+                'section' => optional($student->section)->name,
+                'father_name' => $student->father_name ?? '—',
+                'mother_name' => $student->mother_name ?? '—',
+                'address' => $student->address ?? '—',
+                'phone' => $student->father_phone ?? '—',
+            ],
+            'invoices' => $invoices
+        ]);
+    }
+
+    public function printSlip($type, $number)
+    {
+        $schoolId = auth()->user()->school_id;
+        $school = \App\Models\School::find($schoolId);
+        $config = \App\Models\FeeConfiguration::where('school_id', $schoolId)->first();
+
+        $student = null;
+        $items = collect();
+        $title = '';
+        $date = '';
+        $mode = '';
+        $amount = 0;
+        $bankName = null;
+        $bankDate = null;
+        $remarks = '';
+
+        $invoice = \App\Models\FeeInvoice::where('school_id', $schoolId)
+            ->where('invoice_number', $number)
+            ->first();
+
+        if ($invoice) {
+            // Tenancy scoping check
+            if ($invoice->school_id !== $schoolId) {
+                abort(403, 'Unauthorized access to invoice.');
+            }
+
+            $student = Student::where('school_id', $schoolId)->with(['class', 'section'])->findOrFail($invoice->student_id);
+            $date = $invoice->payment_date;
+            $mode = $invoice->payment_mode ?: 'Invoice Only';
+            $amount = $invoice->amount;
+            $remarks = $invoice->remarks ?? '';
+            $bankName = null;
+            $bankDate = null;
+            
+            if ($invoice->type === 'payment') {
+                $title = $config?->invoice_title ?: 'Fee Receipt';
+            } elseif ($invoice->type === 'refund') {
+                $title = 'Refund Voucher';
+            } elseif ($invoice->type === 'cancel_payment' || $invoice->type === 'cancel_refund') {
+                $title = 'Cancelled Invoice';
+            } else {
+                $title = $config?->invoice_title ?: 'Fee Invoice';
+            }
+
+            $items = collect();
+            if ($config?->show_installment_components_on_invoice) {
+                if ($invoice->type === 'invoice') {
+                    // Query components from student_fees table by invoice_no
+                    $fees = StudentFee::withoutGlobalScope('active')
+                        ->where('school_id', $schoolId)
+                        ->where('student_id', $invoice->student_id)
+                        ->where('invoice_no', $invoice->invoice_number)
+                        ->with(['category', 'component'])
+                        ->get();
+                    
+                    if ($fees->isEmpty()) {
+                        // fallback to installment_no
+                        $fees = StudentFee::withoutGlobalScope('active')
+                            ->where('school_id', $schoolId)
+                            ->where('student_id', $invoice->student_id)
+                            ->where('installment_no', $invoice->installment_no)
+                            ->with(['category', 'component'])
+                            ->get();
+                    }
+                    
+                    $items = $fees->map(function($fee) use ($invoice) {
+                        return (object)[
+                            'installment_no' => $fee->installment_no,
+                            'description' => ($fee->component?->component_name ?: 'Fee Component') . ' (Inst. ' . $fee->installment_no . ')',
+                            'amount' => $fee->amount,
+                            'instant_discount_amount' => $fee->instant_discount_amount,
+                            'paid_amount' => $fee->paid_amount,
+                            'invoice_status' => $fee->invoice_status ?? 'active',
+                        ];
+                    });
+                } elseif ($invoice->type === 'payment' && !empty($invoice->payment_details)) {
+                    // Decoded from payment_details
+                    $decoded = json_decode($invoice->payment_details, true);
+                    if (is_array($decoded)) {
+                        $compList = isset($decoded['components']) && is_array($decoded['components']) 
+                            ? $decoded['components'] 
+                            : $decoded;
+                        
+                        foreach ($compList as $comp) {
+                            if (!is_array($comp)) continue;
+                            $sf = null;
+                            if (isset($comp['student_fee_id'])) {
+                                $sf = StudentFee::withoutGlobalScope('active')->find($comp['student_fee_id']);
+                            }
+                            
+                            $origAmt = $sf ? $sf->amount : ($comp['amount_paid'] ?? 0);
+                            if (isset($comp['amount_paid']) && $sf && $sf->amount < $comp['amount_paid']) {
+                                $origAmt = $comp['amount_paid'];
+                            }
+                            
+                            $disc = $sf ? $sf->instant_discount_amount : 0;
+                            if (isset($comp['discount_amount'])) {
+                                $disc = $comp['discount_amount'];
+                            }
+
+                            $items->push((object)[
+                                'installment_no' => $invoice->installment_no,
+                                'description' => ($comp['component_name'] ?? 'Fee Component') . ' (Inst. ' . $invoice->installment_no . ')',
+                                'amount' => $origAmt,
+                                'instant_discount_amount' => $disc,
+                                'paid_amount' => $comp['amount_paid'] ?? 0,
+                                'invoice_status' => $invoice->status,
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            if ($items->isEmpty()) {
+                $items = collect([
+                    (object)[
+                        'installment_no' => $invoice->installment_no,
+                        'description' => 'Installment ' . $invoice->installment_no,
+                        'amount' => $invoice->amount + $invoice->discount_amount,
+                        'instant_discount_amount' => $invoice->discount_amount,
+                        'paid_amount' => $invoice->amount,
+                        'invoice_status' => $invoice->status,
+                    ]
+                ]);
+            }
+        } else {
+            // Fallback for legacy database queries
+            if ($type === 'payment') {
+                $receipt = FeeReceipt::withoutGlobalScope('active')->where('school_id', $schoolId)
+                    ->where('receipt_number', $number)
+                    ->firstOrFail();
+                $student = Student::where('school_id', $schoolId)->with(['class', 'section'])->findOrFail($receipt->student_id);
+                 $title = $config?->invoice_title ?: 'Fee Receipt';
+                $date = $receipt->payment_date;
+                $mode = $receipt->payment_mode;
+                $amount = $receipt->amount_paid;
+                $remarks = $receipt->remarks ?? '';
+
+                $items = collect();
+                if ($config?->show_installment_components_on_invoice && !empty($receipt->payment_details)) {
+                    $decoded = json_decode($receipt->payment_details, true);
+                    if (is_array($decoded)) {
+                        $compList = isset($decoded['components']) && is_array($decoded['components']) 
+                            ? $decoded['components'] 
+                            : $decoded;
+                        
+                        foreach ($compList as $comp) {
+                            if (!is_array($comp)) continue;
+                            $sf = null;
+                            if (isset($comp['student_fee_id'])) {
+                                $sf = StudentFee::withoutGlobalScope('active')->find($comp['student_fee_id']);
+                            }
+                            
+                            $origAmt = $sf ? $sf->amount : ($comp['amount_paid'] ?? 0);
+                            $disc = $sf ? $sf->instant_discount_amount : 0;
+                            if (isset($comp['discount_amount'])) {
+                                $disc = $comp['discount_amount'];
+                            }
+
+                            $items->push((object)[
+                                'installment_no' => 1,
+                                'description' => ($comp['component_name'] ?? 'Fee Component') . ' (Inst. 1)',
+                                'amount' => $origAmt,
+                                'instant_discount_amount' => $disc,
+                                'paid_amount' => $comp['amount_paid'] ?? 0,
+                                'invoice_status' => $receipt->status === 'cancelled' ? 'cancelled' : 'paid',
+                            ]);
+                        }
+                    }
+                }
+
+                if ($items->isEmpty()) {
+                    $items = collect([
+                        (object)[
+                            'installment_no' => 1,
+                            'description' => 'Installment 1',
+                            'amount' => $receipt->amount_paid + $receipt->discount_amount,
+                            'instant_discount_amount' => $receipt->discount_amount,
+                            'paid_amount' => $receipt->amount_paid,
+                            'invoice_status' => $receipt->status === 'cancelled' ? 'cancelled' : 'paid',
+                        ]
+                    ]);
+                }
+            } elseif ($type === 'refund') {
+                // Try finding by slip_no
+                $refunds = FeeRefund::where('school_id', $schoolId)
+                    ->where('slip_no', $number)
+                    ->get();
+                
+                // If empty, try finding the FeeInvoice of type refund first to get its matching student_fee_ids
+                if ($refunds->isEmpty()) {
+                    $invoice = \App\Models\FeeInvoice::where('school_id', $schoolId)
+                        ->where('invoice_number', $number)
+                        ->where('type', 'refund')
+                        ->first();
+                    if ($invoice) {
+                        $details = json_decode($invoice->payment_details, true);
+                        $compInfo = is_array($details) ? ($details['components'] ?? []) : [];
+                        $feeIds = array_column($compInfo, 'student_fee_id');
+                        
+                        $refunds = FeeRefund::where('school_id', $schoolId)
+                            ->where('student_id', $invoice->student_id)
+                            ->whereIn('student_fee_id', $feeIds)
+                            ->where('refund_date', $invoice->payment_date)
+                            ->get();
+                    }
+                }
+
+                if ($refunds->isEmpty()) {
+                    abort(404, 'Refund slip not found.');
+                }
+                $first = $refunds->first();
+                $student = Student::where('school_id', $schoolId)->with(['class', 'section'])->findOrFail($first->student_id);
+                $title = 'Refund Voucher';
+                $date = $first->refund_date;
+                $mode = $first->payment_mode;
+                $amount = $refunds->sum('amount');
+                $bankName = $first->bank_name;
+                $bankDate = $first->bank_date;
+                $remarks = explode(' (Refunded:', $first->reason)[0];
+
+                $items = collect([
+                    (object)[
+                        'installment_no' => 1,
+                        'description' => $remarks ?: 'Refund',
+                        'amount' => $amount,
+                        'instant_discount_amount' => 0.00,
+                        'paid_amount' => $amount,
+                        'invoice_status' => 'refunded',
+                    ]
+                ]);
+            } elseif ($type === 'invoice') {
+                $studentId = request()->get('student_id');
+                if (!$studentId) {
+                    abort(400, 'Student ID is required for invoice printing.');
+                }
+                $student = Student::where('school_id', $schoolId)->with(['class', 'section'])->findOrFail($studentId);
+                $title = $config?->invoice_title ?: 'Fee Invoice';
+                
+                $fees = StudentFee::withoutGlobalScope('active')
+                    ->where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->where('invoice_no', $number)
+                    ->with(['category', 'component'])
+                    ->get();
+                
+                if ($fees->isEmpty() && preg_match('/^INV-(\d+)$/i', $number, $matches)) {
+                    $installmentNo = (int) $matches[1];
+                    $fees = StudentFee::withoutGlobalScope('active')
+                        ->where('school_id', $schoolId)
+                        ->where('student_id', $student->id)
+                        ->where('installment_no', $installmentNo)
+                        ->whereNull('invoice_no')
+                        ->with(['category', 'component'])
+                        ->get();
+                }
+                
+                if ($fees->isEmpty()) {
+                    abort(404, 'Invoice items not found.');
+                }
+                
+                $firstFee = $fees->first();
+                $date = $firstFee->created_at ?? now();
+                $mode = 'Invoice Only';
+                $groupTotal = $fees->sum('amount');
+                $groupDiscount = $fees->sum('instant_discount_amount');
+                $amount = $groupTotal - $groupDiscount;
+                $remarks = 'Installment ' . ($installmentNo ?? $firstFee->installment_no) . ' Invoice';
+
+                if ($config?->show_installment_components_on_invoice) {
+                    $items = $fees->map(function($fee) {
+                        return (object)[
+                            'installment_no' => $fee->installment_no,
+                            'description' => ($fee->component?->component_name ?: 'Fee Component') . ' (Inst. ' . $fee->installment_no . ')',
+                            'amount' => $fee->amount,
+                            'instant_discount_amount' => $fee->instant_discount_amount,
+                            'paid_amount' => $fee->paid_amount,
+                            'invoice_status' => $fee->invoice_status ?? 'active',
+                        ];
+                    });
+                } else {
+                    $items = collect([
+                        (object)[
+                            'installment_no' => $installmentNo ?? $firstFee->installment_no,
+                            'description' => 'Installment ' . ($installmentNo ?? $firstFee->installment_no),
+                            'amount' => $groupTotal,
+                            'instant_discount_amount' => $groupDiscount,
+                            'paid_amount' => $fees->sum('paid_amount'),
+                            'invoice_status' => $firstFee->invoice_status ?? 'active',
+                        ]
+                    ]);
+                }
+            } else {
+                abort(404);
+            }
+        }
+
+        $isTransport = false;
+        foreach ($items as $item) {
+            $desc = strtolower($item->description ?? '');
+            if (strpos($desc, 'transport') !== false || strpos($desc, 'bus') !== false || strpos($desc, 'vehicle') !== false) {
+                $isTransport = true;
+                break;
+            }
+        }
+        if ($isTransport) {
+            $title = $config?->transport_invoice_title ?: 'Transport Invoice';
+        }
+
+        return view('school.fees.print_slip', compact(
+            'school', 'config', 'student', 'type', 'number', 'items', 'title', 'date', 'mode', 'amount', 'bankName', 'bankDate', 'remarks', 'invoice'
+        ));
     }
 
     public function feeInvoice1(Request $request)
@@ -1728,6 +2908,9 @@ class FeeManagementController extends Controller
         
         // Seed the invoice 1 data
         $this->seedInvoice1Data($schoolId);
+
+        // Sync transport fee records dynamically based on latest route assignments and attendance deductions
+        $this->syncTransportFees($schoolId);
 
         if ($request->has('ajax') || $request->wantsJson()) {
             $query = \App\Models\StudentFee::where('student_fees.school_id', $schoolId)
@@ -1746,11 +2929,17 @@ class FeeManagementController extends Controller
                     'students.first_name',
                     'students.last_name',
                     'students.father_name',
+                    'students.transport_route',
                     'school_classes.name as class_name',
                     'sections.name as section_name',
                     'fee_schedules.name as schedule_name',
                     'fee_components.component_name'
                 );
+
+            $transportComponent = \App\Models\FeeComponent::where('school_id', $schoolId)
+                ->where('component_name', 'Transport Fee')
+                ->first();
+            $query->where('student_fees.fee_component_id', $transportComponent ? $transportComponent->id : 0);
 
             if ($request->filled('academic_session_id')) {
                 $query->where(function($q) use ($request) {
@@ -1769,6 +2958,9 @@ class FeeManagementController extends Controller
                       ->orWhere('sections.name', $secVal)
                       ->orWhere('sections.id', $secVal);
                 });
+            }
+            if ($request->filled('transport_route')) {
+                $query->where('students.transport_route', $request->transport_route);
             }
             if ($request->filled('fee_schedule_id')) {
                 $query->where('student_fees.fee_schedule_id', $request->fee_schedule_id);
@@ -1812,19 +3004,25 @@ class FeeManagementController extends Controller
         $sections = \App\Models\Section::where('school_id', $schoolId)->get();
         $feeSchedules = \App\Models\FeeSchedule::where('school_id', $schoolId)->get();
         $feeComponents = \App\Models\FeeComponent::where('school_id', $schoolId)->get();
+        $routes = \App\Models\TransportRoute::where('school_id', $schoolId)->get();
 
         return view('school.fees.invoice1', compact(
             'academicSessions',
             'classes',
             'sections',
             'feeSchedules',
-            'feeComponents'
+            'feeComponents',
+            'routes'
         ));
     }
 
     public function feeInvoice1Generate(Request $request)
     {
         $schoolId = auth()->user()->school_id;
+        
+        // Sync transport fee records dynamically based on latest route assignments and attendance deductions
+        $this->syncTransportFees($schoolId);
+
         $feeIds = $request->input('fee_ids', []);
 
         if (empty($feeIds)) {
@@ -1871,6 +3069,11 @@ class FeeManagementController extends Controller
     private function seedInvoice1Data($schoolId)
     {
         // No auto-seeding
+    }
+
+    private function syncTransportFees($schoolId)
+    {
+        \App\Models\StudentFee::syncTransportFees($schoolId);
     }
 
     public function feeBulkUpload(Request $request)

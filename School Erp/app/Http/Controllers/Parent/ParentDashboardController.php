@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Parent;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\StudentAttendance;
+use App\Models\Event;
 use Carbon\Carbon;
 
 class ParentDashboardController extends Controller
@@ -155,7 +156,14 @@ class ParentDashboardController extends Controller
             ];
         }
 
+        $schoolId = $user->school_id;
+        $todayEvents = Event::where('school_id', $schoolId)
+            ->whereDate('start_date', '<=', today()->toDateString())
+            ->whereDate('end_date', '>=', today()->toDateString())
+            ->get();
+
         return view('parent.dashboard', compact(
+            'todayEvents',
             'user',
             'student',
             'school',

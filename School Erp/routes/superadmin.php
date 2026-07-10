@@ -43,6 +43,10 @@ Route::get('/schools/{school}/inactive-students', [SchoolController::class, 'ina
 Route::post('/schools/{school}/inactive-students/restore', [SchoolController::class, 'restoreStudents'])->name('superadmin.schools.restore-students');
 Route::post('/schools/{school}/inactive-students/delete', [SchoolController::class, 'deleteStudentsPermanently'])->name('superadmin.schools.delete-students');
 
+// ─── School Data Reset ─────────────────────────────────────────
+Route::get('/schools/{school}/reset-data',   [SchoolController::class, 'resetDataPage'])->name('superadmin.schools.reset-data');
+Route::post('/schools/{school}/reset-data',  [SchoolController::class, 'resetData'])->name('superadmin.schools.reset-data.execute');
+
 // ─── AI Intelligence Module ───────────────────────────────────
 Route::get('/ai',              [AiController::class, 'index'])->name('superadmin.ai.index');
 Route::post('/ai/toggle',      [AiController::class, 'toggleSchool'])->name('superadmin.ai.toggle');

@@ -21,8 +21,29 @@ class ExpenseVouchersController extends Controller
         $schoolId = auth()->user()->school_id;
 
         // Default filters
-        $startDate = $request->get('start_date', Carbon::now()->subMonth()->format('Y-m-d'));
-        $endDate   = $request->get('end_date', Carbon::now()->format('Y-m-d'));
+        $startDateInput = $request->get('start_date');
+        $endDateInput   = $request->get('end_date');
+
+        if ($startDateInput) {
+            try {
+                $startDate = Carbon::parse($startDateInput)->format('Y-m-d');
+            } catch (\Exception $e) {
+                $startDate = Carbon::now()->subMonth()->format('Y-m-d');
+            }
+        } else {
+            $startDate = Carbon::now()->subMonth()->format('Y-m-d');
+        }
+
+        if ($endDateInput) {
+            try {
+                $endDate = Carbon::parse($endDateInput)->format('Y-m-d');
+            } catch (\Exception $e) {
+                $endDate = Carbon::now()->format('Y-m-d');
+            }
+        } else {
+            $endDate = Carbon::now()->format('Y-m-d');
+        }
+
         $paymentStatus = $request->get('payment_status', 'All');
         $approvalStatus = $request->get('approval_status', 'All');
         $showDeleted = $request->has('show_deleted');
@@ -266,8 +287,10 @@ class ExpenseVouchersController extends Controller
         $totalPaid = $voucher->total_paid;
         if ($totalPaid >= (float) $voucher->amount) {
             $voucher->payment_status = 'Paid';
-        } else {
+        } elseif ($totalPaid > 0) {
             $voucher->payment_status = 'Partial';
+        } else {
+            $voucher->payment_status = 'Pending';
         }
         $voucher->save();
 

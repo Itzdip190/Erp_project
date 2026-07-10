@@ -38,7 +38,7 @@ class ExpensesController extends Controller
             $query->where('status', $status);
         }
 
-        $expenses = $query->with('expenseHead')->orderByDesc('expense_date')->get();
+        $expenses = $query->with(['expenseHead', 'voucher'])->orderByDesc('expense_date')->get();
 
         // Summary stats
         $totalThisMonth   = SchoolExpense::where('school_id', $schoolId)

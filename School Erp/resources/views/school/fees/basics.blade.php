@@ -687,6 +687,7 @@
                     <tr>
                         <th>Head Name</th>
                         <th>Component Name</th>
+                        <th>Fee Schedule</th>
                         <th>Admission Type</th>
                         <th>Gender</th>
                         <th style="width: 100px; text-align: center;">Action</th>
@@ -700,6 +701,15 @@
                                 <strong>{{ $comp->head_name }}</strong>
                             </td>
                             <td>{{ $comp->component_name }}</td>
+                            <td>
+                                @if($comp->schedule)
+                                    <span style="background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:6px; padding:2px 8px; font-size:0.8rem; font-weight:600;">
+                                        {{ $comp->schedule->name }}
+                                    </span>
+                                @else
+                                    <span style="color:#94a3b8; font-size:0.8rem;">—</span>
+                                @endif
+                            </td>
                             <td><span class="badge badge-blue">{{ $comp->admission_type }}</span></td>
                             <td><span class="badge badge-purple">{{ $comp->gender }}</span></td>
                             <td style="text-align: center;">
@@ -716,7 +726,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" style="text-align: center; color: #94a3b8; padding: 24px;">No Fee Components created for this session.</td>
+                            <td colspan="6" style="text-align: center; color: #94a3b8; padding: 24px;">No Fee Components created for this session.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -945,6 +955,20 @@
             <input type="hidden" name="academic_session_id" value="{{ $selectedSession->id }}">
             <div class="modal-body-custom">
                 <div class="form-group">
+                    <label class="form-label">Fee Schedule <span style="color:#ef4444;">*</span></label>
+                    <select name="fee_schedule_id" class="form-control" required>
+                        <option value="">— Select a Fee Schedule —</option>
+                        @foreach($schedules as $sched)
+                            <option value="{{ $sched->id }}">{{ $sched->name }} ({{ $sched->classes }})</option>
+                        @endforeach
+                    </select>
+                    @if($schedules->isEmpty())
+                        <p style="font-size:12px; color:#ef4444; margin-top:4px;">
+                            <i class="fas fa-exclamation-circle"></i> No fee schedules exist for this session. Please create a schedule first.
+                        </p>
+                    @endif
+                </div>
+                <div class="form-group">
                     <label class="form-label">Head Name *</label>
                     <input type="text" name="head_name" class="form-control" placeholder="e.g. School Fee" required>
                 </div>
@@ -971,7 +995,7 @@
             </div>
             <div class="modal-ftr">
                 <button type="button" class="btn btn-outline" onclick="closeModal('componentModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Create Component</button>
+                <button type="submit" class="btn btn-primary" {{ $schedules->isEmpty() ? 'disabled' : '' }}>Create Component</button>
             </div>
         </form>
     </div>
@@ -1165,9 +1189,18 @@
                     <label class="form-label">Remarks / Description</label>
                     <textarea name="remarks" class="form-control" placeholder="Remarks related to this discount eligibility" rows="3"></textarea>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Discount Amount (₹) *</label>
-                    <input type="number" name="amount" class="form-control" placeholder="e.g. 500" required>
+                <div style="display:flex; gap:12px;">
+                    <div class="form-group" style="flex:1;">
+                        <label class="form-label">Discount Type *</label>
+                        <select name="type" class="form-control" id="basics_discount_type" onchange="document.getElementById('basics_discount_amt_label').textContent = this.value === 'percentage' ? 'Discount Value (%) *' : 'Discount Amount (₹) *'">
+                            <option value="flat">Flat Amount (₹)</option>
+                            <option value="percentage">Percentage (%)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label class="form-label" id="basics_discount_amt_label">Discount Amount (₹) *</label>
+                        <input type="number" name="amount" class="form-control" placeholder="e.g. 500" required>
+                    </div>
                 </div>
             </div>
 

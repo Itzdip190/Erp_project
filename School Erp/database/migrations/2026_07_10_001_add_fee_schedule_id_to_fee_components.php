@@ -1,0 +1,27 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Add fee_schedule_id to fee_components (nullable for backward compatibility with existing components)
+        if (!Schema::hasColumn('fee_components', 'fee_schedule_id')) {
+            Schema::table('fee_components', function (Blueprint $table) {
+                $table->unsignedBigInteger('fee_schedule_id')->nullable()->after('academic_session_id');
+                $table->foreign('fee_schedule_id')->references('id')->on('fee_schedules')->onDelete('set null');
+            });
+        }
+    }
+
+    public function down(): void
+    {
+        Schema::table('fee_components', function (Blueprint $table) {
+            $table->dropForeign(['fee_schedule_id']);
+            $table->dropColumn('fee_schedule_id');
+        });
+    }
+};

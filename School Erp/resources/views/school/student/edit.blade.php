@@ -107,7 +107,7 @@
         <p>Edit student general details, class/section mapping, family background, previous education history, bank and health details</p>
     </div>
     <div class="page-hdr-right" style="display: flex; gap: 10px; align-items: center;">
-        <a href="{{ route('school.students.download-pdf', $student->id) }}" class="btn" style="background-color: var(--gold, #d4af37); color: #fff; border: 1px solid var(--gold, #d4af37); display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-weight: 600; text-decoration: none;">
+        <a href="{{ route('school.students.download-pdf', [$student->id, 'type' => 'form_only']) }}" target="_blank" class="btn" style="background-color: var(--gold, #d4af37); color: #fff; border: 1px solid var(--gold, #d4af37); display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 6px; font-weight: 600; text-decoration: none;">
             <i class="fa fa-download"></i> Download PDF
         </a>
         <a href="{{ route('school.students.index') }}" class="btn btn-outline">

@@ -352,47 +352,170 @@ class StudentManagementController extends Controller
         if ($request->get('export') === 'excel') {
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
-            
-            $headers = ['Parent Details', 'Student Name', 'Admission ID', 'Class & Section', 'Gender', 'Status', 'Date of Admission'];
-            $sheet->fromArray($headers, null, 'A1');
-            
-            $rowIdx = 2;
-            $groupNum = 1;
-            foreach ($groups as $group) {
-                $details = [];
-                $details[] = 'Phone: ' . $group['phone'];
-                if ($group['father_name'] !== 'N/A') {
-                    $details[] = 'Father: ' . $group['father_name'];
-                }
-                if ($group['mother_name'] !== 'N/A') {
-                    $details[] = 'Mother: ' . $group['mother_name'];
-                }
-                if ($group['guardian_name'] !== 'N/A' && $group['guardian_name'] !== $group['father_name'] && $group['guardian_name'] !== $group['mother_name']) {
-                    $details[] = 'Guardian: ' . $group['guardian_name'];
-                }
-                $details[] = 'Email: ' . $group['email'];
-                
-                $parentDetail = $groupNum . '. ' . implode(' | ', $details);
+            $sheet->setTitle('Sibling Report');
 
-                foreach ($group['students'] as $idx => $student) {
-                    $sheet->fromArray([
-                        $idx === 0 ? $parentDetail : '',
-                        $student->full_name,
-                        $student->admission_number,
-                        ($student->class?->name ?? 'N/A') . ' - ' . ($student->section?->name ?? 'N/A'),
-                        ucfirst($student->gender),
-                        $student->is_active ? 'Active' : 'Inactive',
-                        $student->admission_date ? $student->admission_date->format('d/m/Y') : 'N/A'
-                    ], null, 'A' . $rowIdx++);
+            // ── Styles ─────────────────────────────────────────────────────────
+            $titleStyle = [
+                'font'      => ['bold' => true, 'size' => 16, 'color' => ['argb' => 'FFFFFFFF']],
+                'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                                'startColor' => ['argb' => 'FF4A1772']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                                'vertical'   => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
+            ];
+            $headerStyle = [
+                'font'      => ['bold' => true, 'size' => 11, 'color' => ['argb' => 'FFFFFFFF']],
+                'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                                'startColor' => ['argb' => 'FF7C3AED']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                                'vertical'   => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
+                'borders'   => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                                                 'color'       => ['argb' => 'FFFFFFFF']]],
+            ];
+            $groupHeaderStyle = [
+                'font'      => ['bold' => true, 'size' => 10, 'color' => ['argb' => 'FF3B0764']],
+                'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                                'startColor' => ['argb' => 'FFEDE9FE']],
+                'borders'   => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                                                 'color'       => ['argb' => 'FFCFB8F8']]],
+            ];
+            $dataStyleOdd = [
+                'font'    => ['size' => 10],
+                'fill'    => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                              'startColor' => ['argb' => 'FFFAF5FF']],
+                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                                               'color'       => ['argb' => 'FFD8B4FE']]],
+                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
+            ];
+            $dataStyleEven = [
+                'font'    => ['size' => 10],
+                'fill'    => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                              'startColor' => ['argb' => 'FFFFFFFF']],
+                'borders' => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                                               'color'       => ['argb' => 'FFD8B4FE']]],
+                'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
+            ];
+            $activeStyle = ['font' => ['color' => ['argb' => 'FF059669'], 'bold' => true]];
+            $inactiveStyle = ['font' => ['color' => ['argb' => 'FFDC2626'], 'bold' => true]];
+
+            // ── Title Row (row 1) ───────────────────────────────────────────────
+            $totalCols = 9;
+            $lastCol   = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($totalCols);
+            $sheet->mergeCells("A1:{$lastCol}1");
+            $sheet->setCellValue('A1', '👨‍👩‍👧‍👦  Sibling Families Report  —  Generated ' . now()->format('d M Y'));
+            $sheet->getRowDimension(1)->setRowHeight(36);
+            $sheet->getStyle("A1:{$lastCol}1")->applyFromArray($titleStyle);
+
+            // ── Column Headers (row 2) ─────────────────────────────────────────
+            $headers = [
+                'A' => '#',
+                'B' => 'Phone Number',
+                'C' => 'Father Name',
+                'D' => 'Email',
+                'E' => 'Student Name',
+                'F' => 'Admission No.',
+                'G' => 'Class & Section',
+                'H' => 'Gender',
+                'I' => 'Status',
+            ];
+            foreach ($headers as $col => $label) {
+                $sheet->setCellValue("{$col}2", $label);
+            }
+            $sheet->getStyle("A2:{$lastCol}2")->applyFromArray($headerStyle);
+            $sheet->getRowDimension(2)->setRowHeight(22);
+
+            // ── Column Widths ──────────────────────────────────────────────────
+            $sheet->getColumnDimension('A')->setWidth(6);
+            $sheet->getColumnDimension('B')->setWidth(18);
+            $sheet->getColumnDimension('C')->setWidth(22);
+            $sheet->getColumnDimension('D')->setWidth(28);
+            $sheet->getColumnDimension('E')->setWidth(24);
+            $sheet->getColumnDimension('F')->setWidth(16);
+            $sheet->getColumnDimension('G')->setWidth(20);
+            $sheet->getColumnDimension('H')->setWidth(10);
+            $sheet->getColumnDimension('I')->setWidth(10);
+
+            // ── Freeze header rows ─────────────────────────────────────────────
+            $sheet->freezePane('A3');
+
+            // ── Data Rows ──────────────────────────────────────────────────────
+            $rowIdx   = 3;
+            $groupNum = 1;
+
+            foreach ($groups as $group) {
+                $studentCount = count($group['students']);
+
+                // Group separator row — show family details once, merged across student rows
+                $groupSepRow = $rowIdx;
+                if ($studentCount > 1) {
+                    $sheet->mergeCells("A{$groupSepRow}:A" . ($groupSepRow + $studentCount - 1));
+                    $sheet->mergeCells("B{$groupSepRow}:B" . ($groupSepRow + $studentCount - 1));
+                    $sheet->mergeCells("C{$groupSepRow}:C" . ($groupSepRow + $studentCount - 1));
+                    $sheet->mergeCells("D{$groupSepRow}:D" . ($groupSepRow + $studentCount - 1));
                 }
+
+                $isOddGroup = ($groupNum % 2 === 1);
+                $rowStyle   = $isOddGroup ? $dataStyleOdd : $dataStyleEven;
+
+                // Parent columns — written once on first student row
+                $sheet->setCellValue("A{$groupSepRow}", $groupNum);
+                $sheet->setCellValue("B{$groupSepRow}", $group['phone'] !== 'N/A' ? $group['phone'] : '');
+                $sheet->setCellValue("C{$groupSepRow}", $group['father_name'] !== 'N/A' ? $group['father_name'] : '');
+                $sheet->setCellValue("D{$groupSepRow}", $group['email'] !== 'N/A' ? $group['email'] : '');
+
+                // Style the merged parent cells
+                $sheet->getStyle("A{$groupSepRow}")->applyFromArray(array_merge($rowStyle, [
+                    'font'      => ['bold' => true, 'size' => 10],
+                    'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                                    'vertical'   => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER],
+                ]));
+                $sheet->getStyle("B{$groupSepRow}:D{$groupSepRow}")->applyFromArray(array_merge($rowStyle, [
+                    'font'      => ['bold' => true, 'size' => 10],
+                    'alignment' => ['vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                                    'wrapText' => false],
+                ]));
+
+                // Student rows
+                foreach ($group['students'] as $student) {
+                    $sheet->setCellValue("E{$rowIdx}", $student->full_name);
+                    $sheet->setCellValue("F{$rowIdx}", $student->admission_number);
+                    $sheet->setCellValue("G{$rowIdx}", ($student->class?->name ?? 'N/A') . ' — ' . ($student->section?->name ?? 'N/A'));
+                    $sheet->setCellValue("H{$rowIdx}", ucfirst($student->gender ?? 'N/A'));
+                    $sheet->setCellValue("I{$rowIdx}", $student->is_active ? 'Active' : 'Inactive');
+
+                    $sheet->getStyle("E{$rowIdx}:I{$rowIdx}")->applyFromArray($rowStyle);
+                    $sheet->getRowDimension($rowIdx)->setRowHeight(18);
+
+                    // Colour the status cell
+                    if ($student->is_active) {
+                        $sheet->getStyle("I{$rowIdx}")->applyFromArray($activeStyle);
+                    } else {
+                        $sheet->getStyle("I{$rowIdx}")->applyFromArray($inactiveStyle);
+                    }
+
+                    $rowIdx++;
+                }
+
                 $groupNum++;
             }
-            
+
+            // ── Summary row ────────────────────────────────────────────────────
+            $sheet->mergeCells("A{$rowIdx}:{$lastCol}{$rowIdx}");
+            $sheet->setCellValue("A{$rowIdx}", "Total: " . count($groups) . " families  |  " . array_sum(array_map(fn($g) => count($g['students']), $groups)) . " students");
+            $sheet->getStyle("A{$rowIdx}:{$lastCol}{$rowIdx}")->applyFromArray([
+                'font'      => ['bold' => true, 'size' => 10, 'color' => ['argb' => 'FF4A1772']],
+                'fill'      => ['fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                                'startColor' => ['argb' => 'FFEDE9FE']],
+                'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
+                'borders'   => ['allBorders' => ['borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_MEDIUM,
+                                                 'color'       => ['argb' => 'FF7C3AED']]],
+            ]);
+            $sheet->getRowDimension($rowIdx)->setRowHeight(20);
+
             $writer = new Xlsx($spreadsheet);
-            
+
             return response()->streamDownload(function () use ($writer) {
                 $writer->save('php://output');
-            }, 'siblings_report.xlsx', [
+            }, 'siblings_report_' . now()->format('Y-m-d') . '.xlsx', [
                 'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             ]);
         }
@@ -441,26 +564,21 @@ class StudentManagementController extends Controller
             $toDate = \Carbon\Carbon::now()->endOfMonth()->format('Y-m-d');
         }
 
-        // Limit range to 31 days
+        // No day limit — allow any range
         $startCarbon = \Carbon\Carbon::parse($fromDate);
-        $endCarbon = \Carbon\Carbon::parse($toDate);
-        $daysDiff = $startCarbon->diffInDays($endCarbon) + 1;
-        if ($daysDiff > 31) {
-            $endCarbon = $startCarbon->copy()->addDays(30);
-            $toDate = $endCarbon->format('Y-m-d');
-            $daysDiff = 31;
-            session()->flash('warning', 'The maximum allowed date range is 31 days. We adjusted your end date.');
-        }
+        $endCarbon   = \Carbon\Carbon::parse($toDate);
+        $daysDiff    = $startCarbon->diffInDays($endCarbon) + 1;
 
         $totalDays = $daysDiff;
-        $weekdays = 0;
-        $weekends = 0;
+        $weekdays  = 0; // Mon–Sat (working)
+        $weekends  = 0; // Sun only (holiday)
         $datesInRange = [];
 
         $tempDate = $startCarbon->copy();
         while ($tempDate->lte($endCarbon)) {
             $datesInRange[] = $tempDate->copy();
-            if ($tempDate->isWeekend()) {
+            // Sunday (dayOfWeek === 0) is the only holiday; Saturday is working
+            if ($tempDate->dayOfWeek === 0) {
                 $weekends++;
             } else {
                 $weekdays++;
@@ -483,7 +601,12 @@ class StudentManagementController extends Controller
                     $q->where('first_name', 'like', "%{$search}%")
                       ->orWhere('last_name', 'like', "%{$search}%")
                       ->orWhere('admission_number', 'like', "%{$search}%")
-                      ->orWhere('roll_number', 'like', "%{$search}%");
+                      ->orWhere('roll_number', 'like', "%{$search}%")
+                      ->orWhere('phone', 'like', "%{$search}%")
+                      ->orWhere('father_phone', 'like', "%{$search}%")
+                      ->orWhere('mother_phone', 'like', "%{$search}%")
+                      ->orWhere('guardian_phone', 'like', "%{$search}%")
+                      ->orWhere('whatsapp_number', 'like', "%{$search}%");
                 });
             }
 
@@ -619,11 +742,11 @@ class StudentManagementController extends Controller
         $classId = $request->class_id;
         $sectionId = $request->section_id;
 
-        // Generate exactly W working days starting from from_date, skipping weekends
+        // Generate exactly W working days starting from from_date, skipping Sundays only (Saturday is a working day)
         $dates = [];
         $current = \Carbon\Carbon::parse($fromDate);
         while (count($dates) < $workingDays) {
-            if (!$current->isWeekend()) {
+            if ($current->dayOfWeek !== 0) {
                 $dates[] = $current->toDateString();
             }
             $current->addDay();

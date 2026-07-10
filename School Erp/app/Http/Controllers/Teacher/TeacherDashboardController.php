@@ -7,6 +7,7 @@ use App\Models\AcademicSession;
 use App\Models\ClassTimetableCell;
 use App\Models\Notice;
 use App\Models\School;
+use App\Models\Event;
 use App\Models\SchoolClass;
 use App\Models\SectionSubjectStaff;
 use App\Models\Staff;
@@ -43,6 +44,11 @@ class TeacherDashboardController extends Controller
             }
 
             $schoolId = $school?->id ?? $user->school_id ?? 1;
+
+            $todayEvents = Event::where('school_id', $schoolId)
+                ->whereDate('start_date', '<=', today()->toDateString())
+                ->whereDate('end_date', '>=', today()->toDateString())
+                ->get();
 
             $currentSession = null;
             if (Schema::hasTable('academic_sessions')) {
@@ -303,6 +309,7 @@ class TeacherDashboardController extends Controller
             }
 
             return view('teacher.dashboard', compact(
+                'todayEvents',
                 'user',
                 'school',
                 'currentSession',
@@ -325,6 +332,7 @@ class TeacherDashboardController extends Controller
             \Illuminate\Support\Facades\Log::error("TeacherDashboardController error: " . $e->getMessage());
             
             $user = Auth::user();
+            $todayEvents = collect();
             $school = app('currentSchool') ?? School::first();
             $currentSession = null;
             $staff = null;
@@ -365,6 +373,7 @@ class TeacherDashboardController extends Controller
             } catch (\Throwable $ex) {}
 
             return view('teacher.dashboard', compact(
+                'todayEvents',
                 'user',
                 'school',
                 'currentSession',
@@ -384,5 +393,105 @@ class TeacherDashboardController extends Controller
                 'accessibleModules'
             ));
         }
+    }
+
+    public function notices()
+    {
+        $user = auth()->user();
+        $school = null;
+        if (\Schema::hasTable('schools')) {
+            $school = app('currentSchool') ?? \App\Models\School::first();
+        }
+        $schoolId = $school?->id ?? $user->school_id ?? 1;
+
+        $staff = null;
+        if (\Schema::hasTable('staff')) {
+            $staff = \App\Models\Staff::where('user_id', $user->id)->first();
+        }
+
+        $notices = Notice::where('school_id', $schoolId)
+            ->whereIn('target_audience', ['all', 'staff'])
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Accessible modules logic for sidebar
+        $accessibleModules = [];
+        try {
+            $allModules = \App\Models\ModuleRegistry::all();
+            $featureRouteMap = [
+                'student_list'         => 'school.students.index',
+                'student_import'       => 'school.students.import',
+                'student_attendance'   => 'school.attendance.student',
+                'staff_list'           => 'school.staff.index',
+                'staff_attendance'     => 'school.attendance.staff',
+                'timetable_list'       => 'school.timetable.index',
+                'fee_invoice'          => 'school.fees.invoice',
+                'fee_invoice1'         => 'school.fees.invoice1',
+                'template_creator'     => 'school.cards.template-creator',
+                'generate_card'        => 'school.cards.generate-card',
+                'create_diary'         => 'school.diary.create',
+                'diary_report'         => 'school.diary.report',
+                'event_holiday'        => 'school.events.index',
+                'manage_certs'        => 'school.certificates.manage',
+                'class_wise_cert'     => 'school.certificates.class-wise',
+                'cert_report'         => 'school.certificates.report',
+                'leave_basics'         => 'school.leave.basics',
+                'staff_leave'          => 'school.leave.staff',
+                'student_leave'        => 'school.leave.student',
+                'notification_settings'=> 'school.communication.settings',
+                'notice_circular'      => 'school.communication.notice',
+                'survey'               => 'school.communication.survey',
+                'sms'                  => 'school.communication.sms',
+                'sms_template'         => 'school.communication.sms-template',
+                'whatsapp'             => 'school.communication.whatsapp',
+                'email'                => 'school.communication.email',
+                'chat'                 => 'school.communication.chat',
+                'grade_scale'         => 'school.examination.grade-scale',
+                'marks_entry'          => 'school.examination.marks-entry',
+                'offline_tests'        => 'school.examination.offline-tests',
+                'report_card_template' => 'school.examination.report-card-template',
+                'report_card'          => 'school.examination.report-card',
+                'report_card_v2'       => 'school.examination.report-card-v2',
+                'admission_process'     => 'school.admissions.process',
+                'admission_settings'    => 'school.admissions.settings',
+                'enquiry_leads'         => 'school.admissions.enquiry-leads',
+                'application_payment'   => 'school.admissions.application-payment',
+                'pending_documents'     => 'school.admissions.pending-documents',
+                'interaction_evaluation'=> 'school.admissions.interaction-evaluation',
+                'admission'             => 'school.admissions.admission',
+                'new_admission_report'  => 'school.admissions.new-admission-report',
+                'daily_planner'         => 'school.admissions.daily-planner',
+                'admission_dashboard'   => 'school.admissions.dashboard',
+                'post_event'            => 'school.gallery.events',
+            ];
+
+            foreach ($allModules as $modKey => $modInfo) {
+                $hasAnyFeature = false;
+                $grantedFeatures = [];
+                foreach ($modInfo['features'] as $featKey => $featLabel) {
+                    if (\App\Helpers\StaffAccessHelper::hasAccess($modKey, $featKey, 'view')) {
+                        $hasAnyFeature = true;
+                        $routeName = $featureRouteMap[$featKey] ?? null;
+                        $url = '#';
+                        if ($routeName && \Route::has($routeName)) {
+                            $url = route($routeName);
+                        }
+                        $grantedFeatures[$featKey] = [
+                            'label' => $featLabel,
+                            'url'   => $url,
+                        ];
+                    }
+                }
+                if ($hasAnyFeature) {
+                    $accessibleModules[$modKey] = [
+                        'label' => $modInfo['label'],
+                        'icon' => $modInfo['icon'],
+                        'features' => $grantedFeatures,
+                    ];
+                }
+            }
+        } catch (\Throwable $ex) {}
+
+        return view('teacher.notices', compact('user', 'school', 'staff', 'notices', 'accessibleModules'));
     }
 }

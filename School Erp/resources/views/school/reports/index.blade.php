@@ -610,7 +610,7 @@ body.dark-mode .cat-card-footer {
     <div class="rp-section-hdr" style="margin-top: 12px;">
         <h2><i class="fas fa-chart-bar" style="color:var(--rp-primary); margin-right:8px;"></i>Fee & Finance Reports</h2>
         <div class="rp-section-divider"></div>
-        <span style="font-size:12px; font-weight:600; color:var(--rp-text2); white-space:nowrap;">9 Reports Available</span>
+        <span style="font-size:12px; font-weight:600; color:var(--rp-text2); white-space:nowrap;">10 Reports Available</span>
     </div>
 
     <div class="rp-cards-grid">
@@ -759,6 +759,27 @@ body.dark-mode .cat-card-footer {
                 <div class="rp-card-footer">
                     <span class="rp-card-cta">Open Report <i class="fas fa-arrow-right"></i></span>
                     <span class="rp-card-count">{{ \Illuminate\Support\Facades\DB::table('fee_refunds')->where('school_id',$schoolId)->count() }} refunds</span>
+                </div>
+            </div>
+        </a>
+
+        {{-- Student-wise Refund Report --}}
+        <a href="{{ route('school.reports.detail', 'studentwise_refund') }}" class="rp-card">
+            <div class="rp-card-header" style="background: linear-gradient(135deg, #0f172a, #3b82f6);">
+                <div class="rp-card-icon"><i class="fas fa-users-viewfinder"></i></div>
+                <span class="rp-card-badge">REFUNDS</span>
+            </div>
+            <div class="rp-card-body">
+                <div class="rp-card-title">Student-wise Refund Report</div>
+                <div class="rp-card-desc">Overview of fee refunds grouped by student, showing refund counts and total refunded amounts.</div>
+                <div class="rp-card-features">
+                    <span class="rp-card-feature">Grouped by Student</span>
+                    <span class="rp-card-feature">Total Refunded</span>
+                    <span class="rp-card-feature">Refund Counts</span>
+                </div>
+                <div class="rp-card-footer">
+                    <span class="rp-card-cta">Open Report <i class="fas fa-arrow-right"></i></span>
+                    <span class="rp-card-count">{{ \Illuminate\Support\Facades\DB::table('fee_refunds')->where('school_id',$schoolId)->distinct('student_id')->count() }} students</span>
                 </div>
             </div>
         </a>

@@ -71,8 +71,39 @@ Route::get('/migrate-db', function (\Illuminate\Http\Request $request) {
         if ($allOutput) {
             $errorMsg .= "<h4>Output before error:</h4><pre>" . htmlspecialchars($allOutput) . "</pre>";
         }
-        return response($errorMsg, 500);
     }
+});
+
+// Up Site Route — disables maintenance mode programmatically
+Route::get('/up-site', function (\Illuminate\Http\Request $request) {
+    $expectedKey = env('DB_MIGRATE_KEY');
+    if (!$expectedKey || $request->query('key') !== $expectedKey) {
+        abort(403, 'Unauthorized.');
+    }
+    
+    $message = '';
+    
+    // Clear maintenance mode file if it exists
+    $downFile = storage_path('framework/down');
+    if (file_exists($downFile)) {
+        if (@unlink($downFile)) {
+            $message .= "Maintenance mode file (storage/framework/down) deleted successfully.\n";
+        } else {
+            $message .= "Found storage/framework/down but could not delete it (permission issue).\n";
+        }
+    } else {
+        $message .= "No maintenance mode file found at storage/framework/down.\n";
+    }
+
+    try {
+        \Illuminate\Support\Facades\Artisan::call('up');
+        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+        $message .= "\nArtisan commands 'up' and 'optimize:clear' executed successfully.";
+    } catch (\Throwable $e) {
+        $message .= "\nArtisan command error: " . $e->getMessage();
+    }
+
+    return response("<h3 style='color:green'>✅ Site is ONLINE!</h3><pre>{$message}</pre>", 200);
 });
 
 // Fix Tables Route — directly creates staff_module_access if it doesn't exist (bypasses migration tracking)

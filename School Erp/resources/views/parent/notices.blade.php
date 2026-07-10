@@ -254,7 +254,7 @@ body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);displ
                 <div class="notice-box">
                     <div class="notice-hdr">
                         <h4 class="notice-title">{{ $notice->title }}</h4>
-                        <span class="notice-date"><i class="far fa-clock"></i> {{ \Carbon\Carbon::parse($notice->publish_date)->format('M d, Y') }}</span>
+                        <span class="notice-date"><i class="far fa-clock"></i> {{ $notice->created_at ? $notice->created_at->format('M d, Y') : '-' }}</span>
                     </div>
                     <p class="notice-content">{{ $notice->content }}</p>
                 </div>

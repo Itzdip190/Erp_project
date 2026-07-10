@@ -243,6 +243,9 @@
             <button class="tab-trigger" onclick="switchTab('fees')" id="btn-tab-fees">
                 <i class="fa fa-credit-card"></i> Fees
             </button>
+            <button class="tab-trigger" onclick="switchTab('leaves')" id="btn-tab-leaves">
+                <i class="fa fa-calendar-times"></i> Leaves
+            </button>
         </div>
 
         <!-- TAB CONTENT: General -->
@@ -250,7 +253,7 @@
             <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 1.5rem; color: var(--accent); display: flex; align-items: center; gap: 8px;">
                 <i class="fa fa-user-tag"></i> Student Personal Profile
             </h3>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
                 <div class="info-tile">
                     <span class="info-label"><i class="fa fa-calendar-alt"></i> Date of Birth</span>
                     <span class="info-value">{{ $student->date_of_birth->format('d M Y') }}</span>
@@ -264,8 +267,8 @@
                     <span class="info-value">{{ $student->religion ?? 'N/A' }}</span>
                 </div>
                 <div class="info-tile">
-                    <span class="info-label"><i class="fa fa-id-card"></i> Caste</span>
-                    <span class="info-value">{{ $student->caste ?? 'N/A' }}</span>
+                    <span class="info-label"><i class="fa fa-id-card"></i> Caste / Sub-Caste</span>
+                    <span class="info-value">{{ $student->caste ?? 'N/A' }} {{ $student->sub_caste ? '(' . $student->sub_caste . ')' : '' }}</span>
                 </div>
                 <div class="info-tile">
                     <span class="info-label"><i class="fa fa-calendar-check"></i> Admission Date</span>
@@ -281,39 +284,361 @@
                         @endif
                     </span>
                 </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-map-marker-alt"></i> Place of Birth</span>
+                    <span class="info-value">{{ $student->place_of_birth ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-file-contract"></i> Birth Certificate No</span>
+                    <span class="info-value">{{ $student->birth_certificate_no ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-fingerprint"></i> Biometric ID</span>
+                    <span class="info-value">{{ $student->biometric_id ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-address-card"></i> USN / SRN Number</span>
+                    <span class="info-value">{{ $student->usn_srn_number ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-id-badge"></i> APAAR ID</span>
+                    <span class="info-value">{{ $student->apaar_id ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-barcode"></i> Samagra ID</span>
+                    <span class="info-value">{{ $student->samagra_id ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-pen"></i> PEN Number</span>
+                    <span class="info-value">{{ $student->pen_number ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-passport"></i> National ID (Aadhar)</span>
+                    <span class="info-value">{{ $student->national_id ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-hotel"></i> Boarding Type</span>
+                    <span class="info-value">{{ $student->boarding_type ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-shield-alt"></i> Defence Personal</span>
+                    <span class="info-value">{{ $student->defence_personal ? 'Yes' : 'No' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label"><i class="fa fa-hand-holding-usd"></i> RTE Student</span>
+                    <span class="info-value">{{ $student->is_rte ? 'Yes' : 'No' }}</span>
+                </div>
+            </div>
+
+            <!-- SECTION: Previous Academic Details -->
+            <h4 style="font-family: 'Syne', sans-serif; font-weight: 700; margin-bottom: 1.2rem; color: var(--t1); border-top: 1px solid var(--border); padding-top: 1.5rem; display: flex; align-items: center; gap: 8px;">
+                <i class="fa fa-university" style="color: var(--accent);"></i> Previous School & Academic Details
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                <div class="info-tile">
+                    <span class="info-label">Previous School Name</span>
+                    <span class="info-value">{{ $student->prev_school ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">City / Country</span>
+                    <span class="info-value">{{ $student->prev_city_country ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Year Attended</span>
+                    <span class="info-value">{{ $student->prev_year_attended ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Board / Affiliate</span>
+                    <span class="info-value">{{ $student->prev_board ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Previous Reg Number</span>
+                    <span class="info-value">{{ $student->prev_reg_no ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">PCM Marks / %</span>
+                    <span class="info-value">{{ $student->prev_pcm_marks ?? 'N/A' }} / {{ $student->prev_pcm_percentage ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Total Marks / Average</span>
+                    <span class="info-value">{{ $student->prev_total_marks ?? 'N/A' }} / {{ $student->prev_average ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2;">
+                    <span class="info-label">Entrance Exam (Name / Rank / Remarks)</span>
+                    <span class="info-value">
+                        {{ $student->entrance_exam_name ?? 'N/A' }} 
+                        @if($student->entrance_exam_rank)(Rank: {{ $student->entrance_exam_rank }})@endif
+                        @if($student->entrance_exam_remarks)- {{ $student->entrance_exam_remarks }}@endif
+                    </span>
+                </div>
+            </div>
+
+            <!-- SECTION: Questionnaire -->
+            <h4 style="font-family: 'Syne', sans-serif; font-weight: 700; margin-bottom: 1.2rem; color: var(--t1); border-top: 1px solid var(--border); padding-top: 1.5rem; display: flex; align-items: center; gap: 8px;">
+                <i class="fa fa-question-circle" style="color: var(--accent);"></i> Academic & Behavior Questionnaire
+            </h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                <div class="info-tile" style="grid-column: span 2; display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
+                    <span class="info-label" style="max-width: 70%;">Has the student ever been involved in any serious disciplinary action?</span>
+                    <span class="info-value">
+                        @if($student->disciplinary_action)
+                            <span class="badge badge-danger" style="background-color: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 4px 8px; border-radius: 6px;">Yes</span> <span style="font-size: 13px; color: var(--text-muted); margin-left: 10px;">{{ $student->disciplinary_action_reason }}</span>
+                        @else
+                            <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 8px; border-radius: 6px;">No</span>
+                        @endif
+                    </span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2; display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
+                    <span class="info-label" style="max-width: 70%;">Has the student ever been asked to leave school?</span>
+                    <span class="info-value">
+                        @if($student->asked_to_leave)
+                            <span class="badge badge-danger" style="background-color: rgba(239, 68, 68, 0.15); color: #ef4444; padding: 4px 8px; border-radius: 6px;">Yes</span> <span style="font-size: 13px; color: var(--text-muted); margin-left: 10px;">{{ $student->asked_to_leave_reason }}</span>
+                        @else
+                            <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 8px; border-radius: 6px;">No</span>
+                        @endif
+                    </span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2; display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
+                    <span class="info-label" style="max-width: 70%;">Does the student have any special educational needs?</span>
+                    <span class="info-value">
+                        @if($student->special_needs)
+                            <span class="badge badge-warning" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; padding: 4px 8px; border-radius: 6px;">Yes</span> <span style="font-size: 13px; color: var(--text-muted); margin-left: 10px;">{{ $student->special_needs_reason }}</span>
+                        @else
+                            <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 8px; border-radius: 6px;">No</span>
+                        @endif
+                    </span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2; display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
+                    <span class="info-label" style="max-width: 70%;">Does the student have any interests or talents?</span>
+                    <span class="info-value">
+                        @if($student->interests_talents)
+                            <span class="badge badge-blue" style="background-color: rgba(59, 130, 246, 0.15); color: #3b82f6; padding: 4px 8px; border-radius: 6px;">Yes</span> <span style="font-size: 13px; color: var(--text-muted); margin-left: 10px;">{{ $student->interests_talents_reason }}</span>
+                        @else
+                            <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 8px; border-radius: 6px;">No</span>
+                        @endif
+                    </span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2; display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
+                    <span class="info-label" style="max-width: 70%;">Has the student represented his/her school in sports or other events?</span>
+                    <span class="info-value">
+                        @if($student->represented_school)
+                            <span class="badge badge-blue" style="background-color: rgba(59, 130, 246, 0.15); color: #3b82f6; padding: 4px 8px; border-radius: 6px;">Yes</span> <span style="font-size: 13px; color: var(--text-muted); margin-left: 10px;">{{ $student->represented_school_reason }}</span>
+                        @else
+                            <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 8px; border-radius: 6px;">No</span>
+                        @endif
+                    </span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2; display: flex; flex-direction: row; justify-content: space-between; align-items: center;">
+                    <span class="info-label" style="max-width: 70%;">Other relevant info?</span>
+                    <span class="info-value">
+                        @if($student->other_info)
+                            <span class="badge badge-blue" style="background-color: rgba(59, 130, 246, 0.15); color: #3b82f6; padding: 4px 8px; border-radius: 6px;">Yes</span> <span style="font-size: 13px; color: var(--text-muted); margin-left: 10px;">{{ $student->other_info_reason }}</span>
+                        @else
+                            <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981; padding: 4px 8px; border-radius: 6px;">No</span>
+                        @endif
+                    </span>
+                </div>
+            </div>
+
+            <!-- SECTION: Medical -->
+            <h4 style="font-family: 'Syne', sans-serif; font-weight: 700; margin-bottom: 1.2rem; color: var(--t1); border-top: 1px solid var(--border); padding-top: 1.5rem; display: flex; align-items: center; gap: 8px;">
+                <i class="fa fa-heartbeat" style="color: var(--accent);"></i> Medical Health & Emergency Contacts
+            </h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
+                <div class="info-tile">
+                    <span class="info-label">Height (cm) / Weight (kg)</span>
+                    <span class="info-value">{{ $student->medical_height ?? '—' }} cm / {{ $student->medical_weight ?? '—' }} kg</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Vision (Left / Right)</span>
+                    <span class="info-value">{{ $student->medical_vision_left ?? '—' }} / {{ $student->medical_vision_right ?? '—' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Dental Condition</span>
+                    <span class="info-value">{{ $student->medical_dental ?? '—' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Allergies / Disabilities</span>
+                    <span class="info-value">{{ $student->medical_allergies ?? 'None' }} / {{ $student->medical_disabilities ?? 'None' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Preferred Doctor</span>
+                    <span class="info-value">{{ $student->medical_doctor_name ?? '—' }} @if($student->medical_doctor_phone) ({{ $student->medical_doctor_phone }}) @endif</span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2;">
+                    <span class="info-label">Doctor Address</span>
+                    <span class="info-value">{{ $student->medical_doctor_address ?? '—' }}</span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2;">
+                    <span class="info-label">Significant Illness / Accident</span>
+                    <span class="info-value">{{ $student->medical_illness ?? 'None' }}</span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2;">
+                    <span class="info-label">Medical History Details</span>
+                    <span class="info-value">{{ $student->medical_history ?? 'None' }}</span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2;">
+                    <span class="info-label" style="color: var(--accent); font-weight: bold;"><i class="fa fa-exclamation-triangle"></i> Emergency Contact (Name / Phone)</span>
+                    <span class="info-value" style="font-weight: 700; color: var(--navy);">
+                        {{ $student->emergency_name ?? 'N/A' }} 
+                        @if($student->emergency_number) (Phone: {{ $student->emergency_number }}) @endif
+                    </span>
+                </div>
             </div>
         </div>
 
         <!-- TAB CONTENT: Guardian -->
         <div id="tab-guardian" class="tab-content glass-card" style="display: none;">
+            <!-- FATHER SECTION -->
             <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 1.5rem; color: var(--accent); display: flex; align-items: center; gap: 8px;">
-                <i class="fa fa-users-cog"></i> Guardian Information
+                <i class="fa fa-user-tie"></i> Father's Information
             </h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
                 <div class="info-tile">
-                    <span class="info-label"><i class="fa fa-user-shield"></i> Guardian Name</span>
-                    <span class="info-value">{{ $student->guardian_name }}</span>
+                    <span class="info-label">Father's Name</span>
+                    <span class="info-value" style="font-weight: 700; color: var(--navy);">{{ $student->father_name ?? 'N/A' }}</span>
                 </div>
                 <div class="info-tile">
-                    <span class="info-label"><i class="fa fa-heart"></i> Relationship</span>
+                    <span class="info-label">Father's Phone</span>
+                    <span class="info-value">{{ $student->father_phone ?? 'N/A' }} @if($student->father_alternate_phone) / {{ $student->father_alternate_phone }} @endif</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Father's Email</span>
+                    <span class="info-value">{{ $student->father_email ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Father's Occupation</span>
+                    <span class="info-value">{{ $student->father_occupation ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Aadhar / ID Card</span>
+                    <span class="info-value">{{ $student->father_aadhar ?? 'N/A' }} @if($student->father_id) / {{ $student->father_id }} @endif</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Annual Income</span>
+                    <span class="info-value">₹{{ number_format($student->father_income ?? 0, 2) }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Qualification</span>
+                    <span class="info-value">{{ $student->father_qualification ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Passport Number</span>
+                    <span class="info-value">{{ $student->father_passport ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2;">
+                    <span class="info-label">Residential Address</span>
+                    <span class="info-value">{{ $student->father_address ?? 'N/A' }}</span>
+                </div>
+            </div>
+
+            <!-- MOTHER SECTION -->
+            <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 1.5rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <i class="fa fa-user-nurse"></i> Mother's Information
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                <div class="info-tile">
+                    <span class="info-label">Mother's Name</span>
+                    <span class="info-value" style="font-weight: 700; color: var(--navy);">{{ $student->mother_name ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Mother's Phone</span>
+                    <span class="info-value">{{ $student->mother_phone ?? 'N/A' }} @if($student->mother_alternate_phone) / {{ $student->mother_alternate_phone }} @endif</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Mother's Email</span>
+                    <span class="info-value">{{ $student->mother_email ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Mother's Occupation</span>
+                    <span class="info-value">{{ $student->mother_occupation ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Aadhar / ID Card</span>
+                    <span class="info-value">{{ $student->mother_aadhar ?? 'N/A' }} @if($student->mother_id) / {{ $student->mother_id }} @endif</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Annual Income</span>
+                    <span class="info-value">₹{{ number_format($student->mother_income ?? 0, 2) }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Qualification</span>
+                    <span class="info-value">{{ $student->mother_qualification ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Passport Number</span>
+                    <span class="info-value">{{ $student->mother_passport ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2;">
+                    <span class="info-label">Residential Address</span>
+                    <span class="info-value">{{ $student->mother_address ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2;">
+                    <span class="info-label">Office Address</span>
+                    <span class="info-value">{{ $student->mother_office_address ?? 'N/A' }}</span>
+                </div>
+            </div>
+
+            <!-- GUARDIAN SECTION -->
+            <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 1.5rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <i class="fa fa-user-shield"></i> Guardian Information
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+                <div class="info-tile">
+                    <span class="info-label">Guardian Name</span>
+                    <span class="info-value" style="font-weight: 700; color: var(--navy);">{{ $student->guardian_name }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Relationship</span>
                     <span class="info-value">{{ ucfirst($student->guardian_relationship) }}</span>
                 </div>
                 <div class="info-tile">
-                    <span class="info-label"><i class="fa fa-phone"></i> Phone Number</span>
+                    <span class="info-label">Phone Number</span>
                     <span class="info-value">{{ $student->guardian_phone }}</span>
                 </div>
                 <div class="info-tile">
-                    <span class="info-label"><i class="fa fa-envelope"></i> Email Address</span>
+                    <span class="info-label">Email Address</span>
                     <span class="info-value" style="word-break: break-all;">{{ $student->guardian_email ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Occupation</span>
+                    <span class="info-value">{{ $student->guardian_occupation ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Passport Number</span>
+                    <span class="info-value">{{ $student->guardian_passport ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile">
+                    <span class="info-label">Name (Local Language)</span>
+                    <span class="info-value">{{ $student->guardian_name_local ?? 'N/A' }}</span>
+                </div>
+                <div class="info-tile" style="grid-column: span 2;">
+                    <span class="info-label">Guardian Address</span>
+                    <span class="info-value">{{ $student->guardian_address ?? 'N/A' }}</span>
                 </div>
             </div>
             
+            <!-- ADDRESS DETAILS -->
             <h4 style="font-family: 'Syne', sans-serif; font-weight: 700; margin-bottom: 1rem; color: var(--t1); border-top: 1px solid var(--border); padding-top: 1.5rem; display: flex; align-items: center; gap: 8px;">
-                <i class="fa fa-home" style="color: var(--accent);"></i> Residential Address
+                <i class="fa fa-home" style="color: var(--accent);"></i> Student Address Information
             </h4>
-            <div style="background: rgba(0, 0, 0, 0.015); border: 1px solid var(--border); border-radius: 12px; padding: 20px; line-height: 1.8; color: var(--t1);">
-                <strong style="color: var(--accent);">Address:</strong> {{ $student->address }}<br>
-                <strong style="color: var(--accent);">City/State/Zip:</strong> {{ $student->city }}, {{ $student->state }} - {{ $student->pincode }}
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div style="background: rgba(0, 0, 0, 0.015); border: 1px solid var(--border); border-radius: 12px; padding: 20px; line-height: 1.8; color: var(--t1);">
+                    <strong style="color: var(--accent);"><i class="fa fa-map-pin"></i> Current Address:</strong><br>
+                    {{ $student->address }}<br>
+                    @if($student->address_line_2){{ $student->address_line_2 }}<br>@endif
+                    {{ $student->city }}, {{ $student->state }} - {{ $student->pincode }}
+                </div>
+                <div style="background: rgba(0, 0, 0, 0.015); border: 1px solid var(--border); border-radius: 12px; padding: 20px; line-height: 1.8; color: var(--t1);">
+                    <strong style="color: var(--accent);"><i class="fa fa-map-marked-alt"></i> Permanent Address:</strong><br>
+                    @if($student->permanent_address)
+                        {{ $student->permanent_address }}<br>
+                        @if($student->permanent_address_line_2){{ $student->permanent_address_line_2 }}<br>@endif
+                        {{ $student->permanent_city }}, {{ $student->permanent_state }} - {{ $student->permanent_pincode }}
+                    @else
+                        Same as Current Address
+                    @endif
+                </div>
             </div>
         </div>
 
@@ -458,6 +783,52 @@
                     </tbody>
                 </table>
             </div>
+
+            <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1.5rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <i class="fa fa-pencil-alt"></i> Scheduled Class & Offline Tests
+            </h3>
+            <div class="table-wrap">
+                <table class="tbl" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Test Title</th>
+                            <th>Subject</th>
+                            <th>Chapters/Topics</th>
+                            <th>Date & Time</th>
+                            <th>Duration</th>
+                            <th>Grading</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($offlineTests as $ot)
+                            <tr>
+                                <td style="font-weight: 700; color: var(--navy);">{{ $ot->title }}</td>
+                                <td>{{ $ot->subject?->name ?? 'General' }}</td>
+                                <td>
+                                    <span style="font-size: 12.5px; color: var(--text-muted);">
+                                        {{ $ot->chapters ?? '—' }} @if($ot->sub_chapters) ({{ $ot->sub_chapters }}) @endif
+                                    </span>
+                                </td>
+                                <td>{{ $ot->start_date_time ? \Carbon\Carbon::parse($ot->start_date_time)->format('d M Y, h:i A') : '—' }}</td>
+                                <td>{{ $ot->duration_minutes ? $ot->duration_minutes . ' min' : '—' }}</td>
+                                <td><span class="badge badge-blue" style="background-color: rgba(59, 130, 246, 0.15); color: #3b82f6;">{{ $ot->grading_type }}</span></td>
+                                <td>
+                                    @if(strtolower($ot->status) === 'published')
+                                        <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981;">Published</span>
+                                    @else
+                                        <span class="badge badge-warning" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b;">{{ ucfirst($ot->status) }}</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">No scheduled class tests found for this student's class.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- TAB CONTENT: Transport -->
@@ -494,6 +865,46 @@
                     <p style="margin: 0;">This student is not currently mapped to any school transport routes.</p>
                 </div>
             @endif
+
+            <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1.5rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <i class="fa fa-clipboard-list"></i> Bus Attendance Logs
+            </h3>
+            <div class="table-wrap" style="max-height: 250px; overflow-y: auto;">
+                <table class="tbl" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Trip Type</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($busAttendances as $ba)
+                            <tr>
+                                <td style="font-weight: 600;">{{ \Carbon\Carbon::parse($ba->date)->format('d M Y') }}</td>
+                                <td>
+                                    @if(strtolower($ba->trip_type) === 'pickup')
+                                        <span class="badge badge-blue" style="background-color: rgba(59, 130, 246, 0.15); color: #3b82f6;"><i class="fa fa-sign-in-alt"></i> Pickup</span>
+                                    @else
+                                        <span class="badge badge-purple" style="background-color: rgba(139, 92, 246, 0.15); color: #8b5cf6;"><i class="fa fa-sign-out-alt"></i> Drop</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if(strtolower($ba->status) === 'present')
+                                        <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981;">Present</span>
+                                    @else
+                                        <span class="badge badge-danger" style="background-color: rgba(239, 68, 68, 0.15); color: #ef4444;">Absent</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 15px;">No bus attendance logs recorded.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- TAB CONTENT: Fees -->
@@ -556,6 +967,137 @@
                         @empty
                             <tr>
                                 <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">No active fee allocations or schedule mapping records found.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1.5rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <i class="fa fa-receipt"></i> Paid Invoices & Receipts
+            </h3>
+            <div class="table-wrap">
+                <table class="tbl" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Receipt Number</th>
+                            <th>Amount Paid</th>
+                            <th>Discount</th>
+                            <th>Payment Mode</th>
+                            <th>Transaction ID</th>
+                            <th>Payment Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($receipts as $r)
+                            <tr>
+                                <td style="font-weight: 700; color: var(--navy);">{{ $r->receipt_number }}</td>
+                                <td style="font-weight: bold; color: #10b981;">₹{{ number_format($r->amount_paid, 2) }}</td>
+                                <td>
+                                    @if($r->discount_amount > 0)
+                                        <span style="color: var(--red);">₹{{ number_format($r->discount_amount, 2) }}</span> ({{ $r->discount_type }})
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                                <td><span class="badge badge-blue" style="background-color: rgba(59, 130, 246, 0.15); color: #3b82f6;">{{ $r->payment_mode }}</span></td>
+                                <td><code style="font-size: 12px;">{{ $r->transaction_id ?? '—' }}</code></td>
+                                <td>{{ $r->payment_date ? \Carbon\Carbon::parse($r->payment_date)->format('d M Y') : '—' }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No paid invoices or receipts found.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; margin-top: 2rem; margin-bottom: 1.5rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                <i class="fa fa-undo-alt"></i> Fee Refunds
+            </h3>
+            <div class="table-wrap">
+                <table class="tbl" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Refund Slip</th>
+                            <th>Amount Refunded</th>
+                            <th>Refund Date</th>
+                            <th>Payment Mode</th>
+                            <th>Reason</th>
+                            <th>Bank Name / Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($refunds as $rf)
+                            <tr>
+                                <td style="font-weight: 700; color: var(--navy);">{{ $rf->slip_no ?? '—' }}</td>
+                                <td style="font-weight: bold; color: var(--red);">₹{{ number_format($rf->amount, 2) }}</td>
+                                <td>{{ $rf->refund_date ? \Carbon\Carbon::parse($rf->refund_date)->format('d M Y') : '—' }}</td>
+                                <td><span class="badge badge-warning" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b;">{{ $rf->payment_mode }}</span></td>
+                                <td style="color: var(--text-muted); font-size: 12.5px;">{{ $rf->reason }}</td>
+                                <td>
+                                    @if($rf->bank_name || $rf->bank_date)
+                                        <span style="font-size: 12px;">{{ $rf->bank_name }} @if($rf->bank_date) ({{ \Carbon\Carbon::parse($rf->bank_date)->format('d M Y') }}) @endif</span>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No fee refund records found.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB CONTENT: Leaves -->
+        <div id="tab-leaves" class="tab-content glass-card" style="display: none;">
+            <h3 style="font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 1.5rem; color: var(--accent); display: flex; align-items: center; gap: 8px;">
+                <i class="fa fa-calendar-times"></i> Leave Applications
+            </h3>
+            <div class="table-wrap">
+                <table class="tbl" style="width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Leave Type</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Reason</th>
+                            <th>Status</th>
+                            <th>Approved By</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($leaves as $lv)
+                            <tr>
+                                <td style="font-weight: 700; color: var(--navy);">{{ $lv->leave_type }}</td>
+                                <td>{{ \Carbon\Carbon::parse($lv->start_date)->format('d M Y') }}</td>
+                                <td>{{ \Carbon\Carbon::parse($lv->end_date)->format('d M Y') }}</td>
+                                <td style="color: var(--text-muted); font-size: 12.5px;">{{ $lv->reason }}</td>
+                                <td>
+                                    @if(strtolower($lv->status) === 'approved')
+                                        <span class="badge badge-success" style="background-color: rgba(16, 185, 129, 0.15); color: #10b981;">Approved</span>
+                                    @elseif(strtolower($lv->status) === 'pending')
+                                        <span class="badge badge-warning" style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b;">Pending</span>
+                                    @else
+                                        <span class="badge badge-danger" style="background-color: rgba(239, 68, 68, 0.15); color: #ef4444;">Rejected</span>
+                                    @endif
+                                </td>
+                                <td>
+                                    @if($lv->approved_by)
+                                        <span style="font-size: 12px; font-weight: 600; color: var(--t1);">ID: {{ $lv->approved_by }}</span>
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No leave applications found for this student.</td>
                             </tr>
                         @endforelse
                     </tbody>

@@ -254,6 +254,10 @@
                                 <span class="badge-status leave">Leave</span>
                             @elseif($currentStatus === 'duty_leave')
                                 <span class="badge-status duty_leave">Duty Leave</span>
+                            @elseif($currentStatus === 'late')
+                                <span class="badge-status late" style="background-color: rgba(217, 119, 6, 0.1); color: #d97706;">Late</span>
+                            @elseif($currentStatus === 'holiday')
+                                <span class="badge-status holiday" style="background-color: rgba(75, 85, 99, 0.1); color: #4b5563;">Holiday</span>
                             @else
                                 <span class="badge-status not_marked">Not Marked</span>
                             @endif

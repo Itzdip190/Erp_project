@@ -1,3 +1,68 @@
+@php
+    $navNotifications = collect();
+    if (auth()->check()) {
+        $schoolId = auth()->user()->school_id;
+        if ($schoolId) {
+            $today = \Carbon\Carbon::today();
+            $now = \Carbon\Carbon::now();
+
+            // Query today's notices (timezone safe)
+            $todayNotices = \App\Models\Notice::where('school_id', $schoolId)
+                ->whereBetween('created_at', [$now->copy()->startOfDay(), $now->copy()->endOfDay()])
+                ->get()
+                ->map(function ($n) use ($now) {
+                    return (object) [
+                        'title' => $n->title,
+                        'content' => $n->content,
+                        'time' => $n->created_at->diffForHumans(),
+                        'icon' => 'fa-bullhorn',
+                        'color' => '#8b5cf6',
+                        'type' => 'Notice',
+                        'created_at' => $n->created_at,
+                        'is_today' => $n->created_at->between($now->copy()->startOfDay(), $now->copy()->endOfDay())
+                    ];
+                });
+
+            // Query today's events/holidays (timezone safe)
+            $todayEvents = \App\Models\Event::where('school_id', $schoolId)
+                ->whereDate('start_date', '<=', $today->toDateString())
+                ->whereDate('end_date', '>=', $today->toDateString())
+                ->get()
+                ->map(function ($e) use ($today) {
+                    $isHoliday = (bool) $e->is_holiday;
+                    $isToday = ($today->toDateString() >= $e->start_date && $today->toDateString() <= $e->end_date);
+                    return (object) [
+                        'title' => $e->title,
+                        'content' => $e->description ?? ($isHoliday ? 'Official School Holiday' : 'Event'),
+                        'time' => 'Today',
+                        'icon' => $isHoliday ? 'fa-calendar-xmark' : 'fa-calendar-check',
+                        'color' => $isHoliday ? '#ef4444' : '#10b981',
+                        'type' => $isHoliday ? 'Holiday' : 'Event',
+                        'created_at' => $e->created_at ?? \Carbon\Carbon::parse($e->start_date),
+                        'is_today' => $isToday
+                    ];
+                });
+
+            // Combine
+            $typePriority = ['Holiday' => 3, 'Notice' => 2, 'Event' => 1];
+            $navNotifications = $todayNotices->concat($todayEvents)->sort(function ($a, $b) use ($typePriority) {
+                // 1. is_today first
+                if ($a->is_today && !$b->is_today) return -1;
+                if (!$a->is_today && $b->is_today) return 1;
+
+                // 2. type priority
+                $pA = $typePriority[$a->type] ?? 0;
+                $pB = $typePriority[$b->type] ?? 0;
+                if ($pA !== $pB) {
+                    return $pB <=> $pA; // Descending
+                }
+
+                // 3. created_at desc
+                return $b->created_at <=> $a->created_at;
+            });
+        }
+    }
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1136,6 +1201,119 @@ nav[role="navigation"] svg {
     vertical-align: middle !important;
 }
 
+/* Notification dropdown in admin topbar */
+.notif-drop {
+    position: absolute;
+    right: 0;
+    top: 45px;
+    width: 320px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+    display: none;
+    z-index: 1000;
+    overflow: hidden;
+}
+.notif-drop.open {
+    display: block;
+}
+.nd-hdr {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--page);
+}
+.nd-hdr strong {
+    font-size: 12.5px;
+    color: var(--t1);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+.nd-mark {
+    font-size: 10.5px;
+    color: var(--gold);
+    font-weight: 600;
+    cursor: pointer;
+}
+.nd-item {
+    display: flex;
+    align-items: start;
+    gap: 10px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    transition: .15s;
+    text-decoration: none;
+}
+.nd-item:hover {
+    background: var(--page);
+}
+.nd-item:last-child {
+    border-bottom: none;
+}
+.nd-ico {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--gold);
+}
+.nd-body {
+    flex: 1;
+    min-width: 0;
+}
+.nd-title {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--t1);
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.nd-desc {
+    font-size: 10.5px;
+    color: var(--t2);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.nd-time {
+    font-size: 9.5px;
+    color: var(--t3);
+    margin-top: 4px;
+}
+.nd-empty {
+    padding: 30px 14px;
+    text-align: center;
+    color: var(--t3);
+    font-size: 11.5px;
+}
+.notif-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--white);
+}
+
 /* ══════════════════════════════════════════════════════════════
    COMPREHENSIVE DARK MODE THEME (NO WHITE BACKGROUNDS)
    ══════════════════════════════════════════════════════════════ */
@@ -1516,8 +1694,14 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
             ? \App\Models\AcademicSession::where('school_id',$currentSchool->id)->where('is_current',true)->first()
             : null;
         $planName = $currentSchool ? ucfirst($currentSchool->status ?? 'Basic') : 'Basic';
+        $layoutAcademicSessions = $currentSchool
+            ? \App\Models\AcademicSession::where('school_id', $currentSchool->id)->orderByDesc('start_date')->get(['id','name','is_current'])
+            : collect();
+        $layoutCurrentSessionId = $currentSession ? $currentSession->id : ($layoutAcademicSessions->first()?->id ?? null);
     } catch (\Exception $e) {
         $currentSchool = null; $currentSession = null; $planName = 'Basic';
+        $layoutAcademicSessions = collect();
+        $layoutCurrentSessionId = null;
     }
 @endphp
 
@@ -1546,10 +1730,21 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
             </button>
             <div class="page-heading">@yield('page-title', 'Dashboard')</div>
             @if($currentSchool)
-            <div class="topbar-search-wrap" style="position: relative; margin-left: 20px; display: flex; align-items: center; max-width: 280px; width: 100%;">
-                <i class="fas fa-search" style="position: absolute; left: 10px; color: var(--t2); font-size: 13px; pointer-events: none;"></i>
-                <input type="text" id="topbarSearchInput" placeholder="Search students, staff..." style="width: 100%; height: 34px; padding: 0 10px 0 28px; border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px; font-weight: 500; background: var(--page); color: var(--t1); outline: none; transition: all 0.2s;" autocomplete="off">
-                <div id="topbarSearchResults" style="display: none; position: absolute; top: 40px; left: 0; right: 0; background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); max-height: 300px; overflow-y: auto; z-index: 1000; width: 320px;"></div>
+            <div class="topbar-search-wrap" style="position: relative; margin-left: 20px; display: flex; align-items: center; gap: 8px; flex: 1; max-width: 560px;">
+                <div style="position: relative; flex: 1;">
+                    <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--t2); font-size: 13px; pointer-events: none;"></i>
+                    <input type="text" id="topbarSearchInput" placeholder="Search by name, mobile, adm no..." style="width: 100%; height: 34px; padding: 0 10px 0 28px; border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px; font-weight: 500; background: var(--page); color: var(--t1); outline: none; transition: all 0.2s;" autocomplete="off">
+                    <div id="topbarSearchResults" style="display: none; position: absolute; top: 40px; left: 0; background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); max-height: 300px; overflow-y: auto; z-index: 1000; width: 340px;"></div>
+                </div>
+                @if(isset($layoutAcademicSessions) && $layoutAcademicSessions->isNotEmpty())
+                <select id="topbarAcademicYear" onchange="switchAcademicYear(this.value)" style="height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-weight: 700; background: var(--page); color: var(--t1); outline: none; cursor: pointer; min-width: 130px; white-space: nowrap; flex-shrink: 0; transition: all 0.2s;" title="Switch Academic Year">
+                    @foreach($layoutAcademicSessions as $ses)
+                        <option value="{{ $ses->id }}" {{ ($layoutCurrentSessionId == $ses->id) ? 'selected' : '' }}>
+                            {{ $ses->name }}{{ $ses->is_current ? ' ★' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                @endif
             </div>
             @endif
         </div>
@@ -1560,8 +1755,33 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
                 </div>
             </div>
             <div class="notif-wrap">
-                <div class="notif-btn" title="Notifications">
+                <div class="notif-btn" onclick="toggleNotifDrop(event)" title="Notifications" style="cursor:pointer;">
                     <i class="fas fa-bell"></i>
+                    @if($navNotifications->count() > 0)
+                        <span class="notif-badge">{{ $navNotifications->count() }}</span>
+                    @endif
+                </div>
+                <div class="notif-drop" id="notifDrop">
+                    <div class="nd-hdr">
+                        <strong>Notifications ({{ $navNotifications->count() }})</strong>
+                        <span class="nd-mark" onclick="toggleNotifDrop(event)">Dismiss</span>
+                    </div>
+                    <div style="max-height: 250px; overflow-y: auto;">
+                        @forelse($navNotifications as $notif)
+                        <a href="{{ route('school.communication.notice') }}" class="nd-item">
+                            <div class="nd-ico" style="background: {{ $notif->color }}20; color: {{ $notif->color }};">
+                                <i class="fas {{ $notif->icon }}"></i>
+                            </div>
+                            <div class="nd-body">
+                                <div class="nd-title" style="font-weight: 700;">{{ $notif->title }} <span style="font-size: 8.5px; opacity: 0.75; font-weight: 500;">({{ $notif->type }})</span></div>
+                                <div class="nd-desc" style="margin-top: 2px;">{{ $notif->content }}</div>
+                                <div class="nd-time">{{ $notif->time }}</div>
+                            </div>
+                        </a>
+                        @empty
+                        <div class="nd-empty">No new notifications today</div>
+                        @endforelse
+                    </div>
                 </div>
             </div>
             <div class="notif-wrap" style="margin-left: 4px;">
@@ -1881,7 +2101,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const name = student.first_name + ' ' + (student.last_name || '');
                                 const roll = student.roll_number ? 'Roll: ' + student.roll_number : '';
                                 const adm = student.admission_number ? 'Adm: ' + student.admission_number : '';
-                                const details = [adm, roll].filter(Boolean).join(' | ');
+                                const phone = student.phone ? '📞 ' + student.phone : '';
+                                const details = [adm, roll, phone].filter(Boolean).join(' | ');
                                 const photo = student.photo ? `/storage/${student.photo}` : null;
                                 
                                 html += `
@@ -1903,6 +2124,8 @@ document.addEventListener('DOMContentLoaded', () => {
                             data.staff.forEach(member => {
                                 const name = member.first_name + ' ' + (member.last_name || '');
                                 const empId = member.employee_id ? 'ID: ' + member.employee_id : '';
+                                const phone = member.phone ? '📞 ' + member.phone : '';
+                                const details = [empId, phone].filter(Boolean).join(' | ');
                                 const photo = member.photo ? `/storage/${member.photo}` : null;
                                 
                                 html += `
@@ -1912,7 +2135,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         </div>
                                         <div style="min-width: 0;">
                                             <div style="font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</div>
-                                            <div style="font-size: 10.5px; color: var(--t2);">${empId}</div>
+                                            <div style="font-size: 10.5px; color: var(--t2);">${details}</div>
                                         </div>
                                     </a>
                                 `;
@@ -1997,6 +2220,10 @@ document.addEventListener('click', e => {
     if (!e.target.closest('.user-wrap')) {
         document.querySelectorAll('.user-drop').forEach(d => d.classList.remove('open'));
     }
+    if (!e.target.closest('.notif-wrap')) {
+        const drop = document.getElementById('notifDrop');
+        if (drop) drop.classList.remove('open');
+    }
     // Close sidebar profile menu when clicking outside
     if (!e.target.closest('.sb-bottom')) {
         const m = document.getElementById('sbProfileMenu');
@@ -2007,6 +2234,12 @@ document.addEventListener('click', e => {
         document.querySelectorAll('.sb-tooltip-popup').forEach(t => { t.style.display = 'none'; });
     }
 });
+
+function toggleNotifDrop(event) {
+    if (event) event.stopPropagation();
+    const drop = document.getElementById('notifDrop');
+    if (drop) drop.classList.toggle('open');
+}
 
 function toggleSbProfileMenu(event) {
     event.stopPropagation();
@@ -2033,6 +2266,24 @@ document.addEventListener('DOMContentLoaded', () => {
         updateThemeIcon(true);
     }
 });
+
+function switchAcademicYear(sessionId) {
+    if (!sessionId) return;
+    $.post('{{ route("school.dashboard.change-session") }}', {
+        academic_session_id: sessionId
+    }).done(function(res) {
+        if (res.success) {
+            showToast(res.message || 'Academic session changed successfully!');
+            setTimeout(() => {
+                location.reload();
+            }, 800);
+        } else {
+            showToast('Failed to switch academic session.');
+        }
+    }).fail(function() {
+        showToast('Error switching academic session.');
+    });
+}
 </script>
 @include('layouts.ai_chatbot')
 @yield('scripts')

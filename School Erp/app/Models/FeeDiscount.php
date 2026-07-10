@@ -18,6 +18,8 @@ class FeeDiscount extends Model
         'classes_installments',
         'amount',
         'student_ids',
+        'type',
+        'installment_no',
     ];
 
     public function session()

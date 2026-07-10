@@ -423,8 +423,9 @@ body.dark-mode #invoiceReceiptModal .modal-close {
             </form>
 
             {{-- INTERACTION BAR --}}
-            <div class="bar-row">
+            <div class="bar-row" style="display: flex; gap: 8px; align-items: center; margin-bottom: 20px;">
                 <button class="pill-btn-blue" id="addTransferBtn">Account Transfers</button>
+                <button class="pill-btn-outline" id="manageBanksBtn" style="border: 1.5px solid var(--exp-blue); color: var(--exp-blue); font-weight: 700; border-radius: 20px; font-size:12px; cursor:pointer; padding: 8px 16px; background: transparent; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-university"></i> Add Bank Name</button>
                 <button class="pill-btn-print" onclick="openPrintAllConfig('transfer')">Print All Transfers <i class="fas fa-print"></i></button>
             </div>
 
@@ -616,20 +617,18 @@ body.dark-mode #invoiceReceiptModal .modal-close {
                     <label>From Account <span>*</span></label>
                     <select class="form-control" name="from_account" required>
                         <option value="">Select Account</option>
-                        <option value="CASH">CASH</option>
-                        <option value="SBI Bank">SBI Bank</option>
-                        <option value="HDFC Bank">HDFC Bank</option>
-                        <option value="Petty Cash">Petty Cash</option>
+                        @foreach($banks as $bank)
+                        <option value="{{ $bank->bank_name }}">{{ $bank->bank_name }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <div class="form-group">
                     <label>To Account <span>*</span></label>
                     <select class="form-control" name="to_account" required>
                         <option value="">Select Account</option>
-                        <option value="CASH">CASH</option>
-                        <option value="SBI Bank">SBI Bank</option>
-                        <option value="HDFC Bank">HDFC Bank</option>
-                        <option value="Petty Cash">Petty Cash</option>
+                        @foreach($banks as $bank)
+                        <option value="{{ $bank->bank_name }}">{{ $bank->bank_name }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <div class="form-group">
@@ -652,6 +651,37 @@ body.dark-mode #invoiceReceiptModal .modal-close {
     </div>
 </div>
 
+{{-- ADD BANK MODAL --}}
+<div class="exp-modal-overlay" id="bankModal">
+    <div class="exp-modal" style="max-width: 450px;">
+        <div class="exp-modal-hdr" style="background: var(--exp-blue-dark);">
+            <h3>Add Bank Account</h3>
+            <button class="modal-close" onclick="closeBankModal()"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="exp-modal-body" style="padding: 20px;">
+            <form id="bankForm">
+                @csrf
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="font-weight: 700; margin-bottom: 6px; display: block; font-size:13px; color:var(--exp-text);">Bank / Account Name <span style="color:var(--exp-red);">*</span></label>
+                    <input type="text" class="form-control" name="bank_name" placeholder="e.g. Axis Bank, Petty Cash 2" required style="width: 100%; padding: 8px 12px; border: 1.5px solid var(--exp-border); border-radius: 8px;">
+                </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="font-weight: 700; margin-bottom: 6px; display: block; font-size:13px; color:var(--exp-text);">Account Number</label>
+                    <input type="text" class="form-control" name="account_no" placeholder="Optional" style="width: 100%; padding: 8px 12px; border: 1.5px solid var(--exp-border); border-radius: 8px;">
+                </div>
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label style="font-weight: 700; margin-bottom: 6px; display: block; font-size:13px; color:var(--exp-text);">Branch</label>
+                    <input type="text" class="form-control" name="branch" placeholder="Optional" style="width: 100%; padding: 8px 12px; border: 1.5px solid var(--exp-border); border-radius: 8px;">
+                </div>
+                <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; margin-top: 18px;">
+                    <button type="button" class="exp-btn-clear" onclick="closeBankModal()" style="height: auto; padding: 8px 18px; border: 1.5px solid var(--exp-border); background: var(--exp-white); border-radius: 20px; font-weight: 700; font-size: 12px; cursor: pointer;">Cancel</button>
+                    <button type="submit" class="pill-btn-blue" id="bankSubmitBtn" style="background:#1d4ed8; color:#fff; border:none; padding:8px 18px; border-radius:20px; font-weight:700; cursor:pointer; font-size: 12px;">Save Bank</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <div id="exp-toast"></div>
 @endsection
 
@@ -659,6 +689,54 @@ body.dark-mode #invoiceReceiptModal .modal-close {
 <script>
 const tModal = document.getElementById('transferModal');
 const tForm  = document.getElementById('transferForm');
+const bModal = document.getElementById('bankModal');
+const bForm  = document.getElementById('bankForm');
+
+document.getElementById('manageBanksBtn').addEventListener('click', () => {
+    bModal.classList.add('open');
+});
+
+function closeBankModal() { bModal.classList.remove('open'); bForm.reset(); }
+
+bForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const btn = document.getElementById('bankSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const data = Object.fromEntries(new FormData(bForm));
+
+    try {
+        const res = await fetch('{{ route("school.expenses.transfers.banks.store") }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if (json.success) {
+            showToast(json.message, 'success');
+            closeBankModal();
+            
+            // Add new bank option dynamically to the dropdowns
+            const fromSelect = document.querySelector('select[name="from_account"]');
+            const toSelect   = document.querySelector('select[name="to_account"]');
+            
+            const newOption1 = new Option(json.bank.bank_name, json.bank.bank_name);
+            const newOption2 = new Option(json.bank.bank_name, json.bank.bank_name);
+            
+            fromSelect.add(newOption1);
+            toSelect.add(newOption2);
+        } else {
+            showToast(json.message || 'Error creating bank.', 'error');
+        }
+    } catch(err) {
+        showToast('Network error.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Bank';
+    }
+});
 
 document.getElementById('addTransferBtn').addEventListener('click', () => {
     document.getElementById('tDate').value = new Date().toISOString().split('T')[0];

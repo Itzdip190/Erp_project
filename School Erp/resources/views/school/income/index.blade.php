@@ -278,6 +278,7 @@ body.dark-mode {
     font-weight: 700;
 }
 .badge-paid { background-color: #d1fae5; color: #065f46; }
+.badge-partial { background-color: #dbeafe; color: #1e40af; }
 .badge-pending { background-color: #fef3c7; color: #92400e; }
 .badge-cancelled { background-color: #fee2e2; color: #991b1b; }
 
@@ -554,7 +555,13 @@ textarea.form-control {
                         </thead>
                         <tbody id="incomeTableBody">
                         @foreach($incomes as $i => $inc)
-                        <tr id="row-{{ $inc->id }}">
+                        @php
+                            $displayStatus = $inc->status;
+                            if ($inc->voucher) {
+                                $displayStatus = strtolower($inc->voucher->payment_status);
+                            }
+                        @endphp
+                        <tr id="row-{{ $inc->id }}" class="income-row" data-status="{{ $displayStatus }}">
                             <td style="color:var(--inc-text2);">{{ $i + 1 }}</td>
                             <td>
                                 <div style="font-weight:600;color:var(--inc-text);">{{ $inc->title }}</div>
@@ -565,8 +572,8 @@ textarea.form-control {
                             <td><strong style="color:var(--inc-green-mid);">₹{{ number_format($inc->amount, 2) }}</strong></td>
                             <td style="color:var(--inc-text2);">{{ ucwords(str_replace('_',' ',$inc->payment_mode)) }}</td>
                             <td>
-                                <span class="badge badge-{{ $inc->status }}">
-                                    {{ ucfirst($inc->status) }}
+                                <span class="badge badge-{{ $displayStatus }}">
+                                    {{ ucfirst($displayStatus) }}
                                 </span>
                             </td>
                             <td>

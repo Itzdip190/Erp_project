@@ -1828,9 +1828,10 @@ body.dark-mode .row-top-right .badge.green {
     pointer-events: none;
 }
 .calendar-grid-day.today {
-    background: #eae6f3;
-    color: #5e35b1;
-    font-weight: 700;
+    background: #f97316 !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #f97316 !important;
 }
 .calendar-grid-day:hover {
     background: #f1f5f9;
@@ -2382,9 +2383,9 @@ body.dark-mode .calendar-grid-day:hover {
     margin: 2px auto !important;
 }
 .calendar-grid-day.today {
-    background: #eae6f3 !important;
-    color: #5e35b1 !important;
-    font-weight: 700 !important;
+    background: #f97316 !important;
+    color: #fff !important;
+    font-weight: 800 !important;
     border-radius: 50% !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -2393,6 +2394,9 @@ body.dark-mode .calendar-grid-day:hover {
     height: 24px !important;
     line-height: 24px !important;
     margin: 2px auto !important;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #f97316 !important;
+    z-index: 2 !important;
+    position: relative !important;
 }
 
 /* Side Drawer Dynamic Widths */
@@ -4269,6 +4273,18 @@ body.dark-mode .calendar-event-item-custom:hover {
                             <span id="greeting-clock" style="font-family:'Courier New',monospace;font-size:12.5px;font-weight:800;color:#7c3aed;letter-spacing:1px;">00:00:00 AM</span>
                         </div>
                     </div>
+                    <!-- Slide for Today's Events (if any) -->
+                    @if(isset($todayEvents) && $todayEvents->count() > 0)
+                        @foreach($todayEvents as $evt)
+                            <div class="followup-slide" style="justify-content: space-between; width: 100%;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <i class="fas fa-calendar-day" style="color: #ef4444; font-size: 14px;"></i>
+                                    <span style="font-weight: 700; color: #7c3aed;">Today is: {{ $evt->title }} 🎉</span>
+                                </div>
+                                <span class="badge {{ $evt->is_holiday ? 'badge-danger' : 'badge-success' }}" style="font-size: 10px; padding: 2px 8px; border-radius:12px;">{{ $evt->is_holiday ? 'Holiday' : 'Event' }}</span>
+                            </div>
+                        @endforeach
+                    @endif
                     <!-- Slide 2: Follow-ups -->
                     <div class="followup-slide" style="justify-content: space-between; width: 100%;">
                         <div style="display: flex; align-items: center; gap: 8px;">
@@ -5264,14 +5280,15 @@ body.dark-mode .calendar-event-item-custom:hover {
 </div>
 
 <script>
-// ── DATA FROM PHP ─────────────────────────────────────────────────────────────
-const CSRF = document.querySelector('meta[name="csrf-token"]').content;
-const MONTHS_LABELS = @json($months);
-const INCOME_DATA = @json($incomeData);
-const EXPENSE_DATA = @json($expenseData);
-const NOTICES_DATA = @json($noticesData);
-const DIARIES_DATA = @json($diariesData);
-const LEAVES_DATA = @json($leavesData);
+// ── DATA FROM PHP (safe load) ─────────────────────────────────────────────────
+const CSRF = document.querySelector('meta[name="csrf-token"]') ? document.querySelector('meta[name="csrf-token"]').content : '';
+let MONTHS_LABELS, INCOME_DATA, EXPENSE_DATA, NOTICES_DATA, DIARIES_DATA, LEAVES_DATA;
+try { MONTHS_LABELS = @json($months); } catch(e) { MONTHS_LABELS = []; }
+try { INCOME_DATA = @json($incomeData); } catch(e) { INCOME_DATA = []; }
+try { EXPENSE_DATA = @json($expenseData); } catch(e) { EXPENSE_DATA = []; }
+try { NOTICES_DATA = @json($noticesData); } catch(e) { NOTICES_DATA = []; }
+try { DIARIES_DATA = @json($diariesData); } catch(e) { DIARIES_DATA = []; }
+try { LEAVES_DATA = @json($leavesData); } catch(e) { LEAVES_DATA = []; }
 let feeChart;
 
 // ── SPIN ICON MICRO-ANIMATION & COOLDOWN REFRESH ───────────────────────────────
@@ -5513,102 +5530,119 @@ function escapeHtml(text) {
 }
 
 function switchUpdateTab(tab) {
-    const tabs = ['Notice', 'Visitor', 'Leave', 'Diary'];
-    tabs.forEach(t => document.getElementById('tab' + t).classList.remove('active'));
-    
-    document.getElementById('tab' + ucfirst(tab)).classList.add('active');
-    
-    const container = document.getElementById('updatesContent');
-    
-    if (tab === 'notice') {
-        if (NOTICES_DATA.length === 0) {
-            container.innerHTML = `
-                <i class="fas fa-box-open empty-state-icon"></i>
-                <h4>No new updates</h4>
-                <p>Notices will appear here once you receive any updates</p>
-            `;
-        } else {
-            let html = '<div class="updates-list">';
-            NOTICES_DATA.forEach(n => {
-                html += `
-                    <div class="update-item">
-                        <div class="update-item-header">
-                            <span class="update-item-title">${escapeHtml(n.title)}</span>
-                            <span class="update-item-date">${escapeHtml(n.date)}</span>
-                        </div>
-                        <p class="update-item-body">${escapeHtml(n.content)}</p>
-                        <div class="update-item-footer">
-                            <span class="badge badge-audience"><i class="fas fa-users"></i> ${escapeHtml(n.audience)}</span>
-                        </div>
+    try {
+        const tabs = ['Notice', 'Visitor', 'Leave', 'Diary'];
+        tabs.forEach(t => {
+            const el = document.getElementById('tab' + t);
+            if (el) el.classList.remove('active');
+        });
+        
+        const activeTabEl = document.getElementById('tab' + ucfirst(tab));
+        if (activeTabEl) activeTabEl.classList.add('active');
+        
+        const container = document.getElementById('updatesContent');
+        if (!container) return;
+        
+        if (tab === 'notice') {
+            if (typeof NOTICES_DATA === 'undefined' || !NOTICES_DATA || NOTICES_DATA.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:40px; color:var(--t3);">
+                        <i class="fas fa-box-open empty-state-icon" style="font-size:32px; margin-bottom:8px; display:block; color:var(--border);"></i>
+                        <h4>No new updates</h4>
+                        <p>Notices will appear here once you receive any updates</p>
                     </div>
                 `;
-            });
-            html += '</div>';
-            container.innerHTML = html;
-        }
-    } else if (tab === 'visitor') {
-        container.innerHTML = `
-            <i class="fas fa-id-badge empty-state-icon" style="color: #6ee7b7;"></i>
-            <h4>No visitors approval today</h4>
-            <p>Visitor logs needing admin signature will appear here</p>
-        `;
-    } else if (tab === 'leave') {
-        if (LEAVES_DATA.length === 0) {
+            } else {
+                let html = '<div class="updates-list">';
+                NOTICES_DATA.forEach(n => {
+                    html += `
+                        <div class="update-item">
+                            <div class="update-item-header">
+                                <span class="update-item-title">${escapeHtml(n.title)}</span>
+                                <span class="update-item-date">${escapeHtml(n.date)}</span>
+                            </div>
+                            <p class="update-item-body">${escapeHtml(n.content)}</p>
+                            <div class="update-item-footer">
+                                <span class="badge badge-audience"><i class="fas fa-users"></i> ${escapeHtml(n.audience)}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+        } else if (tab === 'visitor') {
             container.innerHTML = `
-                <i class="fas fa-file-signature empty-state-icon" style="color: #fca5a5;"></i>
-                <h4>No leaves pending approval</h4>
-                <p>Leave requests will show here once submitted</p>
+                <div style="text-align:center; padding:40px; color:var(--t3);">
+                    <i class="fas fa-id-badge empty-state-icon" style="font-size:32px; margin-bottom:8px; display:block; color:#6ee7b7;"></i>
+                    <h4>No visitors approval today</h4>
+                    <p>Visitor logs needing admin signature will appear here</p>
+                </div>
             `;
-        } else {
-            let html = '<div class="updates-list">';
-            LEAVES_DATA.forEach(l => {
-                let badgeClass = 'badge-pending';
-                if (l.status === 'approved') badgeClass = 'badge-approved';
-                if (l.status === 'rejected') badgeClass = 'badge-rejected';
-                html += `
-                    <div class="update-item" style="border-left-color:#ef4444;">
-                        <div class="update-item-header">
-                            <span class="update-item-title">${escapeHtml(l.user_name)} (${escapeHtml(l.applicant_type)})</span>
-                            <span class="update-item-date">${escapeHtml(l.start_date)} - ${escapeHtml(l.end_date)}</span>
-                        </div>
-                        <p class="update-item-body"><strong>Reason:</strong> ${escapeHtml(l.reason)}</p>
-                        <div class="update-item-footer">
-                            <span class="badge badge-type"><i class="fas fa-calendar-day"></i> ${escapeHtml(l.leave_type)}</span>
-                            <span class="badge ${badgeClass}">${escapeHtml(l.status.toUpperCase())}</span>
-                        </div>
+        } else if (tab === 'leave') {
+            if (typeof LEAVES_DATA === 'undefined' || !LEAVES_DATA || LEAVES_DATA.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:40px; color:var(--t3);">
+                        <i class="fas fa-file-signature empty-state-icon" style="font-size:32px; margin-bottom:8px; display:block; color:#fca5a5;"></i>
+                        <h4>No leaves pending approval</h4>
+                        <p>Leave requests will show here once submitted</p>
                     </div>
                 `;
-            });
-            html += '</div>';
-            container.innerHTML = html;
-        }
-    } else if (tab === 'diary') {
-        if (DIARIES_DATA.length === 0) {
-            container.innerHTML = `
-                <i class="fas fa-book-open empty-state-icon" style="color: #c084fc;"></i>
-                <h4>No digital diary entries</h4>
-                <p>Today's homework & class logs are up to date</p>
-            `;
-        } else {
-            let html = '<div class="updates-list">';
-            DIARIES_DATA.forEach(d => {
-                html += `
-                    <div class="update-item" style="border-left-color:#8b5cf6;">
-                        <div class="update-item-header">
-                            <span class="update-item-title">${escapeHtml(d.title)}</span>
-                            <span class="update-item-date">${escapeHtml(d.date)}</span>
+            } else {
+                let html = '<div class="updates-list">';
+                LEAVES_DATA.forEach(l => {
+                    let badgeClass = 'badge-pending';
+                    if (l.status === 'approved') badgeClass = 'badge-approved';
+                    if (l.status === 'rejected') badgeClass = 'badge-rejected';
+                    html += `
+                        <div class="update-item" style="border-left-color:#ef4444;">
+                            <div class="update-item-header">
+                                <span class="update-item-title">${escapeHtml(l.user_name)} (${escapeHtml(l.applicant_type)})</span>
+                                <span class="update-item-date">${escapeHtml(l.start_date)} - ${escapeHtml(l.end_date)}</span>
+                            </div>
+                            <p class="update-item-body"><strong>Reason:</strong> ${escapeHtml(l.reason)}</p>
+                            <div class="update-item-footer">
+                                <span class="badge badge-type"><i class="fas fa-calendar-day"></i> ${escapeHtml(l.leave_type)}</span>
+                                <span class="badge ${badgeClass}">${escapeHtml(l.status.toUpperCase())}</span>
+                            </div>
                         </div>
-                        <p class="update-item-body">${escapeHtml(d.content)}</p>
-                        <div class="update-item-footer">
-                            <span class="badge badge-teacher"><i class="fas fa-user-tie"></i> ${escapeHtml(d.staff_name)}</span>
-                            <span class="badge badge-class"><i class="fas fa-graduation-cap"></i> Class ${escapeHtml(d.class_section)}</span>
-                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+        } else if (tab === 'diary') {
+            if (typeof DIARIES_DATA === 'undefined' || !DIARIES_DATA || DIARIES_DATA.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:40px; color:var(--t3);">
+                        <i class="fas fa-book-open empty-state-icon" style="font-size:32px; margin-bottom:8px; display:block; color:#c084fc;"></i>
+                        <h4>No digital diary entries</h4>
+                        <p>Today's homework & class logs are up to date</p>
                     </div>
                 `;
-            });
-            html += '</div>';
-            container.innerHTML = html;
+            } else {
+                let html = '<div class="updates-list">';
+                DIARIES_DATA.forEach(d => {
+                    html += `
+                        <div class="update-item" style="border-left-color:#8b5cf6;">
+                            <div class="update-item-header">
+                                <span class="update-item-title">${escapeHtml(d.title)}</span>
+                                <span class="update-item-date">${escapeHtml(d.date)}</span>
+                            </div>
+                            <p class="update-item-body">${escapeHtml(d.content)}</p>
+                            <div class="update-item-footer">
+                                <span class="badge badge-teacher"><i class="fas fa-user-tie"></i> ${escapeHtml(d.staff_name)}</span>
+                                <span class="badge badge-class"><i class="fas fa-graduation-cap"></i> Class ${escapeHtml(d.class_section)}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
         }
+    } catch (e) {
+        console.error("Error switching updates tab:", e);
     }
 }
 
@@ -5847,7 +5881,7 @@ function openDrawer(type, extraVal = '') {
         drawer.classList.add('drawer-xl');
     } else if (type === 'staffs' || type === 'income') {
         drawer.classList.add('drawer-lg');
-    } else if (type === 'send_reminder' || type === 'class_fee_report' || type === 'student_attendance' || type === 'staff_attendance') {
+    } else if (type === 'send_reminder' || type === 'class_fee_report' || type === 'student_attendance' || type === 'staff_attendance' || type === 'calendar_month_events') {
         drawer.classList.add('drawer-md');
     } else {
         drawer.classList.add('drawer-sm');
@@ -5863,6 +5897,55 @@ function openDrawer(type, extraVal = '') {
             <span>Fetching details...</span>
         </div>
     `;
+
+    // calendar_month_events needs month/year params and special rendering
+    if (type === 'calendar_month_events') {
+        const monthEl = document.getElementById('calendarMonth');
+        const yearEl = document.getElementById('calendarYear');
+        const month = monthEl ? monthEl.value : new Date().getMonth() + 1;
+        const year = yearEl ? yearEl.value : new Date().getFullYear();
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        title.textContent = `${monthNames[parseInt(month) - 1]} ${year} — All Events & Birthdays`;
+        fetch(`/school/dashboard/details?type=calendar_month_events&month=${month}&year=${year}`)
+            .then(r => r.json())
+            .then(res => {
+                const events = res.events || [];
+                if (events.length === 0) {
+                    body.innerHTML = `<div class="drawer-empty"><i class="fas fa-calendar-xmark"></i><span>No events or birthdays this month.</span></div>`;
+                    return;
+                }
+                // Group events by day
+                const byDay = {};
+                events.forEach(ev => {
+                    const d = ev.day;
+                    if (!byDay[d]) byDay[d] = [];
+                    byDay[d].push(ev);
+                });
+                let html = '<div style="padding: 0;">';
+                Object.keys(byDay).sort((a,b) => a - b).forEach(day => {
+                    html += `<div style="padding: 10px 16px; border-bottom: 1px solid var(--border);">`;
+                    html += `<div style="font-size:11px;font-weight:800;color:var(--gold);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;">Day ${day}</div>`;
+                    byDay[day].forEach(ev => {
+                        const isHoliday = ev.type === 'holiday';
+                        const isBirthday = ev.type === 'student' || ev.type === 'staff';
+                        const color = isHoliday ? '#ef4444' : isBirthday ? '#8b5cf6' : '#10b981';
+                        const icon = isHoliday ? 'fa-calendar-xmark' : isBirthday ? 'fa-birthday-cake' : 'fa-calendar-check';
+                        html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;">`;
+                        html += `<div style="width:28px;height:28px;border-radius:50%;background:${color}20;color:${color};display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;"><i class="fas ${icon}"></i></div>`;
+                        html += `<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--t1);">${ev.name}</div><div style="font-size:10.5px;color:var(--t3);">${ev.type === 'student' ? 'Student Birthday' : ev.type === 'staff' ? 'Staff Birthday' : ev.type === 'holiday' ? 'Holiday' : 'Event'} • ${ev.details || ''}</div></div>`;
+                        html += `</div>`;
+                    });
+                    html += `</div>`;
+                });
+                html += '</div>';
+                body.innerHTML = html;
+            })
+            .catch(err => {
+                console.error(err);
+                body.innerHTML = `<div class="drawer-empty"><i class="fas fa-triangle-exclamation" style="color:var(--red);"></i><span>Failed to load events.</span></div>`;
+            });
+        return;
+    }
 
     let url = `/school/dashboard/details?type=${type}`;
     if (type === 'calendar_events' && extraVal) {
@@ -6980,7 +7063,7 @@ function renderDrawerContent(type, data) {
     drawer.querySelector('.drawer-header').className = 'drawer-header';
     drawer.querySelector('.drawer-header').removeAttribute('style');
 
-    if (!data) {
+    if (!data || data.length === 0) {
         body.innerHTML = `
             <div class="drawer-empty">
                 <i class="fas fa-folder-open"></i>
@@ -7587,12 +7670,12 @@ document.addEventListener('DOMContentLoaded', () => {
         Notification.requestPermission();
     }
 
-    renderCalendarGrid();
-    drawIncomeExpenseChart();
-    drawHeadcountPieCharts();
-    drawAdmissionLineChart();
-    loadCalendarMonthEvents();
-    switchUpdateTab('notice');
+    try { renderCalendarGrid(); } catch (e) { console.error('Error rendering calendar grid:', e); }
+    try { drawIncomeExpenseChart(); } catch (e) { console.error('Error drawing income expense chart:', e); }
+    try { drawHeadcountPieCharts(); } catch (e) { console.error('Error drawing headcount pie charts:', e); }
+    try { drawAdmissionLineChart(); } catch (e) { console.error('Error drawing admission line chart:', e); }
+    try { loadCalendarMonthEvents(); } catch (e) { console.error('Error loading calendar events:', e); }
+    try { switchUpdateTab('notice'); } catch (e) { console.error('Error switching update tab:', e); }
     
     // Sidebar accordion toggles and active menu expansion are handled globally in layouts/app.blade.php.
 
@@ -8013,25 +8096,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (slider) {
+        const slidesCount = slider.children.length;
         setInterval(() => {
             if (currentSlide === 0) {
-                // Switching to slide 2: erase greeting first
+                // Switching away from slide 0: erase greeting first
                 if (greetEl) {
                     typewriterErase(greetEl, greetEl.textContent, () => {
-                        currentSlide = 1;
-                        slider.style.transform = `translateY(-${SLIDE_HEIGHT}px)`;
+                        currentSlide = (currentSlide + 1) % slidesCount;
+                        slider.style.transform = `translateY(-${currentSlide * SLIDE_HEIGHT}px)`;
                     });
                 } else {
-                    currentSlide = 1;
-                    slider.style.transform = `translateY(-${SLIDE_HEIGHT}px)`;
+                    currentSlide = (currentSlide + 1) % slidesCount;
+                    slider.style.transform = `translateY(-${currentSlide * SLIDE_HEIGHT}px)`;
                 }
             } else {
-                // Back to slide 1: slide back then retype
-                currentSlide = 0;
-                slider.style.transform = `translateY(0px)`;
-                setTimeout(() => {
-                    if (greetEl) typewriterType(greetEl, activeGreet.text, null);
-                }, 700);
+                currentSlide = (currentSlide + 1) % slidesCount;
+                slider.style.transform = `translateY(-${currentSlide * SLIDE_HEIGHT}px)`;
+                if (currentSlide === 0) {
+                    // Back to slide 0: re-type greeting
+                    setTimeout(() => {
+                        if (greetEl) typewriterType(greetEl, activeGreet.text, null);
+                    }, 700);
+                }
             }
         }, 5000);
     }

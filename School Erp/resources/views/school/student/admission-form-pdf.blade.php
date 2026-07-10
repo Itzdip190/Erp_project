@@ -199,7 +199,7 @@
         </tr>
         <tr>
             <td>
-                <span class="grid-label">National ID:</span>
+                <span class="grid-label">National ID (Aadhar):</span>
                 <span class="grid-value">{{ $student->national_id ?? 'N/A' }}</span>
             </td>
             <td>
@@ -207,28 +207,72 @@
                 <span class="grid-value">{{ $student->whatsapp_number ?? 'N/A' }}</span>
             </td>
         </tr>
-    </table>
-
-    <div class="section-title">2. Parent & Guardian Information</div>
-    <table class="grid-table">
         <tr>
             <td>
-                <span class="grid-label">Father's Name:</span>
-                <span class="grid-value">{{ $student->father_name ?? 'N/A' }}</span>
+                <span class="grid-label">Place of Birth:</span>
+                <span class="grid-value">{{ $student->place_of_birth ?? 'N/A' }}</span>
             </td>
             <td>
-                <span class="grid-label">Mother's Name:</span>
-                <span class="grid-value">{{ $student->mother_name ?? 'N/A' }}</span>
+                <span class="grid-label">Birth Certificate No:</span>
+                <span class="grid-value">{{ $student->birth_certificate_no ?? 'N/A' }}</span>
             </td>
         </tr>
         <tr>
             <td>
-                <span class="grid-label">Father's Phone:</span>
-                <span class="grid-value">{{ $student->father_phone ?? 'N/A' }}</span>
+                <span class="grid-label">USN / SRN Number:</span>
+                <span class="grid-value">{{ $student->usn_srn_number ?? 'N/A' }}</span>
             </td>
             <td>
-                <span class="grid-label">Mother's Phone:</span>
-                <span class="grid-value">{{ $student->mother_phone ?? 'N/A' }}</span>
+                <span class="grid-label">Boarding Type:</span>
+                <span class="grid-value">{{ $student->boarding_type ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Defence Personal:</span>
+                <span class="grid-value">{{ $student->defence_personal ? 'Yes' : 'No' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Biometric ID:</span>
+                <span class="grid-value">{{ $student->biometric_id ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">APAAR ID:</span>
+                <span class="grid-value">{{ $student->apaar_id ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Samagra ID:</span>
+                <span class="grid-value">{{ $student->samagra_id ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">PEN Number:</span>
+                <span class="grid-value">{{ $student->pen_number ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Local ID:</span>
+                <span class="grid-value">{{ $student->local_id ?? 'N/A' }}</span>
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">2. Parent & Guardian Information</div>
+    <table class="grid-table">
+        <!-- Father Profile -->
+        <tr>
+            <td colspan="2" style="background-color: #f8fafc; padding: 4px 8px; font-weight: bold; color: #1e3a8a; border-bottom: 1px solid #e2e8f0;">FATHER'S PROFILE</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Father's Name:</span>
+                <span class="grid-value" style="font-weight: bold;">{{ $student->father_name ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Father's Phone:</span>
+                <span class="grid-value">{{ $student->father_phone ?? 'N/A' }} @if($student->father_alternate_phone) / {{ $student->father_alternate_phone }} @endif</span>
             </td>
         </tr>
         <tr>
@@ -237,24 +281,132 @@
                 <span class="grid-value">{{ $student->father_email ?? 'N/A' }}</span>
             </td>
             <td>
+                <span class="grid-label">Father's Occupation:</span>
+                <span class="grid-value">{{ $student->father_occupation ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Father's Aadhar / ID:</span>
+                <span class="grid-value">{{ $student->father_aadhar ?? 'N/A' }} @if($student->father_id) / {{ $student->father_id }} @endif</span>
+            </td>
+            <td>
+                <span class="grid-label">Father's Income:</span>
+                <span class="grid-value">₹{{ number_format($student->father_income ?? 0, 2) }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Father's Qualification:</span>
+                <span class="grid-value">{{ $student->father_qualification ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Father's Passport No:</span>
+                <span class="grid-value">{{ $student->father_passport ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <span class="grid-label">Father's Address:</span>
+                <span class="grid-value">{{ $student->father_address ?? 'N/A' }}</span>
+            </td>
+        </tr>
+
+        <!-- Mother Profile -->
+        <tr>
+            <td colspan="2" style="background-color: #f8fafc; padding: 4px 8px; font-weight: bold; color: #1e3a8a; border-bottom: 1px solid #e2e8f0; border-top: 1px solid #e2e8f0;">MOTHER'S PROFILE</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Mother's Name:</span>
+                <span class="grid-value" style="font-weight: bold;">{{ $student->mother_name ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Mother's Phone:</span>
+                <span class="grid-value">{{ $student->mother_phone ?? 'N/A' }} @if($student->mother_alternate_phone) / {{ $student->mother_alternate_phone }} @endif</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
                 <span class="grid-label">Mother's Email:</span>
                 <span class="grid-value">{{ $student->mother_email ?? 'N/A' }}</span>
             </td>
-        </tr>
-        <tr>
-            <td colspan="2" style="border-top: 1px dashed #e5e7eb; padding-top: 10px; margin-top: 5px;">
-                <span class="grid-label" style="font-weight: bold; color: #1e3a8a;">Guardian Name:</span>
-                <span class="grid-value" style="font-weight: bold;">{{ $student->guardian_name }} ({{ ucfirst($student->guardian_relationship) }})</span>
+            <td>
+                <span class="grid-label">Mother's Occupation:</span>
+                <span class="grid-value">{{ $student->mother_occupation ?? 'N/A' }}</span>
             </td>
         </tr>
         <tr>
+            <td>
+                <span class="grid-label">Mother's Aadhar / ID:</span>
+                <span class="grid-value">{{ $student->mother_aadhar ?? 'N/A' }} @if($student->mother_id) / {{ $student->mother_id }} @endif</span>
+            </td>
+            <td>
+                <span class="grid-label">Mother's Income:</span>
+                <span class="grid-value">₹{{ number_format($student->mother_income ?? 0, 2) }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Mother's Qualification:</span>
+                <span class="grid-value">{{ $student->mother_qualification ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Mother's Passport No:</span>
+                <span class="grid-value">{{ $student->mother_passport ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <span class="grid-label">Mother's Address:</span>
+                <span class="grid-value">{{ $student->mother_address ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <span class="grid-label">Mother's Office Address:</span>
+                <span class="grid-value">{{ $student->mother_office_address ?? 'N/A' }}</span>
+            </td>
+        </tr>
+
+        <!-- Guardian Profile -->
+        <tr>
+            <td colspan="2" style="background-color: #f8fafc; padding: 4px 8px; font-weight: bold; color: #1e3a8a; border-bottom: 1px solid #e2e8f0; border-top: 1px solid #e2e8f0;">GUARDIAN'S PROFILE</td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Guardian Name:</span>
+                <span class="grid-value" style="font-weight: bold;">{{ $student->guardian_name }} ({{ ucfirst($student->guardian_relationship) }})</span>
+            </td>
             <td>
                 <span class="grid-label">Guardian Phone:</span>
                 <span class="grid-value">{{ $student->guardian_phone }}</span>
             </td>
+        </tr>
+        <tr>
             <td>
                 <span class="grid-label">Guardian Email:</span>
                 <span class="grid-value">{{ $student->guardian_email ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Guardian Occupation:</span>
+                <span class="grid-value">{{ $student->guardian_occupation ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Guardian Passport:</span>
+                <span class="grid-value">{{ $student->guardian_passport ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Guardian Name (Local Language):</span>
+                <span class="grid-value">{{ $student->guardian_name_local ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <span class="grid-label">Guardian Address:</span>
+                <span class="grid-value">{{ $student->guardian_address ?? 'N/A' }}</span>
             </td>
         </tr>
     </table>
@@ -279,9 +431,97 @@
             </td>
         </tr>
         @endif
+        <tr>
+            <td class="field-label">Emergency Contact:</td>
+            <td class="field-value" style="font-weight: bold;">
+                {{ $student->emergency_name ?? 'N/A' }} @if($student->emergency_number) (Phone: {{ $student->emergency_number }}) @endif
+            </td>
+        </tr>
     </table>
 
-    <div class="section-title">4. Medical Information</div>
+    <div class="section-title">4. Previous School & Academic Details</div>
+    <table class="grid-table">
+        <tr>
+            <td>
+                <span class="grid-label">Previous School Name:</span>
+                <span class="grid-value">{{ $student->prev_school ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">City / Country:</span>
+                <span class="grid-value">{{ $student->prev_city_country ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Year Attended:</span>
+                <span class="grid-value">{{ $student->prev_year_attended ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Board / Affiliate:</span>
+                <span class="grid-value">{{ $student->prev_board ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Previous Reg No:</span>
+                <span class="grid-value">{{ $student->prev_reg_no ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">PCM Marks / %:</span>
+                <span class="grid-value">{{ $student->prev_pcm_marks ?? 'N/A' }} / {{ $student->prev_pcm_percentage ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Total Marks / Avg:</span>
+                <span class="grid-value">{{ $student->prev_total_marks ?? 'N/A' }} / {{ $student->prev_average ?? 'N/A' }}</span>
+            </td>
+            <td>
+                <span class="grid-label">Entrance Exam Details:</span>
+                <span class="grid-value">
+                    {{ $student->entrance_exam_name ?? '—' }} 
+                    @if($student->entrance_exam_rank)(Rank: {{ $student->entrance_exam_rank }})@endif 
+                    @if($student->entrance_exam_remarks)- {{ $student->entrance_exam_remarks }}@endif
+                </span>
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">5. Academic & Behavior Questionnaire</div>
+    <table class="grid-table">
+        <tr>
+            <td>
+                <span class="grid-label">Disciplinary Action:</span>
+                <span class="grid-value">{{ $student->disciplinary_action ? 'Yes' : 'No' }} @if($student->disciplinary_action_reason) (Reason: {{ $student->disciplinary_action_reason }}) @endif</span>
+            </td>
+            <td>
+                <span class="grid-label">Asked to Leave School:</span>
+                <span class="grid-value">{{ $student->asked_to_leave ? 'Yes' : 'No' }} @if($student->asked_to_leave_reason) (Reason: {{ $student->asked_to_leave_reason }}) @endif</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Special Educational Needs:</span>
+                <span class="grid-value">{{ $student->special_needs ? 'Yes' : 'No' }} @if($student->special_needs_reason) (Details: {{ $student->special_needs_reason }}) @endif</span>
+            </td>
+            <td>
+                <span class="grid-label">Interests or Talents:</span>
+                <span class="grid-value">{{ $student->interests_talents ? 'Yes' : 'No' }} @if($student->interests_talents_reason) (Details: {{ $student->interests_talents_reason }}) @endif</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Represented School:</span>
+                <span class="grid-value">{{ $student->represented_school ? 'Yes' : 'No' }} @if($student->represented_school_reason) (Details: {{ $student->represented_school_reason }}) @endif</span>
+            </td>
+            <td>
+                <span class="grid-label">Other Relevant Info:</span>
+                <span class="grid-value">{{ $student->other_info ? 'Yes' : 'No' }} @if($student->other_info_reason) (Details: {{ $student->other_info_reason }}) @endif</span>
+            </td>
+        </tr>
+    </table>
+
+    <div class="section-title">6. Medical Information</div>
     <table class="grid-table">
         <tr>
             <td>
@@ -289,19 +529,45 @@
                 <span class="grid-value">{{ $student->medical_height ?? 'N/A' }} / {{ $student->medical_weight ?? 'N/A' }}</span>
             </td>
             <td>
-                <span class="grid-label">Vision (L/R):</span>
+                <span class="grid-label">Vision (L / R):</span>
                 <span class="grid-value">{{ $student->medical_vision_left ?? 'N/A' }} / {{ $student->medical_vision_right ?? 'N/A' }}</span>
             </td>
         </tr>
         <tr>
-            <td colspan="2">
+            <td>
+                <span class="grid-label">Dental Condition:</span>
+                <span class="grid-value">{{ $student->medical_dental ?? 'N/A' }}</span>
+            </td>
+            <td>
                 <span class="grid-label">Allergies / Disabilities:</span>
                 <span class="grid-value">{{ $student->medical_allergies ?? 'None' }} / {{ $student->medical_disabilities ?? 'None' }}</span>
             </td>
         </tr>
+        <tr>
+            <td>
+                <span class="grid-label">Preferred Doctor:</span>
+                <span class="grid-value">{{ $student->medical_doctor_name ?? 'N/A' }} @if($student->medical_doctor_phone) (Phone: {{ $student->medical_doctor_phone }}) @endif</span>
+            </td>
+            <td>
+                <span class="grid-label">Preferred Doctor Address:</span>
+                <span class="grid-value">{{ $student->medical_doctor_address ?? 'N/A' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <span class="grid-label">Significant Illness / Accident:</span>
+                <span class="grid-value">{{ $student->medical_illness ?? 'None' }}</span>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <span class="grid-label">Medical History:</span>
+                <span class="grid-value">{{ $student->medical_history ?? 'None' }}</span>
+            </td>
+        </tr>
     </table>
-
-    <div class="section-title">5. Attendance Report</div>
+    @if(!isset($formOnly) || !$formOnly)
+    <div class="section-title">7. Attendance Report</div>
     <table style="margin-bottom: 10px;">
         <tr>
             <td style="font-weight: bold; width: 25%;">Attendance Rate:</td>
@@ -313,11 +579,11 @@
             <td style="font-weight: bold;">Days Present:</td>
             <td style="color: #047857; font-weight: bold;">{{ $presentDays }}</td>
             <td style="font-weight: bold;">Days Absent / Late:</td>
-            <td><span style="color: #b91c1c; font-weight: bold;">{{ $absentDays }}</span> / <span style="color: #d97706; font-weight: bold;">{{ $lateDays }}</span></td>
+            <td><span style="color: #b91c1c; font-weight: bold;">{{ $presentDays ? $totalDays - $presentDays : $absentDays }}</span> / <span style="color: #d97706; font-weight: bold;">{{ $lateDays }}</span></td>
         </tr>
     </table>
 
-    <div class="section-title">6. Sibling Information</div>
+    <div class="section-title">8. Sibling Information</div>
     @if(count($siblings) > 0)
         <table style="width: 100%; border: 1px solid #e5e7eb; border-collapse: collapse; margin-bottom: 15px;">
             <thead>
@@ -343,7 +609,7 @@
         <div style="font-size: 11px; color: #6b7280; padding: 5px; margin-bottom: 15px;">No siblings registered in this school.</div>
     @endif
 
-    <div class="section-title">7. Academic Exam Report</div>
+    <div class="section-title">9. Academic Exam Report</div>
     @if(count($marks) > 0)
         <table style="width: 100%; border: 1px solid #e5e7eb; border-collapse: collapse; margin-bottom: 15px;">
             <thead>
@@ -371,7 +637,7 @@
         <div style="font-size: 11px; color: #6b7280; padding: 5px; margin-bottom: 15px;">No exam results or marks records found.</div>
     @endif
 
-    <div class="section-title">8. Transport Mapping Details</div>
+    <div class="section-title">10. Transport Mapping Details</div>
     @if($student->transport_route || $student->transport_stop || $student->transport_vehicle_code)
         <table class="grid-table" style="margin-bottom: 15px;">
             <tr>
@@ -406,7 +672,7 @@
         <div style="font-size: 11px; color: #6b7280; padding: 5px; margin-bottom: 15px;">This student is not currently mapped to any school transport routes.</div>
     @endif
 
-    <div class="section-title">9. Financial Fees Ledger</div>
+    <div class="section-title">11. Financial Fees Ledger</div>
     <table style="margin-bottom: 10px;">
         <tr>
             <td style="font-weight: bold; width: 25%;">Opening Dues:</td>
@@ -458,6 +724,8 @@
     @else
         <div style="font-size: 11px; color: #6b7280; padding: 5px; margin-bottom: 15px;">No active fee allocations or maps found.</div>
     @endif
+    @endif
+
 
     <div class="footer">
         <table class="signature-table">

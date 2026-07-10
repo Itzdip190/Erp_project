@@ -169,6 +169,16 @@ class Student extends Model
         'defence_personal',
         'is_rte',
         'fee_schedule_id',
+        // Transport
+        'transport_opted',
+        'transport_route_id',
+        'transport_pick_fare',
+        'transport_drop_fare',
+        'transport_pickup_location',
+        'transport_drop_location',
+        'transport_pickup_time',
+        'transport_drop_time',
+        'transport_calendar_start',
     ];
 
     protected $casts = [
@@ -188,6 +198,10 @@ class Student extends Model
         'any_allergy' => 'boolean',
         'defence_personal' => 'boolean',
         'is_rte' => 'boolean',
+        'transport_opted' => 'boolean',
+        'transport_pick_fare' => 'decimal:2',
+        'transport_drop_fare' => 'decimal:2',
+        'transport_calendar_start' => 'date',
     ];
 
     protected $appends = [
@@ -310,6 +324,32 @@ class Student extends Model
     public function feeSchedule()
     {
         return $this->belongsTo(FeeSchedule::class, 'fee_schedule_id');
+    }
+
+    public function transportRoute()
+    {
+        return $this->belongsTo(TransportRoute::class, 'transport_route_id');
+    }
+
+    /**
+     * Returns true only when the student has explicitly opted for transport
+     * and has a route assigned. This is the key check for transport fee applicability.
+     */
+    public function hasTransportAssigned(): bool
+    {
+        return (bool) $this->transport_opted && !empty($this->transport_route);
+    }
+
+    /**
+     * Returns total monthly transport fare for this student.
+     * Used by fee sync logic — returns 0 if transport not opted.
+     */
+    public function getTransportTotalFareAttribute(): float
+    {
+        if (!$this->hasTransportAssigned()) {
+            return 0.0;
+        }
+        return (float) ($this->transport_pick_fare ?? 0) + (float) ($this->transport_drop_fare ?? 0);
     }
 }
 

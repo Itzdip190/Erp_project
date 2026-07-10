@@ -543,7 +543,6 @@
                 <i class="fas fa-chevron-down sb-hdr-arrow"></i>
             </div>
             <ul class="sb-submenu">
-                {{--
                 @if(StaffAccessHelper::hasAccess('fee_management', 'fee_configuration'))
                 <li class="{{ request()->is('school/fees/configuration*') ? 'active' : '' }}">
                     <a href="{{ route('school.fees.configuration') }}">
@@ -552,7 +551,6 @@
                     </a>
                 </li>
                 @endif
-                --}}
                 @if(StaffAccessHelper::hasAccess('fee_management', 'fee_basics'))
                 <li class="{{ request()->is('school/fees/basics*') ? 'active' : '' }}">
                     <a href="{{ route('school.fees.basics') }}">

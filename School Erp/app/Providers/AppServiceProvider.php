@@ -33,6 +33,7 @@ class AppServiceProvider extends ServiceProvider
             // Fail silently or log
         }
 
+
         // Share dynamic SuperAdmin notifications across navbar and layout views
         try {
             view()->composer(['superadmin.layouts.master', 'superadmin.partials.navbar'], function ($view) {

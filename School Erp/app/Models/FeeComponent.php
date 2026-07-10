@@ -13,6 +13,7 @@ class FeeComponent extends Model
     protected $fillable = [
         'school_id',
         'academic_session_id',
+        'fee_schedule_id',
         'head_name',
         'component_name',
         'admission_type',
@@ -22,5 +23,10 @@ class FeeComponent extends Model
     public function session()
     {
         return $this->belongsTo(AcademicSession::class, 'academic_session_id');
+    }
+
+    public function schedule()
+    {
+        return $this->belongsTo(FeeSchedule::class, 'fee_schedule_id');
     }
 }

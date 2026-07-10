@@ -82,11 +82,15 @@ Route::middleware(['check.module:attendance'])->group(function () {
     Route::get('/attendance/students/daily', [StudentAttendanceController::class, 'dailyReport'])->name('school.attendance.students.daily');
     Route::get('/attendance/students/stats', [StudentAttendanceController::class, 'stats'])->name('school.attendance.students.stats');
     Route::get('/attendance/students/marking-report', [StudentAttendanceController::class, 'markingReport'])->name('school.attendance.students.marking-report');
+    Route::get('/attendance/students/export', [StudentAttendanceController::class, 'export'])->name('school.attendance.students.export');
+    Route::get('/attendance/students/preview', [StudentAttendanceController::class, 'preview'])->name('school.attendance.students.preview');
 
     // Staff Attendance
     Route::get('/attendance/staff', [StaffAttendanceController::class, 'index'])->name('school.attendance.staff.index');
     Route::post('/attendance/staff', [StaffAttendanceController::class, 'store'])->name('school.attendance.staff.store');
     Route::get('/attendance/staff/report', [StaffAttendanceController::class, 'report'])->name('school.attendance.staff.report');
+    Route::get('/attendance/staff/export', [StaffAttendanceController::class, 'export'])->name('school.attendance.staff.export');
+    Route::get('/attendance/staff/preview', [StaffAttendanceController::class, 'preview'])->name('school.attendance.staff.preview');
 
     // Bulk Attendance
     Route::get('/staff/bulk-attendance', [StaffAttendanceController::class, 'bulkAttendance'])->name('school.staff.bulk-attendance');
@@ -248,6 +252,7 @@ Route::get('/fees/class-wise', [FeeManagementController::class, 'classWiseFee'])
 Route::post('/fees/class-wise', [FeeManagementController::class, 'classWiseFee']);
 Route::get('/fees/student-wise', [FeeManagementController::class, 'studentWiseFee'])->name('school.fees.student-wise');
 Route::post('/fees/student-wise', [FeeManagementController::class, 'studentWiseFee']);
+Route::get('/fees/student-invoices/{student}', [FeeManagementController::class, 'getStudentInvoices'])->name('school.fees.student-invoices');
 Route::get('/fees/optional-mapping', [FeeManagementController::class, 'optionalFeeMapping'])->name('school.fees.optional-mapping');
 Route::post('/fees/optional-mapping', [FeeManagementController::class, 'optionalFeeMapping']);
 Route::get('/fees/payment-links', [FeeManagementController::class, 'paymentLinks'])->name('school.fees.payment-links');
@@ -259,6 +264,7 @@ Route::post('/fees/schedule-mapper', [FeeManagementController::class, 'scheduleM
 Route::get('/fees/refund', [FeeManagementController::class, 'refundFee'])->name('school.fees.refund');
 Route::post('/fees/refund', [FeeManagementController::class, 'refundFee']);
 Route::get('/fees/receipts', [FeeManagementController::class, 'feeReceipts'])->name('school.fees.receipts');
+Route::get('/fees/print-slip/{type}/{number}', [FeeManagementController::class, 'printSlip'])->name('school.fees.print-slip');
 Route::get('/fees/pending-cheques', [FeeManagementController::class, 'pendingCheques'])->name('school.fees.pending-cheques');
 Route::post('/fees/pending-cheques', [FeeManagementController::class, 'pendingCheques']);
 Route::get('/fees/reports', [FeeManagementController::class, 'feeReports'])->name('school.fees.reports');
@@ -285,6 +291,10 @@ Route::get('/diary/report', [DigitalDiaryController::class, 'diaryReport'])->nam
 // Event & Holiday Management Routes
 Route::get('/events', [EventHolidayController::class, 'eventManagement'])->name('school.events.index');
 Route::post('/events', [EventHolidayController::class, 'eventManagement']);
+Route::get('/events/template', [EventHolidayController::class, 'downloadTemplate'])->name('school.events.template');
+Route::post('/events/import', [EventHolidayController::class, 'bulkImport'])->name('school.events.import');
+Route::post('/events/{event}/update', [EventHolidayController::class, 'updateEvent'])->name('school.events.update');
+Route::delete('/events/{event}', [EventHolidayController::class, 'deleteEvent'])->name('school.events.delete');
 
 // Certificate Management Routes
 Route::get('/certificates/template-creator', [CertificateManagementController::class, 'templateCreator'])->name('school.certificates.template-creator');
@@ -372,6 +382,7 @@ Route::match(['get', 'post'], '/transport/bus-attendance', [\App\Http\Controller
 // Vehicle Expenses (No PRO badge!)
 Route::match(['get', 'post'], '/transport/vehicle-expenses', [\App\Http\Controllers\School\TransportController::class, 'expenses'])->name('school.transport.expenses');
 Route::post('/transport/delete', [\App\Http\Controllers\School\TransportController::class, 'deleteItem'])->name('school.transport.delete');
+Route::get('/transport/student/{studentId}/calendar.ics', [\App\Http\Controllers\School\TransportController::class, 'exportCalendar'])->name('school.transport.export-calendar');
 
 // Expenses Control Module
 Route::middleware(['check.module:expenses_control'])->group(function () {
@@ -401,6 +412,7 @@ Route::middleware(['check.module:expenses_control'])->group(function () {
     // Transfers
     Route::get('/expenses/transfers', [App\Http\Controllers\School\AccountTransfersController::class, 'index'])->name('school.expenses.transfers');
     Route::post('/expenses/transfers', [App\Http\Controllers\School\AccountTransfersController::class, 'store'])->name('school.expenses.transfers.store');
+    Route::post('/expenses/transfers/banks', [App\Http\Controllers\School\AccountTransfersController::class, 'storeBank'])->name('school.expenses.transfers.banks.store');
 });
 
 // Income Control Module

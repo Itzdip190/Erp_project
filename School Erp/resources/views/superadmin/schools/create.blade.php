@@ -299,20 +299,21 @@ body.dark-mode .btn-sa-cancel:hover { background: #111827 !important; }
                 </div>
                 <div class="sa-form-group">
                     <label>Admin User Email <span>*</span></label>
-                    <input type="email" name="admin_email" class="sa-input" placeholder="e.g. admin@oakridgeschool.in" value="{{ old('admin_email') }}" required>
+                    <input type="email" name="admin_email" id="admin_email_display" class="sa-input" placeholder="Auto-filled from School Email" value="{{ old('admin_email') }}" readonly style="background:#f1f5f9; cursor:not-allowed; color:#64748b;">
+                    <span style="font-size:11px;color:#64748b;margin-top:4px;display:block;">&#128274; Auto-synced from School Email Address above</span>
                     @error('admin_email')<span class="form-err">{{ $message }}</span>@enderror
                 </div>
             </div>
 
-            <div class="sa-form-row">
-                <div class="sa-form-group">
-                    <label>Password <span>*</span></label>
-                    <input type="password" name="admin_password" class="sa-input" placeholder="Min 8 characters" required>
-                    @error('admin_password')<span class="form-err">{{ $message }}</span>@enderror
-                </div>
-                <div class="sa-form-group">
-                    <label>Confirm Password <span>*</span></label>
-                    <input type="password" name="admin_password_confirmation" class="sa-input" placeholder="Repeat password" required>
+            {{-- Auto-generated password notice --}}
+            <div style="background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(79,70,229,0.05)); border:1.5px dashed rgba(99,102,241,0.3); border-radius:12px; padding:16px 20px; display:flex; align-items:flex-start; gap:14px; margin-bottom:4px;">
+                <div style="background:rgba(99,102,241,0.12); border-radius:8px; width:36px; height:36px; display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#4f46e5; font-size:16px;">&#128274;</div>
+                <div>
+                    <div style="font-size:12px; font-weight:800; color:#4f46e5; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">Auto-Generated Password</div>
+                    <div style="font-size:13px; color:#374151; line-height:1.6;">
+                        The admin password is auto-generated as the <strong>first 4 letters of the school name</strong> (lowercase) + <code style="background:#e0e7ff; color:#4f46e5; padding:2px 6px; border-radius:4px; font-weight:700;">@123</code><br>
+                        <span style="color:#64748b;">Example: &quot;Oakridge School&quot; &rarr; <code style="background:#e0e7ff; color:#4f46e5; padding:2px 6px; border-radius:4px;">oakr@123</code></span>
+                    </div>
                 </div>
             </div>
 
@@ -358,6 +359,7 @@ body.dark-mode .btn-sa-cancel:hover { background: #111827 !important; }
             });
         }
 
+        // Sync Director Name -> Admin Name
         const directorInput = document.querySelector('input[name="director_name"]');
         const adminNameInput = document.querySelector('input[name="admin_name"]');
         
@@ -370,6 +372,20 @@ body.dark-mode .btn-sa-cancel:hover { background: #111827 !important; }
                 if (!userInteracted) {
                     adminNameInput.value = this.value;
                 }
+            });
+        }
+
+        // Sync School Email -> Admin Email (always mirror)
+        const schoolEmailInput = document.querySelector('input[name="email"]');
+        const adminEmailDisplay = document.getElementById('admin_email_display');
+
+        if (schoolEmailInput && adminEmailDisplay) {
+            // Initialise on load
+            if (!adminEmailDisplay.value && schoolEmailInput.value) {
+                adminEmailDisplay.value = schoolEmailInput.value;
+            }
+            schoolEmailInput.addEventListener('input', function() {
+                adminEmailDisplay.value = this.value;
             });
         }
     });

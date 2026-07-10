@@ -14,9 +14,14 @@ class FeeRefund extends Model
     protected $fillable = [
         'school_id',
         'student_id',
+        'student_fee_id',
         'amount',
         'refund_date',
         'reason',
+        'slip_no',
+        'payment_mode',
+        'bank_date',
+        'bank_name',
     ];
 
     public function school()

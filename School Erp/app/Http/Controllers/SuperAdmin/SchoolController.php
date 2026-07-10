@@ -49,7 +49,7 @@ class SchoolController extends Controller
             'state'          => 'nullable|string|size:2',
             'school_type'    => 'nullable|string|in:CBSE,CBSE PATTERN,ICSE,STATE BOARD',
             'director_name'  => 'nullable|string|max:255',
-            'email'          => 'nullable|email|max:255',
+            'email'          => 'nullable|email|max:255|unique:users,email',
             'code'           => 'required|string|max:50|unique:schools,code',
             'phone'          => 'nullable|string|max:20',
             'address'        => 'nullable|string|max:500',
@@ -58,13 +58,15 @@ class SchoolController extends Controller
             'plan_id'        => 'nullable|exists:plans,id',
             // Admin account
             'admin_name'     => 'required|string|max:100',
-            'admin_email'    => 'required|email|unique:users,email',
-            'admin_password' => 'required|string|min:8|confirmed',
             // Session
             'academic_session_name'       => 'nullable|string|max:100',
             'academic_session_start_date' => 'nullable|date',
             'academic_session_end_date'   => 'nullable|date|after_or_equal:academic_session_start_date',
         ]);
+
+        // Admin email = school email; auto-generate password = first 4 letters of school name + @123
+        $adminEmail        = $validated['email'] ?? null;
+        $generatedPassword = strtolower(substr(preg_replace('/\s+/', '', $validated['name']), 0, 4)) . '@123';
 
         // Create school
         $school = School::create([
@@ -75,16 +77,16 @@ class SchoolController extends Controller
             'state'         => $validated['state'] ?? 'MH',
             'school_type'   => $validated['school_type'] ?? 'CBSE',
             'director_name' => $validated['director_name'] ?? $validated['admin_name'],
-            'email'         => $validated['email'] ?? $validated['admin_email'],
+            'email'         => $adminEmail,
             'custom_domain' => $validated['custom_domain'] ?? null,
             'status'        => $validated['status'],
         ]);
 
-        // Create admin user for the school
+        // Create admin user for the school — email = school email, password auto-generated
         $user = User::create([
             'name'      => $validated['admin_name'],
-            'email'     => $validated['admin_email'],
-            'password'  => Hash::make($validated['admin_password']),
+            'email'     => $adminEmail,
+            'password'  => Hash::make($generatedPassword),
             'school_id' => $school->id,
             'role'      => 'school_admin',
         ]);
@@ -102,9 +104,9 @@ class SchoolController extends Controller
         }
 
         // Create academic session
-        $sessionName = $validated['academic_session_name'] ?? (date('Y') . '-' . (date('Y') + 1));
+        $sessionName  = $validated['academic_session_name']       ?? (date('Y') . '-' . (date('Y') + 1));
         $sessionStart = $validated['academic_session_start_date'] ?? date('Y-04-01');
-        $sessionEnd = $validated['academic_session_end_date'] ?? date('Y-03-31', strtotime('+1 year'));
+        $sessionEnd   = $validated['academic_session_end_date']   ?? date('Y-03-31', strtotime('+1 year'));
 
         \App\Models\AcademicSession::create([
             'school_id'  => $school->id,
@@ -115,7 +117,7 @@ class SchoolController extends Controller
         ]);
 
         return redirect()->route('superadmin.schools.index')
-            ->with('success', "School \"{$school->name}\" created successfully! Admin login: {$validated['admin_email']}");
+            ->with('success', "School \"{$school->name}\" created! Admin login: {$adminEmail} / Password: {$generatedPassword}");
     }
 
     // ─── Direct Login / Impersonate School Admin ────────────────
@@ -335,13 +337,153 @@ class SchoolController extends Controller
             return redirect()->back()->with('error', 'No students selected.');
         }
 
-        \App\Models\Student::where('school_id', $school->id)
+        $students = \App\Models\Student::where('school_id', $school->id)
             ->whereIn('id', $studentIds)
-            ->forceDelete();
+            ->get();
+
+        foreach ($students as $student) {
+            // Delete associated student user record
+            if ($student->user_id) {
+                \App\Models\User::where('id', $student->user_id)->delete();
+            }
+
+            // Check if guardian email is used by other students in the same school (excluding current batch)
+            if ($student->guardian_email) {
+                $otherStudentsExist = \App\Models\Student::where('school_id', $school->id)
+                    ->where('guardian_email', $student->guardian_email)
+                    ->whereNotIn('id', $studentIds)
+                    ->exists();
+
+                if (!$otherStudentsExist) {
+                    // Delete parent user record
+                    \App\Models\User::where('school_id', $school->id)
+                        ->where('email', $student->guardian_email)
+                        ->delete();
+                }
+            }
+
+            // Force delete the student record
+            $student->forceDelete();
+        }
 
         \Illuminate\Support\Facades\Cache::forget('students_list_version_' . $school->id);
         \Illuminate\Support\Facades\Cache::put('students_list_version_' . $school->id, time(), 86400);
 
         return redirect()->back()->with('success', 'Selected student(s) permanently deleted.');
     }
+
+    // ─── Reset School Data (preserve students, teachers, classes) ─
+    public function resetDataPage(School $school): \Illuminate\Contracts\View\View
+    {
+        return view('superadmin.schools.reset_data', compact('school'));
+    }
+
+    public function resetData(Request $request, School $school): \Illuminate\Http\RedirectResponse
+    {
+        $request->validate([
+            'confirm_name' => ['required', 'string', function ($attribute, $value, $fail) use ($school) {
+                if (strtolower(trim($value)) !== strtolower(trim($school->name))) {
+                    $fail('School name does not match. Please type the exact school name to confirm.');
+                }
+            }],
+        ]);
+
+        $sid = $school->id;
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($sid) {
+
+            // ── Fee module ────────────────────────────────────────────
+            \Illuminate\Support\Facades\DB::table('fee_invoices')      ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('fee_receipts')      ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('fee_refunds')       ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('pending_cheques')   ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('payment_links')     ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('student_fees')      ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('class_wise_fees')   ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('fee_components')    ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('fee_schedules')     ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('fee_discounts')     ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('fee_fines')         ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('misc_fees')         ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('optional_fee_mappings')->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('fee_configurations')->where('school_id', $sid)->delete();
+
+            // Reset fee_schedule_id on students so they get re-assigned cleanly
+            \Illuminate\Support\Facades\DB::table('students')
+                ->where('school_id', $sid)
+                ->update(['fee_schedule_id' => null, 'fee_visible' => 1]);
+
+            // ── Attendance ────────────────────────────────────────────
+            \Illuminate\Support\Facades\DB::table('student_attendances')->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('staff_attendances')  ->where('school_id', $sid)->delete();
+
+            // ── Timetables ────────────────────────────────────────────
+            \Illuminate\Support\Facades\DB::table('timetable_substitutions')->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('timetables')            ->where('school_id', $sid)->delete();
+            if (\Illuminate\Support\Facades\Schema::hasTable('timetable_group_periods')) {
+                $groupIds = \Illuminate\Support\Facades\DB::table('timetable_groups')->where('school_id', $sid)->pluck('id');
+                \Illuminate\Support\Facades\DB::table('timetable_group_periods')->whereIn('timetable_group_id', $groupIds)->delete();
+            }
+            \Illuminate\Support\Facades\DB::table('timetable_groups')      ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('class_timetable_cells') ->where('school_id', $sid)->delete();
+
+            // ── Exams & Marks ─────────────────────────────────────────
+            \Illuminate\Support\Facades\DB::table('student_marks')   ->where('school_id', $sid)->delete();
+            $examIds = \Illuminate\Support\Facades\DB::table('exams')->where('school_id', $sid)->pluck('id');
+            \Illuminate\Support\Facades\DB::table('exam_subjects')   ->whereIn('exam_id', $examIds)->delete();
+            \Illuminate\Support\Facades\DB::table('exams')           ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('offline_tests')   ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('grade_scales')    ->where('school_id', $sid)->delete();
+
+            // ── Expenses & Income ─────────────────────────────────────
+            \Illuminate\Support\Facades\DB::table('school_expenses')  ->where('school_id', $sid)->delete();
+            if (\Illuminate\Support\Facades\Schema::hasTable('voucher_payments')) {
+                $voucherIds = \Illuminate\Support\Facades\DB::table('expense_vouchers')->where('school_id', $sid)->pluck('id');
+                \Illuminate\Support\Facades\DB::table('voucher_payments')->whereIn('expense_voucher_id', $voucherIds)->delete();
+            }
+            \Illuminate\Support\Facades\DB::table('expense_vouchers') ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('expense_heads')    ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('account_transfers')->where('school_id', $sid)->delete();
+
+            \Illuminate\Support\Facades\DB::table('school_incomes')   ->where('school_id', $sid)->delete();
+            if (\Illuminate\Support\Facades\Schema::hasTable('voucher_receipts')) {
+                $incomeVoucherIds = \Illuminate\Support\Facades\DB::table('income_vouchers')->where('school_id', $sid)->pluck('id');
+                \Illuminate\Support\Facades\DB::table('voucher_receipts')->whereIn('income_voucher_id', $incomeVoucherIds)->delete();
+            }
+            \Illuminate\Support\Facades\DB::table('income_vouchers')  ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('income_heads')     ->where('school_id', $sid)->delete();
+
+            // ── Gallery, Notices, Events ──────────────────────────────
+            \Illuminate\Support\Facades\DB::table('gallery_posts') ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('events')        ->where('school_id', $sid)->delete();
+
+            // ── Teacher Assignments & Study Materials ─────────────────
+            if (\Illuminate\Support\Facades\Schema::hasTable('teacher_assignment_submissions')) {
+                $assignmentIds = \Illuminate\Support\Facades\DB::table('teacher_assignments')->where('school_id', $sid)->pluck('id');
+                \Illuminate\Support\Facades\DB::table('teacher_assignment_submissions')->whereIn('assignment_id', $assignmentIds)->delete();
+            }
+            \Illuminate\Support\Facades\DB::table('teacher_assignments')->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('study_materials')   ->where('school_id', $sid)->delete();
+
+            // ── Academic Sessions (keeps classes/sections intact) ─────
+            \Illuminate\Support\Facades\DB::table('student_sessions')  ->where('school_id', $sid)->delete();
+            \Illuminate\Support\Facades\DB::table('academic_sessions') ->where('school_id', $sid)->delete();
+
+            // ── Import Logs ───────────────────────────────────────────
+            \Illuminate\Support\Facades\DB::table('import_logs') ->where('school_id', $sid)->delete();
+
+            // ── School Banks ──────────────────────────────────────────
+            if (\Illuminate\Support\Facades\Schema::hasTable('school_banks')) {
+                \Illuminate\Support\Facades\DB::table('school_banks')->where('school_id', $sid)->delete();
+            }
+        });
+
+        // Clear any cached data for this school
+        \Illuminate\Support\Facades\Cache::forget('students_list_version_' . $sid);
+
+        return redirect()
+            ->route('superadmin.schools.edit', $school)
+            ->with('success', "School \"{$school->name}\" data has been reset successfully. Students, teachers, and classes are preserved.");
+    }
 }
+

@@ -11,11 +11,6 @@
             </h1>
             <p style="color: #475569; font-size: 13.5px; margin-top: 4px;">Configure fee layouts, payment URLs, default modes, details displayed on receipts, and parent portal app options.</p>
         </div>
-        <div class="page-hdr-right">
-            <button class="btn btn-outline" style="border-color: #bfdbfe; color: #1e40af; background: #eff6ff; font-weight: 700; font-size: 13px;" onclick="window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'})">
-                <i class="fas fa-arrow-down"></i> Manage Categories
-            </button>
-        </div>
     </div>
 
     @if(session('success'))
@@ -107,7 +102,7 @@
                         </label>
                     </div>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                        <input type="text" id="payment_url_input" name="payment_url" value="{{ $config?->payment_url ?? 'https://online.edutinker.com/form/student/fees?schoolId=' . auth()->user()->school_id . '&schoolName=' . rawurlencode(auth()->user()->school?->name ?? 'School') }}" class="form-control" style="background:#fff; border-color:#bfdbfe; color:#1e293b; flex:1;" placeholder="Enter custom gateway URL. Use tags like {student_id}, {amount}, {purpose}">
+                        <input type="text" id="payment_url_input" name="payment_url" value="{{ $config?->payment_url ?? '' }}" class="form-control" style="background:#fff; border-color:#bfdbfe; color:#1e293b; flex:1;" placeholder="Enter custom gateway URL. Use tags like {student_id}, {amount}, {purpose}">
                         <button type="button" class="btn btn-outline" style="border-color: #bfdbfe; background: #fff; padding: 10px;" onclick="copyUrlToClipboard()" title="Copy Payment Link">
                             <i class="fas fa-copy" style="color: #3b82f6;"></i>
                         </button>
@@ -130,6 +125,27 @@
                         <label style="display:inline-flex; align-items:center; gap:8px; font-weight:600; color:#1e293b; cursor:pointer;">
                             <input type="checkbox" name="add_fee_balance" value="1" {{ ($config?->add_fee_balance ?? true) ? 'checked' : '' }} class="checkbox-blue"> Fee Balance
                         </label>
+                    </div>
+                </div>
+
+                <!-- Add to fee invoice checkboxes -->
+                <div class="form-group" style="margin-bottom: 24px; border-top:1px solid #e2e8f0; padding-top:20px;">
+                    <label class="form-label" style="color: #1e3a8a; font-weight: 700; font-size: 12.5px; margin-bottom: 12px; display:block;">Fee Invoice Settings</label>
+                    <div style="display:flex; flex-direction:column; gap:12px;">
+                        <label style="display:inline-flex; align-items:center; gap:8px; font-weight:600; color:#1e293b; cursor:pointer;">
+                            <input type="checkbox" name="show_installment_components_on_invoice" value="1" {{ ($config?->show_installment_components_on_invoice ?? false) ? 'checked' : '' }} class="checkbox-blue"> Show detailed components per installment on invoice
+                        </label>
+                        <label style="display:inline-flex; align-items:center; gap:8px; font-weight:600; color:#1e293b; cursor:pointer;">
+                            <input type="checkbox" name="show_due_on_invoice" value="1" {{ ($config?->show_due_on_invoice ?? true) ? 'checked' : '' }} class="checkbox-blue"> Show outstanding due in invoice
+                        </label>
+                    </div>
+                    <div class="form-group" style="margin-top: 14px; margin-bottom: 0;">
+                        <label class="form-label" style="color: #1e3a8a; font-weight: 700; font-size: 12.5px;">Invoice Title (Custom Name)</label>
+                        <input type="text" name="invoice_title" value="{{ $config?->invoice_title ?? 'Fee Invoice' }}" class="form-control input-blue" placeholder="e.g. Fee Invoice, demand slip, school fee challan">
+                    </div>
+                    <div class="form-group" style="margin-top: 14px; margin-bottom: 0;">
+                        <label class="form-label" style="color: #1e3a8a; font-weight: 700; font-size: 12.5px;">Transport Invoice Title (Custom Name)</label>
+                        <input type="text" name="transport_invoice_title" value="{{ $config?->transport_invoice_title ?? 'Transport Invoice' }}" class="form-control input-blue" placeholder="e.g. Transport Invoice, bus fee receipt, vehicle slip">
                     </div>
                 </div>
 
@@ -461,68 +477,6 @@
             </button>
         </div>
     </form>
-
-    <hr style="border: 0; border-top: 2px dashed #bfdbfe; margin: 40px 0;">
-
-    <!-- PANEL 6: Category Management (Preserved Feature) -->
-    <div class="grid-3" id="categories-section" style="margin-top: 24px;">
-        <div class="card" style="grid-column: span 1; border: 1px solid #bfdbfe; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-            <div class="card-hdr" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 14px 20px; color: #1e3a8a;">
-                <h3 style="margin: 0; font-size: 15px; font-weight: 700;">Add Fee Category</h3>
-            </div>
-            <div class="card-body" style="padding: 20px; background: #fff;">
-                <form method="POST" action="{{ route('school.fees.configuration') }}">
-                    @csrf
-                    <input type="hidden" name="action" value="add_category">
-                    <div class="form-group">
-                        <label class="form-label" style="color: #475569; font-weight: 700; font-size: 12px;">Category Name</label>
-                        <input type="text" name="name" class="form-control input-blue" placeholder="e.g. Science Lab Fee, Hostel Fee" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" style="color: #475569; font-weight: 700; font-size: 12px;">Description</label>
-                        <textarea name="description" class="form-control input-blue" style="height:80px;" placeholder="Brief details about what this fee covers..."></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-gold" style="width:100%; justify-content:center; background:#f59e0b; color:#1e1b4b; font-weight:700; padding:10px;">
-                        <i class="fas fa-plus-circle"></i> Add Category
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <div class="card" style="grid-column: span 2; border: 1px solid #bfdbfe; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-            <div class="card-hdr" style="background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; padding: 14px 20px; color: #1e3a8a;">
-                <h3 style="margin: 0; font-size: 15px; font-weight: 700;">Fee Categories Directory</h3>
-            </div>
-            <div class="card-body" style="padding:0; background: #fff;">
-                <div class="table-wrap">
-                    <table class="tbl" style="width: 100%; border-collapse: collapse;">
-                        <thead>
-                            <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                                <th style="padding: 12px 16px; text-align: left; font-size: 11.5px; color: #475569;">ID</th>
-                                <th style="padding: 12px 16px; text-align: left; font-size: 11.5px; color: #475569;">Fee Category Name</th>
-                                <th style="padding: 12px 16px; text-align: left; font-size: 11.5px; color: #475569;">Description</th>
-                                <th style="padding: 12px 16px; text-align: left; font-size: 11.5px; color: #475569;">Date Created</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($categories as $category)
-                            <tr style="border-bottom: 1px solid #f1f5f9;">
-                                <td style="padding: 12px 16px;"><strong>#{{ $category->id }}</strong></td>
-                                <td style="padding: 12px 16px;"><strong style="color:#1e3a8a;">{{ $category->name }}</strong></td>
-                                <td style="padding: 12px 16px;"><span style="color:#64748b; font-size: 13px;">{{ $category->description ?? 'No description provided.' }}</span></td>
-                                <td style="padding: 12px 16px; color:#64748b; font-size:12.5px;">{{ $category->created_at->format('Y-m-d') }}</td>
-                            </tr>
-                            @empty
-                            <tr>
-                                <td colspan="4" style="text-align:center; padding:30px; color:#94a3b8;">No fee categories defined.</td>
-                            </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <style>
@@ -763,6 +717,37 @@ body.dark-mode .order-item .item-handle {
 }
 body.dark-mode .order-item .item-handle i {
     color: #64748b !important;
+}
+
+/* Responsive and Mobile-friendly overrides */
+@media (max-width: 768px) {
+    .fee-config {
+        padding: 8px !important;
+    }
+    .fee-config .page-hdr {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
+    }
+    .fee-config .grid-2, 
+    .fee-config .grid-3 {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 16px !important;
+    }
+    .fee-config .card-body {
+        padding: 16px !important;
+    }
+    .fee-config .toggle-item {
+        padding: 12px 0 !important;
+    }
+    .fee-config .toggle-item > span {
+        font-size: 13px !important;
+        max-width: 80%;
+    }
+    .fee-config .form-group label {
+        font-size: 12px !important;
+    }
 }
 </style>
 

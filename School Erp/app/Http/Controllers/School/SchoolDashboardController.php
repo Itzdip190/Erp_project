@@ -283,7 +283,13 @@ class SchoolDashboardController extends Controller
         $planName = $school->activeSubscription()?->plan?->name ?? 'Trial';
         $notificationCount = 0;
 
+        $todayEvents = Event::where('school_id', $schoolId)
+            ->whereDate('start_date', '<=', today()->toDateString())
+            ->whereDate('end_date', '>=', today()->toDateString())
+            ->get();
+
         return view('school.dashboard.index', compact(
+            'todayEvents',
             'school',
             'sessions',
             'currentSession',
@@ -1012,9 +1018,12 @@ class SchoolDashboardController extends Controller
                 $staff = Staff::where('school_id', $schoolId)
                     ->whereMonth('date_of_birth', $month)
                     ->get();
+                $firstDay = Carbon::create($year, $month, 1)->startOfMonth()->toDateString();
+                $lastDay = Carbon::create($year, $month, 1)->endOfMonth()->toDateString();
+
                 $events = Event::where('school_id', $schoolId)
-                    ->whereMonth('start_date', $month)
-                    ->whereYear('start_date', $year)
+                    ->where('start_date', '<=', $lastDay)
+                    ->where('end_date', '>=', $firstDay)
                     ->get();
                     
                 $birthdayList = [];
@@ -1038,13 +1047,21 @@ class SchoolDashboardController extends Controller
                     ];
                 }
                 foreach ($events as $ev) {
-                    $day = Carbon::parse($ev->start_date)->day;
-                    $birthdayList[] = [
-                        'day' => $day,
-                        'name' => $ev->title,
-                        'type' => $ev->is_holiday ? 'holiday' : 'event',
-                        'details' => $ev->description ?? 'Event'
-                    ];
+                    $startLimit = Carbon::parse($ev->start_date);
+                    $endLimit = Carbon::parse($ev->end_date);
+                    
+                    $current = $startLimit->copy();
+                    while ($current->lte($endLimit)) {
+                        if ($current->month === $month && $current->year === $year) {
+                            $birthdayList[] = [
+                                'day' => $current->day,
+                                'name' => $ev->title,
+                                'type' => $ev->is_holiday ? 'holiday' : 'event',
+                                'details' => $ev->description ?? 'Event'
+                            ];
+                        }
+                        $current->addDay();
+                    }
                 }
 
                 return response()->json([
@@ -1108,7 +1125,20 @@ class SchoolDashboardController extends Controller
 
             case 'expense':
                 $title = 'School Expenses';
+                $expenses = SchoolExpense::where('school_id', $schoolId)
+                    ->where('status', '!=', 'cancelled')
+                    ->latest('expense_date')
+                    ->get();
                 $data = [];
+                foreach ($expenses as $exp) {
+                    $data[] = [
+                        'expense_id' => 'EXP-' . $exp->id,
+                        'category' => ucfirst($exp->category),
+                        'amount' => '₹ ' . number_format($exp->amount, 2),
+                        'date' => $exp->expense_date,
+                        'status' => ucfirst($exp->status ?? 'Paid')
+                    ];
+                }
                 break;
 
             case 'today_collection':
@@ -1231,7 +1261,7 @@ class SchoolDashboardController extends Controller
                     $data[] = [
                         'event_name' => $ev->title,
                         'type' => $ev->is_holiday ? 'Holiday' : 'Event',
-                        'time' => Carbon::parse($ev->start_time)->format('h:i A') . ' - ' . Carbon::parse($ev->end_time)->format('h:i A'),
+                        'time' => Carbon::parse($ev->start_date)->format('d M Y') . ($ev->start_date !== $ev->end_date ? ' – ' . Carbon::parse($ev->end_date)->format('d M Y') : ''),
                         'details' => $ev->description ?? '—'
                     ];
                 }
@@ -1303,8 +1333,15 @@ class SchoolDashboardController extends Controller
             ];
         } elseif ($box === 'accounts') {
             $totalFeeCollection = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
-            $totalIncome = $totalFeeCollection;
-            $totalExpense = 0.0;
+            $totalSchoolIncome  = (float) SchoolIncome::where('school_id', $schoolId)
+                ->where('status', '!=', 'cancelled')
+                ->sum('amount');
+            $totalIncome = $totalFeeCollection + $totalSchoolIncome;
+
+            $totalExpense = (float) SchoolExpense::where('school_id', $schoolId)
+                ->where('status', '!=', 'cancelled')
+                ->sum('amount');
+
             $data = [
                 'totalIncome' => number_format($totalIncome),
                 'totalExpense' => number_format($totalExpense),
@@ -1588,10 +1625,15 @@ class SchoolDashboardController extends Controller
                 $q->where('first_name', 'like', "%{$query}%")
                   ->orWhere('last_name', 'like', "%{$query}%")
                   ->orWhere('admission_number', 'like', "%{$query}%")
-                  ->orWhere('roll_number', 'like', "%{$query}%");
+                  ->orWhere('roll_number', 'like', "%{$query}%")
+                  ->orWhere('phone', 'like', "%{$query}%")
+                  ->orWhere('father_phone', 'like', "%{$query}%")
+                  ->orWhere('mother_phone', 'like', "%{$query}%")
+                  ->orWhere('guardian_phone', 'like', "%{$query}%")
+                  ->orWhere('whatsapp_number', 'like', "%{$query}%");
             })
             ->limit(5)
-            ->get(['id', 'first_name', 'last_name', 'admission_number', 'roll_number', 'photo']);
+            ->get(['id', 'first_name', 'last_name', 'admission_number', 'roll_number', 'photo', 'phone']);
 
         // Fetch staff of this school
         $staff = Staff::where('school_id', $schoolId)
@@ -1599,10 +1641,11 @@ class SchoolDashboardController extends Controller
                 $q->where('first_name', 'like', "%{$query}%")
                   ->orWhere('last_name', 'like', "%{$query}%")
                   ->orWhere('employee_id', 'like', "%{$query}%")
-                  ->orWhere('email', 'like', "%{$query}%");
+                  ->orWhere('email', 'like', "%{$query}%")
+                  ->orWhere('phone', 'like', "%{$query}%");
             })
             ->limit(5)
-            ->get(['id', 'first_name', 'last_name', 'employee_id', 'photo']);
+            ->get(['id', 'first_name', 'last_name', 'employee_id', 'photo', 'phone']);
 
         return response()->json([
             'students' => $students,

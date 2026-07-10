@@ -162,15 +162,24 @@ class StudentController extends Controller
                 $studentEmail = $data['email'];
             }
 
-            $studentUser = User::create([
-                'school_id' => $schoolId,
-                'name' => trim($data['first_name'] . ' ' . $data['last_name']),
-                'email' => $studentEmail,
-                'phone' => $data['guardian_phone'] ?? null,
-                'password' => Hash::make('Student@2026!'), // Default password
-                'is_active' => true,
-            ]);
-            $studentUser->assignRole('student');
+            $studentUser = User::where('email', $studentEmail)->first();
+            if ($studentUser) {
+                $studentUser->update([
+                    'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+                    'phone' => $data['guardian_phone'] ?? $studentUser->phone,
+                    'is_active' => true,
+                ]);
+            } else {
+                $studentUser = User::create([
+                    'school_id' => $schoolId,
+                    'name' => trim($data['first_name'] . ' ' . $data['last_name']),
+                    'email' => $studentEmail,
+                    'phone' => $data['guardian_phone'] ?? null,
+                    'password' => Hash::make('Student@2026!'), // Default password
+                    'is_active' => true,
+                ]);
+                $studentUser->assignRole('student');
+            }
 
             // 2. Create parent user account if guardian email is provided
             if (!empty($data['guardian_email'])) {
@@ -302,6 +311,39 @@ class StudentController extends Controller
             ->orderBy('due_date', 'asc')
             ->get();
 
+        // 5. Refunds
+        $refunds = \App\Models\FeeRefund::where('student_id', $student->id)
+            ->orderBy('refund_date', 'desc')
+            ->get();
+
+        // 6. Receipts / Invoices
+        $receipts = \App\Models\FeeReceipt::where('student_id', $student->id)
+            ->orderBy('payment_date', 'desc')
+            ->get();
+
+        // 7. Bus Attendance
+        $busAttendances = \App\Models\BusAttendance::where('student_id', $student->id)
+            ->orderBy('date', 'desc')
+            ->get();
+
+        // 8. Offline/Class Tests
+        $offlineTests = \App\Models\OfflineTest::where('school_id', $schoolId)
+            ->where('class_id', $student->class_id)
+            ->where(function($q) use ($student) {
+                $q->whereNull('section_id')->orWhere('section_id', $student->section_id);
+            })
+            ->with('subject')
+            ->orderBy('start_date_time', 'desc')
+            ->get();
+
+        // 9. Leaves
+        $leaves = $student->user_id 
+            ? \App\Models\LeaveApplication::where('school_id', $schoolId)
+                ->where('user_id', $student->user_id)
+                ->orderBy('start_date', 'desc')
+                ->get()
+            : collect();
+
         return view('school.student.show', compact(
             'student',
             'attendances',
@@ -312,7 +354,12 @@ class StudentController extends Controller
             'attendancePercentage',
             'siblings',
             'marks',
-            'fees'
+            'fees',
+            'refunds',
+            'receipts',
+            'busAttendances',
+            'offlineTests',
+            'leaves'
         ));
     }
 
@@ -378,8 +425,23 @@ class StudentController extends Controller
         }
 
         DB::transaction(function () use ($schoolId, $student, &$data) {
-            // 1. Manage student user account
             $studentUser = $student->user;
+            if (!$studentUser) {
+                $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
+                $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
+                $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->admission_number));
+                
+                $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
+                if (!empty($data['email'])) {
+                    $studentEmail = $data['email'];
+                }
+                
+                $studentUser = User::where('email', $studentEmail)->first();
+                if ($studentUser) {
+                    $data['user_id'] = $studentUser->id;
+                }
+            }
+
             if (!$studentUser || !$studentUser->hasRole('student')) {
                 $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
                 $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
@@ -1037,53 +1099,67 @@ class StudentController extends Controller
             abort(403, 'Unauthorized.');
         }
 
-        // 1. Attendance
-        $attendances = \App\Models\StudentAttendance::where('student_id', $student->id)
-            ->orderBy('date', 'desc')
-            ->get();
-        $totalDays = $attendances->count();
-        $presentDays = $attendances->where('status', 'present')->count();
-        $absentDays = $attendances->where('status', 'absent')->count();
-        $lateDays = $attendances->where('status', 'late')->count();
-        $attendancePercentage = $totalDays > 0 ? round(($presentDays / $totalDays) * 100, 1) : 100;
+        $formOnly = request('type') === 'form_only';
 
-        // 2. Siblings
-        $siblings = Student::where('school_id', $schoolId)
-            ->where('id', '!=', $student->id)
-            ->where(function($q) use ($student) {
-                $hasFilter = false;
-                if ($student->guardian_email) {
-                    $q->where('guardian_email', $student->guardian_email);
-                    $hasFilter = true;
-                }
-                if ($student->guardian_phone) {
-                    if ($hasFilter) $q->orWhere('guardian_phone', $student->guardian_phone);
-                    else { $q->where('guardian_phone', $student->guardian_phone); $hasFilter = true; }
-                }
-                if ($student->father_phone) {
-                    if ($hasFilter) $q->orWhere('father_phone', $student->father_phone);
-                    else { $q->where('father_phone', $student->father_phone); $hasFilter = true; }
-                }
-                if ($student->mother_phone) {
-                    if ($hasFilter) $q->orWhere('mother_phone', $student->mother_phone);
-                    else { $q->where('mother_phone', $student->mother_phone); $hasFilter = true; }
-                }
-                if (!$hasFilter) {
-                    $q->whereRaw('1 = 0');
-                }
-            })->get();
+        if ($formOnly) {
+            $attendances = collect();
+            $totalDays = 0;
+            $presentDays = 0;
+            $absentDays = 0;
+            $lateDays = 0;
+            $attendancePercentage = 100;
+            $siblings = collect();
+            $marks = collect();
+            $fees = collect();
+        } else {
+            // 1. Attendance
+            $attendances = \App\Models\StudentAttendance::where('student_id', $student->id)
+                ->orderBy('date', 'desc')
+                ->get();
+            $totalDays = $attendances->count();
+            $presentDays = $attendances->where('status', 'present')->count();
+            $absentDays = $attendances->where('status', 'absent')->count();
+            $lateDays = $attendances->where('status', 'late')->count();
+            $attendancePercentage = $totalDays > 0 ? round(($presentDays / $totalDays) * 100, 1) : 100;
 
-        // 3. Exams (marks)
-        $marks = \App\Models\StudentMark::where('student_id', $student->id)
-            ->with('subject')
-            ->orderBy('exam_name', 'asc')
-            ->get();
+            // 2. Siblings
+            $siblings = Student::where('school_id', $schoolId)
+                ->where('id', '!=', $student->id)
+                ->where(function($q) use ($student) {
+                    $hasFilter = false;
+                    if ($student->guardian_email) {
+                        $q->where('guardian_email', $student->guardian_email);
+                        $hasFilter = true;
+                    }
+                    if ($student->guardian_phone) {
+                        if ($hasFilter) $q->orWhere('guardian_phone', $student->guardian_phone);
+                        else { $q->where('guardian_phone', $student->guardian_phone); $hasFilter = true; }
+                    }
+                    if ($student->father_phone) {
+                        if ($hasFilter) $q->orWhere('father_phone', $student->father_phone);
+                        else { $q->where('father_phone', $student->father_phone); $hasFilter = true; }
+                    }
+                    if ($student->mother_phone) {
+                        if ($hasFilter) $q->orWhere('mother_phone', $student->mother_phone);
+                        else { $q->where('mother_phone', $student->mother_phone); $hasFilter = true; }
+                    }
+                    if (!$hasFilter) {
+                        $q->whereRaw('1 = 0');
+                    }
+                })->get();
 
-        // 4. Fees
-        $fees = \App\Models\StudentFee::where('student_id', $student->id)
-            ->with(['category', 'component'])
-            ->orderBy('due_date', 'asc')
-            ->get();
+            // 3. Exams (marks)
+            $marks = \App\Models\StudentMark::where('student_id', $student->id)
+                ->with('subject')
+                ->orderBy('exam_name', 'asc')
+                ->get();
+
+            // 4. Fees
+            $fees = \App\Models\StudentFee::where('student_id', $student->id)
+                ->with(['category', 'component'])
+                ->orderBy('due_date', 'asc')
+                ->get();
+        }
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.student.admission-form-pdf', compact(
             'student',
@@ -1095,8 +1171,10 @@ class StudentController extends Controller
             'attendancePercentage',
             'siblings',
             'marks',
-            'fees'
+            'fees',
+            'formOnly'
         ));
-        return $pdf->stream("admission_form_{$student->admission_number}.pdf");
+        $filename = str_replace(['/', '\\'], '_', "admission_form_{$student->admission_number}.pdf");
+        return $pdf->stream($filename);
     }
 }

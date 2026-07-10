@@ -290,6 +290,7 @@ table.exp-table tbody tr:hover { background: var(--exp-blue-light); }
     letter-spacing: .3px;
 }
 .badge-paid    { background: rgba(16,185,129,.1);  color: #059669; }
+.badge-partial { background: rgba(59, 130, 246, 0.1); color: #1d4ed8; }
 .badge-pending { background: rgba(245,158,11,.12); color: #b45309; }
 .badge-cancelled { background: rgba(239,68,68,.1); color: #dc2626; }
 
@@ -638,7 +639,13 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                 </thead>
                 <tbody id="expenseTableBody">
                 @foreach($expenses as $i => $exp)
-                <tr id="row-{{ $exp->id }}" class="expense-row" data-status="{{ $exp->status }}" data-search="{{ strtolower($exp->title . ' ' . ($exp->paid_to ?? '') . ' ' . ($exp->expenseHead->name ?? '') . ' ' . $exp->category_label) }}">
+                @php
+                    $displayStatus = $exp->status;
+                    if ($exp->voucher) {
+                        $displayStatus = strtolower($exp->voucher->payment_status);
+                    }
+                @endphp
+                <tr id="row-{{ $exp->id }}" class="expense-row" data-status="{{ $displayStatus }}" data-search="{{ strtolower($exp->title . ' ' . ($exp->paid_to ?? '') . ' ' . ($exp->expenseHead->name ?? '') . ' ' . $exp->category_label) }}">
                     <td style="color:var(--exp-text2);">{{ $i + 1 }}</td>
                     <td>
                         <div style="font-weight:600;color:var(--exp-text);">{{ $exp->title }}</div>
@@ -649,8 +656,8 @@ textarea.form-control { resize: vertical; min-height: 80px; }
                     <td><strong style="color:var(--exp-blue);">₹{{ number_format($exp->amount, 2) }}</strong></td>
                     <td style="color:var(--exp-text2);">{{ ucwords(str_replace('_',' ',$exp->payment_mode)) }}</td>
                     <td>
-                        <span class="badge badge-{{ $exp->status }}">
-                            {{ ucfirst($exp->status) }}
+                        <span class="badge badge-{{ $displayStatus }}">
+                            {{ ucfirst($displayStatus) }}
                         </span>
                     </td>
                     <td>

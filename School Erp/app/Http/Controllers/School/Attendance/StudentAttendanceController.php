@@ -11,6 +11,8 @@ use App\Models\Student;
 use App\Models\StudentAttendance;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class StudentAttendanceController extends Controller
 {
@@ -52,12 +54,28 @@ class StudentAttendanceController extends Controller
             ->get()
             ->groupBy('student_id');
 
+        $session = AcademicSession::find($sessionId);
+        $totalWorkingDays = 0;
+        if ($session) {
+            $start = \Carbon\Carbon::parse($session->start_date);
+            $end = \Carbon\Carbon::parse($session->end_date);
+            $days = $start->diffInDays($end) + 1;
+            $sundays = 0;
+            $temp = $start->copy();
+            while ($temp->dayOfWeek !== \Carbon\Carbon::SUNDAY && $temp->lte($end)) {
+                $temp->addDay();
+            }
+            if ($temp->lte($end)) {
+                $sundays = 1 + floor($temp->diffInDays($end) / 7);
+            }
+            $totalWorkingDays = $days - $sundays;
+        }
+
         foreach ($students as $student) {
             $studentAtts = $attendanceStats->get($student->id) ?? collect();
-            $totalMarked = $studentAtts->count();
             $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
                 + ($studentAtts->where('status', 'half_day')->count() * 0.5);
-            $student->attendance_percentage = $totalMarked > 0 ? round(($presentCount / $totalMarked) * 100) : null;
+            $student->attendance_percentage = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
         }
 
         $html = view('school.attendance.students.load-table', compact('students', 'attendances'))->render();
@@ -398,5 +416,419 @@ class StudentAttendanceController extends Controller
             'fromDateStr', 'toDateStr', 'from', 'to', 'dates', 'totalWorkingDays',
             'teachers', 'staffId', 'sections', 'reportData', 'defaulterPct', 'showDayWise'
         ));
+    }
+
+    public function export(Request $request)
+    {
+        $schoolId = auth()->user()->school_id;
+        $type = $request->get('type', 'daily'); // 'daily' or 'monthly'
+        $classId = $request->get('class_id');
+        $sectionId = $request->get('section_id');
+        $date = $request->get('date', date('Y-m-d'));
+        $sessionId = $request->get('academic_session_id');
+        
+        if (!$classId || !$sectionId || !$sessionId) {
+            return back()->with('error', 'Please select Class, Section and Academic Year.');
+        }
+        
+        $class = SchoolClass::findOrFail($classId);
+        $section = Section::findOrFail($sectionId);
+        $session = AcademicSession::findOrFail($sessionId);
+        
+        // Calculate academic year total working days (excluding Sundays)
+        $start = \Carbon\Carbon::parse($session->start_date);
+        $end = \Carbon\Carbon::parse($session->end_date);
+        $days = $start->diffInDays($end) + 1;
+        $sundays = 0;
+        $temp = $start->copy();
+        while ($temp->dayOfWeek !== \Carbon\Carbon::SUNDAY && $temp->lte($end)) {
+            $temp->addDay();
+        }
+        if ($temp->lte($end)) {
+            $sundays = 1 + floor($temp->diffInDays($end) / 7);
+        }
+        $totalWorkingDays = $days - $sundays;
+        
+        $students = Student::where('section_id', $sectionId)
+            ->where('is_active', true)
+            ->orderBy('roll_number')
+            ->get();
+
+        $titleStyle = [
+            'font' => ['bold' => true, 'size' => 14, 'color' => ['argb' => 'FFFFFFFF']],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['argb' => 'FF01242E']
+            ],
+            'alignment' => [
+                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER
+            ]
+        ];
+
+        $headerStyle = [
+            'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF'], 'size' => 11],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'startColor' => ['argb' => 'FF023C4D']
+            ],
+            'alignment' => [
+                'horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER,
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER
+            ],
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'color' => ['argb' => 'FFFFFFFF']
+                ]
+            ]
+        ];
+
+        $dataStyle = [
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'color' => ['argb' => 'FFCBD5E1']
+                ]
+            ],
+            'alignment' => [
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER
+            ]
+        ];
+            
+        if ($type === 'daily') {
+            // Daily register
+            $attendances = StudentAttendance::where('section_id', $sectionId)
+                ->whereDate('date', $date)
+                ->get()
+                ->keyBy('student_id');
+                
+            $attendanceStats = StudentAttendance::where('academic_session_id', $sessionId)
+                ->whereIn('student_id', $students->pluck('id'))
+                ->get()
+                ->groupBy('student_id');
+
+            foreach ($students as $student) {
+                $studentAtts = $attendanceStats->get($student->id) ?? collect();
+                $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
+                    + ($studentAtts->where('status', 'half_day')->count() * 0.5);
+                $student->attendance_percentage = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
+            }
+            
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Daily Register');
+
+            // Title block
+            $sheet->mergeCells('A1:F1');
+            $sheet->setCellValue('A1', 'Daily Attendance Register - Class: ' . $class->name . ' - ' . $section->name . ' (Date: ' . date('d-m-Y', strtotime($date)) . ')');
+            $sheet->getRowDimension(1)->setRowHeight(36);
+            $sheet->getStyle('A1:F1')->applyFromArray($titleStyle);
+            
+            // Set Headers
+            $headers = ['Roll No', 'Admission No', 'Student Name', 'Status', 'Remarks', 'Attendance %'];
+            $sheet->fromArray($headers, null, 'A2');
+            $sheet->getRowDimension(2)->setRowHeight(22);
+            $sheet->getStyle('A2:F2')->applyFromArray($headerStyle);
+            
+            $rowIdx = 3;
+            foreach ($students as $st) {
+                $att = $attendances->get($st->id);
+                $status = $att ? ucfirst(str_replace('_', ' ', $att->status)) : 'Not Marked';
+                $remark = $att ? $att->remark : '';
+                $pct = $st->attendance_percentage !== null ? $st->attendance_percentage . '%' : '—';
+                
+                $sheet->fromArray([
+                    $st->roll_number ?? '—',
+                    $st->admission_number,
+                    $st->full_name,
+                    $status,
+                    $remark,
+                    $pct
+                ], null, 'A' . $rowIdx);
+
+                $sheet->getRowDimension($rowIdx)->setRowHeight(20);
+                $sheet->getStyle('A' . $rowIdx . ':F' . $rowIdx)->applyFromArray($dataStyle);
+                $rowIdx++;
+            }
+
+            // Auto-width
+            foreach (range('A', 'F') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+            
+            $writer = new Xlsx($spreadsheet);
+            $filename = 'Student_Attendance_' . $class->name . '_' . $section->name . '_' . $date . '.xlsx';
+            
+            return response()->streamDownload(function () use ($writer) {
+                $writer->save('php://output');
+            }, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+            
+        } else {
+            // Monthly summary
+            $month = $request->get('month', date('m'));
+            $year = $request->get('year', date('Y'));
+            $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+            
+            $records = StudentAttendance::where('section_id', $sectionId)
+                ->whereYear('date', $year)
+                ->whereMonth('date', $month)
+                ->get()
+                ->groupBy('student_id');
+                
+            $attendanceStats = StudentAttendance::where('academic_session_id', $sessionId)
+                ->whereIn('student_id', $students->pluck('id'))
+                ->get()
+                ->groupBy('student_id');
+
+            foreach ($students as $student) {
+                $studentAtts = $attendanceStats->get($student->id) ?? collect();
+                $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
+                    + ($studentAtts->where('status', 'half_day')->count() * 0.5);
+                $student->attendance_percentage = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
+            }
+            
+            $spreadsheet = new Spreadsheet();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->setTitle('Monthly Summary');
+
+            $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($daysInMonth + 6);
+
+            // Title block
+            $sheet->mergeCells('A1:' . $lastCol . '1');
+            $sheet->setCellValue('A1', 'Monthly Attendance Summary - Class: ' . $class->name . ' - ' . $section->name . ' (' . date('F Y', mktime(0,0,0,$month,1,$year)) . ')');
+            $sheet->getRowDimension(1)->setRowHeight(36);
+            $sheet->getStyle('A1:' . $lastCol . '1')->applyFromArray($titleStyle);
+            
+            // Set Headers
+            $headers = ['Roll No', 'Admission No', 'Student Name'];
+            for ($d = 1; $d <= $daysInMonth; $d++) {
+                $headers[] = $d;
+            }
+            $headers[] = 'Present';
+            $headers[] = 'Absent';
+            $headers[] = 'Attendance %';
+            
+            $sheet->fromArray($headers, null, 'A2');
+            $sheet->getRowDimension(2)->setRowHeight(22);
+            $sheet->getStyle('A2:' . $lastCol . '2')->applyFromArray($headerStyle);
+            
+            $rowIdx = 3;
+            foreach ($students as $st) {
+                $studentRecords = $records->get($st->id) ?? collect();
+                $presentCountVal = 0;
+                $absentCountVal = 0;
+                
+                $row = [
+                    $st->roll_number ?? '—',
+                    $st->admission_number,
+                    $st->full_name,
+                ];
+                
+                for ($d = 1; $d <= $daysInMonth; $d++) {
+                    $dateString = sprintf('%s-%02s-%02s', $year, $month, $d);
+                    $rec = $studentRecords->first(fn($r) => $r->date->format('Y-m-d') === $dateString);
+                    
+                    $status = $rec ? $rec->status : null;
+                    if ($status === 'present' || $status === 'late' || $status === 'duty_leave') {
+                        $presentCountVal++;
+                        $statusText = 'P';
+                    } elseif ($status === 'absent') {
+                        $absentCountVal++;
+                        $statusText = 'A';
+                    } elseif ($status === 'half_day') {
+                        $presentCountVal += 0.5;
+                        $statusText = 'HD';
+                    } elseif ($status === 'leave') {
+                        $statusText = 'L';
+                    } elseif ($status === 'holiday') {
+                        $statusText = 'H';
+                    } else {
+                        $statusText = '—';
+                    }
+                    $row[] = $statusText;
+                }
+                
+                $row[] = $presentCountVal;
+                $row[] = $absentCountVal;
+                $row[] = $st->attendance_percentage . '%';
+                
+                $sheet->fromArray($row, null, 'A' . $rowIdx);
+
+                $sheet->getRowDimension($rowIdx)->setRowHeight(20);
+                $sheet->getStyle('A' . $rowIdx . ':' . $lastCol . $rowIdx)->applyFromArray($dataStyle);
+                $rowIdx++;
+            }
+
+            // Auto-width
+            for ($i = 1; $i <= ($daysInMonth + 6); $i++) {
+                $col = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i);
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+            
+            $writer = new Xlsx($spreadsheet);
+            $filename = 'Student_Monthly_Attendance_' . $class->name . '_' . $section->name . '_' . $year . '_' . $month . '.xlsx';
+            
+            return response()->streamDownload(function () use ($writer) {
+                $writer->save('php://output');
+            }, $filename, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ]);
+        }
+    }
+
+    public function preview(Request $request)
+    {
+        $schoolId = auth()->user()->school_id;
+        $type = $request->get('type', 'daily');
+        $classId = $request->get('class_id');
+        $sectionId = $request->get('section_id');
+        $date = $request->get('date', date('Y-m-d'));
+        $sessionId = $request->get('academic_session_id');
+
+        if (!$classId || !$sectionId || !$sessionId) {
+            return response()->json(['success' => false, 'message' => 'Missing filters.']);
+        }
+
+        $session = AcademicSession::findOrFail($sessionId);
+        
+        // Calculate academic year total working days (excluding Sundays)
+        $start = \Carbon\Carbon::parse($session->start_date);
+        $end = \Carbon\Carbon::parse($session->end_date);
+        $days = $start->diffInDays($end) + 1;
+        $sundays = 0;
+        $temp = $start->copy();
+        while ($temp->dayOfWeek !== \Carbon\Carbon::SUNDAY && $temp->lte($end)) {
+            $temp->addDay();
+        }
+        if ($temp->lte($end)) {
+            $sundays = 1 + floor($temp->diffInDays($end) / 7);
+        }
+        $totalWorkingDays = $days - $sundays;
+
+        $students = Student::where('section_id', $sectionId)
+            ->where('is_active', true)
+            ->orderBy('roll_number')
+            ->get();
+
+        if ($type === 'daily') {
+            $attendances = StudentAttendance::where('section_id', $sectionId)
+                ->whereDate('date', $date)
+                ->get()
+                ->keyBy('student_id');
+
+            $attendanceStats = StudentAttendance::where('academic_session_id', $sessionId)
+                ->whereIn('student_id', $students->pluck('id'))
+                ->get()
+                ->groupBy('student_id');
+
+            $columns = ['Roll No', 'Admission No', 'Student Name', 'Status', 'Remarks', 'Attendance %'];
+            $rows = [];
+            foreach ($students as $idx => $st) {
+                $att = $attendances->get($st->id);
+                $status = $att ? ucfirst(str_replace('_', ' ', $att->status)) : 'Not Marked';
+                $remark = $att ? $att->remark : '';
+                
+                $studentAtts = $attendanceStats->get($st->id) ?? collect();
+                $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
+                    + ($studentAtts->where('status', 'half_day')->count() * 0.5);
+                $pct = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
+
+                $rows[] = [
+                    $st->roll_number ?? '—',
+                    $st->admission_number,
+                    $st->full_name,
+                    $status,
+                    $remark,
+                    $pct . '%'
+                ];
+            }
+        } else {
+            $month = $request->get('month', date('m'));
+            $year = $request->get('year', date('Y'));
+            $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+
+            $records = StudentAttendance::where('section_id', $sectionId)
+                ->whereYear('date', $year)
+                ->whereMonth('date', $month)
+                ->get()
+                ->groupBy('student_id');
+
+            $attendanceStats = StudentAttendance::where('academic_session_id', $sessionId)
+                ->whereIn('student_id', $students->pluck('id'))
+                ->get()
+                ->groupBy('student_id');
+
+            $columns = ['Roll No', 'Admission No', 'Student Name'];
+            for ($d = 1; $d <= $daysInMonth; $d++) {
+                $columns[] = (string)$d;
+            }
+            $columns[] = 'Present';
+            $columns[] = 'Absent';
+            $columns[] = 'Attendance %';
+
+            $rows = [];
+            foreach ($students as $st) {
+                $studentRecords = $records->get($st->id) ?? collect();
+                $presentCountVal = 0;
+                $absentCountVal = 0;
+
+                $row = [
+                    $st->roll_number ?? '—',
+                    $st->admission_number,
+                    $st->full_name,
+                ];
+
+                for ($d = 1; $d <= $daysInMonth; $d++) {
+                    $dateString = sprintf('%s-%02s-%02s', $year, $month, $d);
+                    $rec = $studentRecords->first(fn($r) => $r->date->format('Y-m-d') === $dateString);
+
+                    $status = $rec ? $rec->status : null;
+                    if ($status === 'present' || $status === 'late' || $status === 'duty_leave') {
+                        $presentCountVal++;
+                        $statusText = 'P';
+                    } elseif ($status === 'absent') {
+                        $absentCountVal++;
+                        $statusText = 'A';
+                    } elseif ($status === 'half_day') {
+                        $presentCountVal += 0.5;
+                        $statusText = 'HD';
+                    } elseif ($status === 'leave') {
+                        $statusText = 'L';
+                    } elseif ($status === 'holiday') {
+                        $statusText = 'H';
+                    } else {
+                        $statusText = '—';
+                    }
+                    $row[] = $statusText;
+                }
+
+                $studentAtts = $attendanceStats->get($st->id) ?? collect();
+                $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
+                    + ($studentAtts->where('status', 'half_day')->count() * 0.5);
+                $pct = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
+
+                $row[] = (string)$presentCountVal;
+                $row[] = (string)$absentCountVal;
+                $row[] = $pct . '%';
+
+                $rows[] = $row;
+            }
+        }
+
+        // Add spreadsheet letter headers A, B, C, D...
+        $excelLetters = [];
+        for ($i = 1; $i <= count($columns); $i++) {
+            $excelLetters[] = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($i);
+        }
+
+        return response()->json([
+            'success' => true,
+            'headers' => $excelLetters,
+            'columns' => $columns,
+            'rows' => $rows
+        ]);
     }
 }

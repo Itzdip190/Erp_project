@@ -455,6 +455,7 @@ class ReportsController extends Controller
             'dues_report'                     => 'Dues Report',
             'paid_report'                     => 'Paid Fees Report',
             'refund_report'                   => 'Refund Report',
+            'studentwise_refund'              => 'Student-wise Refund Report',
             'estimated_fees'                  => 'Estimated Fees Report',
             'consolidated_fees'               => 'Consolidated Fees Report',
         ];
@@ -593,8 +594,21 @@ class ReportsController extends Controller
                     'amount' => 'Amount',
                     'reason' => 'Reason'
                 ];
-                $records = collect([]);
-                $summary = ['Total Cancelled' => '₹ 0.00'];
+                $query = DB::table('cancelled_payments')
+                    ->where('school_id', $schoolId)
+                    ->whereBetween('payment_date', [$dateFrom, $dateTo])
+                    ->orderByDesc('payment_date');
+                
+                $records = $query->get()->map(function($r) {
+                    return [
+                        'receipt_number' => $r->receipt_number,
+                        'student_name' => $r->student_name,
+                        'payment_date' => $r->payment_date,
+                        'amount' => '₹ ' . number_format($r->amount, 2),
+                        'reason' => $r->reason
+                    ];
+                });
+                $summary = ['Total Cancelled' => '₹ ' . number_format($query->sum('amount'), 2)];
                 break;
 
             case 'student_wise':
@@ -643,7 +657,8 @@ class ReportsController extends Controller
                     ->join('fee_categories', 'student_fees.fee_category_id', '=', 'fee_categories.id')
                     ->selectRaw("students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, fee_categories.name as category_name, (student_fees.amount - student_fees.paid_amount) as amount_due, student_fees.due_date");
 
-                $records = $query->get()->map(function($r) {
+                $results = $query->get();
+                $records = $results->map(function($r) {
                     return [
                         'student_name' => trim($r->first_name . ' ' . $r->last_name),
                         'class_name' => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
@@ -652,7 +667,7 @@ class ReportsController extends Controller
                         'due_date' => $r->due_date ? Carbon::parse($r->due_date)->format('d M Y') : '—'
                     ];
                 });
-                $summary = ['Total Pending' => '₹ ' . number_format($query->sum('amount_due'), 2)];
+                $summary = ['Total Pending' => '₹ ' . number_format($results->sum('amount_due'), 2)];
                 break;
 
             case 'classes_wise_report':
@@ -699,9 +714,11 @@ class ReportsController extends Controller
                     ->join('students', 'student_fees.student_id', '=', 'students.id')
                     ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
                     ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
-                    ->selectRaw("students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, fee_categories.name as category_name, student_fees.paid_amount, (student_fees.amount - student_fees.paid_amount) as pending_amount");
+                    ->selectRaw("students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, MIN(fee_categories.name) as category_name, SUM(student_fees.paid_amount) as paid_amount, SUM(student_fees.amount - student_fees.paid_amount) as pending_amount")
+                    ->groupBy('students.id', 'students.first_name', 'students.last_name', 'school_classes.name', 'sections.name');
 
-                $records = $query->get()->map(function($r) {
+                $results = $query->get();
+                $records = $results->map(function($r) {
                     return [
                         'student_name' => trim($r->first_name . ' ' . $r->last_name),
                         'class_name' => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
@@ -711,8 +728,8 @@ class ReportsController extends Controller
                     ];
                 });
                 $summary = [
-                    'Total Collected' => '₹ ' . number_format($query->sum('paid_amount'), 2),
-                    'Total Pending' => '₹ ' . number_format($query->sum('pending_amount'), 2)
+                    'Total Collected' => '₹ ' . number_format($results->sum('paid_amount'), 2),
+                    'Total Pending' => '₹ ' . number_format($results->sum('pending_amount'), 2)
                 ];
                 break;
 
@@ -758,8 +775,20 @@ class ReportsController extends Controller
                     'new_value' => 'New Value',
                     'updated_at' => 'Date & Time'
                 ];
-                $records = collect([]);
-                $summary = ['Total Updates Logs' => 0];
+                $query = DB::table('installment_edit_histories')
+                    ->where('school_id', $schoolId)
+                    ->orderByDesc('created_at');
+                
+                $records = $query->get()->map(function($r) {
+                    return [
+                        'student_name' => $r->student_name,
+                        'field' => $r->field,
+                        'old_value' => $r->old_value,
+                        'new_value' => $r->new_value,
+                        'updated_at' => Carbon::parse($r->created_at)->format('d M Y h:i A')
+                    ];
+                });
+                $summary = ['Total Updates Logs' => $records->count()];
                 break;
 
             case 'deleted_fine_report':
@@ -768,8 +797,19 @@ class ReportsController extends Controller
                     'deleted_by' => 'Deleted By',
                     'date' => 'Deletion Date'
                 ];
-                $records = collect([]);
-                $summary = ['Total Deleted Fines' => 0];
+                $query = DB::table('deleted_fines')
+                    ->where('school_id', $schoolId)
+                    ->whereBetween('date', [$dateFrom, $dateTo])
+                    ->orderByDesc('date');
+                
+                $records = $query->get()->map(function($r) {
+                    return [
+                        'fine_name' => $r->fine_name,
+                        'deleted_by' => $r->deleted_by,
+                        'date' => Carbon::parse($r->date)->format('d M Y')
+                    ];
+                });
+                $summary = ['Total Deleted Fines' => $records->count()];
                 break;
 
             case 'deleted_concession_report':
@@ -778,8 +818,19 @@ class ReportsController extends Controller
                     'deleted_by' => 'Deleted By',
                     'date' => 'Deletion Date'
                 ];
-                $records = collect([]);
-                $summary = ['Total Deleted Concessions' => 0];
+                $query = DB::table('deleted_concessions')
+                    ->where('school_id', $schoolId)
+                    ->whereBetween('date', [$dateFrom, $dateTo])
+                    ->orderByDesc('date');
+                
+                $records = $query->get()->map(function($r) {
+                    return [
+                        'concession_name' => $r->concession_name,
+                        'deleted_by' => $r->deleted_by,
+                        'date' => Carbon::parse($r->date)->format('d M Y')
+                    ];
+                });
+                $summary = ['Total Deleted Concessions' => $records->count()];
                 break;
 
             // ─── NEW ADDITIONAL REPORTS ────────────────────────────────────
@@ -831,11 +882,12 @@ class ReportsController extends Controller
                     ];
                 });
                 $discounts = DB::table('fee_discounts')->where('school_id', $schoolId)->get()->map(function($r) {
+                    $targetInst = $r->installment_no ? ' (Installment ' . $r->installment_no . ')' : '';
                     return [
                         'type'      => 'Concession / Discount',
-                        'name'      => $r->name,
-                        'fine_type' => 'Fixed Amount',
-                        'amount'    => '₹ ' . number_format($r->amount, 2),
+                        'name'      => $r->name . $targetInst,
+                        'fine_type' => isset($r->type) && $r->type === 'percentage' ? 'Percentage' : 'Fixed Amount',
+                        'amount'    => isset($r->type) && $r->type === 'percentage' ? number_format($r->amount, 0) . '%' : '₹ ' . number_format($r->amount, 2),
                         'status'    => 'Active',
                     ];
                 });
@@ -859,9 +911,13 @@ class ReportsController extends Controller
                     ->get();
                 $rows = collect();
                 foreach ($discountRows as $disc) {
+                    $targetInst = $disc->installment_no ? 'Applies to: Installment ' . $disc->installment_no : 'Applies to: All Installments';
+                    $formattedRemarks = ($disc->remarks ? $disc->remarks . ' · ' : '') . $targetInst;
+                    $formattedAmount = isset($disc->type) && $disc->type === 'percentage' ? number_format($disc->amount, 0) . '%' : '₹ ' . number_format($disc->amount, 2);
+
                     $studentIds = $disc->student_ids ? json_decode($disc->student_ids, true) : [];
                     if (!empty($studentIds)) {
-                        $students = Student::whereIn('id', $studentIds)
+                        $students = Student::whereIn('students.id', $studentIds)
                             ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
                             ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
                             ->selectRaw("students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name")
@@ -871,8 +927,8 @@ class ReportsController extends Controller
                                 'discount_name' => $disc->name,
                                 'student_name'  => trim($stu->first_name . ' ' . $stu->last_name),
                                 'class_name'    => $stu->class_name . ($stu->section_name ? ' - ' . $stu->section_name : ''),
-                                'amount'        => '₹ ' . number_format($disc->amount, 2),
-                                'remarks'       => $disc->remarks ?? '—',
+                                'amount'        => $formattedAmount,
+                                'remarks'       => $formattedRemarks,
                             ]);
                         }
                     } else {
@@ -880,8 +936,8 @@ class ReportsController extends Controller
                             'discount_name' => $disc->name,
                             'student_name'  => 'All Students',
                             'class_name'    => $disc->classes_installments ?? 'All Classes',
-                            'amount'        => '₹ ' . number_format($disc->amount, 2),
-                            'remarks'       => $disc->remarks ?? '—',
+                            'amount'        => $formattedAmount,
+                            'remarks'       => $formattedRemarks,
                         ]);
                     }
                 }
@@ -907,26 +963,28 @@ class ReportsController extends Controller
                     ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
                     ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
                     ->join('fee_categories', 'student_fees.fee_category_id', '=', 'fee_categories.id')
-                    ->selectRaw("students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, fee_categories.name as category_name, student_fees.amount, student_fees.paid_amount, (student_fees.amount - student_fees.paid_amount) as dues_amount, student_fees.due_date, student_fees.status")
+                    ->selectRaw("students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, MIN(fee_categories.name) as category_name, SUM(student_fees.amount) as amount, SUM(student_fees.paid_amount) as paid_amount, SUM(student_fees.amount - student_fees.paid_amount) as dues_amount, MIN(student_fees.due_date) as due_date, MAX(student_fees.status) as status")
+                    ->groupBy('students.id', 'students.admission_number', 'students.first_name', 'students.last_name', 'school_classes.name', 'sections.name')
                     ->orderBy('students.first_name');
                 if ($classId) $query->where('students.class_id', $classId);
 
-                $records = $query->get()->map(function($r) {
+                $results = $query->get();
+                $records = $results->map(function($r) {
                     return [
                         'student_name'  => trim($r->first_name . ' ' . $r->last_name),
                         'admission_no'  => $r->admission_number ?? '—',
                         'class_name'    => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
-                        'fee_head'      => $r->category_name,
+                        'fee_head'      => 'Pending Fees',
                         'total_amount'  => '₹ ' . number_format($r->amount, 2),
                         'paid_amount'   => '₹ ' . number_format($r->paid_amount, 2),
                         'dues_amount'   => '₹ ' . number_format($r->dues_amount, 2),
                         'due_date'      => $r->due_date ? Carbon::parse($r->due_date)->format('d M Y') : '—',
-                        'status'        => ucfirst(str_replace('_', ' ', $r->status ?? 'pending')),
+                        'status'        => 'Pending',
                     ];
                 });
                 $summary = [
                     'Total Records with Dues' => $records->count(),
-                    'Total Dues Amount'        => '₹ ' . number_format($query->sum('dues_amount'), 2),
+                    'Total Dues Amount'        => '₹ ' . number_format($results->sum('dues_amount'), 2),
                 ];
                 break;
 
@@ -999,6 +1057,43 @@ class ReportsController extends Controller
                 $summary = [
                     'Total Refunds'       => $records->count(),
                     'Total Refund Amount' => '₹ ' . number_format($query->sum('fee_refunds.amount'), 2),
+                ];
+                break;
+
+            case 'studentwise_refund':
+                $columns = [
+                    'student_name'  => 'Student Name',
+                    'admission_no'  => 'Admission No.',
+                    'class_name'    => 'Class & Section',
+                    'refund_count'  => 'Refunds Count',
+                    'total_refund'  => 'Total Refunded Amount',
+                ];
+                $query = DB::table('fee_refunds')
+                    ->where('fee_refunds.school_id', $schoolId)
+                    ->join('students', 'fee_refunds.student_id', '=', 'students.id')
+                    ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
+                    ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
+                    ->selectRaw("students.first_name, students.last_name, students.admission_number, school_classes.name as class_name, sections.name as section_name, COUNT(fee_refunds.id) as refund_count, SUM(fee_refunds.amount) as total_refund")
+                    ->whereBetween('fee_refunds.refund_date', [$dateFrom, $dateTo])
+                    ->groupBy('students.id', 'students.first_name', 'students.last_name', 'students.admission_number', 'school_classes.name', 'sections.name')
+                    ->orderBy('students.first_name');
+                if ($classId) $query->where('students.class_id', $classId);
+
+                $records = $query->get()->map(function($r) {
+                    return [
+                        'student_name'  => trim($r->first_name . ' ' . $r->last_name),
+                        'admission_no'  => $r->admission_number ?? '—',
+                        'class_name'    => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
+                        'refund_count'  => $r->refund_count,
+                        'total_refund'  => '₹ ' . number_format($r->total_refund, 2),
+                    ];
+                });
+                
+                $summary = [
+                    'Total Refunded Students' => $records->count(),
+                    'Total Refunded Amount'   => '₹ ' . number_format($records->sum(function($r) {
+                        return (float) str_replace(['₹ ', ','], '', $r['total_refund']);
+                    }), 2),
                 ];
                 break;
 

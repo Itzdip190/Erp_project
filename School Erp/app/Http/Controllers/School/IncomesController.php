@@ -39,7 +39,7 @@ class IncomesController extends Controller
             $query->where('status', $status);
         }
 
-        $incomes = $query->with('incomeHead')->orderByDesc('income_date')->get();
+        $incomes = $query->with(['incomeHead', 'voucher'])->orderByDesc('income_date')->get();
 
         // Summary stats (excluding cancelled ones)
         $totalThisMonth = SchoolIncome::where('school_id', $schoolId)
@@ -52,9 +52,18 @@ class IncomesController extends Controller
             ->where('status', '!=', 'cancelled')
             ->sum('amount');
 
-        $pendingAmount = SchoolIncome::where('school_id', $schoolId)
+        $vouchersDue = \App\Models\IncomeVoucher::where('school_id', $schoolId)
+            ->where('approval_status', 'Approved')
+            ->get()
+            ->sum(function($v) {
+                return $v->total_due;
+            });
+
+        $pendingIncomes = SchoolIncome::where('school_id', $schoolId)
             ->where('status', 'pending')
             ->sum('amount');
+
+        $pendingAmount = $vouchersDue + $pendingIncomes;
 
         $incomeCount = SchoolIncome::where('school_id', $schoolId)
             ->whereYear('income_date', $year)

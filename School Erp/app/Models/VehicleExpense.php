@@ -13,10 +13,12 @@ class VehicleExpense extends Model
     protected $fillable = [
         'school_id',
         'vehicle_id',
+        'school_expense_id',
         'expense_type',
         'amount',
         'date',
         'description',
+        'attachment',
     ];
 
     protected $casts = [
@@ -27,5 +29,10 @@ class VehicleExpense extends Model
     public function vehicle()
     {
         return $this->belongsTo(Vehicle::class, 'vehicle_id');
+    }
+
+    public function schoolExpense()
+    {
+        return $this->belongsTo(SchoolExpense::class, 'school_expense_id');
     }
 }

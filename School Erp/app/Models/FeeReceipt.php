@@ -11,6 +11,16 @@ class FeeReceipt extends Model
 {
     use HasFactory, BelongsToSchool;
 
+    protected static function booted()
+    {
+        static::addGlobalScope('active', function ($builder) {
+            $builder->where(function($q) {
+                $q->where('status', '!=', 'cancelled')
+                  ->orWhereNull('status');
+            });
+        });
+    }
+
     protected $fillable = [
         'school_id',
         'student_id',
@@ -21,6 +31,8 @@ class FeeReceipt extends Model
         'payment_mode',
         'transaction_id',
         'payment_date',
+        'payment_details',
+        'status',
     ];
 
     public function school()

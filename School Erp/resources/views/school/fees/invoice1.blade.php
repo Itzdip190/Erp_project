@@ -16,24 +16,9 @@
     /* Filter Grid Area */
     .filter-grid {
         display: grid;
-        grid-template-columns: repeat(6, 1fr);
+        grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
         gap: 12px;
         margin-bottom: 20px;
-    }
-    @media (max-width: 1200px) {
-        .filter-grid {
-            grid-template-columns: repeat(3, 1fr);
-        }
-    }
-    @media (max-width: 768px) {
-        .filter-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-    }
-    @media (max-width: 480px) {
-        .filter-grid {
-            grid-template-columns: 1fr;
-        }
     }
 
     .filter-card {
@@ -529,6 +514,18 @@
                 @endforeach
             </select>
         </div>
+
+        <!-- Select Route -->
+        <div class="filter-card">
+            <label class="filter-label">Select Route</label>
+            <i class="filter-icon fas fa-route"></i>
+            <select id="filter_route">
+                <option value="">Select Route</option>
+                @foreach($routes as $rt)
+                    <option value="{{ $rt->name }}">{{ $rt->name }}</option>
+                @endforeach
+            </select>
+        </div>
     </div>
 
     <!-- Table Card -->
@@ -616,6 +613,26 @@
     <i class="fas fa-circle-check" id="toastIcon" style="font-size: 16px;"></i>
     <span id="toastMessage">Success message here</span>
 </div>
+
+<!-- Invoice Print Modal -->
+<div class="modal-overlay" id="invoiceModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center; backdrop-filter:blur(6px); transition: all 0.3s ease;">
+    <div style="background:#ffffff; width:90%; max-width:850px; height:85%; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); border: 1px solid #e2e8f0; animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+        <div style="padding:18px 24px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0; font-family:'Plus Jakarta Sans',sans-serif; color:#0f172a; font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px;"><i class="fas fa-file-invoice" style="color:#2563eb;"></i> Invoice Print Preview</h3>
+            <button onclick="closeInvoiceModal()" style="background:#f1f5f9; border:none; color:#64748b; font-size:14px; width:28px; height:28px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;" onmouseover="this.style.background='#fee2e2'; this.style.color='#ef4444'" onmouseout="this.style.background='#f1f5f9'; this.style.color='#64748b'"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div style="flex:1; background:#f1f5f9; position:relative; padding: 2px;">
+            <iframe id="invoiceIframe" src="" style="width:100%; height:100%; border:none; background:#ffffff; border-radius: 0 0 12px 12px;"></iframe>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+</style>
 @endsection
 
 @section('scripts')
@@ -628,7 +645,7 @@
         loadGridData();
 
         // Listen for filter changes
-        $('#filter_academic_year, #filter_class, #filter_section, #filter_schedule, #filter_installment, #filter_component').change(function() {
+        $('#filter_academic_year, #filter_class, #filter_section, #filter_schedule, #filter_installment, #filter_component, #filter_route').change(function() {
             currentPage = 1;
             loadGridData();
         });
@@ -725,6 +742,7 @@
             academic_session_id: $('#filter_academic_year').val(),
             class_id: $('#filter_class').val(),
             section_id: $('#filter_section').val(),
+            transport_route: $('#filter_route').val(),
             fee_schedule_id: $('#filter_schedule').val(),
             installment_no: $('#filter_installment').val(),
             fee_component_id: $('#filter_component').val(),
@@ -769,16 +787,26 @@
                 
                 // Capitalize installment strings/numbers nicely
                 let installment = row.installment_no;
-                if (!isNaN(installment)) {
-                    installment = `Installment ${installment}`;
-                } else if (installment) {
-                    installment = installment.charAt(0).toUpperCase() + installment.slice(1);
+                if (row.component_name && row.component_name.toLowerCase().includes('transport')) {
+                    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                    let mIndex = parseInt(installment) - 1;
+                    if (mIndex >= 0 && mIndex < 12) {
+                        installment = months[mIndex];
+                    } else {
+                        installment = `Month ${installment}`;
+                    }
                 } else {
-                    installment = 'N/A';
+                    if (!isNaN(installment)) {
+                        installment = `Installment ${installment}`;
+                    } else if (installment) {
+                        installment = installment.charAt(0).toUpperCase() + installment.slice(1);
+                    } else {
+                        installment = 'N/A';
+                    }
                 }
 
                 let invoiceTag = row.invoice_no 
-                    ? `<a href="{{ route('school.fees.invoice') }}?student_id=${row.student_id}" class="invoice-tag" style="text-decoration:none;"><i class="fas fa-print" style="margin-right:4px;"></i> ${row.invoice_no}</a>`
+                    ? `<a href="javascript:void(0);" onclick="openInvoiceModal('${row.invoice_no}', '${row.student_id}')" class="invoice-tag" style="text-decoration:none;"><i class="fas fa-print" style="margin-right:4px;"></i> ${row.invoice_no}</a>`
                     : `<span class="no-invoice-tag">—</span>`;
 
                 // If invoice already exists, disable checking this row to prevent generating twice
@@ -792,7 +820,10 @@
                         <span class="row-index">${formattedIdx}.</span>
                         <span class="admission-id-text">${row.admission_id}</span>
                     </td>
-                    <td style="font-weight:600;">${row.student_name}</td>
+                    <td style="font-weight:600;">
+                        <div>${row.student_name}</div>
+                        ${row.transport_route ? `<div style="font-size:11px; color:#2563eb; font-weight:700; margin-top:3px;"><i class="fas fa-route"></i> ${row.transport_route}</div>` : ''}
+                    </td>
                     <td>${fatherName}</td>
                     <td>${className}</td>
                     <td>${scheduleName}</td>
@@ -902,6 +933,17 @@
         setTimeout(function() {
             toast.removeClass('show');
         }, 4000);
+    }
+
+    function openInvoiceModal(invoiceNo, studentId) {
+        let printUrl = `/school/fees/print-slip/invoice/${invoiceNo}?student_id=${studentId}`;
+        $('#invoiceIframe').attr('src', printUrl);
+        $('#invoiceModal').css('display', 'flex');
+    }
+
+    function closeInvoiceModal() {
+        $('#invoiceModal').hide();
+        $('#invoiceIframe').attr('src', '');
     }
 </script>
 @endsection

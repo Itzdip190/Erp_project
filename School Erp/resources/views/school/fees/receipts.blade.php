@@ -366,6 +366,9 @@
                     <td>
                         <span style="font-size:11px; color:#94a3b8; margin-right:4px;">{{ sprintf('%02d.', $index + 1) }}</span>
                         <a href="javascript:void(0)" class="rct-no-link" onclick="triggerReceiptView({{ $index }})">{{ $receipt->receipt_number }}</a>
+                        @if($receipt->status === 'cancelled')
+                            <span style="font-size: 8px; color: #ef4444; border: 1px solid #ef4444; background: #fef2f2; padding: 1px 4px; border-radius: 4px; font-weight: 800; margin-left: 4px;">CANCELLED</span>
+                        @endif
                     </td>
                     <td>{{ \Carbon\Carbon::parse($receipt->payment_date)->format('d/m/Y') }}</td>
                     <td style="font-weight:600;">{{ optional($receipt->student)->admission_id ?? optional($receipt->student)->admission_number ?? '150B' }}</td>
@@ -376,22 +379,27 @@
                     <td style="font-family:monospace; font-size:11px; color:#475569;">{{ $receipt->transaction_id ?? 'TESTPRODMPESAPAY7' }}</td>
                     <td style="font-family:monospace; font-size:11px; color:#475569;">{{ $receipt->transaction_id ?? 'TESTPRODMPESAPAY7' }}</td>
                     <td>
-                        <button class="action-view-btn" onclick="showReceiptDetails(
-                            '{{ $receipt->receipt_number }}',
-                            '{{ optional($receipt->student)->full_name ?? 'Raghav' }}',
-                            '{{ number_format($receipt->amount_paid, 2) }}',
-                            '{{ $receipt->payment_mode }}',
-                            '{{ $receipt->payment_date }}',
-                            '{{ optional($receipt->student)->admission_id ?? '150B' }}',
-                            '{{ optional(optional($receipt->student)->class)->name ?? 'NUR' }} - {{ optional(optional($receipt->student)->section)->name ?? 'A' }}',
-                            '{{ optional($receipt->student)->father_name ?? 'Raghvinder' }}',
-                            '{{ optional($receipt->student)->mother_name ?? 'N/A' }}',
-                            '{{ optional($receipt->student)->address ?? 'N/A' }}',
-                            '{{ optional($receipt->student)->father_phone ?? 'N/A' }}',
-                            '{{ optional($receipt->student)->mother_phone ?? 'N/A' }}'
-                        )">
-                            <i class="fas fa-eye"></i> View
-                        </button>
+                        <div style="display:flex; gap:6px;">
+                            <button class="action-view-btn" onclick="showReceiptDetails(
+                                '{{ $receipt->receipt_number }}',
+                                '{{ optional($receipt->student)->full_name ?? 'Raghav' }}',
+                                '{{ number_format($receipt->amount_paid, 2) }}',
+                                '{{ $receipt->payment_mode }}',
+                                '{{ $receipt->payment_date }}',
+                                '{{ optional($receipt->student)->admission_id ?? '150B' }}',
+                                '{{ optional(optional($receipt->student)->class)->name ?? 'NUR' }} - {{ optional(optional($receipt->student)->section)->name ?? 'A' }}',
+                                '{{ optional($receipt->student)->father_name ?? 'Raghvinder' }}',
+                                '{{ optional($receipt->student)->mother_name ?? 'N/A' }}',
+                                '{{ optional($receipt->student)->address ?? 'N/A' }}',
+                                '{{ optional($receipt->student)->father_phone ?? 'N/A' }}',
+                                '{{ optional($receipt->student)->mother_phone ?? 'N/A' }}'
+                            )">
+                                <i class="fas fa-eye"></i> View
+                            </button>
+                            <button class="action-view-btn" style="background:#fffbeb; color:#d97706; border-color:#fde68a;" onclick="window.open('{{ route('school.fees.print-slip', ['type' => 'payment', 'number' => $receipt->receipt_number]) }}', '_blank', 'width=950,height=750')">
+                                <i class="fas fa-print"></i> Print
+                            </button>
+                        </div>
                     </td>
                 </tr>
                 @empty
@@ -427,7 +435,7 @@
                 <tr style="border-bottom:1px solid #e2e8f0;"><td style="padding:8px 0; color:#64748b;">Father's Name</td><td id="modalFather" style="padding:8px 0; text-align:right;">—</td></tr>
             </table>
 
-            <button class="btn btn-gold" style="width:100%; justify-content:center; padding:10px; background:#0284c7; color:#fff; border:none; font-weight:700; border-radius:6px; cursor:pointer;" onclick="window.print()">
+            <button class="btn btn-gold" id="modalPrintBtn" style="width:100%; justify-content:center; padding:10px; background:#0284c7; color:#fff; border:none; font-weight:700; border-radius:6px; cursor:pointer;">
                 <i class="fas fa-print"></i> Print Receipt
             </button>
         </div>
@@ -491,6 +499,10 @@ function showReceiptDetails(number, student, amount, mode, date, admission_id, c
     if (document.getElementById('modalAdmissionNo')) document.getElementById('modalAdmissionNo').textContent = admission_id;
     if (document.getElementById('modalClass')) document.getElementById('modalClass').textContent = className;
     if (document.getElementById('modalFather')) document.getElementById('modalFather').textContent = fatherName;
+    
+    document.getElementById('modalPrintBtn').onclick = function() {
+        window.open('/school/fees/print-slip/payment/' + number, '_blank', 'width=950,height=750');
+    };
     
     document.getElementById('receiptModal').style.display = 'flex';
 }

@@ -22,3 +22,6 @@ Route::resource('study-materials', TeacherStudyMaterialController::class)->names
     'store'   => 'teacher.study-materials.store',
     'destroy' => 'teacher.study-materials.destroy',
 ]);
+
+// Notices
+Route::get('/notices', [TeacherDashboardController::class, 'notices'])->name('teacher.notices.index');
