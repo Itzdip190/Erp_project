@@ -368,6 +368,31 @@ body.dark-mode {
     padding: 40px 20px; text-align: center; color: var(--dg-text-muted);
 }
 .dg-empty i { font-size: 36px; color: var(--dg-blue-border); margin-bottom: 10px; display: block; }
+
+.dg-tab-btn {
+    border-bottom: 3px solid transparent !important;
+    border-radius: 0 !important;
+    padding: 12px 20px !important;
+    font-size: 14px !important;
+    color: var(--dg-text-muted) !important;
+    background: none !important;
+    border: none !important;
+    font-weight: 700 !important;
+    cursor: pointer !important;
+    transition: .2s !important;
+    outline: none !important;
+}
+.dg-tab-btn:hover {
+    color: var(--dg-blue-light) !important;
+}
+.dg-tab-btn.active {
+    color: var(--dg-blue) !important;
+    border-bottom: 3px solid var(--dg-blue) !important;
+}
+body.dark-mode .dg-tab-btn.active {
+    color: var(--dg-blue-light) !important;
+    border-bottom-color: var(--dg-blue-light) !important;
+}
 </style>
 @endsection
 
@@ -376,110 +401,185 @@ body.dark-mode {
 {{-- Page Header --}}
 <div class="dg-page-header">
     <div>
-        <h1><i class="fas fa-id-card-clip" style="margin-right:10px;opacity:.9;"></i>Role Category — Manage Designations</h1>
-        <p>Create and edit staff designations, mapping them to system privileges for dashboard access.</p>
+        <h1><i class="fas fa-id-card-clip" style="margin-right:10px;opacity:.9;"></i>Role Category — Manage Designations & Departments</h1>
+        <p>Create staff departments and designations, then connect designations to departments and map roles.</p>
     </div>
-    <button type="button" class="dg-add-btn" onclick="openCreatePanel()">
-        <i class="fas fa-plus-circle"></i> Add Designation
+    <div style="display: flex; gap: 10px;">
+        <button type="button" class="dg-add-btn" id="addDesgBtn" onclick="openCreatePanel()">
+            <i class="fas fa-plus-circle"></i> Add Designation
+        </button>
+        <button type="button" class="dg-add-btn" id="addDeptBtn" onclick="openCreateDeptPanel()" style="display: none;">
+            <i class="fas fa-plus-circle"></i> Add Department
+        </button>
+    </div>
+</div>
+
+{{-- Tabs Navigation --}}
+<div class="dg-tabs" style="display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid var(--dg-blue-border); padding-bottom: 0;">
+    <button class="dg-tab-btn active" id="tab-designations" onclick="switchTab('designations')">
+        <i class="fas fa-id-card-clip" style="margin-right: 6px;"></i> Designations
+    </button>
+    <button class="dg-tab-btn" id="tab-departments" onclick="switchTab('departments')">
+        <i class="fas fa-sitemap" style="margin-right: 6px;"></i> Departments
     </button>
 </div>
 
-{{-- Search Card --}}
-<div class="dg-search-card">
-    <form method="GET" action="{{ route('school.designations.index') }}" class="dg-search-form">
-        <div class="dg-search-input-wrapper">
-            <i class="fas fa-magnifying-glass"></i>
-            <input type="text"
-                   name="search"
-                   class="dg-search-input"
-                   value="{{ $search }}"
-                   placeholder="Search designations by name or description...">
-        </div>
-        <button type="submit" class="dg-search-btn"><i class="fas fa-filter" style="margin-right: 5px;"></i> Filter</button>
-        @if($search)
-            <a href="{{ route('school.designations.index') }}" class="dg-clear-btn">Clear</a>
-        @endif
-    </form>
+{{-- Section: Designations --}}
+<div id="section-designations">
+    {{-- Search Card --}}
+    <div class="dg-search-card">
+        <form method="GET" action="{{ route('school.designations.index') }}" class="dg-search-form">
+            <div class="dg-search-input-wrapper">
+                <i class="fas fa-magnifying-glass"></i>
+                <input type="text"
+                       name="search"
+                       class="dg-search-input"
+                       value="{{ $search }}"
+                       placeholder="Search designations by name or description...">
+            </div>
+            <button type="submit" class="dg-search-btn"><i class="fas fa-filter" style="margin-right: 5px;"></i> Filter</button>
+            @if($search)
+                <a href="{{ route('school.designations.index') }}" class="dg-clear-btn">Clear</a>
+            @endif
+        </form>
+    </div>
+
+    @if(!$designations->count())
+    <div class="dg-empty" style="background:#fff;border-radius:14px;border:1px solid var(--dg-blue-border);">
+        <i class="fas fa-folder-open"></i>
+        <strong style="display:block;color:#1e3a5f;font-size:15px;margin-bottom:6px;">No Designations Found</strong>
+        <p>Get started by creating a new designation.</p>
+    </div>
+    @else
+    {{-- Listing --}}
+    <div class="dg-table-card">
+        <table class="dg-table">
+            <thead>
+                <tr>
+                    <th style="width: 20%;">Designation Name</th>
+                    <th style="width: 20%;">Department</th>
+                    <th style="width: 30%;">Description</th>
+                    <th style="width: 15%;">System Role / Privilege</th>
+                    <th style="width: 10%;">Assigned Staff</th>
+                    <th style="width: 5%; text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($designations as $desg)
+                <tr id="desg-row-{{ $desg->id }}">
+                    <td>
+                        <div style="font-weight: 700; color: var(--dg-text-dark);">{{ $desg->name }}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 600; color: var(--dg-blue);">{{ $desg->department ? $desg->department->name : 'N/A' }}</div>
+                    </td>
+                    <td>
+                        <div style="color: var(--dg-text-muted);">{{ $desg->description ?: 'No description provided' }}</div>
+                    </td>
+                    <td>
+                        <span class="role-badge {{ $desg->system_role ?: 'none' }}">
+                            @if($desg->system_role == 'school_admin')
+                                School Admin
+                            @elseif($desg->system_role == 'teacher')
+                                Teacher
+                            @elseif($desg->system_role == 'accountant')
+                                Accountant
+                            @elseif($desg->system_role == 'driver')
+                                Driver
+                            @else
+                                No Role / Basic Staff
+                            @endif
+                        </span>
+                    </td>
+                    <td>
+                        <span class="staff-count-badge">
+                            {{ $desg->staffs_count }} Staff
+                        </span>
+                    </td>
+                    <td style="text-align: center;">
+                        <div class="action-btn-group">
+                            <button type="button"
+                                    class="action-btn"
+                                    onclick="openEditPanel(this)"
+                                    data-id="{{ $desg->id }}"
+                                    data-name="{{ $desg->name }}"
+                                    data-dept="{{ $desg->department_id }}"
+                                    data-desc="{{ $desg->description }}"
+                                    data-role="{{ $desg->system_role ?: 'none' }}">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button type="button"
+                                    class="action-btn delete-btn"
+                                    onclick="deleteDesignation({{ $desg->id }}, '{{ addslashes($desg->name) }}')">
+                                <i class="fas fa-trash-can"></i> Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top: 15px;">
+        {{ $designations->links() }}
+    </div>
+    @endif
 </div>
 
-@if(!$designations->count())
-<div class="dg-empty" style="background:#fff;border-radius:14px;border:1px solid var(--dg-blue-border);">
-    <i class="fas fa-folder-open"></i>
-    <strong style="display:block;color:#1e3a5f;font-size:15px;margin-bottom:6px;">No Designations Found</strong>
-    <p>Get started by creating a new designation.</p>
-</div>
-@else
-{{-- Listing --}}
-<div class="dg-table-card">
-    <table class="dg-table">
-        <thead>
-            <tr>
-                <th style="width: 25%;">Designation Name</th>
-                <th style="width: 40%;">Description</th>
-                <th style="width: 20%;">System Role / Privilege</th>
-                <th style="width: 15%;">Assigned Staff</th>
-                <th style="width: 10%; text-align: center;">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($designations as $desg)
-            <tr id="desg-row-{{ $desg->id }}">
-                <td>
-                    <div style="font-weight: 700; color: var(--dg-text-dark);">{{ $desg->name }}</div>
-                </td>
-                <td>
-                    <div style="color: var(--dg-text-muted);">{{ $desg->description ?: 'No description provided' }}</div>
-                </td>
-                <td>
-                    <span class="role-badge {{ $desg->system_role ?: 'none' }}">
-                        @if($desg->system_role == 'school_admin')
-                            School Admin
-                        @elseif($desg->system_role == 'teacher')
-                            Teacher
-                        @elseif($desg->system_role == 'accountant')
-                            Accountant
-                        @elseif($desg->system_role == 'driver')
-                            Driver
-                        @else
-                            No Role / Basic Staff
-                        @endif
-                    </span>
-                </td>
-                <td>
-                    <span class="staff-count-badge">
-                        {{ $desg->staffs_count }} Staff
-                    </span>
-                </td>
-                <td style="text-align: center;">
-                    <div class="action-btn-group">
-                        <button type="button"
-                                class="action-btn"
-                                onclick="openEditPanel(this)"
-                                data-id="{{ $desg->id }}"
-                                data-name="{{ $desg->name }}"
-                                data-desc="{{ $desg->description }}"
-                                data-role="{{ $desg->system_role ?: 'none' }}">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
-                        <button type="button"
-                                class="action-btn delete-btn"
-                                onclick="deleteDesignation({{ $desg->id }}, '{{ addslashes($desg->name) }}')">
-                            <i class="fas fa-trash-can"></i> Delete
-                        </button>
-                    </div>
-                </td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
+{{-- Section: Departments --}}
+<div id="section-departments" style="display: none;">
+    @if(!$departments->count())
+    <div class="dg-empty" style="background:#fff;border-radius:14px;border:1px solid var(--dg-blue-border);">
+        <i class="fas fa-folder-open"></i>
+        <strong style="display:block;color:#1e3a5f;font-size:15px;margin-bottom:6px;">No Departments Found</strong>
+        <p>Get started by creating a new department.</p>
+    </div>
+    @else
+    <div class="dg-table-card">
+        <table class="dg-table">
+            <thead>
+                <tr>
+                    <th style="width: 30%;">Department Name</th>
+                    <th style="width: 55%;">Description</th>
+                    <th style="width: 15%; text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($departments as $dept)
+                <tr id="dept-row-{{ $dept->id }}">
+                    <td>
+                        <div style="font-weight: 700; color: var(--dg-text-dark);">{{ $dept->name }}</div>
+                    </td>
+                    <td>
+                        <div style="color: var(--dg-text-muted);">{{ $dept->description ?: 'No description provided' }}</div>
+                    </td>
+                    <td style="text-align: center;">
+                        <div class="action-btn-group">
+                            <button type="button"
+                                    class="action-btn"
+                                    onclick="openEditDeptPanel(this)"
+                                    data-id="{{ $dept->id }}"
+                                    data-name="{{ $dept->name }}"
+                                    data-desc="{{ $dept->description }}">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button type="button"
+                                    class="action-btn delete-btn"
+                                    onclick="deleteDepartment({{ $dept->id }}, '{{ addslashes($dept->name) }}')">
+                                <i class="fas fa-trash-can"></i> Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+    @endif
 </div>
 
-<div style="margin-top: 15px;">
-    {{ $designations->links() }}
-</div>
-@endif
-
-{{-- Slide-In Panel --}}
+{{-- Slide-In Panel for Designation --}}
 <div class="dg-panel-backdrop" id="panelBackdrop" onclick="closePanel()"></div>
 <div class="dg-panel" id="designationPanel">
     <div class="dg-panel-header">
@@ -499,6 +599,16 @@ body.dark-mode {
             <div class="form-group">
                 <label for="desgName">Designation Name <span>*</span></label>
                 <input type="text" id="desgName" name="name" class="form-control" placeholder="e.g. Senior Teacher, Receptionist..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="desgDept">Department <span>*</span></label>
+                <select id="desgDept" name="department_id" class="form-control" required>
+                    <option value="">Select Department...</option>
+                    @foreach($departments as $dept)
+                        <option value="{{ $dept->id }}">{{ $dept->name }}</option>
+                    @endforeach
+                </select>
             </div>
 
             <div class="form-group">
@@ -530,16 +640,71 @@ body.dark-mode {
     </div>
 </div>
 
+{{-- Slide-In Panel for Department --}}
+<div class="dg-panel" id="departmentPanel" style="z-index: 1001;">
+    <div class="dg-panel-header">
+        <div>
+            <h3 id="deptPanelTitle">Add Department</h3>
+            <p id="deptPanelSubtitle">Define a new staff department</p>
+        </div>
+        <button class="dg-panel-close" onclick="closeDeptPanel()">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <div class="dg-panel-body">
+        <form id="departmentForm">
+            <input type="hidden" id="deptId" name="id">
+            
+            <div class="form-group">
+                <label for="deptName">Department Name <span>*</span></label>
+                <input type="text" id="deptName" name="name" class="form-control" placeholder="e.g. Teaching, Non Teaching, Security Guard..." required>
+            </div>
+
+            <div class="form-group">
+                <label for="deptDesc">Description</label>
+                <textarea id="deptDesc" name="description" class="form-control" style="height: 100px; resize: none;" placeholder="Provide brief details about this department..."></textarea>
+            </div>
+        </form>
+    </div>
+
+    <div class="dg-panel-footer">
+        <button class="dg-panel-save" id="deptPanelSaveBtn" onclick="saveDepartment()">
+            <i class="fas fa-check"></i> Save Department
+        </button>
+        <button class="dg-panel-cancel" onclick="closeDeptPanel()">Cancel</button>
+    </div>
+</div>
+
 @endsection
 
 @section('scripts')
 <script>
 let isEditMode = false;
+let isDeptEditMode = false;
+
+function switchTab(tab) {
+    document.querySelectorAll('.dg-tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+
+    if (tab === 'designations') {
+        document.getElementById('section-designations').style.display = 'block';
+        document.getElementById('section-departments').style.display = 'none';
+        document.getElementById('addDesgBtn').style.display = 'block';
+        document.getElementById('addDeptBtn').style.display = 'none';
+    } else {
+        document.getElementById('section-designations').style.display = 'none';
+        document.getElementById('section-departments').style.display = 'block';
+        document.getElementById('addDesgBtn').style.display = 'none';
+        document.getElementById('addDeptBtn').style.display = 'block';
+    }
+}
 
 function openCreatePanel() {
     isEditMode = false;
     document.getElementById('desgId').value = '';
     document.getElementById('desgName').value = '';
+    document.getElementById('desgDept').value = '';
     document.getElementById('desgDesc').value = '';
     document.getElementById('desgRole').value = 'none';
 
@@ -554,11 +719,13 @@ function openEditPanel(btnEl) {
     isEditMode = true;
     const id = btnEl.getAttribute('data-id');
     const name = btnEl.getAttribute('data-name');
+    const dept = btnEl.getAttribute('data-dept');
     const desc = btnEl.getAttribute('data-desc');
     const role = btnEl.getAttribute('data-role');
 
     document.getElementById('desgId').value = id;
     document.getElementById('desgName').value = name;
+    document.getElementById('desgDept').value = dept === 'null' || !dept ? '' : dept;
     document.getElementById('desgDesc').value = desc === 'null' || !desc ? '' : desc;
     document.getElementById('desgRole').value = role;
 
@@ -576,12 +743,17 @@ function closePanel() {
 
 function saveDesignation() {
     const name = document.getElementById('desgName').value.trim();
+    const dept = document.getElementById('desgDept').value;
     const desc = document.getElementById('desgDesc').value.trim();
     const role = document.getElementById('desgRole').value;
     const id = document.getElementById('desgId').value;
 
     if (!name) {
         showToast('Please enter a designation name.');
+        return;
+    }
+    if (!dept) {
+        showToast('Please select a department.');
         return;
     }
 
@@ -601,6 +773,7 @@ function saveDesignation() {
         },
         body: JSON.stringify({
             name: name,
+            department_id: dept,
             description: desc,
             system_role: role
         })
@@ -653,6 +826,122 @@ function deleteDesignation(id, name) {
     })
     .catch(err => {
         showToast('Error deleting designation.');
+    });
+}
+
+// Department Functions
+function openCreateDeptPanel() {
+    isDeptEditMode = false;
+    document.getElementById('deptId').value = '';
+    document.getElementById('deptName').value = '';
+    document.getElementById('deptDesc').value = '';
+
+    document.getElementById('deptPanelTitle').textContent = 'Add Department';
+    document.getElementById('deptPanelSubtitle').textContent = 'Define a new staff department';
+
+    document.getElementById('panelBackdrop').classList.add('open');
+    document.getElementById('departmentPanel').classList.add('open');
+}
+
+function openEditDeptPanel(btnEl) {
+    isDeptEditMode = true;
+    const id = btnEl.getAttribute('data-id');
+    const name = btnEl.getAttribute('data-name');
+    const desc = btnEl.getAttribute('data-desc');
+
+    document.getElementById('deptId').value = id;
+    document.getElementById('deptName').value = name;
+    document.getElementById('deptDesc').value = desc === 'null' || !desc ? '' : desc;
+
+    document.getElementById('deptPanelTitle').textContent = 'Edit Department';
+    document.getElementById('deptPanelSubtitle').textContent = `Modify attributes for department: ${name}`;
+
+    document.getElementById('panelBackdrop').classList.add('open');
+    document.getElementById('departmentPanel').classList.add('open');
+}
+
+function closeDeptPanel() {
+    document.getElementById('panelBackdrop').classList.remove('open');
+    document.getElementById('departmentPanel').classList.remove('open');
+}
+
+function saveDepartment() {
+    const name = document.getElementById('deptName').value.trim();
+    const desc = document.getElementById('deptDesc').value.trim();
+    const id = document.getElementById('deptId').value;
+
+    if (!name) {
+        showToast('Please enter a department name.');
+        return;
+    }
+
+    const btn = document.getElementById('deptPanelSaveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    const url = isDeptEditMode
+        ? `{{ url('school/role-management/departments') }}/${id}/update`
+        : `{{ route('school.departments.store') }}`;
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            name: name,
+            description: desc
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message);
+            closeDeptPanel();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showToast(data.error || 'Failed to save department.');
+        }
+    })
+    .catch(err => {
+        showToast('Error saving department. Please try again.');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check"></i> Save Department';
+    });
+}
+
+function deleteDepartment(id, name) {
+    if (!confirm(`Are you sure you want to delete the department "${name}"?`)) {
+        return;
+    }
+
+    fetch(`{{ url('school/role-management/departments') }}/${id}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message);
+            const row = document.getElementById('dept-row-' + id);
+            if (row) row.remove();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            alert(data.error || 'Failed to delete department.');
+        }
+    })
+    .catch(err => {
+        showToast('Error deleting department.');
     });
 }
 
