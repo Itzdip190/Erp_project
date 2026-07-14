@@ -163,7 +163,7 @@ class StudentFeeDeletionTest extends TestCase
             'status' => 'paid',
         ]);
 
-        // Delete component
+        // Delete component (registers pending deletion)
         $response = $this->post(route('school.fees.basics'), [
             'action' => 'delete',
             'type' => 'component',
@@ -171,6 +171,16 @@ class StudentFeeDeletionTest extends TestCase
         ]);
 
         $response->assertSessionHas('success');
+
+        // Approve deletion request to actually delete
+        $pending = \App\Models\PendingDeletion::where('type', 'component')->where('target_id', $this->component->id)->first();
+        $this->assertNotNull($pending);
+        $approveResponse = $this->post(route('school.fees.basics'), [
+            'action' => 'approve_deletion',
+            'deletion_id' => $pending->id,
+            'status' => 'approve',
+        ]);
+        $approveResponse->assertSessionHas('success');
 
         // Unpaid fee should be deleted
         $this->assertDatabaseMissing('student_fees', [
@@ -227,7 +237,7 @@ class StudentFeeDeletionTest extends TestCase
             'status' => 'paid',
         ]);
 
-        // Delete transport component
+        // Delete transport component (registers pending deletion)
         $response = $this->post(route('school.fees.basics'), [
             'action' => 'delete',
             'type' => 'component',
@@ -235,6 +245,16 @@ class StudentFeeDeletionTest extends TestCase
         ]);
 
         $response->assertSessionHas('success');
+
+        // Approve deletion request to actually delete
+        $pending = \App\Models\PendingDeletion::where('type', 'component')->where('target_id', $transportComponent->id)->first();
+        $this->assertNotNull($pending);
+        $approveResponse = $this->post(route('school.fees.basics'), [
+            'action' => 'approve_deletion',
+            'deletion_id' => $pending->id,
+            'status' => 'approve',
+        ]);
+        $approveResponse->assertSessionHas('success');
 
         // Check student opted out
         $this->student->refresh();

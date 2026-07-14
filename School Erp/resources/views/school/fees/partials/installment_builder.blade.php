@@ -538,6 +538,22 @@
             renderTable();
         }
 
+        function serializeInstallments() {
+            const rows = tableBody.querySelectorAll('.ib-row');
+            const finalInstallments = [];
+            rows.forEach(row => {
+                finalInstallments.push({
+                    installment_no: parseInt(row.getAttribute('data-no')),
+                    name: row.querySelector('.ib-name-input').value,
+                    start_date: row.querySelector('.ib-start-input').value,
+                    end_date: row.querySelector('.ib-end-input').value,
+                    due_date: row.querySelector('.ib-end-input').value, // end_date is forced as due_date
+                    grace_days: parseInt(row.querySelector('.ib-grace-input').value) || 0
+                });
+            });
+            hiddenSerialized.value = JSON.stringify(finalInstallments);
+        }
+
         function renderTable() {
             tableBody.innerHTML = '';
             installments.forEach(inst => {
@@ -561,6 +577,7 @@
                 `;
                 tableBody.appendChild(tr);
             });
+            serializeInstallments();
         }
 
         function formatDate(date) {
@@ -581,6 +598,7 @@
 
         window.ibHandleEdit = function() {
             isManuallyEdited = true;
+            serializeInstallments();
         };
 
         // EXPOSED GLOBAL LOADER FOR EDIT MODALS

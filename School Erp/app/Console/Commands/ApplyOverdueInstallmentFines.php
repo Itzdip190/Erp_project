@@ -68,7 +68,6 @@ class ApplyOverdueInstallmentFines extends Command
                     foreach ($studentFees as $sf) {
                         $fineAmount = $finePolicy->calculateFor($sf, $inst['due_date'], $graceDays);
                         if ($fineAmount > 0) {
-                            $sf->amount += $fineAmount;
                             $sf->fine_amount_applied = $fineAmount;
                             $sf->fine_applied_at = now();
                             $sf->save();
@@ -115,7 +114,6 @@ class ApplyOverdueInstallmentFines extends Command
                     foreach ($studentFees as $sf) {
                         $fineAmount = $finePolicy->calculateFor($sf, $inst['due_date'], $graceDays);
                         if ($fineAmount > 0) {
-                            $sf->amount += $fineAmount;
                             $sf->fine_amount_applied = $fineAmount;
                             $sf->fine_applied_at = now();
                             $sf->save();

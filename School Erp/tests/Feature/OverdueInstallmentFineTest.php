@@ -109,16 +109,18 @@ class OverdueInstallmentFineTest extends TestCase
         (new \App\Console\Commands\ApplyOverdueInstallmentFines())->handle();
 
         $studentFee->refresh();
-        $this->assertEquals(1150.00, $studentFee->amount); // 1000 + 150 fine
+        $this->assertEquals(1000.00, $studentFee->amount); // Base remains 1000
         $this->assertEquals(150.00, $studentFee->fine_amount_applied);
+        $this->assertEquals(1150.00, floatval($studentFee->amount) + floatval($studentFee->fine_amount_applied));
         $this->assertNotNull($studentFee->fine_applied_at);
 
         // Run it a second time
         (new \App\Console\Commands\ApplyOverdueInstallmentFines())->handle();
 
         $studentFee->refresh();
-        $this->assertEquals(1150.00, $studentFee->amount); // Should NOT add fine again
+        $this->assertEquals(1000.00, $studentFee->amount); // Base remains 1000
         $this->assertEquals(150.00, $studentFee->fine_amount_applied);
+        $this->assertEquals(1150.00, floatval($studentFee->amount) + floatval($studentFee->fine_amount_applied));
         
         Carbon::setTestNow();
     }
@@ -144,16 +146,14 @@ class OverdueInstallmentFineTest extends TestCase
 
         $studentFee->refresh();
         $this->assertEquals(1000.00, $studentFee->amount); // No fine
-        $this->assertNull($studentFee->fine_applied_at);
+        $this->assertEquals(0, floatval($studentFee->fine_amount_applied));
 
         Carbon::setTestNow();
     }
 
     public function test_fine_not_applied_to_paid_or_cancelled_installments(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-06'));
-
-        // Paid fee
+        // 1. Create paid student fee
         $paidFee = StudentFee::create([
             'school_id' => $this->schoolAdmin->school_id,
             'student_id' => $this->student->id,
@@ -167,63 +167,62 @@ class OverdueInstallmentFineTest extends TestCase
             'status' => 'paid',
         ]);
 
-        // Cancelled fee
+        // 2. Create cancelled student fee
         $cancelledFee = StudentFee::create([
             'school_id' => $this->schoolAdmin->school_id,
             'student_id' => $this->student->id,
             'fee_category_id' => $this->category->id,
             'fee_schedule_id' => $this->schedule->id,
             'fee_component_id' => $this->component->id,
-            'installment_no' => 1,
+            'installment_no' => 2,
             'amount' => 1000.00,
             'due_date' => '2026-04-30',
             'status' => 'pending',
-            'invoice_status' => 'cancelled',
         ]);
+        $cancelledFee->invoice_status = 'cancelled';
+        $cancelledFee->save();
+
+        Carbon::setTestNow(Carbon::parse('2026-05-10'));
 
         (new \App\Console\Commands\ApplyOverdueInstallmentFines())->handle();
 
         $paidFee->refresh();
-        $this->assertEquals(1000.00, $paidFee->amount);
-        $this->assertNull($paidFee->fine_applied_at);
-
         $cancelledFee->refresh();
-        $this->assertEquals(1000.00, $cancelledFee->amount);
-        $this->assertNull($cancelledFee->fine_applied_at);
 
-        Carbon::setTestNow();
+        $this->assertEquals(1000.00, $paidFee->amount);
+        $this->assertEquals(0, floatval($paidFee->fine_amount_applied));
+
+        $this->assertEquals(1000.00, $cancelledFee->amount);
+        $this->assertEquals(0, floatval($cancelledFee->fine_amount_applied));
     }
 
     public function test_daily_fine_type(): void
     {
-        // Daily fine configuration
+        // 1. Create a daily fine policy
         $dailyFine = FeeFine::create([
             'school_id' => $this->schoolAdmin->school_id,
-            'academic_session_id' => $this->session->id,
-            'name' => 'Overdue Daily Fine',
+            'academic_session_id' => $this->schedule->academic_session_id,
+            'name' => 'Daily Fine',
             'fine_type' => 'Daily',
             'fine_amount' => 10.00, // 10 per day overdue
-            'default_grace_days' => 5,
             'status' => true,
+            'default_grace_days' => 0,
         ]);
 
         $dailySchedule = FeeSchedule::create([
             'school_id' => $this->schoolAdmin->school_id,
-            'academic_session_id' => $this->session->id,
+            'academic_session_id' => $this->schedule->academic_session_id,
             'name' => 'Daily Tuition Schedule',
             'classes' => 'Class 1',
             'installment_type' => 'custom',
             'fine_id' => $dailyFine->id,
-            'start_date' => $this->session->start_date->toDateString(),
-            'end_date' => $this->session->end_date->toDateString(),
+            'start_date' => '2026-04-01',
+            'end_date' => '2026-04-30',
             'installments' => [
                 [
                     'installment_no' => 1,
-                    'name' => 'Installment 1',
-                    'start_date' => '2026-04-01',
-                    'end_date' => '2026-04-30',
                     'due_date' => '2026-04-30',
-                    'grace_days' => 5,
+                    'grace_days' => 0,
                 ]
             ]
         ]);
@@ -247,9 +246,10 @@ class OverdueInstallmentFineTest extends TestCase
 
         $studentFee->refresh();
         // 10 days overdue * 10 fine amount = 100 fine applied.
-        $this->assertEquals(1100.00, $studentFee->amount);
+        $this->assertEquals(1000.00, $studentFee->amount); // Base remains 1000
         $this->assertEquals(100.00, $studentFee->fine_amount_applied);
-
+        $this->assertEquals(1100.00, floatval($studentFee->amount) + floatval($studentFee->fine_amount_applied));
+        
         Carbon::setTestNow();
     }
 }
