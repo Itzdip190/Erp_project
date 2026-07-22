@@ -203,9 +203,9 @@ class ReportsController extends Controller
         $receipts = $receiptQuery->orderByDesc('payment_date')->get();
 
         $totalCollected = $receipts->sum('amount_paid');
-        $totalPending   = StudentFee::where('school_id', $schoolId)
-            ->whereRaw('amount - paid_amount - COALESCE(instant_discount_amount, 0) > 0')
-            ->sum(DB::raw('amount - paid_amount - COALESCE(instant_discount_amount, 0)'));
+        $schoolPendingChequesTotal = (float) \App\Models\PendingCheque::where('school_id', $schoolId)->where('status', 'pending')->sum('amount');
+        $totalPending   = max(0.00, StudentFee::where('school_id', $schoolId)
+            ->sum(DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
         $totalRefunded  = 0;
         $receiptCount   = $receipts->count();
 
@@ -231,10 +231,13 @@ class ReportsController extends Controller
             $paid    = FeeReceipt::where('school_id', $schoolId)
                 ->whereHas('student', fn($q) => $q->where('class_id', $cls->id))
                 ->sum('amount_paid');
-            $pending = StudentFee::where('school_id', $schoolId)
-                ->whereRaw('amount - paid_amount - COALESCE(instant_discount_amount, 0) > 0')
+            $classPendingCheques = (float) \App\Models\PendingCheque::where('school_id', $schoolId)
+                ->where('status', 'pending')
                 ->whereHas('student', fn($q) => $q->where('class_id', $cls->id))
-                ->sum(DB::raw('amount - paid_amount - COALESCE(instant_discount_amount, 0)'));
+                ->sum('amount');
+            $pending = max(0.00, StudentFee::where('school_id', $schoolId)
+                ->whereHas('student', fn($q) => $q->where('class_id', $cls->id))
+                ->sum(DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $classPendingCheques);
             return [
                 'class'   => $cls->name,
                 'paid'    => $paid,
@@ -913,7 +916,7 @@ class ReportsController extends Controller
                 foreach ($discountRows as $disc) {
                     $targetInst = $disc->installment_no ? 'Applies to: Installment ' . $disc->installment_no : 'Applies to: All Installments';
                     $formattedRemarks = ($disc->remarks ? $disc->remarks . ' · ' : '') . $targetInst;
-                    $formattedAmount = isset($disc->type) && $disc->type === 'percentage' ? number_format($disc->amount, 0) . '%' : '₹ ' . number_format($disc->amount, 2);
+                    $formattedAmount = isset($disc->type) && $disc->type === 'percentage' ? (float)$disc->amount . '%' : '₹ ' . number_format($disc->amount, 2);
 
                     $studentIds = $disc->student_ids ? json_decode($disc->student_ids, true) : [];
                     if (!empty($studentIds)) {

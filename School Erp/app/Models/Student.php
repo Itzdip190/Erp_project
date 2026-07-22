@@ -13,6 +13,19 @@ class Student extends Model
 {
     use HasFactory, SoftDeletes, BelongsToSchool;
 
+    protected static function booted()
+    {
+        static::saved(function ($student) {
+            if ($student->wasRecentlyCreated || $student->wasChanged(['class_id', 'section_id', 'boarding_type', 'fee_schedule_id'])) {
+                try {
+                    \App\Http\Controllers\School\FeeManagementController::syncStudentClassFees($student);
+                } catch (\Exception $e) {
+                    // Ignore exceptions during console commands/migrations/seeding
+                }
+            }
+        });
+    }
+
     protected $fillable = [
         'school_id',
         'user_id',
@@ -179,6 +192,8 @@ class Student extends Model
         'transport_pickup_time',
         'transport_drop_time',
         'transport_calendar_start',
+        'is_alumni',
+        'is_transfer',
     ];
 
     protected $casts = [
@@ -202,6 +217,8 @@ class Student extends Model
         'transport_pick_fare' => 'decimal:2',
         'transport_drop_fare' => 'decimal:2',
         'transport_calendar_start' => 'date',
+        'is_alumni' => 'boolean',
+        'is_transfer' => 'boolean',
     ];
 
     protected $appends = [

@@ -59,13 +59,17 @@ class ApplyOverdueInstallmentFines extends Command
 
                 if ($today->gt($graceDate)) {
                     // Installment is overdue past the grace period!
-                    $studentFees = StudentFee::where('fee_schedule_id', $sched->id)
+                    $studentFees = StudentFee::where('school_id', $sched->school_id)
+                        ->where('fee_schedule_id', $sched->id)
                         ->where('installment_no', $inst['installment_no'])
                         ->where('status', '!=', 'paid')
                         ->whereNull('fine_applied_at')
                         ->get();
 
                     foreach ($studentFees as $sf) {
+                        if ($finePolicy->fee_component_id !== null && $finePolicy->fee_component_id !== $sf->fee_component_id) {
+                            continue;
+                        }
                         $fineAmount = $finePolicy->calculateFor($sf, $inst['due_date'], $graceDays);
                         if ($fineAmount > 0) {
                             $sf->fine_amount_applied = $fineAmount;
@@ -105,13 +109,17 @@ class ApplyOverdueInstallmentFines extends Command
 
                 if ($today->gt($graceDate)) {
                     // Installment is overdue past the grace period!
-                    $studentFees = StudentFee::where('transport_fee_schedule_id', $sched->id)
+                    $studentFees = StudentFee::where('school_id', $sched->school_id)
+                        ->where('transport_fee_schedule_id', $sched->id)
                         ->where('installment_no', $inst['installment_no'])
                         ->where('status', '!=', 'paid')
                         ->whereNull('fine_applied_at')
                         ->get();
 
                     foreach ($studentFees as $sf) {
+                        if ($finePolicy->fee_component_id !== null && $finePolicy->fee_component_id !== $sf->fee_component_id) {
+                            continue;
+                        }
                         $fineAmount = $finePolicy->calculateFor($sf, $inst['due_date'], $graceDays);
                         if ($fineAmount > 0) {
                             $sf->fine_amount_applied = $fineAmount;

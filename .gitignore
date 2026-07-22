@@ -22,3 +22,15 @@ CODEBASE_MEMORY.md
 local.properties
 .DS_Store
 Thumbs.db
+
+# Ignore temp_extract directory
+temp_extract/
+
+# Ignore local uploads
+School Erp/public/uploads/
+
+# Ignore debug files
+School Erp/public/debug_mapper.txt
+School Erp/public/debug_payment.txt
+School Erp/public/test_transport_generation.php
+

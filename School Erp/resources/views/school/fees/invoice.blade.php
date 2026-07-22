@@ -255,7 +255,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 1000;
+        z-index: 10000;
         opacity: 0;
         pointer-events: none;
         transition: opacity 0.25s ease;
@@ -447,6 +447,50 @@
     }
     @keyframes spin {
         to { transform: rotate(360deg); }
+    }
+
+    /* Responsive adjustments for premium high-end feel */
+    @media (max-width: 992px) {
+        .inv-modal {
+            width: calc(100% - 32px);
+            margin: 16px;
+            max-height: 92vh;
+        }
+        .inv-inst-hdr {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+        }
+        .inv-inst-actions {
+            width: 100%;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .class-selector-card {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .class-selector-group {
+            width: 100%;
+            min-width: 0;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .inv-student-meta {
+            grid-template-columns: 1fr;
+            gap: 8px;
+            padding: 12px;
+        }
+        .inv-search-wrap {
+            width: 100%;
+            min-width: 0;
+        }
     }
 </style>
 @endsection
@@ -659,13 +703,18 @@
                     data.invoices.forEach(inv => {
                         const statusClass = getStatusClass(inv.status);
                         const isCancelled = inv.status === 'cancelled';
+                        const isTransport = inv.is_transport === true;
+                        const transportBadge = isTransport 
+                            ? `<span style="font-size:0.68rem; background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; border-radius:4px; padding:1px 7px; font-weight:700; margin-left:6px;"><i class="fas fa-bus" style="margin-right:3px;"></i>Transport</span>`
+                            : '';
                         
                         html += `
-                            <div class="inv-inst-card">
+                            <div class="inv-inst-card" style="${isTransport ? 'border-left: 3px solid #16a34a;' : ''}">
                                 <div class="inv-inst-hdr">
                                     <div class="inv-inst-title">
-                                        <span>Installment ${inv.installment_no}</span>
-                                        <span class="inv-badge ${statusClass}">${inv.status}</span>
+                                        <span>${inv.installment_label || ('Installment ' + inv.installment_no)}</span>
+                                        ${transportBadge}
+                                        <span class="inv-badge ${statusClass}">${inv.status.replace('_', ' ')}</span>
                                     </div>
                                     <div class="inv-inst-amounts">
                                         Total: ₹${Number(inv.total).toFixed(0)} &nbsp;|&nbsp; 
@@ -679,7 +728,7 @@
                                            class="inv-btn-print">
                                             <i class="fas fa-print"></i> Print Invoice
                                         </a>
-                                        ${!(isCancelled || inv.status === 'refunded') ? `
+                                        ${!(isCancelled || inv.status === 'refunded' || inv.status === 'bounced' || inv.invoice_status === 'bounced') ? `
                                             <button class="inv-btn-cancel" onclick="cancelInvoiceAjax('${inv.invoice_no}', ${inv.installment_no}, ${data.student.id})">
                                                 <i class="fas fa-ban"></i> Cancel Invoice
                                             </button>
@@ -699,7 +748,7 @@
                                         </thead>
                                         <tbody>
                                             ${inv.components.map(comp => `
-                                                <tr style="${comp.status === 'refunded' ? 'background:#faf5ff;' : ''}">
+                                                <tr style="${comp.status === 'refunded' ? 'background:#faf5ff;' : (comp.is_transport ? 'background:#f0fdf4;' : '')}">
                                                     <td style="font-weight:600; text-align:left;">
                                                         ${comp.name}
                                                         ${comp.status === 'refunded' ? '<span style="font-size:0.65rem; background:#f3e8ff; color:#7e22ce; border:1px solid #e9d5ff; border-radius:4px; padding:1px 4px; margin-left:6px; font-weight:700;"><i class="fas fa-undo"></i> Refunded</span>' : ''}
@@ -801,6 +850,22 @@
 
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape') closeModal();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const studentId = urlParams.get('student_id');
+        if (studentId) {
+            const student = allStudents.find(st => st.id == studentId);
+            if (student) {
+                const selectElement = document.getElementById('classFilterSelect');
+                if (selectElement && student.class_id) {
+                    selectElement.value = student.class_id;
+                    loadClassStudents(student.class_id);
+                }
+                viewInvoices(student.id);
+            }
+        }
     });
 </script>
 @endsection

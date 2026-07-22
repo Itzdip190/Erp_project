@@ -6,6 +6,40 @@
 @section('styles')
 <style>
     /* Main container styling in Blue and White */
+    :root {
+        --inv-primary: #1e3a8a;
+        --inv-primary-light: #eff6ff;
+        --inv-accent: #d97706;
+        --inv-dark: #0f172a;
+        --inv-border: #cbd5e1;
+        --inv-green: #16a34a;
+        --inv-red: #dc2626;
+        --inv-purple: #7e22ce;
+    }
+
+    .inv-header {
+        background: linear-gradient(135deg, var(--inv-primary) 0%, #1d4ed8 100%);
+        padding: 24px 32px;
+        border-radius: 16px;
+        margin-bottom: 24px;
+        color: white;
+        box-shadow: 0 4px 20px rgba(30, 58, 138, 0.15);
+    }
+    .inv-header h1 {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.65rem;
+        font-weight: 800;
+        margin: 0 0 6px 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .inv-header p {
+        color: #93c5fd;
+        font-size: 0.88rem;
+        margin: 0;
+    }
+
     .invoice1-container {
         font-family: 'Inter', sans-serif;
         background: #f8fafc;
@@ -17,36 +51,41 @@
     .filter-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
-        gap: 12px;
-        margin-bottom: 20px;
+        gap: 16px;
+        margin-bottom: 24px;
     }
 
     .filter-card {
         position: relative;
         background: #ffffff;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        padding: 8px 12px;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 12px 14px;
         display: flex;
         align-items: center;
-        gap: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        gap: 10px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s;
+    }
+    .filter-card:focus-within {
+        border-color: #1d4ed8;
+        box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.1);
     }
     .filter-label {
         position: absolute;
         top: -8px;
-        left: 10px;
-        background: #f8fafc; /* matches content container background */
-        padding: 0 5px;
+        left: 12px;
+        background: #ffffff;
+        padding: 0 6px;
         font-size: 10px;
         font-weight: 800;
-        color: #2563eb;
+        color: #1e3a8a;
         text-transform: uppercase;
-        letter-spacing: 0.4px;
+        letter-spacing: 0.5px;
     }
     .filter-card i.filter-icon {
         font-size: 14px;
-        color: #3b82f6;
+        color: #1d4ed8;
         flex-shrink: 0;
     }
     .filter-card select {
@@ -54,9 +93,9 @@
         border: none;
         background: transparent;
         outline: none;
-        font-size: 13px;
+        font-size: 0.9rem;
+        font-weight: 700;
         color: #0f172a;
-        font-weight: 600;
         cursor: pointer;
         -webkit-appearance: none;
         -moz-appearance: none;
@@ -69,7 +108,7 @@
         font-family: 'Font Awesome 6 Free';
         font-weight: 900;
         font-size: 9px;
-        color: #3b82f6;
+        color: #1d4ed8;
         position: absolute;
         right: 12px;
         pointer-events: none;
@@ -78,20 +117,20 @@
     /* Table Container & Utilities */
     .table-container-card {
         background: #ffffff;
-        border-radius: 10px;
+        border-radius: 16px;
         border: 1px solid #cbd5e1;
-        box-shadow: 0 4px 16px rgba(37, 99, 235, 0.04);
+        box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.05);
         overflow: hidden;
         margin-bottom: 20px;
     }
 
     .table-utility-bar {
-        background: #1e3a8a; /* Deep Blue */
-        padding: 12px 18px;
+        background: #f8fafc;
+        padding: 14px 20px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+        border-bottom: 1px solid #cbd5e1;
     }
     .utility-left-actions {
         display: flex;
@@ -100,7 +139,7 @@
     .utility-btn {
         background: transparent;
         border: none;
-        color: #ffffff;
+        color: #64748b;
         font-size: 11px;
         font-weight: 800;
         cursor: pointer;
@@ -112,7 +151,7 @@
         transition: color 0.2s;
     }
     .utility-btn:hover {
-        color: #93c5fd;
+        color: #1e3a8a;
     }
     .utility-btn i {
         font-size: 12px;
@@ -128,26 +167,26 @@
         border-collapse: collapse;
     }
     table.fee-datagrid th {
-        background: #1e3a8a; /* Deep Blue */
-        color: #ffffff;
-        padding: 12px 16px;
-        font-size: 11px;
-        font-weight: 800;
+        background: #f8fafc;
+        color: #64748b;
+        padding: 14px 20px;
+        font-size: 0.78rem;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.6px;
+        letter-spacing: 0.5px;
         text-align: left;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+        border-bottom: 1.5px solid #cbd5e1;
     }
     table.fee-datagrid td {
-        padding: 13px 16px;
+        padding: 14px 20px;
         font-size: 13.5px;
         color: #0f172a;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid #f1f5f9;
         background: #ffffff;
         vertical-align: middle;
     }
     table.fee-datagrid tr:hover td {
-        background: #f1f5f9;
+        background: #f8fafc;
     }
 
     /* Serial number styling */
@@ -198,7 +237,7 @@
     .table-footer {
         padding: 14px 20px;
         background: #ffffff;
-        border-top: 1px solid #e2e8f0;
+        border-top: 1px solid #cbd5e1;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -291,7 +330,7 @@
     .search-row {
         background: #ffffff;
         padding: 14px 18px;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid #cbd5e1;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -305,10 +344,10 @@
         padding: 8px 14px 8px 36px;
         font-size: 13px;
         border: 1px solid #cbd5e1;
-        border-radius: 6px;
+        border-radius: 8px;
         outline: none;
         color: #0f172a;
-        font-weight: 500;
+        font-weight: 600;
     }
     .search-input-wrap input:focus {
         border-color: #2563eb;
@@ -427,15 +466,34 @@
         border-color: #2563eb !important;
         color: #ffffff !important;
     }
+
+    .inv-btn-eye {
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1d4ed8;
+        padding: 6px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+    .inv-btn-eye:hover {
+        background: #1d4ed8;
+        color: white;
+        border-color: #1d4ed8;
+        transform: scale(1.03);
+    }
 </style>
 @endsection
 
 @section('content')
-<div class="page-hdr">
-    <div class="page-hdr-left">
-        <h1><i class="fas fa-file-invoice" style="color:var(--gold);margin-right:8px;"></i>Fee Invoice 1</h1>
-        <p>Manage and generate installment fee invoices for students</p>
-    </div>
+<div class="inv-header">
+    <h1><i class="fas fa-file-invoice-dollar"></i> Fee Invoice 1</h1>
+    <p>Manage and generate installment fee invoices for students</p>
 </div>
 
 <div class="invoice1-container">
@@ -566,7 +624,7 @@
                 <input type="text" id="grid_search" placeholder="Search by student, admission ID...">
             </div>
             <div style="font-size: 12.5px; color: #475569; font-weight: 600;">
-                Select rows to generate invoices.
+                Filter students to view their invoices.
             </div>
         </div>
 
@@ -575,18 +633,12 @@
             <table class="fee-datagrid">
                 <thead>
                     <tr>
-                        <th class="checkbox-col">
-                            <input type="checkbox" class="custom-checkbox" id="check_all_rows">
-                        </th>
+                        <th style="width: 60px;">#</th>
                         <th>Admission ID</th>
                         <th>Student Name</th>
                         <th>Father's Name</th>
-                        <th>Class</th>
-                        <th>Fee Schedule</th>
-                        <th>Installment</th>
-                        <th>Component</th>
-                        <th>Amount</th>
-                        <th>Fee Invoice No.</th>
+                        <th>Class & Section</th>
+                        <th style="text-align: center; width: 180px;">Action</th>
                     </tr>
                 </thead>
                 <tbody id="grid_tbody">
@@ -623,6 +675,19 @@
         </div>
         <div style="flex:1; background:#f1f5f9; position:relative; padding: 2px;">
             <iframe id="invoiceIframe" src="" style="width:100%; height:100%; border:none; background:#ffffff; border-radius: 0 0 12px 12px;"></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- Student Transport Invoices Modal -->
+<div class="modal-overlay" id="studentTransportInvoicesModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); z-index:9999; justify-content:center; align-items:center; backdrop-filter:blur(6px); transition: all 0.3s ease;">
+    <div style="background:#ffffff; width:90%; max-width:650px; max-height:85vh; border-radius:16px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); border: 1px solid #e2e8f0; animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);">
+        <div style="padding:18px 24px; background:#1e3a8a; border-bottom:1px solid #cbd5e1; display:flex; justify-content:space-between; align-items:center; color:#ffffff;">
+            <h3 style="margin:0; font-family:'Plus Jakarta Sans',sans-serif; color:#ffffff; font-size:16px; font-weight:800; display:flex; align-items:center; gap:8px;"><i class="fas fa-bus"></i> Transport Invoices — <span id="transportModalStudentName">Student</span></h3>
+            <button onclick="closeTransportInvoicesModal()" style="background:rgba(255,255,255,0.15); border:none; color:white; font-size:14px; width:28px; height:28px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;" onmouseover="this.style.background='#fee2e2'; this.style.color='#ef4444'" onmouseout="this.style.background='rgba(255,255,255,0.15)'; this.style.color='white'"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div style="flex:1; padding:24px; overflow-y:auto; background:#f8fafc;" id="transportInvoicesContent">
+            <!-- Loaded dynamically -->
         </div>
     </div>
 </div>
@@ -773,64 +838,31 @@
         let html = '';
         if (data.length === 0) {
             html = `<tr>
-                <td colspan="10" style="text-align: center; padding: 40px; color: #64748b;">
+                <td colspan="6" style="text-align: center; padding: 40px; color: #64748b;">
                     <i class="fas fa-box-open" style="font-size: 36px; display: block; margin-bottom: 12px; color: #94a3b8;"></i>
-                    No fee dues found matching the selected filters.
+                    No students found matching the selected filters.
                 </td>
             </tr>`;
         } else {
             data.forEach((row, index) => {
                 let formattedIdx = String(startFrom + index).padStart(2, '0');
-                let fatherName = row.father_name || '';
-                let className = row.class_name ? `${row.class_name} - ${row.section_name || ''}` : '';
-                let scheduleName = row.schedule_name || '';
+                let fatherName = row.father_name || '—';
+                let className = row.class_name ? `${row.class_name} - ${row.section_name || ''}` : '—';
                 
-                // Capitalize installment strings/numbers nicely
-                let installment = row.installment_no;
-                if (row.component_name && row.component_name.toLowerCase().includes('transport')) {
-                    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                    let mIndex = parseInt(installment) - 1;
-                    if (mIndex >= 0 && mIndex < 12) {
-                        installment = months[mIndex];
-                    } else {
-                        installment = `Month ${installment}`;
-                    }
-                } else {
-                    if (!isNaN(installment)) {
-                        installment = `Installment ${installment}`;
-                    } else if (installment) {
-                        installment = installment.charAt(0).toUpperCase() + installment.slice(1);
-                    } else {
-                        installment = 'N/A';
-                    }
-                }
-
-                let invoiceTag = row.invoice_no 
-                    ? `<a href="javascript:void(0);" onclick="openInvoiceModal('${row.invoice_no}', '${row.student_id}')" class="invoice-tag" style="text-decoration:none;"><i class="fas fa-print" style="margin-right:4px;"></i> ${row.invoice_no}</a>`
-                    : `<span class="no-invoice-tag">—</span>`;
-
-                // If invoice already exists, disable checking this row to prevent generating twice
-                let checkboxInput = row.invoice_no
-                    ? `<input type="checkbox" class="custom-checkbox row-checkbox" value="${row.fee_id}" disabled>`
-                    : `<input type="checkbox" class="custom-checkbox row-checkbox" value="${row.fee_id}">`;
-
                 html += `<tr>
-                    <td class="checkbox-col">${checkboxInput}</td>
-                    <td>
-                        <span class="row-index">${formattedIdx}.</span>
-                        <span class="admission-id-text">${row.admission_id}</span>
-                    </td>
+                    <td><span class="row-index">${formattedIdx}.</span></td>
+                    <td><span class="admission-id-text">${row.admission_id}</span></td>
                     <td style="font-weight:600;">
                         <div>${row.student_name}</div>
                         ${row.transport_route ? `<div style="font-size:11px; color:#2563eb; font-weight:700; margin-top:3px;"><i class="fas fa-route"></i> ${row.transport_route}</div>` : ''}
                     </td>
                     <td>${fatherName}</td>
                     <td>${className}</td>
-                    <td>${scheduleName}</td>
-                    <td>${installment}</td>
-                    <td>${row.component_name || 'Late Fine'}</td>
-                    <td class="amount-text">₹ ${Number(row.amount).toLocaleString('en-IN', {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
-                    <td>${invoiceTag}</td>
+                    <td style="text-align: center;">
+                        <button class="inv-btn-eye" onclick="showStudentTransportInvoices(${row.student_id}, '${row.student_name.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-eye"></i> View Invoices
+                        </button>
+                    </td>
                 </tr>`;
             });
         }
@@ -944,6 +976,118 @@
     function closeInvoiceModal() {
         $('#invoiceModal').hide();
         $('#invoiceIframe').attr('src', '');
+    }
+
+    function showStudentTransportInvoices(studentId, studentName) {
+        $('#transportModalStudentName').text(studentName);
+        $('#transportInvoicesContent').html(`
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px; gap:12px; color:#64748b;">
+                <div class="spinner"></div>
+                Loading transport invoices...
+            </div>
+        `);
+        $('#studentTransportInvoicesModal').css('display', 'flex');
+
+        fetch(`/school/fees/student-invoices/${studentId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    let html = '';
+                    
+                    let transportInvoices = [];
+                    data.invoices.forEach(inv => {
+                        let hasTransport = false;
+                        let transportPaid = 0;
+                        let transportAmount = 0;
+                        
+                        inv.components.forEach(comp => {
+                            if (comp.name.toLowerCase().includes('transport')) {
+                                hasTransport = true;
+                                transportPaid += Number(comp.paid);
+                                transportAmount += Number(comp.amount);
+                            }
+                        });
+                        
+                        if (hasTransport) {
+                            transportInvoices.push({
+                                invoice_no: inv.invoice_no,
+                                installment_no: inv.installment_no,
+                                amount: transportAmount,
+                                paid: transportPaid,
+                                status: inv.status
+                            });
+                        }
+                    });
+
+                    if (transportInvoices.length > 0) {
+                        html += `<div style="overflow-x:auto;">
+                            <table style="width:100%; border-collapse:collapse; background:#ffffff; border-radius:12px; border:1px solid #cbd5e1; overflow:hidden;">
+                                <thead>
+                                    <tr style="background:#f8fafc; border-bottom:1.5px solid #cbd5e1;">
+                                        <th style="padding:12px 16px; text-align:left; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Installment</th>
+                                        <th style="padding:12px 16px; text-align:left; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Invoice No.</th>
+                                        <th style="padding:12px 16px; text-align:right; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Amount</th>
+                                        <th style="padding:12px 16px; text-align:right; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Paid</th>
+                                        <th style="padding:12px 16px; text-align:center; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                        
+                        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                        
+                        transportInvoices.forEach(inv => {
+                            let instName = inv.installment_no;
+                            if (!isNaN(instName)) {
+                                let mIdx = parseInt(instName) - 1;
+                                if (mIdx >= 0 && mIdx < 12) {
+                                    instName = months[mIdx];
+                                } else {
+                                    instName = `Month ${instName}`;
+                                }
+                            }
+                            
+                            let statusClass = inv.status.toLowerCase();
+                            let badgeColor = 'background:#fef3c7; color:#d97706; border:1px solid #fde68a;';
+                            if (statusClass === 'paid') {
+                                badgeColor = 'background:#dcfce7; color:#16a34a; border:1px solid #bbf7d0;';
+                            } else if (statusClass === 'cancelled') {
+                                badgeColor = 'background:#fef2f2; color:#991b1b; border:1px solid #fca5a5;';
+                            }
+                            
+                            html += `<tr style="border-bottom:1px solid #f1f5f9;">
+                                <td style="padding:12px 16px; font-weight:700; color:#1e3a8a;">${instName}</td>
+                                <td style="padding:12px 16px; font-weight:600; color:#475569;">${inv.invoice_no}</td>
+                                <td style="padding:12px 16px; text-align:right; font-weight:600; color:#0f172a;">₹${Number(inv.amount).toLocaleString('en-IN')}</td>
+                                <td style="padding:12px 16px; text-align:right; font-weight:700; color:#16a34a;">₹${Number(inv.paid).toLocaleString('en-IN')}</td>
+                                <td style="padding:12px 16px; text-align:center;">
+                                    <span style="font-size:10px; font-weight:800; padding:4px 8px; border-radius:6px; text-transform:uppercase; ${badgeColor}">
+                                        ${inv.status}
+                                    </span>
+                                </td>
+                            </tr>`;
+                        });
+                        
+                        html += `</tbody></table></div>`;
+                    } else {
+                        html += `<div style="text-align:center; padding:30px; color:#64748b;">
+                            <i class="fas fa-info-circle" style="font-size:24px; color:#cbd5e1; display:block; margin-bottom:8px;"></i>
+                            No paid transport invoices found for this student.
+                        </div>`;
+                    }
+                    
+                    $('#transportInvoicesContent').html(html);
+                } else {
+                    $('#transportInvoicesContent').html(`<div style="color:#ef4444; font-weight:700; text-align:center; padding:20px;">Could not retrieve invoices list.</div>`);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                $('#transportInvoicesContent').html(`<div style="color:#ef4444; font-weight:700; text-align:center; padding:20px;">Network error loading invoices.</div>`);
+            });
+    }
+
+    function closeTransportInvoicesModal() {
+        $('#studentTransportInvoicesModal').css('display', 'none');
     }
 </script>
 @endsection

@@ -182,15 +182,18 @@ class SchoolDashboardController extends Controller
         }
 
         // Till Date (due_date <= today) Collected vs Due
+        $schoolPendingChequesTotal = (float) \App\Models\PendingCheque::where('school_id', $schoolId)->where('status', 'pending')->sum('amount');
+
+        // Till Date (due_date <= today) Collected vs Due
         $feeCollectedAmount = (float) StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->sum('paid_amount');
-        $feeDueAmount = (float) StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->whereColumn('amount', '>', 'paid_amount')->sum(\DB::raw('amount - paid_amount'));
+        $feeDueAmount = max(0.00, (float) StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->sum(\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
         $feeTotalSum = $feeCollectedAmount + $feeDueAmount;
         $feeCollectedPct = $feeTotalSum > 0 ? round(($feeCollectedAmount / $feeTotalSum) * 100, 2) : 0;
         $feeDuePct = $feeTotalSum > 0 ? round(($feeDueAmount / $feeTotalSum) * 100, 2) : 0;
 
         // Annual (all fees) Collected vs Due
         $annualCollectedAmount = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
-        $annualDueAmount = (float) StudentFee::where('school_id', $schoolId)->whereColumn('amount', '>', 'paid_amount')->sum(\DB::raw('amount - paid_amount'));
+        $annualDueAmount = max(0.00, (float) StudentFee::where('school_id', $schoolId)->sum(\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
         $annualTotalSum = $annualCollectedAmount + $annualDueAmount;
         $annualCollectedPct = $annualTotalSum > 0 ? round(($annualCollectedAmount / $annualTotalSum) * 100, 2) : 0;
         $annualDuePct = $annualTotalSum > 0 ? round(($annualDueAmount / $annualTotalSum) * 100, 2) : 0;
