@@ -98,6 +98,166 @@
         .th-title p{font-size:13px;color:var(--t2);margin-top:2px;}
         
         .th-actions{display:flex;align-items:center;gap:14px;}
+
+        /* Notification Bell Icon & Counter */
+        .th-icon-btn{
+            width:42px;height:42px;border-radius:12px;background:#fff;border:1.5px solid var(--border);
+            display:flex;align-items:center;justify-content:center;color:var(--t2);font-size:17px;
+            position:relative;cursor:pointer;transition:all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            outline:none;
+        }
+        .th-icon-btn:hover{
+            border-color:var(--purple);color:var(--purple);background:var(--purple-light);
+            transform:translateY(-1px);
+        }
+        .th-icon-btn .badge-dot{
+            position:absolute;top:8px;right:8px;width:9px;height:9px;background:var(--red);
+            border-radius:50%;border:2px solid #fff;animation:pulseDot 2s infinite;
+        }
+        .th-icon-btn .badge-count{
+            position:absolute;top:-5px;right:-5px;background:var(--red);color:#fff;
+            font-size:10px;font-weight:800;padding:2px 6px;border-radius:10px;border:2px solid #fff;
+            min-width:18px;text-align:center;line-height:1;box-shadow:0 2px 6px rgba(239,68,68,0.3);
+        }
+        @keyframes pulseDot {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Notification Dropdown Panel */
+        .notif-dropdown-panel {
+            position: absolute;
+            top: 54px;
+            right: 0;
+            width: 360px;
+            max-width: 90vw;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            overflow: hidden;
+            animation: notifSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes notifSlide {
+            from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .notif-header {
+            padding: 14px 18px;
+            background: #ffffff;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .notif-header-title {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--t1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .notif-unread-pill {
+            padding: 2px 8px;
+            background: var(--purple-light);
+            color: var(--purple);
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .btn-mark-all-read {
+            background: transparent;
+            border: none;
+            color: var(--purple);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: opacity 0.2s;
+        }
+        .btn-mark-all-read:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+        }
+
+        .notif-body {
+            max-height: 380px;
+            overflow-y: auto;
+        }
+        .notif-item {
+            padding: 14px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+            position: relative;
+        }
+        .notif-item:last-child { border-bottom: none; }
+        .notif-item:hover { background: #f8fafc; }
+        .notif-item.unread {
+            background: rgba(124, 58, 237, 0.03);
+            border-left: 3px solid var(--purple);
+        }
+        .notif-item.read {
+            background: #ffffff;
+            border-left: 3px solid transparent;
+            opacity: 0.85;
+        }
+        .notif-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        .notif-content { flex: 1; min-width: 0; }
+        .notif-item-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--t1);
+            margin-bottom: 2px;
+            line-height: 1.2;
+        }
+        .notif-item-msg {
+            font-size: 12px;
+            color: var(--t2);
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+        .notif-item-time {
+            font-size: 10.5px;
+            color: var(--t3);
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .notif-unread-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--purple);
+            flex-shrink: 0;
+            margin-top: 5px;
+        }
+        .notif-empty-state {
+            padding: 36px 20px;
+            text-align: center;
+            color: var(--t3);
+        }
+
         .th-user-pill{
             display:flex;align-items:center;gap:10px;padding:4px 6px 4px 4px;background:#f8fafc;
             border:1px solid var(--border);border-radius:30px;
@@ -239,10 +399,11 @@
             border-collapse: collapse;
         }
         .tbl th, .tbl td {
-            padding: 12px 14px;
+            padding: 14px;
             font-size: 13px;
             border-bottom: 1px solid var(--border);
             text-align: left;
+            vertical-align: middle;
         }
         .tbl th {
             background: #f8fafc;
@@ -253,7 +414,7 @@
             border-bottom: none;
         }
         .badge {
-            padding: 4px 8px;
+            padding: 4px 10px;
             border-radius: 20px;
             font-size: 11px;
             font-weight: 700;
@@ -263,6 +424,20 @@
         .badge-approved { background: var(--green-light); color: var(--green); }
         .badge-rejected { background: var(--red-light); color: var(--red); }
         .badge-type { background: var(--blue-light); color: var(--blue); }
+
+        .remark-box {
+            font-size: 12px;
+            line-height: 1.4;
+            max-width: 280px;
+        }
+        .remark-box.rejected {
+            color: var(--red);
+            font-weight: 600;
+        }
+        .remark-box.approved {
+            color: var(--green);
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -336,6 +511,36 @@
                 <p>Apply for leaves and manage your balances</p>
             </div>
             <div class="th-actions">
+                <!-- NOTIFICATION BELL CENTER -->
+                <div class="th-notif-wrapper" style="position: relative;">
+                    <button type="button" class="th-icon-btn" id="teacherNotifBell" onclick="toggleNotifDropdown()" title="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge-dot" id="notifBadgeDot" style="display: none;"></span>
+                        <span class="badge-count" id="notifBadgeCount" style="display: none;">0</span>
+                    </button>
+
+                    <!-- Notification Dropdown Panel -->
+                    <div class="notif-dropdown-panel" id="notifDropdownPanel" style="display: none;">
+                        <div class="notif-header">
+                            <div class="notif-header-title">
+                                <i class="fas fa-bell" style="color: var(--purple);"></i>
+                                Notifications
+                                <span class="notif-unread-pill" id="notifUnreadPill">0 Unread</span>
+                            </div>
+                            <button type="button" class="btn-mark-all-read" onclick="markAllNotifsAsRead()">
+                                <i class="fas fa-check-double"></i> Mark all read
+                            </button>
+                        </div>
+                        <div class="notif-body" id="notifListContainer">
+                            <div class="notif-empty-state">
+                                <i class="fas fa-spinner fa-spin" style="font-size:20px; color:var(--purple); margin-bottom:8px;"></i>
+                                <div>Loading notifications...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Profile Pill -->
                 <div class="th-user-pill">
                     <div class="th-user-img">{{ strtoupper(substr($user->name, 0, 1)) }}</div>
                     <div class="th-user-info">
@@ -433,6 +638,7 @@
                                     <th>Dates</th>
                                     <th>Duration</th>
                                     <th>Status</th>
+                                    <th>Admin Remark / Rejection Remark</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -445,8 +651,8 @@
                                 <tr>
                                     <td><span class="badge badge-type">{{ $app->leave_type }}</span></td>
                                     <td>
-                                        <div style="font-weight:600;color:var(--t1);">{{ $app->start_date }}</div>
-                                        <div style="font-size:11px;color:var(--t3);">to {{ $app->end_date }}</div>
+                                        <div style="font-weight:600;color:var(--t1);">{{ $app->start_date ? $app->start_date->format('d/m/Y') : '' }}</div>
+                                        <div style="font-size:11px;color:var(--t3);">to {{ $app->end_date ? $app->end_date->format('d/m/Y') : '' }}</div>
                                     </td>
                                     <td><strong>{{ $duration }} {{ $duration > 1 ? 'days' : 'day' }}</strong></td>
                                     <td>
@@ -458,10 +664,27 @@
                                             <span class="badge badge-rejected">Rejected</span>
                                         @endif
                                     </td>
+                                    <td>
+                                        @if($app->status === 'rejected')
+                                            <div class="remark-box rejected">
+                                                <i class="fas fa-circle-xmark" style="margin-right:4px;"></i> Rejection Reason: {{ $app->rejection_reason ?? $app->admin_remark ?? 'Not approved by admin.' }}
+                                            </div>
+                                        @elseif($app->status === 'approved')
+                                            @if(!empty($app->admin_remark))
+                                                <div class="remark-box approved">
+                                                    <i class="fas fa-circle-check" style="margin-right:4px;"></i> Approval Remark: {{ $app->admin_remark }}
+                                                </div>
+                                            @else
+                                                <span style="font-size:12px; color:var(--t3);">--</span>
+                                            @endif
+                                        @else
+                                            <span style="font-size:12px; color:var(--t3); font-style:italic;">Awaiting approval</span>
+                                        @endif
+                                    </td>
                                 </tr>
                                 @empty
                                 <tr>
-                                    <td colspan="4" style="text-align:center; padding:40px; color:var(--t3);">
+                                    <td colspan="5" style="text-align:center; padding:40px; color:var(--t3);">
                                         <i class="fas fa-calendar-times" style="font-size:24px;margin-bottom:10px;display:block;"></i>
                                         No leave requests submitted yet.
                                     </td>
@@ -477,5 +700,248 @@
         </main>
     </div>
 
+    <!-- NOTIFICATION SYSTEM SCRIPT -->
+    <script>
+        function toggleNotifDropdown() {
+            const panel = document.getElementById('notifDropdownPanel');
+            if (!panel) return;
+            const isVisible = panel.style.display === 'block';
+            panel.style.display = isVisible ? 'none' : 'block';
+            if (!isVisible) {
+                fetchTeacherNotifications();
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const wrapper = document.querySelector('.th-notif-wrapper');
+            const panel = document.getElementById('notifDropdownPanel');
+            if (wrapper && panel && !wrapper.contains(e.target)) {
+                panel.style.display = 'none';
+            }
+        });
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function fetchTeacherNotifications() {
+            fetch("{{ route('teacher.notifications.index') }}", {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                const count = data.unread_count || 0;
+                const badgeDot = document.getElementById('notifBadgeDot');
+                const badgeCount = document.getElementById('notifBadgeCount');
+                const unreadPill = document.getElementById('notifUnreadPill');
+                const container = document.getElementById('notifListContainer');
+
+                if (count > 0) {
+                    if (badgeDot) badgeDot.style.display = 'block';
+                    if (badgeCount) {
+                        badgeCount.textContent = count > 99 ? '99+' : count;
+                        badgeCount.style.display = 'inline-flex';
+                    }
+                    if (unreadPill) unreadPill.textContent = `${count} Unread`;
+                } else {
+                    if (badgeDot) badgeDot.style.display = 'none';
+                    if (badgeCount) badgeCount.style.display = 'none';
+                    if (unreadPill) unreadPill.textContent = `0 Unread`;
+                }
+
+                if (!container) return;
+
+                if (!data.notifications || data.notifications.length === 0) {
+                    container.innerHTML = `
+                        <div class="notif-empty-state">
+                            <i class="fas fa-bell-slash" style="font-size:24px; color:var(--t3); margin-bottom:8px; display:block;"></i>
+                            <div style="font-weight:700; color:var(--t1); font-size:13px;">No notifications yet</div>
+                            <div style="font-size:11.5px; color:var(--t3); margin-top:2px;">Leave updates and system notices will appear here.</div>
+                        </div>`;
+                    return;
+                }
+
+                let html = '';
+                data.notifications.forEach(item => {
+                    let iconClass = 'fas fa-info-circle';
+                    let iconBg = 'rgba(37,99,235,0.1)';
+                    let iconColor = '#2563eb';
+
+                    if (item.type === 'leave_approved') {
+                        iconClass = 'fas fa-circle-check';
+                        iconBg = 'rgba(16,185,129,0.1)';
+                        iconColor = '#10b981';
+                    } else if (item.type === 'leave_rejected') {
+                        iconClass = 'fas fa-circle-xmark';
+                        iconBg = 'rgba(239,68,68,0.1)';
+                        iconColor = '#ef4444';
+                    } else if (item.type === 'leave_submitted') {
+                        iconClass = 'fas fa-paper-plane';
+                        iconBg = 'rgba(124,58,237,0.1)';
+                        iconColor = '#7c3aed';
+                    }
+
+                    const unreadClass = item.is_read ? 'read' : 'unread';
+
+                    html += `
+                        <div class="notif-item ${unreadClass}" onclick="markNotifAsRead(${item.id})">
+                            <div class="notif-icon" style="background: ${iconBg}; color: ${iconColor};">
+                                <i class="${iconClass}"></i>
+                            </div>
+                            <div class="notif-content">
+                                <div class="notif-item-title">${escapeHtml(item.title)}</div>
+                                <div class="notif-item-msg">${escapeHtml(item.message)}</div>
+                                <div class="notif-item-time"><i class="far fa-clock"></i> ${item.time_ago} (${item.created_at})</div>
+                            </div>
+                            ${!item.is_read ? '<div class="notif-unread-dot"></div>' : ''}
+                        </div>`;
+                });
+                container.innerHTML = html;
+            })
+            .catch(err => {
+                console.error('Error fetching notifications:', err);
+            });
+        }
+
+        function markNotifAsRead(id) {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            fetch(`/teacher/notifications/${id}/read`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                fetchTeacherNotifications();
+            })
+            .catch(err => console.error('Error marking notification read:', err));
+        }
+
+        function markAllNotifsAsRead() {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            fetch("{{ route('teacher.notifications.read-all') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                fetchTeacherNotifications();
+            })
+            .catch(err => console.error('Error marking all read:', err));
+        }
+
+        window.syncTeacherLeaveUI = function() {
+            fetch("{{ route('teacher.leave.history-json') }}", {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) return;
+
+                // Update Leave History Table
+                const tbody = document.querySelector('.table-leave-history tbody');
+                if (tbody && data.applications) {
+                    if (data.applications.length === 0) {
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="5" style="text-align:center; padding:40px; color:var(--t3);">
+                                    <i class="fas fa-calendar-times" style="font-size:24px;margin-bottom:10px;display:block;"></i>
+                                    No leave requests submitted yet.
+                                </td>
+                            </tr>`;
+                    } else {
+                        let html = '';
+                        data.applications.forEach(app => {
+                            let badgeHtml = '';
+                            if (app.status === 'pending') {
+                                badgeHtml = '<span class="badge badge-pending">Pending</span>';
+                            } else if (app.status === 'approved') {
+                                badgeHtml = '<span class="badge badge-approved">Approved</span>';
+                            } else {
+                                badgeHtml = '<span class="badge badge-rejected">Rejected</span>';
+                            }
+
+                            let remarkHtml = '';
+                            if (app.status === 'rejected') {
+                                remarkHtml = `
+                                    <div class="remark-box rejected">
+                                        <i class="fas fa-circle-xmark" style="margin-right:4px;"></i> Rejection Reason: ${escapeHtml(app.rejection_reason || app.admin_remark || 'Not approved by admin.')}
+                                    </div>`;
+                            } else if (app.status === 'approved') {
+                                if (app.admin_remark) {
+                                    remarkHtml = `
+                                        <div class="remark-box approved">
+                                            <i class="fas fa-circle-check" style="margin-right:4px;"></i> Approval Remark: ${escapeHtml(app.admin_remark)}
+                                        </div>`;
+                                } else {
+                                    remarkHtml = `<span style="font-size:12px; color:var(--t3);">--</span>`;
+                                }
+                            } else {
+                                remarkHtml = `<span style="font-size:12px; color:var(--t3); font-style:italic;">Awaiting approval</span>`;
+                            }
+
+                            html += `
+                                <tr>
+                                    <td><span class="badge badge-type">${escapeHtml(app.leave_type)}</span></td>
+                                    <td>
+                                        <div style="font-weight:600;color:var(--t1);">${app.start_date_fmt}</div>
+                                        <div style="font-size:11px;color:var(--t3);">to ${app.end_date_fmt}</div>
+                                    </td>
+                                    <td><strong>${app.duration} ${app.duration > 1 ? 'days' : 'day'}</strong></td>
+                                    <td>${badgeHtml}</td>
+                                    <td>${remarkHtml}</td>
+                                </tr>`;
+                        });
+                        tbody.innerHTML = html;
+                    }
+                }
+
+                // Update Leave Balances Cards
+                if (data.balances) {
+                    data.balances.forEach(b => {
+                        const cardElement = Array.from(document.querySelectorAll('.stat-card')).find(c => c.textContent.includes(b.leave_type));
+                        if (cardElement) {
+                            const valEl = cardElement.querySelector('.stat-value');
+                            if (valEl) valEl.textContent = b.remaining;
+                            const subEl = cardElement.querySelector('.stat-sub');
+                            if (subEl) subEl.textContent = `Allowed: ${b.allowed} | Availed: ${b.availed}`;
+                        }
+                    });
+                }
+            })
+            .catch(err => console.error('Error syncing leave UI:', err));
+        };
+
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchTeacherNotifications();
+            window.syncTeacherLeaveUI();
+            setInterval(fetchTeacherNotifications, 15000);
+            setInterval(window.syncTeacherLeaveUI, 10000);
+        });
+    </script>
+    @include('partials.realtime_notifications')
 </body>
 </html>
+

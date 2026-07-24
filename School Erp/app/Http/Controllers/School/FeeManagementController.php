@@ -3200,6 +3200,37 @@ class FeeManagementController extends Controller
                             'payment_details'=> $paymentDetailsJson,
                         ]);
 
+                        // Send Central Notifications
+                        $feeStudent = \App\Models\Student::find($studentId);
+                        $sName = $feeStudent ? trim($feeStudent->first_name . ' ' . ($feeStudent->last_name ?? '')) : 'Student';
+                        \App\Services\NotificationService::send([
+                            'school_id'      => $schoolId,
+                            'recipient_role' => 'school_admin',
+                            'title'          => 'Fee Payment Received',
+                            'message'        => "Fee payment of ₹" . number_format($rawAmountPaid, 2) . " collected for {$sName} (Receipt: {$receiptNo}).",
+                            'module'         => 'fee',
+                            'type'           => 'fee_paid',
+                            'related_id'     => $studentId,
+                            'icon'           => 'fa-receipt',
+                            'color'          => '#059669',
+                        ]);
+
+                        if ($feeStudent?->user_id) {
+                            \App\Services\NotificationService::send([
+                                'school_id'      => $schoolId,
+                                'user_id'        => $feeStudent->user_id,
+                                'recipient_role' => 'student',
+                                'title'          => 'Fee Payment Confirmed',
+                                'message'        => "Payment of ₹" . number_format($rawAmountPaid, 2) . " received. Receipt No: {$receiptNo}.",
+                                'module'         => 'fee',
+                                'type'           => 'fee_paid',
+                                'related_id'     => $studentId,
+                                'icon'           => 'fa-receipt',
+                                'color'          => '#059669',
+                            ]);
+                        }
+
+
                         // Generate unique collision-free invoice number
                         $invNo = null;
                         $attempts = 0;

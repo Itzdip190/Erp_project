@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use App\Models\Traits\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class LeaveType extends Model
 {
-    use HasFactory, BelongsToSchool;
+    use HasFactory;
 
     protected $fillable = [
         'school_id',
@@ -35,12 +34,10 @@ class LeaveType extends Model
         'non_carry_forward' => 'boolean',
         'accrue_after_month' => 'boolean',
         'allow_before_date' => 'boolean',
-        'leave_count' => 'decimal:2',
-        'start_crediting_days' => 'integer',
     ];
 
-    public function staffBalances()
+    public function school()
     {
-        return $this->hasMany(StaffLeaveBalance::class);
+        return $this->belongsTo(School::class);
     }
 }

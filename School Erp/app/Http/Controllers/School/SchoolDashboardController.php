@@ -5,7 +5,7 @@ namespace App\Http\Controllers\School;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Models\DigitalDiary;
-use App\Models\LeaveApplication;
+use App\Models\StaffLeaveApplication;
 use App\Models\School;
 use App\Models\Staff;
 use App\Models\StaffAttendance;
@@ -217,8 +217,8 @@ class SchoolDashboardController extends Controller
             ->get();
 
         // Recent Updates - Leave Applications
-        $leaves = LeaveApplication::where('school_id', $schoolId)
-            ->with(['user'])
+        $leaves = StaffLeaveApplication::where('school_id', $schoolId)
+            ->with(['staff'])
             ->latest()
             ->take(10)
             ->get();
@@ -241,14 +241,15 @@ class SchoolDashboardController extends Controller
             ];
         });
         $leavesData = $leaves->map(function($l) {
+            $staffName = $l->staff ? trim($l->staff->first_name . ' ' . ($l->staff->last_name ?? '')) : 'Staff';
             return [
-                'user_name' => $l->user ? $l->user->name : 'Staff/Student',
-                'leave_type' => ucfirst($l->leave_type),
+                'user_name' => $staffName,
+                'leave_type' => ucfirst($l->leave_type_name ?? $l->leave_type_code ?? 'Leave'),
                 'start_date' => $l->start_date ? \Carbon\Carbon::parse($l->start_date)->format('d M Y') : '-',
                 'end_date' => $l->end_date ? \Carbon\Carbon::parse($l->end_date)->format('d M Y') : '-',
                 'reason' => $l->reason,
                 'status' => $l->status,
-                'applicant_type' => ucfirst($l->applicant_type ?? 'Staff')
+                'applicant_type' => 'Staff'
             ];
         });
 

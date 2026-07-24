@@ -6,9 +6,11 @@ use App\Models\Traits\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use Illuminate\Database\Eloquent\SoftDeletes;
+
 class ReportCardTemplateMapping extends Model
 {
-    use HasFactory, BelongsToSchool;
+    use HasFactory, BelongsToSchool, SoftDeletes;
 
     protected $fillable = [
         'school_id',

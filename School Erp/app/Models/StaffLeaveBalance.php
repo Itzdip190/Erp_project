@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use App\Models\Traits\BelongsToSchool;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class StaffLeaveBalance extends Model
 {
-    use HasFactory, BelongsToSchool;
+    use HasFactory;
 
     protected $fillable = [
         'school_id',
@@ -19,8 +18,8 @@ class StaffLeaveBalance extends Model
     ];
 
     protected $casts = [
-        'allowed' => 'decimal:2',
-        'availed' => 'decimal:2',
+        'allowed' => 'float',
+        'availed' => 'float',
     ];
 
     public function staff()
