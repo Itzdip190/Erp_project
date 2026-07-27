@@ -13,6 +13,11 @@ use App\Models\SchoolExpense;
 use App\Models\SchoolIncome;
 use App\Models\ExpenseHead;
 use App\Models\IncomeHead;
+use App\Models\AcademicSession;
+use App\Models\FeeSchedule;
+use App\Models\FeeComponent;
+use App\Models\PendingCheque;
+use App\Models\School;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -180,77 +185,748 @@ class ReportsController extends Controller
         ));
     }
 
-    // ─── Fee Report ──────────────────────────────────────────────────────
+    // ─── Fee Report Module ──────────────────────────────────────────────────────
     public function feeReport(Request $request)
     {
-        $schoolId  = $this->schoolId();
-        $classId   = $request->get('class_id', '');
-        $sectionId = $request->get('section_id', '');
-        $dateFrom  = $request->get('date_from', now()->startOfMonth()->format('Y-m-d'));
-        $dateTo    = $request->get('date_to', now()->format('Y-m-d'));
-        $status    = $request->get('status', '');
+        $schoolId = $this->schoolId();
+        $tabData  = $this->getFeeReportData($request, $schoolId);
 
-        $classes  = SchoolClass::where('school_id', $schoolId)->orderBy('name')->get();
-        $sections = $classId
-            ? Section::where('school_id', $schoolId)->where('class_id', $classId)->orderBy('name')->get()
-            : collect();
+        return view('school.reports.fees', array_merge($tabData, [
+            'schoolId' => $schoolId
+        ]));
+    }
 
-        // Fee Receipts in date range
-        $receiptQuery = FeeReceipt::where('school_id', $schoolId)
-            ->with(['student.class', 'student.section'])
-            ->whereBetween('payment_date', [$dateFrom, $dateTo]);
+    public function exportFeeReportPdf(Request $request)
+    {
+        $schoolId = $this->schoolId();
+        $tabData  = $this->getFeeReportData($request, $schoolId);
 
-        $receipts = $receiptQuery->orderByDesc('payment_date')->get();
+        $school = School::find($schoolId);
 
-        $totalCollected = $receipts->sum('amount_paid');
-        $schoolPendingChequesTotal = (float) \App\Models\PendingCheque::where('school_id', $schoolId)->where('status', 'pending')->sum('amount');
-        $totalPending   = max(0.00, StudentFee::where('school_id', $schoolId)
-            ->sum(DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
-        $totalRefunded  = 0;
-        $receiptCount   = $receipts->count();
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.reports.pdf.fee-report-pdf', [
+            'school'        => $school,
+            'reportTitle'   => $tabData['reportTitle'],
+            'sessionName'   => $tabData['sessionName'],
+            'dateFrom'      => $tabData['dateFrom'],
+            'dateTo'        => $tabData['dateTo'],
+            'filterSummary' => $tabData['filterSummary'],
+            'kpis'          => $tabData['kpis'],
+            'headers'       => $tabData['exportHeaders'],
+            'rows'          => $tabData['exportRows'],
+            'totals'        => $tabData['exportTotals'],
+        ]);
 
-        // Payment mode breakdown for pie
-        $paymentModes = $receipts
-            ->groupBy('payment_mode')
-            ->map(fn($g) => $g->sum('amount_paid'));
+        $pdf->setPaper('a4', 'landscape');
+        $fileName = str_replace(' ', '_', $tabData['reportTitle']) . '_' . date('Ymd_His') . '.pdf';
 
-        // Monthly collection trend (last 6 months)
-        $trendMonths = [];
-        $trendFees   = [];
-        for ($i = 5; $i >= 0; $i--) {
-            $m = now()->subMonths($i);
-            $trendMonths[] = $m->format('M Y');
-            $trendFees[]   = (float) FeeReceipt::where('school_id', $schoolId)
-                ->whereYear('payment_date', $m->year)
-                ->whereMonth('payment_date', $m->month)
-                ->sum('amount_paid');
+        return $pdf->download($fileName);
+    }
+
+    public function exportFeeReportCsv(Request $request)
+    {
+        $schoolId = $this->schoolId();
+        $tabData  = $this->getFeeReportData($request, $schoolId);
+
+        $fileName = str_replace(' ', '_', $tabData['reportTitle']) . '_' . date('Ymd_His') . '.csv';
+
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename={$fileName}",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $callback = function() use ($tabData) {
+            $file = fopen('php://output', 'w');
+            
+            // CSV Title & Metadata Header
+            fputcsv($file, [$tabData['reportTitle']]);
+            fputcsv($file, ["Session", $tabData['sessionName'], "Date Range", $tabData['dateFrom'] . ' to ' . $tabData['dateTo']]);
+            fputcsv($file, ["Filters", $tabData['filterSummary']]);
+            fputcsv($file, []);
+
+            // Data Table Column Headers
+            $colTitles = array_map(fn($h) => $h['title'], $tabData['exportHeaders']);
+            fputcsv($file, $colTitles);
+
+            // Data Rows
+            foreach ($tabData['exportRows'] as $row) {
+                $line = [];
+                foreach ($tabData['exportHeaders'] as $key => $h) {
+                    $fieldKey = is_numeric($key) ? ($h['key'] ?? '') : $key;
+                    $val = $row[$fieldKey] ?? '';
+                    $line[] = strip_tags(str_replace(['&nbsp;', '₹'], ['', ''], $val));
+                }
+                fputcsv($file, $line);
+            }
+
+            // Totals Row
+            if (!empty($tabData['exportTotals'])) {
+                $totalLine = [];
+                foreach ($tabData['exportHeaders'] as $key => $h) {
+                    $fieldKey = is_numeric($key) ? ($h['key'] ?? '') : $key;
+                    $val = $tabData['exportTotals'][$fieldKey] ?? '';
+                    $totalLine[] = strip_tags(str_replace(['&nbsp;', '₹'], ['', ''], $val));
+                }
+                fputcsv($file, $totalLine);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    private function getFeeReportData(Request $request, $schoolId)
+    {
+        $activeTab         = $request->get('tab', 'student_fee_collection');
+        $selectedSessionId = $request->get('academic_session_id');
+        
+        $academicSessions = AcademicSession::where('school_id', $schoolId)->get();
+        $currentSession   = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+            ?? $academicSessions->first();
+
+        if (!$selectedSessionId) {
+            $selectedSessionId = $currentSession?->id;
         }
 
-        // Class-wise fee summary
-        $classFees = SchoolClass::where('school_id', $schoolId)->orderBy('name')->get()->map(function ($cls) use ($schoolId) {
-            $paid    = FeeReceipt::where('school_id', $schoolId)
-                ->whereHas('student', fn($q) => $q->where('class_id', $cls->id))
-                ->sum('amount_paid');
-            $classPendingCheques = (float) \App\Models\PendingCheque::where('school_id', $schoolId)
-                ->where('status', 'pending')
-                ->whereHas('student', fn($q) => $q->where('class_id', $cls->id))
-                ->sum('amount');
-            $pending = max(0.00, StudentFee::where('school_id', $schoolId)
-                ->whereHas('student', fn($q) => $q->where('class_id', $cls->id))
-                ->sum(DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $classPendingCheques);
-            return [
-                'class'   => $cls->name,
-                'paid'    => $paid,
-                'pending' => $pending,
-            ];
-        });
+        $sessionObj  = $academicSessions->firstWhere('id', $selectedSessionId) ?? $currentSession;
+        $sessionName = $sessionObj ? $sessionObj->name : 'All Sessions';
 
-        return view('school.reports.fees', compact(
-            'classes', 'sections', 'receipts',
-            'totalCollected', 'totalPending', 'totalRefunded', 'receiptCount',
-            'paymentModes', 'trendMonths', 'trendFees', 'classFees',
-            'classId', 'sectionId', 'dateFrom', 'dateTo', 'status'
-        ));
+        $classes  = SchoolClass::where('school_id', $schoolId)->orderBy('name')->get();
+        $classId   = $request->get('class_id', '');
+        $sectionId = $request->get('section_id', '');
+        $sections = $classId
+            ? Section::where('school_id', $schoolId)->where('class_id', $classId)->orderBy('name')->get()
+            : Section::where('school_id', $schoolId)->orderBy('name')->get();
+
+        $dateFrom       = $request->get('date_from', now()->startOfMonth()->format('Y-m-d'));
+        $dateTo         = $request->get('date_to', now()->format('Y-m-d'));
+        $installmentNo  = $request->get('installment_no', '');
+        $paymentMode    = $request->get('payment_mode', '');
+        $status         = $request->get('status', '');
+        $feeScheduleId  = $request->get('fee_schedule_id', '');
+        $feeComponentId = $request->get('fee_component_id', '');
+        $searchStudent  = $request->get('search_student', '');
+
+        $feeSchedules  = FeeSchedule::where('school_id', $schoolId)->get();
+        $feeComponents = FeeComponent::where('school_id', $schoolId)->get();
+        $paymentModes  = FeeReceipt::where('school_id', $schoolId)->whereNotNull('payment_mode')->where('payment_mode', '!=', '')->distinct()->pluck('payment_mode');
+        $installments  = StudentFee::where('school_id', $schoolId)->whereNotNull('installment_no')->distinct()->pluck('installment_no')->sort();
+
+        // Student filter Closure
+        $studentFilter = function($q) use ($selectedSessionId, $classId, $sectionId, $searchStudent) {
+            if ($selectedSessionId) $q->where('academic_session_id', $selectedSessionId);
+            if ($classId) $q->where('class_id', $classId);
+            if ($sectionId) $q->where('section_id', $sectionId);
+            if ($searchStudent) {
+                $q->where(function($sq) use ($searchStudent) {
+                    $sq->where('first_name', 'like', "%{$searchStudent}%")
+                       ->orWhere('last_name', 'like', "%{$searchStudent}%")
+                       ->orWhere('admission_number', 'like', "%{$searchStudent}%");
+                });
+            }
+        };
+
+        // Filter summary text for exports
+        $filterParts = [];
+        if ($classId && $cls = $classes->firstWhere('id', $classId)) $filterParts[] = 'Class: ' . $cls->name;
+        if ($sectionId && $sec = $sections->firstWhere('id', $sectionId)) $filterParts[] = 'Section: ' . $sec->name;
+        if ($paymentMode) $filterParts[] = 'Mode: ' . ucfirst($paymentMode);
+        if ($status) $filterParts[] = 'Status: ' . ucfirst($status);
+        if ($installmentNo) $filterParts[] = 'Installment: ' . $installmentNo;
+        if ($searchStudent) $filterParts[] = 'Search: ' . $searchStudent;
+        $filterSummary = !empty($filterParts) ? implode(' | ', $filterParts) : 'All Records';
+
+        $reportTitle   = 'Fee Collections Report';
+        $exportHeaders = [];
+        $exportRows    = [];
+        $exportTotals  = [];
+        $kpis          = [];
+        $reportData    = [];
+
+        // ─── TAB 1: STUDENT FEE COLLECTION ───
+        if ($activeTab === 'student_fee_collection') {
+            $reportTitle = 'Student Fee Collection Report';
+
+            $feeQuery = StudentFee::where('school_id', $schoolId)
+                ->whereHas('student', $studentFilter)
+                ->with(['student.class', 'student.section', 'feeSchedule', 'component']);
+
+            if ($feeScheduleId) $feeQuery->where('fee_schedule_id', $feeScheduleId);
+            if ($feeComponentId) $feeQuery->where('fee_component_id', $feeComponentId);
+            if ($installmentNo) $feeQuery->where('installment_no', $installmentNo);
+            if ($dateFrom) $feeQuery->whereDate('due_date', '>=', $dateFrom);
+            if ($dateTo) $feeQuery->whereDate('due_date', '<=', $dateTo);
+            if ($status) {
+                if ($status === 'paid') $feeQuery->where('status', 'paid');
+                elseif ($status === 'partial') $feeQuery->where('paid_amount', '>', 0)->where('status', '!=', 'paid');
+                elseif ($status === 'pending') $feeQuery->where('paid_amount', 0)->where('status', '!=', 'paid');
+            }
+
+            if ($paymentMode) {
+                $matchingStudentIds = FeeReceipt::where('school_id', $schoolId)->where('payment_mode', $paymentMode)->pluck('student_id');
+                $feeQuery->whereIn('student_id', $matchingStudentIds);
+            }
+
+            $rawFees = $feeQuery->orderBy('due_date', 'desc')->get();
+
+            // Fetch receipts keyed by student_id
+            $receiptsMap = FeeReceipt::where('school_id', $schoolId)
+                ->whereIn('student_id', $rawFees->pluck('student_id')->unique())
+                ->get()
+                ->groupBy('student_id');
+
+            $totAssigned = 0; $totPaid = 0; $totDiscount = 0; $totFine = 0; $totPending = 0;
+
+            foreach ($rawFees as $f) {
+                $st = $f->student;
+                if (!$st) continue;
+
+                $assigned  = (float) $f->amount;
+                $disc      = (float) $f->instant_discount_amount;
+                $fine      = (float) $f->fine_amount_applied;
+                $paid      = (float) $f->paid_amount;
+                $due       = max(0.00, $assigned + $fine - $disc - $paid);
+
+                $totAssigned += $assigned;
+                $totDiscount += $disc;
+                $totFine     += $fine;
+                $totPaid     += $paid;
+                $totPending  += $due;
+
+                $stReceipts = $receiptsMap->get($f->student_id, collect());
+                $latestReceipt = $stReceipts->sortByDesc('payment_date')->first();
+
+                $statusLabel = 'Pending';
+                $statusBadge = 'danger';
+                if ($paid >= ($assigned + $fine - $disc) && ($assigned + $fine - $disc) > 0) {
+                    $statusLabel = 'Paid';
+                    $statusBadge = 'success';
+                } elseif ($paid > 0) {
+                    $statusLabel = 'Partial';
+                    $statusBadge = 'warning';
+                }
+
+                $row = [
+                    'id'               => $f->id,
+                    'student_name'     => $st->full_name,
+                    'admission_number' => $st->admission_number,
+                    'class_section'    => ($st->class?->name ?? '—') . ($st->section ? ' - ' . $st->section->name : ''),
+                    'roll_number'      => $st->roll_number ?? '—',
+                    'fee_structure'    => $f->feeSchedule?->name ?? ($f->transport_fee_schedule_id ? 'Transport Fee' : 'General Fee'),
+                    'installment'      => 'Installment ' . ($f->installment_no ?? 1),
+                    'component'        => $f->component?->name ?? ($f->transport_fee_schedule_id ? 'Transport' : 'Tuition/General'),
+                    'actual_amount'    => '₹' . number_format($assigned, 2),
+                    'discount'         => '₹' . number_format($disc, 2),
+                    'fine'             => '₹' . number_format($fine, 2),
+                    'paid_amount'      => '₹' . number_format($paid, 2),
+                    'balance_due'      => '₹' . number_format($due, 2),
+                    'payment_date'     => $latestReceipt?->payment_date ? \Carbon\Carbon::parse($latestReceipt->payment_date)->format('d M Y') : '—',
+                    'payment_mode'     => $latestReceipt?->payment_mode ? ucfirst($latestReceipt->payment_mode) : '—',
+                    'receipt_number'   => $latestReceipt?->receipt_number ?? '—',
+                    'status'           => $statusLabel,
+                    'status_badge'     => $statusBadge,
+                    'collected_by'     => 'Admin/System',
+                    'academic_session' => $sessionName,
+                ];
+
+                $exportRows[] = $row;
+            }
+
+            $kpis = [
+                ['label' => 'Total Assigned',  'value' => '₹' . number_format($totAssigned, 2)],
+                ['label' => 'Total Collected', 'value' => '₹' . number_format($totPaid, 2)],
+                ['label' => 'Total Discount',  'value' => '₹' . number_format($totDiscount, 2)],
+                ['label' => 'Total Fine',      'value' => '₹' . number_format($totFine, 2)],
+                ['label' => 'Total Pending',   'value' => '₹' . number_format($totPending, 2)],
+            ];
+
+            $exportHeaders = [
+                ['title' => 'Student Name',     'key' => 'student_name'],
+                ['title' => 'Adm No',           'key' => 'admission_number'],
+                ['title' => 'Class & Sec',      'key' => 'class_section'],
+                ['title' => 'Installment',      'key' => 'installment'],
+                ['title' => 'Structure',        'key' => 'fee_structure'],
+                ['title' => 'Assigned',         'key' => 'actual_amount', 'align' => 'right'],
+                ['title' => 'Discount',         'key' => 'discount',      'align' => 'right'],
+                ['title' => 'Fine',             'key' => 'fine',          'align' => 'right'],
+                ['title' => 'Paid Amount',      'key' => 'paid_amount',   'align' => 'right'],
+                ['title' => 'Balance Due',      'key' => 'balance_due',   'align' => 'right'],
+                ['title' => 'Receipt No',       'key' => 'receipt_number'],
+                ['title' => 'Mode',             'key' => 'payment_mode'],
+                ['title' => 'Status',           'key' => 'status',        'type'  => 'badge'],
+            ];
+
+            $exportTotals = [
+                'student_name'  => 'GRAND TOTALS (' . count($exportRows) . ' Records)',
+                'actual_amount' => '₹' . number_format($totAssigned, 2),
+                'discount'      => '₹' . number_format($totDiscount, 2),
+                'fine'          => '₹' . number_format($totFine, 2),
+                'paid_amount'   => '₹' . number_format($totPaid, 2),
+                'balance_due'   => '₹' . number_format($totPending, 2),
+            ];
+        }
+
+        // ─── TAB 2: DAILY FEE COLLECTION ───
+        elseif ($activeTab === 'daily_fee_collection') {
+            $reportTitle = 'Daily Fee Collection Report';
+
+            $receiptQuery = FeeReceipt::where('school_id', $schoolId)
+                ->whereHas('student', $studentFilter)
+                ->whereBetween('payment_date', [$dateFrom, $dateTo])
+                ->with(['student.class', 'student.section']);
+
+            if ($paymentMode) $receiptQuery->where('payment_mode', $paymentMode);
+
+            $receipts = $receiptQuery->orderBy('payment_date', 'desc')->get();
+
+            $groupedByDate = $receipts->groupBy(fn($r) => \Carbon\Carbon::parse($r->payment_date)->format('Y-m-d'));
+
+            $totCollections = 0; $totReceiptsCount = 0;
+            $totCash = 0; $totUpi = 0; $totCard = 0; $totBank = 0; $totCheque = 0; $totDisc = 0;
+
+            foreach ($groupedByDate as $dateStr => $dayReceipts) {
+                $dayTotal   = $dayReceipts->sum('amount_paid');
+                $dayCount   = $dayReceipts->count();
+                $dayDisc    = $dayReceipts->sum('discount_amount');
+
+                $cashAmt   = $dayReceipts->where('payment_mode', 'cash')->sum('amount_paid');
+                $upiAmt    = $dayReceipts->whereIn('payment_mode', ['upi', 'online', 'gpay', 'phonepe'])->sum('amount_paid');
+                $cardAmt   = $dayReceipts->where('payment_mode', 'card')->sum('amount_paid');
+                $bankAmt   = $dayReceipts->whereIn('payment_mode', ['bank_transfer', 'neft', 'rtgs', 'net_banking'])->sum('amount_paid');
+                $chequeAmt = $dayReceipts->where('payment_mode', 'cheque')->sum('amount_paid');
+
+                $totCollections   += $dayTotal;
+                $totReceiptsCount += $dayCount;
+                $totCash          += $cashAmt;
+                $totUpi           += $upiAmt;
+                $totCard          += $cardAmt;
+                $totBank          += $bankAmt;
+                $totCheque        += $chequeAmt;
+                $totDisc          += $dayDisc;
+
+                $exportRows[] = [
+                    'date'               => \Carbon\Carbon::parse($dateStr)->format('d M Y (D)'),
+                    'total_collections'  => '₹' . number_format($dayTotal, 2),
+                    'receipts_count'     => $dayCount . ' Receipts',
+                    'cash'               => '₹' . number_format($cashAmt, 2),
+                    'upi'                => '₹' . number_format($upiAmt, 2),
+                    'card'               => '₹' . number_format($cardAmt, 2),
+                    'bank'               => '₹' . number_format($bankAmt, 2),
+                    'cheque'             => '₹' . number_format($chequeAmt, 2),
+                    'discounts'          => '₹' . number_format($dayDisc, 2),
+                    'net_collection'     => '₹' . number_format($dayTotal, 2),
+                ];
+            }
+
+            $kpis = [
+                ['label' => 'Total Collection',  'value' => '₹' . number_format($totCollections, 2)],
+                ['label' => 'Total Transactions','value' => number_format($totReceiptsCount)],
+                ['label' => 'Cash Collections',  'value' => '₹' . number_format($totCash, 2)],
+                ['label' => 'UPI/Online',        'value' => '₹' . number_format($totUpi, 2)],
+                ['label' => 'Cheque Collections','value' => '₹' . number_format($totCheque, 2)],
+            ];
+
+            $exportHeaders = [
+                ['title' => 'Date',             'key' => 'date'],
+                ['title' => 'Receipts Count',   'key' => 'receipts_count',   'align' => 'center'],
+                ['title' => 'Cash',             'key' => 'cash',             'align' => 'right'],
+                ['title' => 'UPI / Online',     'key' => 'upi',              'align' => 'right'],
+                ['title' => 'Card',             'key' => 'card',             'align' => 'right'],
+                ['title' => 'Bank Transfer',    'key' => 'bank',             'align' => 'right'],
+                ['title' => 'Cheque',           'key' => 'cheque',           'align' => 'right'],
+                ['title' => 'Discounts',        'key' => 'discounts',        'align' => 'right'],
+                ['title' => 'Total Collection', 'key' => 'total_collections','align' => 'right'],
+            ];
+
+            $exportTotals = [
+                'date'              => 'TOTALS (' . count($groupedByDate) . ' Days)',
+                'receipts_count'    => $totReceiptsCount . ' Receipts',
+                'cash'              => '₹' . number_format($totCash, 2),
+                'upi'               => '₹' . number_format($totUpi, 2),
+                'card'              => '₹' . number_format($totCard, 2),
+                'bank'              => '₹' . number_format($totBank, 2),
+                'cheque'            => '₹' . number_format($totCheque, 2),
+                'discounts'         => '₹' . number_format($totDisc, 2),
+                'total_collections' => '₹' . number_format($totCollections, 2),
+            ];
+        }
+
+        // ─── TAB 3: INSTALLMENT WISE DUES ───
+        elseif ($activeTab === 'installment_wise_dues') {
+            $reportTitle = 'Installment Wise Dues Report';
+
+            $feeQuery = StudentFee::where('school_id', $schoolId)
+                ->whereHas('student', $studentFilter)
+                ->with(['student.class', 'student.section']);
+
+            if ($installmentNo) $feeQuery->where('installment_no', $installmentNo);
+            if ($status === 'overdue') {
+                $feeQuery->where('status', '!=', 'paid')->whereDate('due_date', '<', now());
+            } elseif ($status === 'pending') {
+                $feeQuery->where('status', '!=', 'paid');
+            }
+
+            $rawFees = $feeQuery->orderBy('installment_no')->orderBy('due_date')->get();
+
+            $totAssigned = 0; $totPaid = 0; $totRemaining = 0; $totFine = 0; $overdueCount = 0;
+
+            foreach ($rawFees as $f) {
+                $st = $f->student;
+                if (!$st) continue;
+
+                $assigned  = (float) $f->amount;
+                $disc      = (float) $f->instant_discount_amount;
+                $fine      = (float) $f->fine_amount_applied;
+                $paid      = (float) $f->paid_amount;
+                $remaining = max(0.00, $assigned + $fine - $disc - $paid);
+
+                $dueDate    = $f->due_date ? \Carbon\Carbon::parse($f->due_date) : null;
+                $daysOverdue = ($dueDate && $dueDate->isPast() && $remaining > 0) ? now()->diffInDays($dueDate) : 0;
+
+                if ($daysOverdue > 0) $overdueCount++;
+
+                $totAssigned  += $assigned;
+                $totPaid      += $paid;
+                $totRemaining += $remaining;
+                $totFine      += $fine;
+
+                $statusLabel = 'Pending';
+                $statusBadge = 'danger';
+                if ($remaining <= 0) {
+                    $statusLabel = 'Paid';
+                    $statusBadge = 'success';
+                } elseif ($daysOverdue > 0) {
+                    $statusLabel = 'Overdue (' . $daysOverdue . 'd)';
+                    $statusBadge = 'danger';
+                } elseif ($paid > 0) {
+                    $statusLabel = 'Partial';
+                    $statusBadge = 'warning';
+                }
+
+                $exportRows[] = [
+                    'student_name'     => $st->full_name,
+                    'admission_number' => $st->admission_number,
+                    'class_section'    => ($st->class?->name ?? '—') . ($st->section ? ' - ' . $st->section->name : ''),
+                    'installment_name' => 'Installment ' . ($f->installment_no ?? 1),
+                    'total_installment'=> '₹' . number_format($assigned, 2),
+                    'paid_amount'      => '₹' . number_format($paid, 2),
+                    'remaining_due'    => '₹' . number_format($remaining, 2),
+                    'due_date'         => $dueDate ? $dueDate->format('d M Y') : '—',
+                    'days_overdue'     => $daysOverdue > 0 ? $daysOverdue . ' Days' : '0',
+                    'fine_applied'     => '₹' . number_format($fine, 2),
+                    'status'           => $statusLabel,
+                    'status_badge'     => $statusBadge,
+                ];
+            }
+
+            $kpis = [
+                ['label' => 'Total Installments Assigned', 'value' => '₹' . number_format($totAssigned, 2)],
+                ['label' => 'Total Paid Amount',           'value' => '₹' . number_format($totPaid, 2)],
+                ['label' => 'Total Remaining Dues',        'value' => '₹' . number_format($totRemaining, 2)],
+                ['label' => 'Total Fine Applied',          'value' => '₹' . number_format($totFine, 2)],
+                ['label' => 'Overdue Items Count',         'value' => number_format($overdueCount)],
+            ];
+
+            $exportHeaders = [
+                ['title' => 'Student Name',         'key' => 'student_name'],
+                ['title' => 'Adm No',               'key' => 'admission_number'],
+                ['title' => 'Class & Sec',          'key' => 'class_section'],
+                ['title' => 'Installment',          'key' => 'installment_name'],
+                ['title' => 'Due Date',             'key' => 'due_date'],
+                ['title' => 'Days Overdue',         'key' => 'days_overdue',   'align' => 'center'],
+                ['title' => 'Assigned',             'key' => 'total_installment', 'align' => 'right'],
+                ['title' => 'Paid',                 'key' => 'paid_amount',    'align' => 'right'],
+                ['title' => 'Fine',                 'key' => 'fine_applied',   'align' => 'right'],
+                ['title' => 'Remaining Due',        'key' => 'remaining_due',  'align' => 'right'],
+                ['title' => 'Status',               'key' => 'status',         'type'  => 'badge'],
+            ];
+
+            $exportTotals = [
+                'student_name'      => 'TOTALS (' . count($exportRows) . ' Records)',
+                'total_installment' => '₹' . number_format($totAssigned, 2),
+                'paid_amount'       => '₹' . number_format($totPaid, 2),
+                'fine_applied'      => '₹' . number_format($totFine, 2),
+                'remaining_due'     => '₹' . number_format($totRemaining, 2),
+            ];
+        }
+
+        // ─── TAB 4: COMPONENT WISE REPORT ───
+        elseif ($activeTab === 'component_wise_report') {
+            $reportTitle = 'Component Wise Fee Report';
+
+            $allFees = StudentFee::where('school_id', $schoolId)
+                ->whereHas('student', $studentFilter)
+                ->with(['component'])
+                ->get();
+
+            $componentsMap = [];
+            foreach ($allFees as $fee) {
+                $compName = $fee->component?->name ?? ($fee->transport_fee_schedule_id ? 'Transport Fee' : 'General / Misc Fee');
+                if (!isset($componentsMap[$compName])) {
+                    $componentsMap[$compName] = [
+                        'assigned'  => 0,
+                        'collected' => 0,
+                        'discount'  => 0,
+                        'fine'      => 0,
+                    ];
+                }
+                $componentsMap[$compName]['assigned']  += (float) $fee->amount;
+                $componentsMap[$compName]['collected'] += (float) $fee->paid_amount;
+                $componentsMap[$compName]['discount']  += (float) $fee->instant_discount_amount;
+                $componentsMap[$compName]['fine']      += (float) $fee->fine_amount_applied;
+            }
+
+            $totAssigned = 0; $totCollected = 0; $totPending = 0; $totDiscount = 0; $totFine = 0;
+
+            foreach ($componentsMap as $name => $vals) {
+                $assigned  = $vals['assigned'];
+                $collected = $vals['collected'];
+                $discount  = $vals['discount'];
+                $fine      = $vals['fine'];
+                $pending   = max(0.00, $assigned + $fine - $discount - $collected);
+
+                $pct = ($assigned - $discount) > 0 ? round(($collected / ($assigned - $discount)) * 100, 1) : 0;
+
+                $totAssigned  += $assigned;
+                $totCollected += $collected;
+                $totPending   += $pending;
+                $totDiscount  += $discount;
+                $totFine      += $fine;
+
+                $exportRows[] = [
+                    'component_name'   => $name,
+                    'assigned_amount'  => '₹' . number_format($assigned, 2),
+                    'collected_amount' => '₹' . number_format($collected, 2),
+                    'pending_amount'   => '₹' . number_format($pending, 2),
+                    'discount_amount'  => '₹' . number_format($discount, 2),
+                    'fine_amount'      => '₹' . number_format($fine, 2),
+                    'collection_pct'   => $pct . '%',
+                ];
+            }
+
+            $overallPct = ($totAssigned - $totDiscount) > 0 ? round(($totCollected / ($totAssigned - $totDiscount)) * 100, 1) : 0;
+
+            $kpis = [
+                ['label' => 'Total Components',     'value' => count($exportRows)],
+                ['label' => 'Total Assigned',       'value' => '₹' . number_format($totAssigned, 2)],
+                ['label' => 'Total Collected',      'value' => '₹' . number_format($totCollected, 2)],
+                ['label' => 'Total Pending',        'value' => '₹' . number_format($totPending, 2)],
+                ['label' => 'Collection Rate',      'value' => $overallPct . '%'],
+            ];
+
+            $exportHeaders = [
+                ['title' => 'Fee Component Name',  'key' => 'component_name'],
+                ['title' => 'Assigned Amount',     'key' => 'assigned_amount',  'align' => 'right'],
+                ['title' => 'Collected Amount',    'key' => 'collected_amount', 'align' => 'right'],
+                ['title' => 'Discounts Allowed',   'key' => 'discount_amount',  'align' => 'right'],
+                ['title' => 'Fine Applied',        'key' => 'fine_amount',      'align' => 'right'],
+                ['title' => 'Pending Amount',      'key' => 'pending_amount',   'align' => 'right'],
+                ['title' => 'Collection Rate %',   'key' => 'collection_pct',   'align' => 'center'],
+            ];
+
+            $exportTotals = [
+                'component_name'   => 'TOTALS',
+                'assigned_amount'  => '₹' . number_format($totAssigned, 2),
+                'collected_amount' => '₹' . number_format($totCollected, 2),
+                'discount_amount'  => '₹' . number_format($totDiscount, 2),
+                'fine_amount'      => '₹' . number_format($totFine, 2),
+                'pending_amount'   => '₹' . number_format($totPending, 2),
+                'collection_pct'   => $overallPct . '%',
+            ];
+        }
+
+        // ─── TAB 5: CLASS WISE FEE REPORT ───
+        elseif ($activeTab === 'class_wise_fee_report') {
+            $reportTitle = 'Class-Wise Fee Report';
+
+            $targetClasses = $classId ? $classes->where('id', $classId) : $classes;
+
+            $totStudents = 0; $totAssigned = 0; $totCollected = 0; $totPending = 0; $totDiscount = 0; $totFine = 0;
+
+            foreach ($targetClasses as $cls) {
+                $studentsQuery = Student::where('school_id', $schoolId)->where('class_id', $cls->id);
+                if ($selectedSessionId) $studentsQuery->where('academic_session_id', $selectedSessionId);
+                if ($sectionId) $studentsQuery->where('section_id', $sectionId);
+
+                $stCount = $studentsQuery->count();
+
+                $classFees = StudentFee::where('school_id', $schoolId)
+                    ->whereHas('student', function($sq) use ($cls, $selectedSessionId, $sectionId) {
+                        $sq->where('class_id', $cls->id);
+                        if ($selectedSessionId) $sq->where('academic_session_id', $selectedSessionId);
+                        if ($sectionId) $sq->where('section_id', $sectionId);
+                    })
+                    ->get();
+
+                $assigned  = (float) $classFees->sum('amount');
+                $collected = (float) $classFees->sum('paid_amount');
+                $discount  = (float) $classFees->sum('instant_discount_amount');
+                $fine      = (float) $classFees->sum('fine_amount_applied');
+                $pending   = max(0.00, $assigned + $fine - $discount - $collected);
+                $pct       = ($assigned - $discount) > 0 ? round(($collected / ($assigned - $discount)) * 100, 1) : 0;
+
+                $totStudents  += $stCount;
+                $totAssigned  += $assigned;
+                $totCollected += $collected;
+                $totPending   += $pending;
+                $totDiscount  += $discount;
+                $totFine      += $fine;
+
+                $exportRows[] = [
+                    'class_name'       => $cls->name,
+                    'total_students'   => $stCount . ' Students',
+                    'fee_assigned'     => '₹' . number_format($assigned, 2),
+                    'fee_collected'    => '₹' . number_format($collected, 2),
+                    'discount_amount'  => '₹' . number_format($discount, 2),
+                    'fine_amount'      => '₹' . number_format($fine, 2),
+                    'pending_balance'  => '₹' . number_format($pending, 2),
+                    'collection_pct'   => $pct . '%',
+                ];
+            }
+
+            $overallPct = ($totAssigned - $totDiscount) > 0 ? round(($totCollected / ($totAssigned - $totDiscount)) * 100, 1) : 0;
+
+            $kpis = [
+                ['label' => 'Total Classes',     'value' => count($exportRows)],
+                ['label' => 'Total Students',    'value' => number_format($totStudents)],
+                ['label' => 'Total Assigned',    'value' => '₹' . number_format($totAssigned, 2)],
+                ['label' => 'Total Collected',   'value' => '₹' . number_format($totCollected, 2)],
+                ['label' => 'Total Pending',     'value' => '₹' . number_format($totPending, 2)],
+            ];
+
+            $exportHeaders = [
+                ['title' => 'Class Name',          'key' => 'class_name'],
+                ['title' => 'Total Students',      'key' => 'total_students',   'align' => 'center'],
+                ['title' => 'Assigned Amount',     'key' => 'fee_assigned',     'align' => 'right'],
+                ['title' => 'Collected Amount',    'key' => 'fee_collected',    'align' => 'right'],
+                ['title' => 'Discounts Allowed',   'key' => 'discount_amount',  'align' => 'right'],
+                ['title' => 'Fine Applied',        'key' => 'fine_amount',      'align' => 'right'],
+                ['title' => 'Pending Balance',     'key' => 'pending_balance',  'align' => 'right'],
+                ['title' => 'Collection Rate %',   'key' => 'collection_pct',   'align' => 'center'],
+            ];
+
+            $exportTotals = [
+                'class_name'       => 'TOTALS',
+                'total_students'   => number_format($totStudents) . ' Students',
+                'fee_assigned'     => '₹' . number_format($totAssigned, 2),
+                'fee_collected'    => '₹' . number_format($totCollected, 2),
+                'discount_amount'  => '₹' . number_format($totDiscount, 2),
+                'fine_amount'      => '₹' . number_format($totFine, 2),
+                'pending_balance'  => '₹' . number_format($totPending, 2),
+                'collection_pct'   => $overallPct . '%',
+            ];
+        }
+
+        // ─── TAB 6: PENDING CHEQUES ───
+        elseif ($activeTab === 'pending_cheques') {
+            $reportTitle = 'Pending Cheques Management Report';
+
+            $chequeQuery = PendingCheque::where('school_id', $schoolId)
+                ->whereHas('student', $studentFilter)
+                ->with(['student.class', 'student.section']);
+
+            if ($status) $chequeQuery->where('status', $status);
+            if ($dateFrom) $chequeQuery->whereDate('cheque_date', '>=', $dateFrom);
+            if ($dateTo) $chequeQuery->whereDate('cheque_date', '<=', $dateTo);
+
+            $cheques = $chequeQuery->orderBy('cheque_date', 'desc')->get();
+
+            $totAmt = 0; $pendingAmt = 0; $clearedAmt = 0; $bouncedAmt = 0;
+
+            foreach ($cheques as $c) {
+                $st = $c->student;
+                if (!$st) continue;
+
+                $amt = (float) $c->amount;
+                $totAmt += $amt;
+
+                $stLabel = ucfirst($c->status ?? 'pending');
+                $stBadge = 'warning';
+
+                if ($c->status === 'cleared') {
+                    $clearedAmt += $amt;
+                    $stBadge = 'success';
+                } elseif ($c->status === 'bounced') {
+                    $bouncedAmt += $amt;
+                    $stBadge = 'danger';
+                } elseif ($c->status === 'cancelled') {
+                    $stBadge = 'slate';
+                } else {
+                    $pendingAmt += $amt;
+                }
+
+                $exportRows[] = [
+                    'student_name'     => $st->full_name,
+                    'admission_number' => $st->admission_number,
+                    'receipt_number'   => $c->receipt_number ?? '—',
+                    'cheque_number'    => $c->cheque_number,
+                    'bank_name'        => $c->bank_name . ($c->branch ? ' (' . $c->branch . ')' : ''),
+                    'amount'           => '₹' . number_format($amt, 2),
+                    'collection_date'  => $c->cheque_date ? \Carbon\Carbon::parse($c->cheque_date)->format('d M Y') : '—',
+                    'status'           => $stLabel,
+                    'status_badge'     => $stBadge,
+                    'cleared_date'     => $c->status_changed_at ? \Carbon\Carbon::parse($c->status_changed_at)->format('d M Y') : '—',
+                    'remarks'          => $c->status_remarks ?? '—',
+                ];
+            }
+
+            $kpis = [
+                ['label' => 'Total Cheques Logged',  'value' => count($exportRows)],
+                ['label' => 'Pending Cheques Amt',   'value' => '₹' . number_format($pendingAmt, 2)],
+                ['label' => 'Cleared Cheques Amt',   'value' => '₹' . number_format($clearedAmt, 2)],
+                ['label' => 'Bounced Cheques Amt',   'value' => '₹' . number_format($bouncedAmt, 2)],
+            ];
+
+            $exportHeaders = [
+                ['title' => 'Student Name',     'key' => 'student_name'],
+                ['title' => 'Adm No',           'key' => 'admission_number'],
+                ['title' => 'Receipt No',       'key' => 'receipt_number'],
+                ['title' => 'Cheque No',        'key' => 'cheque_number'],
+                ['title' => 'Bank & Branch',    'key' => 'bank_name'],
+                ['title' => 'Cheque Date',      'key' => 'collection_date'],
+                ['title' => 'Amount',           'key' => 'amount',           'align' => 'right'],
+                ['title' => 'Status',           'key' => 'status',           'type'  => 'badge'],
+                ['title' => 'Cleared/Status Date','key' => 'cleared_date'],
+                ['title' => 'Remarks',          'key' => 'remarks'],
+            ];
+
+            $exportTotals = [
+                'student_name' => 'TOTALS (' . count($exportRows) . ' Cheques)',
+                'amount'       => '₹' . number_format($totAmt, 2),
+            ];
+        }
+
+        return [
+            'activeTab'         => $activeTab,
+            'academicSessions'  => $academicSessions,
+            'selectedSessionId' => $selectedSessionId,
+            'sessionName'       => $sessionName,
+            'classes'           => $classes,
+            'classId'           => $classId,
+            'sections'          => $sections,
+            'sectionId'         => $sectionId,
+            'dateFrom'          => $dateFrom,
+            'dateTo'            => $dateTo,
+            'installmentNo'     => $installmentNo,
+            'paymentMode'       => $paymentMode,
+            'status'            => $status,
+            'feeScheduleId'     => $feeScheduleId,
+            'feeComponentId'    => $feeComponentId,
+            'searchStudent'     => $searchStudent,
+            'feeSchedules'      => $feeSchedules,
+            'feeComponents'     => $feeComponents,
+            'paymentModes'      => $paymentModes,
+            'installments'      => $installments,
+            'reportTitle'       => $reportTitle,
+            'filterSummary'     => $filterSummary,
+            'kpis'              => $kpis,
+            'exportHeaders'     => $exportHeaders,
+            'exportRows'        => $exportRows,
+            'exportTotals'      => $exportTotals,
+        ];
     }
 
     // ─── Sibling Report ──────────────────────────────────────────────────

@@ -27,9 +27,9 @@
         }
         body{font-family:'Inter',sans-serif;background:var(--page);color:var(--t1);display:flex;min-height:100vh;overflow-x:hidden;}
 
-        /* ─── SIDEBAR ─────────────────────────────────────────────── */
+        /* ─── SIDEBAR & NAV COMPONENT STYLING ─────────────────────── */
         .sidebar{
-            width:250px;min-width:250px;background:var(--navy);
+            width:260px;min-width:260px;background:var(--navy);
             display:flex;flex-direction:column;color:#fff;position:sticky;top:0;height:100vh;overflow-y:auto;
             z-index:100;box-shadow:4px 0 20px rgba(0,0,0,0.15);
         }
@@ -47,36 +47,55 @@
 
         /* Profile Badge Box */
         .sb-profile{
-            margin:16px;padding:14px;background:rgba(255,255,255,.05);
+            margin:14px;padding:12px 14px;background:rgba(255,255,255,.05);
             border:1px solid rgba(255,255,255,.1);border-radius:14px;display:flex;align-items:center;gap:12px;
         }
         .sb-avatar{
-            width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#4c1d95);
+            width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#4c1d95);
             color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;
             box-shadow:0 2px 8px rgba(124,58,237,.4);flex-shrink:0;
         }
-        .sb-prof-info h4{font-size:13.5px;font-weight:700;color:#fff;line-height:1.2;margin-bottom:3px;}
+        .sb-prof-info h4{font-size:13px;font-weight:700;color:#fff;line-height:1.2;margin-bottom:2px;}
         .sb-prof-info p{font-size:11px;color:rgba(255,255,255,.6);}
         .sb-prof-badge{
             display:inline-block;padding:2px 8px;background:rgba(245,158,11,.2);color:var(--gold);
-            border-radius:20px;font-size:10px;font-weight:700;margin-top:4px;
+            border-radius:20px;font-size:10px;font-weight:700;margin-top:3px;
         }
 
-        /* Nav Groups */
-        .sb-nav{padding:8px 12px;flex:1;}
-        .sb-grp-title{
-            font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
-            color:rgba(255,255,255,.4);padding:14px 10px 6px;display:flex;align-items:center;justify-content:space-between;
+        /* sidebar_nav Styling */
+        .sb-nav{padding:8px 10px;flex:1;overflow-y:auto;overflow-x:hidden;}
+        .sb-search-wrapper input{background:rgba(255,255,255,0.06) !important;color:#fff !important;border-color:rgba(255,255,255,0.12) !important;}
+        .sb-search-wrapper input::placeholder{color:rgba(255,255,255,0.4) !important;}
+        .sb-search-box i{color:rgba(255,255,255,0.4) !important;}
+        
+        .sb-group{margin-bottom:4px;border-bottom:none !important;}
+        .sb-hdr{
+            display:flex;align-items:center;justify-content:space-between;
+            padding:9px 12px;cursor:pointer;user-select:none;
+            color:rgba(255,255,255,0.82) !important;transition:all .2s;border-radius:10px;
+            margin:2px 0;
         }
-        .sb-item{
-            display:flex;align-items:center;gap:12px;padding:10px 12px;color:rgba(255,255,255,.75);
-            text-decoration:none;font-size:13px;font-weight:600;border-radius:10px;margin-bottom:4px;
-            transition:all .2s;
+        .sb-hdr:hover{background:rgba(255,255,255,0.08) !important;color:#fff !important;}
+        .sb-hdr-left{display:flex;align-items:center;gap:10px;}
+        .sb-hdr-icon{
+            width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,0.08) !important;
+            display:flex;align-items:center;justify-content:center;
+            color:rgba(255,255,255,0.85) !important;font-size:12px;flex-shrink:0;
         }
-        .sb-item:hover{background:rgba(255,255,255,.08);color:#fff;}
-        .sb-item.active{background:linear-gradient(90deg,#7c3aed,#6d28d9);color:#fff;box-shadow:0 4px 12px rgba(124,58,237,.3);}
-        .sb-item i{font-size:15px;width:20px;text-align:center;color:rgba(255,255,255,.6);}
-        .sb-item.active i{color:#fff;}
+        .sb-hdr-title{font-family:'Plus Jakarta Sans',sans-serif;color:inherit;font-size:13px;font-weight:700;}
+        .sb-hdr-arrow{font-size:10px;color:rgba(255,255,255,0.4) !important;transition:transform .2s;}
+        .sb-hdr.open .sb-hdr-arrow{transform:rotate(180deg);color:var(--gold) !important;}
+
+        .sb-submenu{list-style:none;padding:2px 0 4px 14px;}
+        .sb-submenu li{margin-bottom:2px;}
+        .sb-submenu a{
+            display:flex;align-items:center;justify-content:space-between;
+            padding:7px 10px;border-radius:8px;
+            color:rgba(255,255,255,0.75) !important;font-size:12.5px;font-weight:500;
+            text-decoration:none !important;transition:all .18s;
+        }
+        .sb-submenu a:hover{color:#fff !important;background:rgba(255,255,255,0.1) !important;}
+        .sb-submenu li.active a{color:#fff !important;background:linear-gradient(90deg, #7c3aed, #6d28d9) !important;font-weight:700;box-shadow:0 2px 8px rgba(124,58,237,.3);}
 
         .sb-logout{padding:16px;border-top:1px solid rgba(255,255,255,.08);}
         .btn-logout{
@@ -85,6 +104,34 @@
             border-radius:10px;text-decoration:none;font-size:13px;font-weight:700;transition:all .2s;
         }
         .btn-logout:hover{background:#ef4444;color:#fff;}
+
+        /* Hamburger button */
+        .hamburger-btn{
+            display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;
+            background:rgba(26,31,60,.06);border:1px solid var(--border);border-radius:10px;
+            color:var(--t1);font-size:16px;cursor:pointer;margin-right:14px;transition:all 0.2s;
+        }
+        .hamburger-btn:hover{background:var(--purple-light);color:var(--purple);}
+
+        /* Desktop Sidebar Close/Collapse Support */
+        body.sidebar-closed .sidebar {
+            display: none !important;
+        }
+
+        /* Mobile Sidebar Overlay */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+            z-index: 999;
+        }
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+
 
         /* ─── MAIN WRAPPER & HEADER ───────────────────────────────── */
         .main-wrapper{flex:1;display:flex;flex-direction:column;min-width:0;}
@@ -438,12 +485,108 @@
             color: var(--green);
             font-weight: 600;
         }
+
+        .form-row-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        /* ─── COMPREHENSIVE MOBILE RESPONSIVE STYLING ─────────────── */
+        @media (max-width: 991px) {
+            body.sidebar-closed .sidebar { display: flex !important; }
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                transform: translateX(-100%);
+                z-index: 1000;
+                transition: transform 0.3s ease;
+            }
+            .sidebar.open { transform: translateX(0); }
+            
+            .top-header {
+                padding: 8px 12px !important;
+                height: auto !important;
+                min-height: 56px;
+                flex-direction: row !important;
+                align-items: center !important;
+                justify-content: space-between !important;
+                flex-wrap: nowrap !important;
+                gap: 6px !important;
+            }
+            .th-actions {
+                width: auto !important;
+                justify-content: flex-end !important;
+                gap: 6px !important;
+                flex-shrink: 0 !important;
+            }
+            .th-title {
+                min-width: 0;
+                flex: 1;
+            }
+            .th-title h2 {
+                font-size: 14px !important;
+                white-space: nowrap !important;
+                max-width: 140px !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+            .th-title p { display: none !important; }
+            .th-user-info { display: none !important; }
+            .th-user-pill { padding: 2px !important; background: transparent !important; border: none !important; }
+            .th-user-img { width: 32px !important; height: 32px !important; font-size: 12px !important; }
+            .th-icon-btn { width: 36px !important; height: 36px !important; font-size: 14px !important; }
+            .th-logout-btn { width: 36px !important; height: 36px !important; margin-right: 0 !important; }
+
+            .content-area { padding: 14px 10px !important; }
+            .balance-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important; gap: 12px !important; margin-bottom: 20px !important; }
+            .balance-card { padding: 12px 14px !important; gap: 10px !important; }
+            .balance-icon { width: 38px !important; height: 38px !important; font-size: 1rem !important; }
+            .balance-details .val { font-size: 17px !important; }
+            .columns-layout { grid-template-columns: 1fr !important; gap: 16px !important; }
+            .card { padding: 16px 14px !important; border-radius: 14px !important; }
+        }
+
+        @media (max-width: 576px) {
+            .top-header { padding: 6px 8px !important; }
+            .th-title h2 { max-width: 110px !important; font-size: 13px !important; }
+            .hamburger-btn { margin-right: 4px !important; width: 32px !important; height: 32px !important; font-size: 13px !important; }
+            .th-icon-btn { width: 32px !important; height: 32px !important; font-size: 13px !important; }
+            .th-logout-btn { width: 32px !important; height: 32px !important; }
+            .th-user-img { width: 30px !important; height: 30px !important; font-size: 11px !important; }
+            .th-actions { gap: 4px !important; }
+            .lang-switch-container { transform: scale(0.85); transform-origin: center right; margin: 0 -4px; }
+            .card-title { font-size: 14px !important; margin-bottom: 14px !important; }
+            .form-group { margin-bottom: 12px !important; }
+            .form-label { font-size: 12px !important; }
+            .form-control { height: 38px !important; font-size: 12.5px !important; padding: 6px 10px !important; }
+            .tbl th, .tbl td { padding: 10px 8px !important; font-size: 11.5px !important; }
+            .form-row-2col { grid-template-columns: 1fr !important; gap: 10px !important; }
+            .balance-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+        }
+
+        @media (max-width: 768px) {
+            .notif-dropdown-panel {
+                position: fixed !important;
+                top: 60px !important;
+                left: 12px !important;
+                right: 12px !important;
+                width: auto !important;
+                max-width: none !important;
+                z-index: 1050 !important;
+                box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2) !important;
+            }
+        }
     </style>
 </head>
 <body>
 
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleTeacherSidebar()"></div>
+
     <!-- ─── SIDEBAR ─────────────────────────────────────────────── -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="teacherSidebar">
         <!-- Logo -->
         <a href="{{ route('teacher.dashboard') }}" class="sb-logo">
             <div class="sb-logo-icon"><i class="fas fa-graduation-cap"></i></div>
@@ -465,32 +608,8 @@
             </div>
         </div>
 
-        <!-- Sidebar Nav -->
-        <div class="sb-nav">
-            <div class="sb-grp-title">Core Navigation</div>
-            <a href="{{ route('teacher.dashboard') }}" class="sb-item">
-                <i class="fas fa-chart-pie"></i>
-                <span>Dashboard</span>
-            </a>
-            <a href="{{ route('teacher.leave.apply') }}" class="sb-item active">
-                <i class="fas fa-calendar-alt"></i>
-                <span>Apply Leave</span>
-            </a>
-            
-            <div class="sb-grp-title" style="margin-top: 12px;">Standard Work</div>
-            <a href="{{ route('teacher.assignments.index') }}" class="sb-item">
-                <i class="fas fa-tasks"></i>
-                <span>Assignments</span>
-            </a>
-            <a href="{{ route('teacher.study-materials.index') }}" class="sb-item">
-                <i class="fas fa-book-open"></i>
-                <span>Study Materials</span>
-            </a>
-            <a href="{{ route('teacher.notices.index') }}" class="sb-item">
-                <i class="fas fa-bullhorn"></i>
-                <span>Notice Board</span>
-            </a>
-        </div>
+        <!-- Single Centralized Nav Component -->
+        @include('layouts.sidebar_nav')
 
         <!-- Logout -->
         <div class="sb-logout">
@@ -506,9 +625,14 @@
         
         <!-- Top Header -->
         <header class="top-header">
-            <div class="th-title">
-                <h2>Leave Application Portal</h2>
-                <p>Apply for leaves and manage your balances</p>
+            <div style="display:flex;align-items:center;">
+                <button type="button" class="hamburger-btn" onclick="toggleTeacherSidebar()" aria-label="Toggle Sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="th-title">
+                    <h2>Leave Application Portal</h2>
+                    <p>Apply for leaves and manage your balances</p>
+                </div>
             </div>
             <div class="th-actions">
                 <!-- NOTIFICATION BELL CENTER -->
@@ -540,14 +664,28 @@
                     </div>
                 </div>
 
+                <!-- DIRECT LOGOUT ICON BUTTON -->
+                <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('teacher-leave-logout-form').submit();" class="th-icon-btn th-logout-btn" title="Logout" style="width:38px;height:38px;border-radius:50%;background:rgba(239,68,68,0.1);color:#ef4444;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;margin-right:4px;">
+                    <i class="fas fa-power-off"></i>
+                </a>
+                <form id="teacher-leave-logout-form" action="{{ route('logout.post') }}" method="POST" style="display: none;">
+                    @csrf
+                </form>
+
                 <!-- User Profile Pill -->
-                <div class="th-user-pill">
-                    <div class="th-user-img">{{ strtoupper(substr($user->name, 0, 1)) }}</div>
+                <a href="{{ route('teacher.dashboard') }}" class="th-user-pill" style="text-decoration:none;">
+                    <div class="th-user-img">
+                        @if(!empty($user->photo))
+                            <img src="{{ asset($user->photo) }}" alt="{{ $user->name }}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+                        @else
+                            {{ strtoupper(substr($user->name, 0, 1)) }}
+                        @endif
+                    </div>
                     <div class="th-user-info">
                         <h5>{{ $user->name }}</h5>
                         <p>{{ $staff->designation?->name ?? 'Staff Member' }}</p>
                     </div>
-                </div>
+                </a>
             </div>
         </header>
 
@@ -605,7 +743,7 @@
                             </select>
                         </div>
                         
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                        <div class="form-row-2col">
                             <div class="form-group">
                                 <label class="form-label">From Date *</label>
                                 <input type="date" name="start_date" class="form-control" required>
@@ -792,6 +930,14 @@
                     }
 
                     const unreadClass = item.is_read ? 'read' : 'unread';
+                    const timeDisplay = item.time || item.time_ago || '';
+                    const dateDisplay = item.date_str || item.created_at || '';
+                    let timeText = '';
+                    if (timeDisplay && dateDisplay && !timeDisplay.includes(dateDisplay)) {
+                        timeText = `${timeDisplay} (${dateDisplay})`;
+                    } else {
+                        timeText = timeDisplay || dateDisplay || '';
+                    }
 
                     html += `
                         <div class="notif-item ${unreadClass}" onclick="markNotifAsRead(${item.id})">
@@ -801,7 +947,7 @@
                             <div class="notif-content">
                                 <div class="notif-item-title">${escapeHtml(item.title)}</div>
                                 <div class="notif-item-msg">${escapeHtml(item.message)}</div>
-                                <div class="notif-item-time"><i class="far fa-clock"></i> ${item.time_ago} (${item.created_at})</div>
+                                <div class="notif-item-time"><i class="far fa-clock"></i> ${escapeHtml(timeText)}</div>
                             </div>
                             ${!item.is_read ? '<div class="notif-unread-dot"></div>' : ''}
                         </div>`;
@@ -933,6 +1079,20 @@
             })
             .catch(err => console.error('Error syncing leave UI:', err));
         };
+
+        function toggleTeacherSidebar(e) {
+            if (e && e.preventDefault) { e.preventDefault(); e.stopPropagation(); }
+            const sidebar = document.getElementById('teacherSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            if (!sidebar) return;
+
+            if (window.innerWidth > 991) {
+                document.body.classList.toggle('sidebar-closed');
+            } else {
+                const isOpen = sidebar.classList.toggle('open');
+                if (overlay) overlay.classList.toggle('active', isOpen);
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
             fetchTeacherNotifications();

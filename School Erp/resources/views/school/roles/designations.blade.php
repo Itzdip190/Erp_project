@@ -393,6 +393,86 @@ body.dark-mode .dg-tab-btn.active {
     color: var(--dg-blue-light) !important;
     border-bottom-color: var(--dg-blue-light) !important;
 }
+
+/* ── MOBILE RESPONSIVE STYLES ── */
+@media (max-width: 768px) {
+    .dg-page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+        padding: 20px;
+    }
+    .dg-page-header h1 {
+        font-size: 18px;
+    }
+    .dg-add-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    .dg-search-card {
+        padding: 14px 16px;
+    }
+    .dg-search-form {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+    .dg-search-btn, .dg-clear-btn {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+    }
+    .dg-table-card {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 12px;
+    }
+    .dg-table {
+        min-width: 650px;
+    }
+    .dg-table th, .dg-table td {
+        padding: 12px 14px;
+    }
+    /* Slide-in panel full width on mobile */
+    .dg-panel {
+        width: 100%;
+        right: -100%;
+    }
+    .dg-panel.open {
+        right: 0;
+    }
+
+    /* Mobile pagination: Hide all page numbers, show ONLY Prev (<) & Next (>) arrows */
+    .dg-pagination-wrap nav[role="navigation"] span.shadow-sm > a,
+    .dg-pagination-wrap nav[role="navigation"] span.shadow-sm > span,
+    .dg-pagination-wrap .pagination li {
+        display: none !important;
+    }
+    .dg-pagination-wrap nav[role="navigation"] span.shadow-sm > a:first-child,
+    .dg-pagination-wrap nav[role="navigation"] span.shadow-sm > span:first-child,
+    .dg-pagination-wrap nav[role="navigation"] span.shadow-sm > a:last-child,
+    .dg-pagination-wrap nav[role="navigation"] span.shadow-sm > span:last-child,
+    .dg-pagination-wrap .pagination li:first-child,
+    .dg-pagination-wrap .pagination li:last-child {
+        display: inline-flex !important;
+    }
+    .dg-pagination-wrap nav[role="navigation"] span.shadow-sm {
+        display: flex !important;
+        justify-content: center !important;
+        gap: 20px !important;
+        width: 100% !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .dg-table {
+        min-width: 580px;
+    }
+    .dg-table th, .dg-table td {
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+}
 </style>
 @endsection
 
@@ -521,7 +601,7 @@ body.dark-mode .dg-tab-btn.active {
         </table>
     </div>
 
-    <div style="margin-top: 15px;">
+    <div style="margin-top: 15px;" class="dg-pagination-wrap">
         {{ $designations->links() }}
     </div>
     @endif

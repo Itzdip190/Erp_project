@@ -137,7 +137,119 @@ class TeacherLeaveController extends Controller
                 ->get();
         }
 
-        return view('teacher.leave.apply', compact('user', 'staff', 'leaveSummaries', 'applications'));
+        // Build accessible modules for sidebar nav
+        $accessibleModules = [];
+        try {
+            $allModules = \App\Support\ModuleRegistry::all();
+            $featureRouteMap = [
+                'mis_report'            => 'school.dashboard.mis-report',
+                'admin_dashboard'       => 'school.dashboard',
+                'basic_info'            => 'school.settings.institute-info',
+                'udise'                 => 'school.settings.udise',
+                'roles'                 => 'school.roles.index',
+                'permissions'           => 'school.roles.permissions',
+                'password_reset'        => 'school.passwords.reset',
+                'staff_directory'       => 'school.staff.index',
+                'add_staff'             => 'school.staff.create',
+                'bulk_import'           => 'school.staff.import',
+                'bulk_photo'            => 'school.staff.bulk-photo',
+                'leave_basics'         => 'school.leave.basics',
+                'staff_leave'          => 'teacher.leave.apply',
+                'student_leave'        => 'school.leave.student',
+                'class_overview'        => 'school.assignments.class-overview',
+                'add_class'             => 'school.assignments.classes',
+                'add_subject'           => 'school.assignments.subjects',
+                'assign_teacher'        => 'school.assignments.teachers',
+                'class_timetable'       => 'school.timetable.class',
+                'group_timetable'       => 'school.timetable.group',
+                'teacher_timetable'     => 'school.timetable.teacher',
+                'teacher_substitution'  => 'school.timetable.substitution',
+                'add_student'           => 'school.students.create',
+                'bulk_student_import'   => 'school.student-mgmt.import',
+                'bulk_photo_doc'        => 'school.student-mgmt.bulk-photo',
+                'optional_subject'      => 'school.student-mgmt.optional-subject',
+                'student_directory'     => 'school.students.index',
+                'admission_report'      => 'school.student-mgmt.admission-report',
+                'siblings'              => 'school.student-mgmt.siblings',
+                'student_attendance'    => 'school.attendance.students.index',
+                'student_report'        => 'school.student-mgmt.report',
+                'student_bulk_attendance'=> 'school.student-mgmt.bulk-attendance',
+                'staff_attendance'      => 'school.attendance.staff.index',
+                'staff_bulk_attendance' => 'school.staff.bulk-attendance',
+                'student_att_report'    => 'school.attendance.students.marking-report',
+                'student_download'      => 'school.downloads.student-status',
+                'staff_download'        => 'school.downloads.staff-status',
+                'parent_download'       => 'school.downloads.parent-status',
+                'student_activity'      => 'school.downloads.student-activity',
+                'staff_activity'        => 'school.downloads.staff-activity',
+                'parent_activity'       => 'school.downloads.parent-activity',
+                'fee_configuration'     => 'school.fees.configuration',
+                'fee_basics'            => 'school.fees.basics',
+                'class_wise_fee'        => 'school.fees.class-wise',
+                'student_wise_fee'      => 'school.fees.student-wise',
+                'schedule_mapper'       => 'school.fees.schedule-mapper',
+                'fee_receipts'          => 'school.fees.receipts',
+                'pending_cheques'       => 'school.fees.pending-cheques',
+                'fee_reports'           => 'school.fees.reports',
+                'fee_invoice'           => 'school.fees.invoice',
+                'fee_invoice1'          => 'school.fees.invoice1',
+                'template_creator'      => 'school.cards.template-creator',
+                'generate_card'         => 'school.cards.generate-card',
+                'create_diary'          => 'school.diary.create',
+                'diary_report'          => 'school.diary.report',
+                'event_holiday'         => 'school.events.index',
+                'manage_certs'          => 'school.certificates.manage',
+                'class_wise_cert'       => 'school.certificates.class-wise',
+                'cert_report'           => 'school.certificates.report',
+                'notification_settings' => 'school.communication.settings',
+                'notice_circular'       => 'teacher.notices.index',
+                'survey'                => 'school.communication.survey',
+                'sms'                   => 'school.communication.sms',
+                'sms_template'          => 'school.communication.sms-template',
+                'whatsapp'              => 'school.communication.whatsapp',
+                'email'                 => 'school.communication.email',
+                'chat'                  => 'school.communication.chat',
+                'grade_scale'          => 'school.examination.grade-scale',
+                'marks_entry'           => 'school.examination.marks-entry',
+                'offline_tests'         => 'school.examination.offline-tests',
+                'report_card_template'  => 'school.examination.report-card-template',
+                'report_card'           => 'school.examination.report-card',
+                'report_card_v2'        => 'school.examination.report-card-v2',
+                'admission_process'      => 'school.admissions.process',
+                'admission_settings'     => 'school.admissions.settings',
+                'enquiry_leads'          => 'school.admissions.enquiry-leads',
+                'application_payment'    => 'school.admissions.application-payment',
+                'pending_documents'      => 'school.admissions.pending-documents',
+                'interaction_evaluation' => 'school.admissions.interaction-evaluation',
+                'admission'              => 'school.admissions.admission',
+                'new_admission_report'   => 'school.admissions.new-admission-report',
+                'daily_planner'          => 'school.admissions.daily-planner',
+                'admission_dashboard'    => 'school.admissions.dashboard',
+                'post_event'             => 'school.gallery.events',
+            ];
+
+            foreach ($allModules as $modKey => $modInfo) {
+                $hasAnyFeature = false;
+                $grantedFeatures = [];
+                foreach ($modInfo['features'] as $featKey => $featLabel) {
+                    if (\App\Support\StaffAccessHelper::hasAccess($modKey, $featKey, 'view')) {
+                        $hasAnyFeature = true;
+                        $routeName = $featureRouteMap[$featKey] ?? null;
+                        $url = ($routeName && \Illuminate\Support\Facades\Route::has($routeName)) ? route($routeName) : '#';
+                        $grantedFeatures[$featKey] = ['label' => $featLabel, 'url' => $url];
+                    }
+                }
+                if ($hasAnyFeature) {
+                    $accessibleModules[$modKey] = [
+                        'label' => $modInfo['label'],
+                        'icon' => $modInfo['icon'],
+                        'features' => $grantedFeatures,
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return view('teacher.leave.apply', compact('user', 'staff', 'leaveSummaries', 'applications', 'accessibleModules'));
     }
 
     public function store(Request $request)

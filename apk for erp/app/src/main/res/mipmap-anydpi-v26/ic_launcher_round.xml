@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Circle background with vibrant royal blue -->
+    <path
+        android:fillColor="#0D6EFD"
+        android:pathData="M54,54m-54,0a54,54 0 1,0 108,0a54,54 0 1,0 -108,0" />
+
+    <!-- Open Book / Education Symbol -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,68c6.6,-4.4 14.7,-7 26,-7 11.3,0 19.4,2.6 26,7v-38c-6.6,-4.4 -14.7,-7 -26,-7 -11.3,0 -19.4,2.6 -26,7v38z" />
+
+    <!-- Book Center Fold Line -->
+    <path
+        android:fillColor="#0D6EFD"
+        android:pathData="M52,24h4v46h-4z" />
+
+    <!-- Graduation Cap / Mortarboard Accent (Gold color) -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M54,30l22,10l-22,10l-22,-10z" />
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M40,46.5v10c0,0 7,6 14,6c7,0 14,-6 14,-6v-10l-14,6.5z" />
+
+</vector>
