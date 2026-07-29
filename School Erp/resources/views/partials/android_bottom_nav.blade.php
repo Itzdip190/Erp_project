@@ -48,47 +48,41 @@
 @endphp
 
 @if($showBottomNav)
-<!-- Android Dedicated Bottom Navigation Bar -->
+<!-- Android Dedicated Premium Bottom Navigation Bar -->
 <div class="android-bottom-nav" id="androidBottomNav">
-    <a href="{{ $dashUrl }}" class="abn-item {{ $isDashActive ? 'active' : '' }}" title="Dashboard">
+    <a href="{{ $dashUrl }}" class="abn-item {{ $isDashActive ? 'active' : '' }}" title="Home">
         <div class="abn-icon-wrap">
-            <i class="fas fa-border-all"></i>
+            <i class="fas fa-house"></i>
+        </div>
+        <span>Home</span>
+        @if($isDashActive)
+            <div class="abn-active-line"></div>
+        @endif
+    </a>
+
+    <button type="button" class="abn-item" onclick="toggleAndroidSidebar(event)" title="Dashboard">
+        <div class="abn-icon-wrap">
+            <i class="fas fa-sliders"></i>
         </div>
         <span>Dashboard</span>
-    </a>
+    </button>
 
-    <a href="{{ $studentsUrl }}" class="abn-item {{ $isStudentsActive ? 'active' : '' }}" title="Students">
+    <a href="{{ Route::has('school.communication.notice') ? route('school.communication.notice') : '#' }}" class="abn-item" title="Messages">
         <div class="abn-icon-wrap">
-            <i class="fas fa-user-graduate"></i>
-        </div>
-        <span>Students</span>
-    </a>
-
-    <a href="{{ $attendanceUrl }}" class="abn-item {{ $isAttendanceActive ? 'active' : '' }}" title="Attendance">
-        <div class="abn-icon-wrap">
-            <i class="fas fa-calendar-check"></i>
-        </div>
-        <span>Attendance</span>
-    </a>
-
-    <button type="button" class="abn-item" onclick="openMobileNotifModal(event)" title="Alerts">
-        <div class="abn-icon-wrap">
-            <i class="fas fa-bell"></i>
+            <i class="far fa-comment-dots"></i>
             @if($notifCount > 0)
                 <span class="abn-badge">{{ $notifCount }}</span>
-            @else
-                <span class="abn-badge">1</span>
             @endif
         </div>
-        <span>Alerts</span>
-    </button>
+        <span>Messages</span>
+    </a>
 
-    <button type="button" class="abn-item" onclick="toggleAndroidSidebar(event)" title="Menu">
+    <a href="{{ route('school.settings.index') }}" class="abn-item" title="Profile">
         <div class="abn-icon-wrap">
-            <div class="abn-avatar">{{ $uInitials }}</div>
+            <i class="far fa-user"></i>
         </div>
-        <span>Menu</span>
-    </button>
+        <span>Profile</span>
+    </a>
 </div>
 @endif
 

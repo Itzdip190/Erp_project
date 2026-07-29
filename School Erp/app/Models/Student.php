@@ -134,6 +134,8 @@ class Student extends Model
         'region',
         'permanent_address',
         'permanent_address_line_2',
+        'permanent_house_number',
+        'permanent_location',
         'permanent_city',
         'permanent_state',
         'permanent_country',
@@ -331,6 +333,20 @@ class Student extends Model
         return $this->belongsToMany(Subject::class, 'student_optional_subjects', 'student_id', 'subject_id')
             ->withPivot('academic_session_id')
             ->withTimestamps();
+    }
+
+    /**
+     * Get all subjects assigned to this student (class subjects filtered by student-level mapping).
+     */
+    public function getAssignedSubjects(?int $sessionId = null)
+    {
+        $classSubjects = Subject::where('school_id', $this->school_id)
+            ->where('class_id', $this->class_id)
+            ->get();
+
+        return $classSubjects->filter(function ($subject) use ($sessionId) {
+            return $subject->isStudentMapped($this->id, $sessionId);
+        });
     }
 
     public function studentFees()

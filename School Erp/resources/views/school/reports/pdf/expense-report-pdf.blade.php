@@ -2,14 +2,14 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>{{ $reportTitle ?? 'Fee Report' }}</title>
+    <title>{{ $reportTitle ?? 'School Expense Ledger & Audit Report' }}</title>
     <style>
         @page {
             margin: 25px 25px 35px 25px;
         }
         body {
             font-family: 'DejaVu Sans', sans-serif;
-            font-size: 10px;
+            font-size: 9.5px;
             color: #1e293b;
             line-height: 1.3;
             margin: 0;
@@ -18,52 +18,52 @@
         .header-table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #1d4ed8;
-            padding-bottom: 10px;
+            margin-bottom: 12px;
+            border-bottom: 2px solid #dc2626;
+            padding-bottom: 8px;
         }
         .header-logo {
-            width: 60px;
+            width: 55px;
             height: auto;
-            max-height: 60px;
+            max-height: 55px;
         }
         .school-name {
             font-size: 18px;
             font-weight: bold;
-            color: #1d4ed8;
+            color: #dc2626;
             margin: 0;
             text-transform: uppercase;
         }
         .school-info {
-            font-size: 9px;
+            font-size: 8.5px;
             color: #64748b;
             margin-top: 2px;
         }
         .report-title-box {
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
             border-radius: 6px;
             padding: 8px 12px;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
         .report-title {
             font-size: 14px;
             font-weight: bold;
-            color: #1e40af;
+            color: #991b1b;
             margin: 0;
         }
         .meta-grid {
             width: 100%;
             border-collapse: collapse;
-            font-size: 9px;
-            color: #475569;
+            font-size: 8.5px;
+            color: #7f1d1d;
             margin-top: 4px;
         }
         .meta-grid td {
             padding: 2px 0;
         }
-        
-        /* Summary KPI Bar */
+
+        /* KPI Bar */
         .kpi-table {
             width: 100%;
             border-collapse: collapse;
@@ -77,7 +77,7 @@
             text-align: center;
         }
         .kpi-lbl {
-            font-size: 8px;
+            font-size: 7.5px;
             text-transform: uppercase;
             color: #64748b;
             font-weight: bold;
@@ -96,18 +96,18 @@
             margin-bottom: 15px;
         }
         .data-table th {
-            background: #1d4ed8;
+            background: #dc2626;
             color: #ffffff;
-            font-size: 9px;
+            font-size: 8.5px;
             font-weight: bold;
             text-transform: uppercase;
-            padding: 6px 8px;
+            padding: 6px 7px;
             text-align: left;
-            border: 1px solid #1d4ed8;
+            border: 1px solid #dc2626;
         }
         .data-table td {
-            padding: 5px 8px;
-            font-size: 9px;
+            padding: 5px 7px;
+            font-size: 8.5px;
             border-bottom: 1px solid #e2e8f0;
             border-left: 1px solid #e2e8f0;
             border-right: 1px solid #e2e8f0;
@@ -116,25 +116,25 @@
             background: #f8fafc;
         }
         .data-table tr.total-row td {
-            background: #eff6ff;
+            background: #fef2f2;
             font-weight: bold;
-            font-size: 9.5px;
-            color: #1e40af;
-            border-top: 2px solid #1d4ed8;
-            border-bottom: 2px solid #1d4ed8;
+            font-size: 9px;
+            color: #991b1b;
+            border-top: 2px solid #dc2626;
+            border-bottom: 2px solid #dc2626;
         }
         .badge {
             display: inline-block;
             padding: 2px 5px;
             border-radius: 3px;
-            font-size: 8px;
+            font-size: 7.5px;
             font-weight: bold;
             text-transform: uppercase;
         }
         .badge-success { background: #dcfce7; color: #166534; }
         .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-danger { background: #fee2e2; color: #991b1b; }
-        .badge-info { background: #dbeafe; color: #1e40af; }
+        .badge-danger  { background: #fee2e2; color: #991b1b; }
+        .badge-gray    { background: #f1f5f9; color: #475569; }
 
         .footer-note {
             position: fixed;
@@ -145,7 +145,7 @@
             color: #94a3b8;
             text-align: center;
             border-top: 1px solid #e2e8f0;
-            padding-top: 5px;
+            padding-top: 4px;
         }
         .text-right { text-align: right; }
         .text-center { text-align: center; }
@@ -157,7 +157,7 @@
     <table class="header-table">
         <tr>
             @if(!empty($school->logo) && file_exists(public_path('storage/' . $school->logo)))
-                <td style="width: 70px; vertical-align: middle;">
+                <td style="width: 65px; vertical-align: middle;">
                     <img src="{{ public_path('storage/' . $school->logo) }}" class="header-logo" alt="Logo">
                 </td>
             @endif
@@ -168,7 +168,7 @@
                 </div>
             </td>
             <td class="text-right" style="vertical-align: middle;">
-                <div style="font-size: 10px; font-weight: bold; color: #1d4ed8;">OFFICIAL REPORT</div>
+                <div style="font-size: 10px; font-weight: bold; color: #dc2626;">OFFICIAL EXPENSE REPORT</div>
                 <div style="font-size: 8px; color: #64748b;">Generated: {{ now()->format('d M Y, h:i A') }}</div>
                 <div style="font-size: 8px; color: #64748b;">By: {{ auth()->user()->name ?? 'System' }}</div>
             </td>
@@ -205,57 +205,71 @@
     <table class="data-table">
         <thead>
             <tr>
-                @foreach($headers as $h)
-                    @php $thAlign = isset($h['align']) ? 'text-' . $h['align'] : ''; @endphp
-                    <th class="{{ isset($h['class']) ? $h['class'] : '' }} {{ $thAlign }}">{{ $h['title'] }}</th>
-                @endforeach
+                <th style="width: 4%;">#</th>
+                <th style="width: 10%;">Voucher No</th>
+                <th style="width: 12%;">Date</th>
+                <th style="width: 18%;">Expense Head</th>
+                <th style="width: 12%;">Category</th>
+                <th style="width: 10%;">Payment Mode</th>
+                <th style="width: 12%; text-align: right;">Amount</th>
+                <th style="width: 14%;">Paid To / Vendor</th>
+                <th style="width: 8%; text-align: center;">Status</th>
             </tr>
         </thead>
         <tbody>
-            @forelse($rows as $row)
+            @php $totalAmt = 0; @endphp
+            @forelse($expenses as $idx => $exp)
+                @php
+                    $amt = (float) $exp->amount;
+                    if ($exp->status !== 'cancelled') $totalAmt += $amt;
+                @endphp
                 <tr>
-                    @foreach($headers as $key => $h)
-                        @php
-                            $fieldKey = is_numeric($key) ? ($h['key'] ?? '') : $key;
-                            $val = $row[$fieldKey] ?? '—';
-                            $align = isset($h['align']) ? 'text-' . $h['align'] : '';
-                        @endphp
-                        <td class="{{ $align }}">
-                            @if(isset($h['type']) && $h['type'] === 'badge')
-                                <span class="badge badge-{{ $row[$fieldKey . '_badge'] ?? 'info' }}">{{ $val }}</span>
-                            @else
-                                {!! $val !!}
-                            @endif
-                        </td>
-                    @endforeach
+                    <td>{{ $idx + 1 }}</td>
+                    <td style="font-weight: bold;">{{ $exp->receipt_no ?? ($exp->reference_no ?? ('EXP-' . $exp->id)) }}</td>
+                    <td>{{ $exp->expense_date ? \Carbon\Carbon::parse($exp->expense_date)->format('d M Y') : '—' }}</td>
+                    <td style="font-weight: bold; color: #991b1b;">{{ optional($exp->expenseHead)->name ?? 'Other' }}</td>
+                    <td>{{ $exp->category_label }}</td>
+                    <td>{{ ucfirst(str_replace('_', ' ', $exp->payment_mode ?? 'Cash')) }}</td>
+                    <td class="text-right" style="font-weight: bold;">₹{{ number_format($amt, 2) }}</td>
+                    <td>{{ $exp->paid_to ?? '—' }}</td>
+                    <td class="text-center">
+                        <span class="badge {{ $exp->status === 'paid' ? 'badge-success' : ($exp->status === 'pending' ? 'badge-warning' : 'badge-danger') }}">
+                            {{ ucfirst($exp->status ?? 'Paid') }}
+                        </span>
+                    </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="{{ count($headers) }}" class="text-center" style="padding: 15px; color: #64748b;">
-                        No records found matching the criteria.
+                    <td colspan="9" class="text-center" style="padding: 15px; color: #64748b;">
+                        No expense records found matching the criteria.
                     </td>
                 </tr>
             @endforelse
 
-            @if(!empty($totals))
+            @if(count($expenses) > 0)
                 <tr class="total-row">
-                    @foreach($headers as $key => $h)
-                        @php
-                            $fieldKey = is_numeric($key) ? ($h['key'] ?? '') : $key;
-                            $align = isset($h['align']) ? 'text-' . $h['align'] : '';
-                        @endphp
-                        <td class="{{ $align }}">
-                            {!! $totals[$fieldKey] ?? '' !!}
-                        </td>
-                    @endforeach
+                    <td colspan="6" class="text-right">GRAND TOTAL EXPENSE:</td>
+                    <td class="text-right">₹{{ number_format($totalAmt, 2) }}</td>
+                    <td colspan="2"></td>
                 </tr>
             @endif
         </tbody>
     </table>
 
     <div class="footer-note">
-        This report is computer generated by {{ $school->name ?? 'School ERP' }} on {{ now()->format('d-m-Y H:i') }}.
+        {{ $school->name ?? 'School ERP' }} — School Expense Ledger & Audit Report — Confidentially Generated Record
     </div>
 
+    <script type="text/php">
+        if (isset($pdf)) {
+            $text = "Page {PAGE_NUM} of {PAGE_COUNT}";
+            $font = $fontMetrics->get_font("DejaVu Sans", "bold");
+            $size = 7.5;
+            $color = array(0.4, 0.4, 0.4);
+            $y = $pdf->get_height() - 22;
+            $x = $pdf->get_width() - 80;
+            $pdf->page_text($x, $y, $text, $font, $size, $color);
+        }
+    </script>
 </body>
 </html>

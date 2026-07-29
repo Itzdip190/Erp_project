@@ -592,15 +592,25 @@
     </div>
 @endif
 
+    @php
+        $showSchoolNameHeader = true;
+        $showSchoolLogoHeader = true;
+        if ($hasTransport || str_contains(strtolower($title ?? ''), 'transport')) {
+            $showSchoolNameHeader = \App\Services\SettingService::get('show_school_name_transport_invoice', '1') == '1';
+            $showSchoolLogoHeader = \App\Services\SettingService::get('show_school_logo_transport_invoice', '1') == '1';
+        }
+    @endphp
     <!-- School Header -->
     <div class="school-header" style="display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 20px;">
-        @if(!empty($school->logo) && Storage::disk('public')->exists($school->logo))
+        @if($showSchoolLogoHeader && !empty($school->logo) && Storage::disk('public')->exists($school->logo))
             <div class="school-logo-container" style="position: absolute; left: 0; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
                 <img src="{{ Storage::disk('public')->url($school->logo) }}" alt="School Logo" style="max-height: 80px; max-width: 80px; object-fit: contain; display: block;">
             </div>
         @endif
         <div style="text-align: center; max-width: 85%;">
-            <h1 class="school-name" style="font-size: 26px; font-weight: bold; margin: 0; color: #000; font-family: Arial, sans-serif;">{{ $school->name }}</h1>
+            @if($showSchoolNameHeader)
+                <h1 class="school-name" style="font-size: 26px; font-weight: bold; margin: 0; color: #000; font-family: Arial, sans-serif;">{{ $school->name }}</h1>
+            @endif
             <p class="school-details" style="font-size: 14px; margin: 4px 0 0 0; color: #000; font-weight: bold;">{{ $school->address }}</p>
             @if(!empty($school->udise_data['affiliation_number']))
                 <p class="school-details" style="font-size: 14px; margin: 4px 0 0 0; color: #000; font-weight: bold;">School Affiliation No : {{ $school->udise_data['affiliation_number'] }}</p>

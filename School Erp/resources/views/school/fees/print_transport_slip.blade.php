@@ -186,6 +186,10 @@
             return 'Rupees ' . ($result ? $result : 'Zero') . $paise . ' Only';
         }
     }
+
+    $showSchoolName = \App\Services\SettingService::get('show_school_name_transport_invoice', '1') == '1';
+    $showSchoolLogo = \App\Services\SettingService::get('show_school_logo_transport_invoice', '1') == '1';
+    $showRouteVehicle = \App\Services\SettingService::get('show_route_vehicle_on_transport_invoice', '1') == '1';
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -511,11 +515,13 @@
             @endif
 
             <div class="header-section">
-                @if(!empty($school->logo) && Storage::disk('public')->exists($school->logo))
+                @if($showSchoolLogo && !empty($school->logo) && Storage::disk('public')->exists($school->logo))
                     <img src="{{ Storage::disk('public')->url($school->logo) }}" alt="School Logo" class="logo-img">
                 @endif
                 <div class="school-info-block">
-                    <h1 class="school-name-text">{{ $school->name }}</h1>
+                    @if($showSchoolName)
+                        <h1 class="school-name-text">{{ $school->name }}</h1>
+                    @endif
                     <p class="school-address-text">{{ $school->address }}</p>
                 </div>
             </div>
@@ -599,6 +605,7 @@
                 Amount In Words &nbsp; <strong>{{ convertNumberToWordsHelper($paidAmount) }}</strong>
             </div>
 
+            @if($showRouteVehicle)
             <div class="details-section">
                 <table class="details-table">
                     <tr>
@@ -621,6 +628,7 @@
                     </tr>
                 </table>
             </div>
+            @endif
 
             <div class="note-block">
                 Note: Fees Once Paid Will Not Be Refundable In Any Case
@@ -646,11 +654,13 @@
             @endif
 
             <div class="header-section">
-                @if(!empty($school->logo) && Storage::disk('public')->exists($school->logo))
+                @if($showSchoolLogo && !empty($school->logo) && Storage::disk('public')->exists($school->logo))
                     <img src="{{ Storage::disk('public')->url($school->logo) }}" alt="School Logo" class="logo-img">
                 @endif
                 <div class="school-info-block">
-                    <h1 class="school-name-text">{{ $school->name }}</h1>
+                    @if($showSchoolName)
+                        <h1 class="school-name-text">{{ $school->name }}</h1>
+                    @endif
                     <p class="school-address-text">{{ $school->address }}</p>
                 </div>
             </div>
@@ -734,6 +744,7 @@
                 Amount In Words &nbsp; <strong>{{ convertNumberToWordsHelper($paidAmount) }}</strong>
             </div>
 
+            @if($showRouteVehicle)
             <div class="details-section">
                 <table class="details-table">
                     <tr>
@@ -756,6 +767,7 @@
                     </tr>
                 </table>
             </div>
+            @endif
 
             <div class="note-block">
                 Note: Fees Once Paid Will Not Be Refundable In Any Case

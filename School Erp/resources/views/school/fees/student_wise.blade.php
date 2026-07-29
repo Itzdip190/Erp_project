@@ -1735,37 +1735,58 @@ body.dark-mode #feeComponentSectionContainer {
                 </div>
 
                 @php
-                    $groupedTransportFees = $transportFees->groupBy(function($fee) {
-                        return $fee->installment_no ?? 1;
-                    })->sortKeys();
+                    $isQuarterlyTransport = \App\Services\SettingService::get('quarterly_transport_payment', '0') == '1';
+                    if ($isQuarterlyTransport) {
+                        $groupedTransportFees = $transportFees->groupBy(function($fee) {
+                            $ino = (int)($fee->installment_no ?? 1);
+                            if ($ino <= 3) return 1;
+                            if ($ino <= 6) return 2;
+                            if ($ino <= 9) return 3;
+                            return 4;
+                        })->sortKeys();
+                    } else {
+                        $groupedTransportFees = $transportFees->groupBy(function($fee) {
+                            return $fee->installment_no ?? 1;
+                        })->sortKeys();
+                    }
                 @endphp
 
                 @forelse($groupedTransportFees as $instNo => $instFees)
                 @php
                     $firstFee = $instFees->first();
                     $monthName = null;
-                    if ($firstFee && $firstFee->transportFeeSchedule) {
-                        $instConfig = collect($firstFee->transportFeeSchedule->installments)->firstWhere('installment_no', $instNo);
-                        if ($instConfig) {
-                            if (!empty($instConfig['due_date'])) {
-                                $monthName = \Carbon\Carbon::parse($instConfig['due_date'])->format('F');
-                            } elseif (!empty($instConfig['name'])) {
-                                try {
-                                    $monthName = \Carbon\Carbon::parse($instConfig['name'])->format('F');
-                                } catch (\Exception $e) {
-                                    $monthName = $instConfig['name'];
+                    if ($isQuarterlyTransport) {
+                        $qLabels = [
+                            1 => 'Quarter 1 (April - June)',
+                            2 => 'Quarter 2 (July - September)',
+                            3 => 'Quarter 3 (October - December)',
+                            4 => 'Quarter 4 (January - March)'
+                        ];
+                        $instLabel = 'Transport — ' . ($qLabels[$instNo] ?? ('Quarter ' . $instNo));
+                    } else {
+                        if ($firstFee && $firstFee->transportFeeSchedule) {
+                            $instConfig = collect($firstFee->transportFeeSchedule->installments)->firstWhere('installment_no', $instNo);
+                            if ($instConfig) {
+                                if (!empty($instConfig['due_date'])) {
+                                    $monthName = \Carbon\Carbon::parse($instConfig['due_date'])->format('F');
+                                } elseif (!empty($instConfig['name'])) {
+                                    try {
+                                        $monthName = \Carbon\Carbon::parse($instConfig['name'])->format('F');
+                                    } catch (\Exception $e) {
+                                        $monthName = $instConfig['name'];
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (!$monthName && $firstFee && $firstFee->due_date) {
-                        $monthName = \Carbon\Carbon::parse($firstFee->due_date)->format('F');
-                    }
-                    
-                    if ($monthName) {
-                        $instLabel = 'Transport — ' . $monthName;
-                    } else {
-                        $instLabel = 'Transport — Installment ' . $instNo;
+                        if (!$monthName && $firstFee && $firstFee->due_date) {
+                            $monthName = \Carbon\Carbon::parse($firstFee->due_date)->format('F');
+                        }
+                        
+                        if ($monthName) {
+                            $instLabel = 'Transport — ' . $monthName;
+                        } else {
+                            $instLabel = 'Transport — Installment ' . $instNo;
+                        }
                     }
                     $groupTotal = $instFees->sum('amount') + $instFees->sum('fine_amount_applied');
                     $groupDiscount = $instFees->sum('instant_discount_amount');

@@ -437,6 +437,10 @@ class StudentFee extends Model
 
     public static function applyTransportAttendanceDeduction($schoolId, $studentId, $month, $year)
     {
+        if (\App\Services\SettingService::get('auto_transport_absent_deduction', '1') == '0') {
+            return;
+        }
+
         $student = \App\Models\Student::where('school_id', $schoolId)->find($studentId);
         if (!$student) {
             return;

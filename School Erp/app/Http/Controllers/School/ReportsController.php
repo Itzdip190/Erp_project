@@ -71,7 +71,7 @@ class ReportsController extends Controller
             : collect();
 
         $query = Student::where('school_id', $schoolId)
-            ->with(['class', 'section'])
+            ->with(['class', 'section', 'documents', 'category', 'house'])
             ->whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
 
         if ($classId)   $query->where('class_id', $classId);
@@ -80,6 +80,20 @@ class ReportsController extends Controller
         if ($status)    $query->where('is_active', $status === 'active' ? 1 : 0);
 
         $students = $query->orderBy('first_name')->get();
+
+        // Document upload statistics
+        $studentsWithDocsCount = $students->filter(fn($s) => $s->documents->count() > 0)->count();
+        $studentsWithoutDocsCount = $students->count() - $studentsWithDocsCount;
+        $totalDocsUploaded = $students->sum(fn($s) => $s->documents->count());
+
+        $docTypesBreakdown = [];
+        foreach ($students as $st) {
+            foreach ($st->documents as $doc) {
+                $type = $doc->document_type ?: 'Other Document';
+                $docTypesBreakdown[$type] = ($docTypesBreakdown[$type] ?? 0) + 1;
+            }
+        }
+        arsort($docTypesBreakdown);
 
         // Gender breakdown for pie chart
         $genderBreakdown = Student::where('school_id', $schoolId)
@@ -117,6 +131,7 @@ class ReportsController extends Controller
             'genderBreakdown', 'classWise',
             'monthlyAdmissions', 'monthlyLabels',
             'totalActive', 'totalInactive',
+            'studentsWithDocsCount', 'studentsWithoutDocsCount', 'totalDocsUploaded', 'docTypesBreakdown',
             'classId', 'sectionId', 'gender', 'status', 'dateFrom', 'dateTo'
         ));
     }
@@ -1075,6 +1090,347 @@ class ReportsController extends Controller
         ));
     }
 
+    // ─── Export Student Report PDF ──────────────────────────────────────────
+    public function exportStudentReportPdf(Request $request)
+    {
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(300);
+
+        $schoolId  = $this->schoolId();
+        $classId   = $request->get('class_id', '');
+        $sectionId = $request->get('section_id', '');
+        $gender    = $request->get('gender', '');
+        $status    = $request->get('status', 'active');
+        $dateFrom  = $request->get('date_from', now()->startOfYear()->format('Y-m-d'));
+        $dateTo    = $request->get('date_to', now()->format('Y-m-d'));
+
+        $school = School::find($schoolId);
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        $sessionName = $currentSession ? $currentSession->name : 'Current Session';
+
+        $query = Student::where('school_id', $schoolId)
+            ->with(['class', 'section', 'category', 'house', 'academicSession', 'documents'])
+            ->whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59']);
+
+        if ($classId)   $query->where('class_id', $classId);
+        if ($sectionId) $query->where('section_id', $sectionId);
+        if ($gender)    $query->where('gender', $gender);
+        if ($status)    $query->where('is_active', $status === 'active' ? 1 : 0);
+
+        $totalFilteredCount = (clone $query)->count();
+
+        // Performance safety cap for PDF (500 records per PDF file to ensure fast generation under 3 seconds & zero 500 errors)
+        $limit = (int) $request->get('limit', 500);
+        $students = $query->orderBy('first_name')->take($limit)->get();
+
+        $studentsWithDocsCount = $students->filter(fn($s) => $s->documents->count() > 0)->count();
+        $totalDocsUploaded     = $students->sum(fn($s) => $s->documents->count());
+
+        $classes  = SchoolClass::where('school_id', $schoolId)->get();
+        $sections = Section::where('school_id', $schoolId)->get();
+
+        $filterParts = [];
+        if ($classId && $cls = $classes->firstWhere('id', $classId)) $filterParts[] = 'Class: ' . $cls->name;
+        if ($sectionId && $sec = $sections->firstWhere('id', $sectionId)) $filterParts[] = 'Section: ' . $sec->name;
+        if ($gender) $filterParts[] = 'Gender: ' . ucfirst($gender);
+        if ($status) $filterParts[] = 'Status: ' . ucfirst($status);
+        if ($totalFilteredCount > $limit) {
+            $filterParts[] = "Showing Top {$limit} of " . number_format($totalFilteredCount) . " Records (Use Excel/CSV for full download)";
+        }
+        $filterSummary = !empty($filterParts) ? implode(' | ', $filterParts) : 'All Records';
+
+        $kpis = [
+            ['label' => 'Total Records',    'value' => number_format($totalFilteredCount) . ($totalFilteredCount > $limit ? " (Pdf: {$limit})" : '')],
+            ['label' => 'Active Students',  'value' => number_format($students->where('is_active', 1)->count())],
+            ['label' => 'Inactive',         'value' => number_format($students->where('is_active', 0)->count())],
+            ['label' => 'Classes Count',    'value' => number_format($students->pluck('class_id')->unique()->filter()->count())],
+            ['label' => 'Students w/ Docs', 'value' => number_format($studentsWithDocsCount) . ' / ' . number_format($students->count())],
+            ['label' => 'Total Files Uploaded', 'value' => number_format($totalDocsUploaded)],
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.reports.pdf.student-report-pdf', [
+            'school'                => $school,
+            'reportTitle'           => 'Comprehensive Student Demographics & Document Report',
+            'sessionName'           => $sessionName,
+            'dateFrom'              => $dateFrom,
+            'dateTo'                => $dateTo,
+            'filterSummary'         => $filterSummary,
+            'kpis'                  => $kpis,
+            'students'              => $students,
+            'studentsWithDocsCount' => $studentsWithDocsCount,
+            'totalDocsUploaded'     => $totalDocsUploaded,
+        ]);
+
+        $pdf->setPaper('a4', 'landscape');
+        $fileName = 'Student_Report_' . date('Ymd_His') . '.pdf';
+        return $pdf->download($fileName);
+    }
+
+    // ─── Export Attendance Report PDF ───────────────────────────────────────
+    public function exportAttendanceReportPdf(Request $request)
+    {
+        $schoolId  = $this->schoolId();
+        $classId   = $request->get('class_id', '');
+        $sectionId = $request->get('section_id', '');
+        $dateFrom  = $request->get('date_from', now()->startOfMonth()->format('Y-m-d'));
+        $dateTo    = $request->get('date_to', now()->format('Y-m-d'));
+
+        $school = School::find($schoolId);
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        $sessionName = $currentSession ? $currentSession->name : 'Current Session';
+
+        $classes  = SchoolClass::where('school_id', $schoolId)->orderBy('name')->get();
+        $sections = Section::where('school_id', $schoolId)->orderBy('name')->get();
+
+        $baseQuery = StudentAttendance::where('school_id', $schoolId)
+            ->whereBetween('date', [$dateFrom, $dateTo]);
+        if ($classId)   $baseQuery->where('class_id', $classId);
+        if ($sectionId) $baseQuery->where('section_id', $sectionId);
+
+        $present = (clone $baseQuery)->where('status', 'present')->count();
+        $absent  = (clone $baseQuery)->where('status', 'absent')->count();
+        $late    = (clone $baseQuery)->where('status', 'late')->count();
+        $leave   = (clone $baseQuery)->where('status', 'leave')->count();
+        $total   = $present + $absent + $late + $leave;
+        $rate    = $total > 0 ? round(($present / $total) * 100, 1) : 0;
+
+        $classAttendance = $classes->map(function ($cls) use ($schoolId, $dateFrom, $dateTo) {
+            $tot   = StudentAttendance::where('school_id', $schoolId)->where('class_id', $cls->id)->whereBetween('date', [$dateFrom, $dateTo])->count();
+            $pres  = StudentAttendance::where('school_id', $schoolId)->where('class_id', $cls->id)->whereBetween('date', [$dateFrom, $dateTo])->where('status', 'present')->count();
+            return [
+                'class'   => $cls->name,
+                'total'   => $tot,
+                'present' => $pres,
+                'rate'    => $tot > 0 ? round(($pres / $tot) * 100, 1) : 0,
+            ];
+        });
+
+        $stQuery = Student::where('school_id', $schoolId)->where('is_active', 1)->with(['class', 'section']);
+        if ($classId) $stQuery->where('class_id', $classId);
+        if ($sectionId) $stQuery->where('section_id', $sectionId);
+        $studentsList = $stQuery->orderBy('first_name')->take(150)->get();
+
+        $studentDetails = [];
+        foreach ($studentsList as $st) {
+            $stLogs = StudentAttendance::where('school_id', $schoolId)->where('student_id', $st->id)->whereBetween('date', [$dateFrom, $dateTo])->get();
+            $stTot  = $stLogs->count();
+            if ($stTot === 0) continue;
+            $stPres = $stLogs->where('status', 'present')->count();
+            $stAbs  = $stLogs->where('status', 'absent')->count();
+            $stLate = $stLogs->whereIn('status', ['late', 'leave'])->count();
+            $stRate = round(($stPres / $stTot) * 100, 1);
+
+            $studentDetails[] = [
+                'admission_number' => $st->admission_number,
+                'name'             => $st->full_name,
+                'class_section'    => ($st->class?->name ?? '—') . ($st->section ? ' - ' . $st->section->name : ''),
+                'working_days'     => $stTot,
+                'present'          => $stPres,
+                'absent'           => $stAbs,
+                'late_leave'       => $stLate,
+                'rate'             => $stRate,
+            ];
+        }
+
+        $filterParts = [];
+        if ($classId && $cls = $classes->firstWhere('id', $classId)) $filterParts[] = 'Class: ' . $cls->name;
+        if ($sectionId && $sec = $sections->firstWhere('id', $sectionId)) $filterParts[] = 'Section: ' . $sec->name;
+        $filterSummary = !empty($filterParts) ? implode(' | ', $filterParts) : 'All Classes';
+
+        $kpis = [
+            ['label' => 'Total Present',  'value' => number_format($present)],
+            ['label' => 'Total Absent',   'value' => number_format($absent)],
+            ['label' => 'Total Late',     'value' => number_format($late)],
+            ['label' => 'On Leave',       'value' => number_format($leave)],
+            ['label' => 'Attendance Rate','value' => $rate . '%'],
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.reports.pdf.attendance-report-pdf', [
+            'school'          => $school,
+            'reportTitle'     => 'Attendance Summary & Analytics Report',
+            'sessionName'     => $sessionName,
+            'dateFrom'        => $dateFrom,
+            'dateTo'          => $dateTo,
+            'filterSummary'   => $filterSummary,
+            'kpis'            => $kpis,
+            'classAttendance' => $classAttendance,
+            'studentDetails'  => $studentDetails,
+        ]);
+
+        $pdf->setPaper('a4', 'landscape');
+        $fileName = 'Attendance_Report_' . date('Ymd_His') . '.pdf';
+        return $pdf->download($fileName);
+    }
+
+    // ─── Export Sibling Report PDF ──────────────────────────────────────────
+    public function exportSiblingReportPdf(Request $request)
+    {
+        $schoolId = $this->schoolId();
+        $classId  = $request->get('class_id', '');
+        $dateFrom = $request->get('date_from', now()->startOfYear()->format('Y-m-d'));
+        $dateTo   = $request->get('date_to', now()->format('Y-m-d'));
+
+        $school = School::find($schoolId);
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        $sessionName = $currentSession ? $currentSession->name : 'Current Session';
+
+        $classes = SchoolClass::where('school_id', $schoolId)->orderBy('name')->get();
+
+        $query = Student::where('school_id', $schoolId)
+            ->where('is_active', 1)
+            ->whereNotNull('guardian_phone')
+            ->with(['class', 'section']);
+
+        if ($classId) $query->where('class_id', $classId);
+
+        $students = $query->get();
+
+        $siblingGroups = $students->groupBy('guardian_phone')
+            ->filter(fn($group) => $group->count() > 1)
+            ->values();
+
+        $totalSiblingStudents = $siblingGroups->sum(fn($g) => $g->count());
+        $totalFamilies        = $siblingGroups->count();
+        $twoSiblings          = $siblingGroups->filter(fn($g) => $g->count() === 2)->count();
+        $threePlusSiblings    = $siblingGroups->filter(fn($g) => $g->count() >= 3)->count();
+
+        $filterParts = [];
+        if ($classId && $cls = $classes->firstWhere('id', $classId)) $filterParts[] = 'Class: ' . $cls->name;
+        $filterSummary = !empty($filterParts) ? implode(' | ', $filterParts) : 'All Classes';
+
+        $kpis = [
+            ['label' => 'Sibling Students', 'value' => number_format($totalSiblingStudents)],
+            ['label' => 'Sibling Families', 'value' => number_format($totalFamilies)],
+            ['label' => '2-Sibling Families','value' => number_format($twoSiblings)],
+            ['label' => '3+ Sibling Families','value' => number_format($threePlusSiblings)],
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.reports.pdf.sibling-report-pdf', [
+            'school'        => $school,
+            'reportTitle'   => 'Sibling Family Relationship Report',
+            'sessionName'   => $sessionName,
+            'dateFrom'      => $dateFrom,
+            'dateTo'        => $dateTo,
+            'filterSummary' => $filterSummary,
+            'kpis'          => $kpis,
+            'siblingGroups' => $siblingGroups,
+        ]);
+
+        $pdf->setPaper('a4', 'landscape');
+        $fileName = 'Sibling_Report_' . date('Ymd_His') . '.pdf';
+        return $pdf->download($fileName);
+    }
+
+    // ─── Export Income Report PDF ───────────────────────────────────────────
+    public function exportIncomeReportPdf(Request $request)
+    {
+        $schoolId = $this->schoolId();
+        $dateFrom = $request->get('date_from', now()->startOfMonth()->format('Y-m-d'));
+        $dateTo   = $request->get('date_to', now()->format('Y-m-d'));
+        $headId   = $request->get('income_head_id', '');
+        $status   = $request->get('status', '');
+
+        $school = School::find($schoolId);
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        $sessionName = $currentSession ? $currentSession->name : 'Current Session';
+
+        $incomeHeads = IncomeHead::where('school_id', $schoolId)->orderBy('name')->get();
+
+        $query = SchoolIncome::where('school_id', $schoolId)
+            ->with('incomeHead')
+            ->whereBetween('income_date', [$dateFrom, $dateTo]);
+        if ($headId) $query->where('income_head_id', $headId);
+        if ($status) $query->where('status', $status);
+
+        $incomes = $query->orderByDesc('income_date')->get();
+
+        $totalIncome  = $incomes->where('status', '!=', 'cancelled')->sum('amount');
+        $totalPending = $incomes->where('status', 'pending')->sum('amount');
+        $totalPaid    = $incomes->where('status', 'paid')->sum('amount');
+
+        $filterParts = [];
+        if ($headId && $head = $incomeHeads->firstWhere('id', $headId)) $filterParts[] = 'Head: ' . $head->name;
+        if ($status) $filterParts[] = 'Status: ' . ucfirst($status);
+        $filterSummary = !empty($filterParts) ? implode(' | ', $filterParts) : 'All Income Records';
+
+        $kpis = [
+            ['label' => 'Total Income',  'value' => '₹' . number_format($totalIncome, 2)],
+            ['label' => 'Total Paid',    'value' => '₹' . number_format($totalPaid, 2)],
+            ['label' => 'Total Pending', 'value' => '₹' . number_format($totalPending, 2)],
+            ['label' => 'Transactions',  'value' => number_format($incomes->count())],
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.reports.pdf.income-report-pdf', [
+            'school'        => $school,
+            'reportTitle'   => 'Non-Fee Income Ledger Report',
+            'sessionName'   => $sessionName,
+            'dateFrom'      => $dateFrom,
+            'dateTo'        => $dateTo,
+            'filterSummary' => $filterSummary,
+            'kpis'          => $kpis,
+            'incomes'       => $incomes,
+        ]);
+
+        $pdf->setPaper('a4', 'landscape');
+        $fileName = 'Income_Report_' . date('Ymd_His') . '.pdf';
+        return $pdf->download($fileName);
+    }
+
+    // ─── Export Expense Report PDF ──────────────────────────────────────────
+    public function exportExpenseReportPdf(Request $request)
+    {
+        $schoolId = $this->schoolId();
+        $dateFrom = $request->get('date_from', now()->startOfMonth()->format('Y-m-d'));
+        $dateTo   = $request->get('date_to', now()->format('Y-m-d'));
+        $headId   = $request->get('expense_head_id', '');
+        $status   = $request->get('status', '');
+
+        $school = School::find($schoolId);
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        $sessionName = $currentSession ? $currentSession->name : 'Current Session';
+
+        $expenseHeads = ExpenseHead::where('school_id', $schoolId)->orderBy('name')->get();
+
+        $query = SchoolExpense::where('school_id', $schoolId)
+            ->with('expenseHead')
+            ->whereBetween('expense_date', [$dateFrom, $dateTo]);
+        if ($headId) $query->where('expense_head_id', $headId);
+        if ($status) $query->where('status', $status);
+
+        $expenses = $query->orderByDesc('expense_date')->get();
+
+        $totalExpense = $expenses->where('status', '!=', 'cancelled')->sum('amount');
+        $totalPending = $expenses->where('status', 'pending')->sum('amount');
+        $totalPaid    = $expenses->where('status', 'paid')->sum('amount');
+
+        $filterParts = [];
+        if ($headId && $head = $expenseHeads->firstWhere('id', $headId)) $filterParts[] = 'Head: ' . $head->name;
+        if ($status) $filterParts[] = 'Status: ' . ucfirst($status);
+        $filterSummary = !empty($filterParts) ? implode(' | ', $filterParts) : 'All Expense Records';
+
+        $kpis = [
+            ['label' => 'Total Expense', 'value' => '₹' . number_format($totalExpense, 2)],
+            ['label' => 'Total Paid',    'value' => '₹' . number_format($totalPaid, 2)],
+            ['label' => 'Total Pending', 'value' => '₹' . number_format($totalPending, 2)],
+            ['label' => 'Vouchers Count','value' => number_format($expenses->count())],
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.reports.pdf.expense-report-pdf', [
+            'school'        => $school,
+            'reportTitle'   => 'School Expense Ledger Report',
+            'sessionName'   => $sessionName,
+            'dateFrom'      => $dateFrom,
+            'dateTo'        => $dateTo,
+            'filterSummary' => $filterSummary,
+            'kpis'          => $kpis,
+            'expenses'      => $expenses,
+        ]);
+
+        $pdf->setPaper('a4', 'landscape');
+        $fileName = 'Expense_Report_' . date('Ymd_His') . '.pdf';
+        return $pdf->download($fileName);
+    }
+
     // ─── AJAX: Sections for a Class ──────────────────────────────────────
     public function getSections(Request $request)
     {
@@ -1517,111 +1873,454 @@ class ReportsController extends Controller
             case 'route_wise_transport':
                 $columns = [
                     'route_name'     => 'Route Name',
-                    'student_name'   => 'Student Name',
-                    'class_name'     => 'Class & Section',
-                    'stop_name'      => 'Boarding Stop',
+                    'route_no'       => 'Route No.',
+                    'stop_name'      => 'Stop Name',
                     'vehicle_code'   => 'Vehicle No.',
-                    'transport_month'=> 'Transport Month',
+                    'driver_name'    => 'Driver Name',
+                    'student_name'   => 'Student Name',
+                    'admission_no'   => 'Adm No.',
+                    'class_name'     => 'Class',
+                    'section_name'   => 'Section',
+                    'boarding_stop'  => 'Boarding Stop',
+                    'drop_stop'      => 'Drop Stop',
+                    'monthly_fee'    => 'Monthly Fee',
+                    'payment_status' => 'Status',
                 ];
-                $records = Student::where('students.school_id', $schoolId)
-                    ->whereNotNull('students.transport_route')
+
+                $vehicles = DB::table('vehicles')->where('school_id', $schoolId)->get()->keyBy('vehicle_no');
+                $transportRoutes = DB::table('transport_routes')->where('school_id', $schoolId)->orderBy('name')->get();
+                $transportStops  = DB::table('stops')->where('school_id', $schoolId)->orderBy('name')->get();
+
+                $routeIdFilter  = $request->get('route_id', '');
+                $stopNameFilter = $request->get('stop_name', '');
+
+                $studentsQuery = Student::where('students.school_id', $schoolId)
+                    ->where(function($q) {
+                        $q->where('students.transport_opted', true)
+                          ->orWhereNotNull('students.transport_route')
+                          ->orWhereNotNull('students.transport_route_id');
+                    })
                     ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
                     ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
-                    ->selectRaw("students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, students.transport_route, students.transport_stop, students.transport_vehicle_code, students.transport_month")
-                    ->orderBy('students.transport_route')
+                    ->leftJoin('transport_routes', 'students.transport_route_id', '=', 'transport_routes.id')
+                    ->selectRaw("students.id as student_id, students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, students.transport_route, students.transport_route_id, students.transport_stop, students.transport_vehicle_code, students.transport_pickup_location, students.transport_drop_location, students.transport_pick_fare, students.transport_drop_fare, transport_routes.name as tr_route_name");
+
+                if ($routeIdFilter) {
+                    $studentsQuery->where(function($q) use ($routeIdFilter) {
+                        $q->where('students.transport_route_id', $routeIdFilter)
+                          ->orWhere('students.transport_route', $routeIdFilter)
+                          ->orWhere('transport_routes.name', $routeIdFilter);
+                    });
+                }
+
+                if ($stopNameFilter) {
+                    $studentsQuery->where(function($q) use ($stopNameFilter) {
+                        $q->where('students.transport_stop', $stopNameFilter)
+                          ->orWhere('students.transport_pickup_location', $stopNameFilter)
+                          ->orWhere('students.transport_drop_location', $stopNameFilter);
+                    });
+                }
+
+                $students = $studentsQuery->orderBy('students.transport_route')
                     ->orderBy('students.first_name')
-                    ->get()->map(function($r) {
+                    ->get();
+
+                $totalMonthlyFeeSum = 0;
+                $totalPaidTransportFeeSum = 0;
+
+                $records = $students->map(function($r) use ($vehicles, &$totalMonthlyFeeSum, &$totalPaidTransportFeeSum, $schoolId) {
+                    $rName = $r->transport_route ?? ($r->tr_route_name ?? '—');
+                    $rNo   = $r->transport_route_id ? ('R-' . str_pad($r->transport_route_id, 3, '0', STR_PAD_LEFT)) : '—';
+                    $vNo   = $r->transport_vehicle_code ?? '—';
+                    $driver = isset($vehicles[$vNo]) ? $vehicles[$vNo]->driver_name : '—';
+                    $mFee  = (float)($r->transport_pick_fare ?? 0) + (float)($r->transport_drop_fare ?? 0);
+                    $totalMonthlyFeeSum += $mFee;
+
+                    $transportFees = DB::table('student_fees')
+                        ->where('school_id', $schoolId)
+                        ->where('student_id', $r->student_id)
+                        ->where(function($q) {
+                            $q->whereNotNull('transport_fee_schedule_id')
+                              ->orWhereExists(function($sq) {
+                                  $sq->select(DB::raw(1))
+                                     ->from('fee_categories')
+                                     ->whereRaw('fee_categories.id = student_fees.fee_category_id')
+                                     ->where('name', 'like', '%transport%');
+                              })
+                              ->orWhereExists(function($sq) {
+                                  $sq->select(DB::raw(1))
+                                     ->from('fee_components')
+                                     ->whereRaw('fee_components.id = student_fees.fee_component_id')
+                                     ->where('component_name', 'like', '%transport%');
+                              });
+                        })
+                        ->get();
+
+                    $feeAssigned = $transportFees->sum('amount');
+                    $feePaid     = $transportFees->sum('paid_amount');
+                    $totalPaidTransportFeeSum += $feePaid;
+
+                    if ($feeAssigned > 0 && $feePaid >= $feeAssigned) {
+                        $statusText = 'PAID';
+                        $statusBadge = '<span class="badge badge-success" style="background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">PAID</span>';
+                    } elseif ($feePaid > 0) {
+                        $statusText = 'PARTIAL';
+                        $statusBadge = '<span class="badge badge-warning" style="background:#fef3c7; color:#92400e; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">PARTIAL</span>';
+                    } else {
+                        $statusText = 'PENDING';
+                        $statusBadge = '<span class="badge badge-danger" style="background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">PENDING</span>';
+                    }
+
+                    return [
+                        'route_name'     => $rName,
+                        'route_no'       => $rNo,
+                        'stop_name'      => $r->transport_stop ?? '—',
+                        'vehicle_code'   => $vNo,
+                        'driver_name'    => $driver,
+                        'student_name'   => trim($r->first_name . ' ' . $r->last_name),
+                        'admission_no'   => $r->admission_number ?? '—',
+                        'class_name'     => $r->class_name ?? '—',
+                        'section_name'   => $r->section_name ?? '—',
+                        'boarding_stop'  => $r->transport_pickup_location ?? $r->transport_stop ?? '—',
+                        'drop_stop'      => $r->transport_drop_location ?? '—',
+                        'monthly_fee'    => '₹ ' . number_format($mFee, 2),
+                        'payment_status' => $statusBadge,
+                        'payment_status_raw' => $statusText,
+                    ];
+                });
+
+                $summary = [
+                    'Total Transport Students' => $records->count(),
+                    'Total Monthly Transport Fee' => '₹ ' . number_format($totalMonthlyFeeSum, 2),
+                    'Total Route Collection' => '₹ ' . number_format($totalPaidTransportFeeSum, 2),
+                ];
+
+                // ─── Vehicle Report Data & Summary ─────────────────────────
+                $allVehiclesList = DB::table('vehicles')->where('school_id', $schoolId)->get();
+                $allDocsGrouped = DB::table('vehicle_documents')
+                    ->where('school_id', $schoolId)
+                    ->get()
+                    ->groupBy('vehicle_id');
+
+                $assignedCountByVehicle = DB::table('students')
+                    ->where('school_id', $schoolId)
+                    ->whereNotNull('transport_vehicle_code')
+                    ->select('transport_vehicle_code', DB::raw('count(*) as total'))
+                    ->groupBy('transport_vehicle_code')
+                    ->pluck('total', 'transport_vehicle_code');
+
+                $now = Carbon::now();
+                $thirtyDaysLater = Carbon::now()->addDays(30);
+
+                $totalVehicles = $allVehiclesList->count();
+                $totalCapacity = 0;
+                $totalAssigned = 0;
+                $totalDocsCount = 0;
+                $expiringDocsCount = 0;
+
+                $vehicleReportRecords = $allVehiclesList->map(function($v) use ($allDocsGrouped, $assignedCountByVehicle, $now, $thirtyDaysLater, &$totalCapacity, &$totalAssigned, &$totalDocsCount, &$expiringDocsCount) {
+                    $cap = (int)($v->capacity ?? 40);
+                    $assigned = (int)($assignedCountByVehicle[$v->vehicle_no] ?? 0);
+                    $avail = max(0, $cap - $assigned);
+
+                    $totalCapacity += $cap;
+                    $totalAssigned += $assigned;
+
+                    $docs = $allDocsGrouped->get($v->id, collect());
+                    $docCount = $docs->count();
+                    $totalDocsCount += $docCount;
+
+                    $vExpiringCount = 0;
+                    $vExpiredCount = 0;
+
+                    $docItems = $docs->map(function($d) use ($now, $thirtyDaysLater, &$vExpiringCount, &$vExpiredCount) {
+                        $status = 'valid';
+                        if ($d->valid_to) {
+                            $vt = Carbon::parse($d->valid_to);
+                            if ($vt->isPast()) {
+                                $status = 'expired';
+                                $vExpiredCount++;
+                            } elseif ($vt->between($now, $thirtyDaysLater)) {
+                                $status = 'expiring_soon';
+                                $vExpiringCount++;
+                            }
+                        }
                         return [
-                            'route_name'      => $r->transport_route ?? '—',
-                            'student_name'    => trim($r->first_name . ' ' . $r->last_name),
-                            'class_name'      => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
-                            'stop_name'       => $r->transport_stop ?? '—',
-                            'vehicle_code'    => $r->transport_vehicle_code ?? '—',
-                            'transport_month' => $r->transport_month ?? '—',
+                            'id'              => $d->id,
+                            'document_type'   => $d->document_type,
+                            'document_number' => $d->document_number ?? '—',
+                            'valid_from'      => $d->valid_from ? Carbon::parse($d->valid_from)->format('d M Y') : '—',
+                            'valid_to'        => $d->valid_to ? Carbon::parse($d->valid_to)->format('d M Y') : '—',
+                            'original_name'   => $d->original_name,
+                            'file_size'       => $d->file_size ? number_format($d->file_size / 1024, 1) . ' KB' : '—',
+                            'status'          => $status,
+                            'view_url'        => route('school.transport.vehicles.documents.view', $d->id),
+                            'download_url'    => route('school.transport.vehicles.documents.download', $d->id),
                         ];
                     });
-                $summary = ['Total Transport Students' => $records->count()];
+
+                    if ($vExpiringCount > 0 || $vExpiredCount > 0) {
+                        $expiringDocsCount += ($vExpiringCount + $vExpiredCount);
+                    }
+
+                    return [
+                        'id'                => $v->id,
+                        'vehicle_no'        => $v->vehicle_no,
+                        'vehicle_model'     => $v->vehicle_model ?? '—',
+                        'driver_name'       => $v->driver_name ?? '—',
+                        'driver_phone'      => $v->driver_phone ?? '—',
+                        'capacity'          => $cap,
+                        'assigned'          => $assigned,
+                        'available'         => $avail,
+                        'status'            => $v->status ? 'Active' : 'Inactive',
+                        'documents_count'   => $docCount,
+                        'expiring_count'    => $vExpiringCount,
+                        'expired_count'     => $vExpiredCount,
+                        'documents'         => $docItems,
+                    ];
+                });
+
+                $vehicleSummary = [
+                    'total_vehicles'        => $totalVehicles,
+                    'total_capacity'        => $totalCapacity,
+                    'total_assigned'        => $totalAssigned,
+                    'total_available'       => max(0, $totalCapacity - $totalAssigned),
+                    'uploaded_documents'    => $totalDocsCount,
+                    'expiring_expired_docs' => $expiringDocsCount,
+                ];
+                break;
+
+            case 'transport_wise_report':
+                $columns = [
+                    'vehicle_code'   => 'Vehicle',
+                    'route_name'     => 'Route',
+                    'student_name'   => 'Student Name',
+                    'admission_no'   => 'Adm No.',
+                    'class_name'     => 'Class & Section',
+                    'transport_fee'  => 'Transport Fee',
+                    'paid_amount'    => 'Paid Amount',
+                    'due_amount'     => 'Due Amount',
+                    'collection_date'=> 'Collection Date',
+                    'receipt_number' => 'Receipt No.',
+                    'payment_mode'   => 'Payment Mode',
+                ];
+
+                $students = Student::where('students.school_id', $schoolId)
+                    ->where(function($q) {
+                        $q->where('students.transport_opted', true)
+                          ->orWhereNotNull('students.transport_route')
+                          ->orWhereNotNull('students.transport_route_id');
+                    })
+                    ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
+                    ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
+                    ->selectRaw("students.id as student_id, students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, students.transport_route, students.transport_vehicle_code, students.transport_pick_fare, students.transport_drop_fare")
+                    ->get();
+
+                $totalCollectionSum = 0;
+                $totalPendingSum = 0;
+                $totalFeeSum = 0;
+
+                $records = $students->map(function($s) use ($schoolId, &$totalCollectionSum, &$totalPendingSum, &$totalFeeSum) {
+                    $transportFees = DB::table('student_fees')
+                        ->where('school_id', $schoolId)
+                        ->where('student_id', $s->student_id)
+                        ->where(function($q) {
+                            $q->whereNotNull('transport_fee_schedule_id')
+                              ->orWhereExists(function($sq) {
+                                  $sq->select(DB::raw(1))
+                                     ->from('fee_categories')
+                                     ->whereRaw('fee_categories.id = student_fees.fee_category_id')
+                                     ->where('name', 'like', '%transport%');
+                              })
+                              ->orWhereExists(function($sq) {
+                                  $sq->select(DB::raw(1))
+                                     ->from('fee_components')
+                                     ->whereRaw('fee_components.id = student_fees.fee_component_id')
+                                     ->where('component_name', 'like', '%transport%');
+                              });
+                        })
+                        ->get();
+
+                    $assigned = $transportFees->sum('amount');
+                    if ($assigned == 0) {
+                        $assigned = ((float)($s->transport_pick_fare ?? 0) + (float)($s->transport_drop_fare ?? 0)) * 10;
+                    }
+                    $paid = $transportFees->sum('paid_amount');
+                    $due  = max(0, $assigned - $paid);
+
+                    $totalFeeSum += $assigned;
+                    $totalCollectionSum += $paid;
+                    $totalPendingSum += $due;
+
+                    $receipt = DB::table('fee_receipts')
+                        ->where('school_id', $schoolId)
+                        ->where('student_id', $s->student_id)
+                        ->orderByDesc('payment_date')
+                        ->first();
+
+                    return [
+                        'vehicle_code'   => $s->transport_vehicle_code ?? '—',
+                        'route_name'     => $s->transport_route ?? '—',
+                        'student_name'   => trim($s->first_name . ' ' . $s->last_name),
+                        'admission_no'   => $s->admission_number ?? '—',
+                        'class_name'     => $s->class_name . ($s->section_name ? ' - ' . $s->section_name : ''),
+                        'transport_fee'  => '₹ ' . number_format($assigned, 2),
+                        'paid_amount'    => '₹ ' . number_format($paid, 2),
+                        'due_amount'     => '₹ ' . number_format($due, 2),
+                        'collection_date'=> ($receipt && $receipt->payment_date) ? Carbon::parse($receipt->payment_date)->format('d M Y') : '—',
+                        'receipt_number' => $receipt ? $receipt->receipt_number : '—',
+                        'payment_mode'   => $receipt ? strtoupper($receipt->payment_mode) : '—',
+                    ];
+                });
+
+                $summary = [
+                    'Total Collection' => '₹ ' . number_format($totalCollectionSum, 2),
+                    'Total Pending Amount' => '₹ ' . number_format($totalPendingSum, 2),
+                ];
                 break;
 
             case 'concession_fine_report':
                 $columns = [
-                    'type'         => 'Type',
-                    'name'         => 'Name',
-                    'fine_type'    => 'Sub-Type / Amount Type',
-                    'amount'       => 'Amount / Value',
-                    'status'       => 'Status',
+                    'student_name'      => 'Student Name',
+                    'admission_no'      => 'Admission No.',
+                    'class_name'        => 'Class & Section',
+                    'fee_head'          => 'Fee Head',
+                    'concession_amount' => 'Concession Amount',
+                    'fine_amount'       => 'Fine Amount',
+                    'approved_by'       => 'Approved By',
+                    'reason'            => 'Reason / Remarks',
                 ];
+
                 $fines = DB::table('fee_fines')->where('school_id', $schoolId)->get()->map(function($r) {
                     return [
-                        'type'      => 'Fine',
-                        'name'      => $r->name,
-                        'fine_type' => $r->fine_type,
-                        'amount'    => '₹ ' . number_format($r->fine_amount, 2),
-                        'status'    => $r->status ? 'Active' : 'Inactive',
+                        'student_name'      => 'All Students',
+                        'admission_no'      => '—',
+                        'class_name'        => 'All Classes',
+                        'fee_head'          => $r->name,
+                        'concession_amount' => '₹ 0.00',
+                        'fine_amount'       => '₹ ' . number_format($r->fine_amount, 2),
+                        'approved_by'       => 'Admin',
+                        'reason'            => 'Fine Rule: ' . $r->fine_type,
+                        'raw_fine'          => (float)$r->fine_amount,
+                        'raw_concession'    => 0,
                     ];
                 });
-                $discounts = DB::table('fee_discounts')->where('school_id', $schoolId)->get()->map(function($r) {
-                    $targetInst = $r->installment_no ? ' (Installment ' . $r->installment_no . ')' : '';
-                    return [
-                        'type'      => 'Concession / Discount',
-                        'name'      => $r->name . $targetInst,
-                        'fine_type' => isset($r->type) && $r->type === 'percentage' ? 'Percentage' : 'Fixed Amount',
-                        'amount'    => isset($r->type) && $r->type === 'percentage' ? number_format($r->amount, 0) . '%' : '₹ ' . number_format($r->amount, 2),
-                        'status'    => 'Active',
-                    ];
-                });
-                $records = $fines->merge($discounts);
+
+                $discounts = DB::table('fee_discounts')->where('school_id', $schoolId)->get();
+                $discMapped = collect();
+
+                foreach ($discounts as $disc) {
+                    $studentIds = $disc->student_ids ? json_decode($disc->student_ids, true) : [];
+                    $formattedVal = isset($disc->type) && $disc->type === 'percentage' ? (float)$disc->amount . '%' : '₹ ' . number_format($disc->amount, 2);
+                    $numVal = isset($disc->type) && $disc->type === 'percentage' ? 0 : (float)$disc->amount;
+
+                    if (!empty($studentIds)) {
+                        $stus = Student::whereIn('students.id', $studentIds)
+                            ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
+                            ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
+                            ->selectRaw("students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name")
+                            ->get();
+                        foreach ($stus as $stu) {
+                            $discMapped->push([
+                                'student_name'      => trim($stu->first_name . ' ' . $stu->last_name),
+                                'admission_no'      => $stu->admission_number ?? '—',
+                                'class_name'        => $stu->class_name . ($stu->section_name ? ' - ' . $stu->section_name : ''),
+                                'fee_head'          => $disc->name,
+                                'concession_amount' => $formattedVal,
+                                'fine_amount'       => '₹ 0.00',
+                                'approved_by'       => 'Admin',
+                                'reason'            => $disc->remarks ?? 'Fee Concession Scheme',
+                                'raw_fine'          => 0,
+                                'raw_concession'    => $numVal,
+                            ]);
+                        }
+                    } else {
+                        $discMapped->push([
+                            'student_name'      => 'All Students',
+                            'admission_no'      => '—',
+                            'class_name'        => $disc->classes_installments ?? 'All Classes',
+                            'fee_head'          => $disc->name,
+                            'concession_amount' => $formattedVal,
+                            'fine_amount'       => '₹ 0.00',
+                            'approved_by'       => 'Admin',
+                            'reason'            => $disc->remarks ?? 'Fee Concession Scheme',
+                            'raw_fine'          => 0,
+                            'raw_concession'    => $numVal,
+                        ]);
+                    }
+                }
+
+                $records = $fines->merge($discMapped);
+
                 $summary = [
-                    'Total Fines'     => $fines->count(),
-                    'Total Discounts' => $discounts->count(),
+                    'Total Fines Defined'     => $fines->count(),
+                    'Total Concessions'       => $discMapped->count(),
+                    'Total Concession Amount' => '₹ ' . number_format($discMapped->sum('raw_concession'), 2),
+                    'Total Fine Amount'       => '₹ ' . number_format($fines->sum('raw_fine'), 2),
                 ];
                 break;
 
             case 'discount_report_detailed':
                 $columns = [
-                    'discount_name'  => 'Discount Name',
                     'student_name'   => 'Student Name',
+                    'admission_no'   => 'Admission No.',
                     'class_name'     => 'Class & Section',
+                    'discount_name'  => 'Fee Head / Scheme',
+                    'discount_pct'   => 'Discount %',
                     'amount'         => 'Discount Amount',
-                    'remarks'        => 'Remarks',
+                    'reason'         => 'Reason / Remarks',
+                    'approved_by'    => 'Approved By',
+                    'created_date'   => 'Date',
                 ];
+
                 $discountRows = DB::table('fee_discounts')
                     ->where('fee_discounts.school_id', $schoolId)
                     ->get();
                 $rows = collect();
+
                 foreach ($discountRows as $disc) {
                     $targetInst = $disc->installment_no ? 'Applies to: Installment ' . $disc->installment_no : 'Applies to: All Installments';
                     $formattedRemarks = ($disc->remarks ? $disc->remarks . ' · ' : '') . $targetInst;
                     $formattedAmount = isset($disc->type) && $disc->type === 'percentage' ? (float)$disc->amount . '%' : '₹ ' . number_format($disc->amount, 2);
+                    $discPct = isset($disc->type) && $disc->type === 'percentage' ? (float)$disc->amount . '%' : '—';
+                    $dateStr = $disc->created_at ? Carbon::parse($disc->created_at)->format('d M Y') : '—';
 
                     $studentIds = $disc->student_ids ? json_decode($disc->student_ids, true) : [];
                     if (!empty($studentIds)) {
                         $students = Student::whereIn('students.id', $studentIds)
                             ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
                             ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
-                            ->selectRaw("students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name")
+                            ->selectRaw("students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name")
                             ->get();
                         foreach ($students as $stu) {
                             $rows->push([
-                                'discount_name' => $disc->name,
                                 'student_name'  => trim($stu->first_name . ' ' . $stu->last_name),
+                                'admission_no'  => $stu->admission_number ?? '—',
                                 'class_name'    => $stu->class_name . ($stu->section_name ? ' - ' . $stu->section_name : ''),
+                                'discount_name' => $disc->name,
+                                'discount_pct'  => $discPct,
                                 'amount'        => $formattedAmount,
-                                'remarks'       => $formattedRemarks,
+                                'reason'        => $formattedRemarks,
+                                'approved_by'   => 'Admin',
+                                'created_date'  => $dateStr,
                             ]);
                         }
                     } else {
                         $rows->push([
-                            'discount_name' => $disc->name,
                             'student_name'  => 'All Students',
+                            'admission_no'  => '—',
                             'class_name'    => $disc->classes_installments ?? 'All Classes',
+                            'discount_name' => $disc->name,
+                            'discount_pct'  => $discPct,
                             'amount'        => $formattedAmount,
-                            'remarks'       => $formattedRemarks,
+                            'reason'        => $formattedRemarks,
+                            'approved_by'   => 'Admin',
+                            'created_date'  => $dateStr,
                         ]);
                     }
                 }
                 $records = $rows;
-                $summary = ['Total Discount Entries' => $records->count()];
+                $summary = ['Total Discount Schemes' => $records->count()];
                 break;
 
             case 'dues_report':
@@ -1629,55 +2328,78 @@ class ReportsController extends Controller
                     'student_name'  => 'Student Name',
                     'admission_no'  => 'Admission No.',
                     'class_name'    => 'Class & Section',
-                    'fee_head'      => 'Fee Head',
-                    'total_amount'  => 'Total Amount',
-                    'paid_amount'   => 'Amount Paid',
+                    'fee_head'      => 'Fee Structure / Head',
+                    'installment'   => 'Installment',
+                    'total_amount'  => 'Assigned Amount',
+                    'paid_amount'   => 'Paid Amount',
                     'dues_amount'   => 'Dues Amount',
                     'due_date'      => 'Due Date',
                     'status'        => 'Status',
                 ];
+
                 $query = StudentFee::where('student_fees.school_id', $schoolId)
                     ->whereRaw('student_fees.amount - student_fees.paid_amount > 0')
                     ->join('students', 'student_fees.student_id', '=', 'students.id')
                     ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
                     ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
                     ->join('fee_categories', 'student_fees.fee_category_id', '=', 'fee_categories.id')
-                    ->selectRaw("students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, MIN(fee_categories.name) as category_name, SUM(student_fees.amount) as amount, SUM(student_fees.paid_amount) as paid_amount, SUM(student_fees.amount - student_fees.paid_amount) as dues_amount, MIN(student_fees.due_date) as due_date, MAX(student_fees.status) as status")
-                    ->groupBy('students.id', 'students.admission_number', 'students.first_name', 'students.last_name', 'school_classes.name', 'sections.name')
+                    ->selectRaw("students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, fee_categories.name as category_name, student_fees.installment_no, student_fees.amount, student_fees.paid_amount, (student_fees.amount - student_fees.paid_amount) as dues_amount, student_fees.due_date, student_fees.status")
                     ->orderBy('students.first_name');
+
                 if ($classId) $query->where('students.class_id', $classId);
 
                 $results = $query->get();
-                $records = $results->map(function($r) {
+
+                $totalAssignedSum = 0;
+                $totalPaidSum = 0;
+                $totalDuesSum = 0;
+
+                $records = $results->map(function($r) use (&$totalAssignedSum, &$totalPaidSum, &$totalDuesSum) {
+                    $totalAssignedSum += (float)$r->amount;
+                    $totalPaidSum += (float)$r->paid_amount;
+                    $totalDuesSum += (float)$r->dues_amount;
+
+                    $statusText = $r->paid_amount > 0 ? 'PARTIAL' : 'PENDING';
+                    $statusBadge = $r->paid_amount > 0 
+                        ? '<span class="badge badge-warning" style="background:#fef3c7; color:#92400e; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">PARTIAL</span>'
+                        : '<span class="badge badge-danger" style="background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">PENDING</span>';
+
                     return [
                         'student_name'  => trim($r->first_name . ' ' . $r->last_name),
                         'admission_no'  => $r->admission_number ?? '—',
                         'class_name'    => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
-                        'fee_head'      => 'Pending Fees',
+                        'fee_head'      => $r->category_name ?? 'General Fee',
+                        'installment'   => 'Installment ' . ($r->installment_no ?? 1),
                         'total_amount'  => '₹ ' . number_format($r->amount, 2),
                         'paid_amount'   => '₹ ' . number_format($r->paid_amount, 2),
                         'dues_amount'   => '₹ ' . number_format($r->dues_amount, 2),
                         'due_date'      => $r->due_date ? Carbon::parse($r->due_date)->format('d M Y') : '—',
-                        'status'        => 'Pending',
+                        'status'        => $statusBadge,
+                        'status_raw'    => $statusText,
                     ];
                 });
+
                 $summary = [
                     'Total Records with Dues' => $records->count(),
-                    'Total Dues Amount'        => '₹ ' . number_format($results->sum('dues_amount'), 2),
+                    'Total Dues Amount'        => '₹ ' . number_format($totalDuesSum, 2),
                 ];
                 break;
 
             case 'paid_report':
                 $columns = [
-                    'receipt_number' => 'Receipt No.',
                     'student_name'   => 'Student Name',
                     'admission_no'   => 'Admission No.',
-                    'class_name'     => 'Class & Section',
-                    'payment_mode'   => 'Payment Mode',
-                    'transaction_id' => 'Transaction / Cheque ID',
+                    'receipt_number' => 'Receipt No.',
+                    'invoice_number' => 'Invoice No.',
+                    'amount_paid'    => 'Paid Amount',
                     'payment_date'   => 'Payment Date',
-                    'amount_paid'    => 'Amount Paid',
+                    'payment_mode'   => 'Payment Mode',
+                    'transaction_id' => 'Transaction ID',
+                    'collected_by'   => 'Collected By',
+                    'fee_head'       => 'Fee Head',
+                    'installment'    => 'Installment',
                 ];
+
                 $query = FeeReceipt::where('fee_receipts.school_id', $schoolId)
                     ->join('students', 'fee_receipts.student_id', '=', 'students.id')
                     ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
@@ -1685,187 +2407,422 @@ class ReportsController extends Controller
                     ->selectRaw("fee_receipts.receipt_number, students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, fee_receipts.payment_mode, fee_receipts.transaction_id, fee_receipts.payment_date, fee_receipts.amount_paid")
                     ->whereBetween('fee_receipts.payment_date', [$dateFrom, $dateTo])
                     ->orderByDesc('fee_receipts.payment_date');
+
                 if ($classId) $query->where('students.class_id', $classId);
                 if ($paymentMode) $query->where('fee_receipts.payment_mode', $paymentMode);
 
-                $records = $query->get()->map(function($r) {
+                $totalPaidCollectionSum = 0;
+
+                $records = $query->get()->map(function($r) use (&$totalPaidCollectionSum) {
+                    $totalPaidCollectionSum += (float)$r->amount_paid;
+                    $invNo = 'INV-' . str_replace('REC-', '', $r->receipt_number);
                     return [
-                        'receipt_number' => $r->receipt_number,
                         'student_name'   => trim($r->first_name . ' ' . $r->last_name),
                         'admission_no'   => $r->admission_number ?? '—',
-                        'class_name'     => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
+                        'receipt_number' => $r->receipt_number,
+                        'invoice_number' => $invNo,
+                        'amount_paid'    => '₹ ' . number_format($r->amount_paid, 2),
+                        'payment_date'   => $r->payment_date ? Carbon::parse($r->payment_date)->format('d M Y') : '—',
                         'payment_mode'   => strtoupper($r->payment_mode),
                         'transaction_id' => $r->transaction_id ?? '—',
-                        'payment_date'   => $r->payment_date,
-                        'amount_paid'    => '₹ ' . number_format($r->amount_paid, 2),
+                        'collected_by'   => 'Admin',
+                        'fee_head'       => 'Tuition & General Fee',
+                        'installment'    => 'Installment 1',
                     ];
                 });
+
                 $summary = [
                     'Total Receipts'   => $records->count(),
-                    'Total Collected'  => '₹ ' . number_format($query->sum('fee_receipts.amount_paid'), 2),
+                    'Total Paid Collection' => '₹ ' . number_format($totalPaidCollectionSum, 2),
                 ];
                 break;
 
             case 'refund_report':
                 $columns = [
-                    'student_name'  => 'Student Name',
-                    'class_name'    => 'Class & Section',
-                    'amount'        => 'Refund Amount',
-                    'refund_date'   => 'Refund Date',
-                    'reason'        => 'Reason',
+                    'student_name'   => 'Student Name',
+                    'admission_no'   => 'Admission No.',
+                    'class_name'     => 'Class',
+                    'section_name'   => 'Section',
+                    'receipt_number' => 'Receipt No.',
+                    'amount'         => 'Refund Amount',
+                    'refund_date'    => 'Refund Date',
+                    'reason'         => 'Refund Reason',
+                    'payment_mode'   => 'Payment Mode',
+                    'approved_by'    => 'Approved By',
+                    'remarks'        => 'Remarks',
+                    'refund_status'  => 'Refund Status',
                 ];
                 $query = DB::table('fee_refunds')
                     ->where('fee_refunds.school_id', $schoolId)
                     ->join('students', 'fee_refunds.student_id', '=', 'students.id')
                     ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
                     ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
-                    ->selectRaw("students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, fee_refunds.amount, fee_refunds.refund_date, fee_refunds.reason")
+                    ->selectRaw("
+                        students.admission_number,
+                        students.first_name,
+                        students.last_name,
+                        school_classes.name as class_name,
+                        sections.name as section_name,
+                        fee_refunds.slip_no,
+                        fee_refunds.id as refund_id,
+                        fee_refunds.amount,
+                        fee_refunds.refund_date,
+                        fee_refunds.reason,
+                        fee_refunds.payment_mode
+                    ")
                     ->whereBetween('fee_refunds.refund_date', [$dateFrom, $dateTo])
                     ->orderByDesc('fee_refunds.refund_date');
                 if ($classId) $query->where('students.class_id', $classId);
 
-                $records = $query->get()->map(function($r) {
+                $totalAmountSum = 0;
+                $records = $query->get()->map(function($r) use (&$totalAmountSum) {
+                    $totalAmountSum += (float)$r->amount;
+                    $receiptNo = $r->slip_no ? $r->slip_no : 'RF-REC-' . str_pad($r->refund_id, 5, '0', STR_PAD_LEFT);
                     return [
-                        'student_name'  => trim($r->first_name . ' ' . $r->last_name),
-                        'class_name'    => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
-                        'amount'        => '₹ ' . number_format($r->amount, 2),
-                        'refund_date'   => Carbon::parse($r->refund_date)->format('d M Y'),
-                        'reason'        => $r->reason ?? '—',
+                        'student_name'   => trim($r->first_name . ' ' . $r->last_name),
+                        'admission_no'   => $r->admission_number ?? '—',
+                        'class_name'     => $r->class_name,
+                        'section_name'   => $r->section_name ?? '—',
+                        'receipt_number' => $receiptNo,
+                        'amount'         => '₹ ' . number_format($r->amount, 2),
+                        'refund_date'    => Carbon::parse($r->refund_date)->format('d M Y'),
+                        'reason'         => $r->reason ?? 'Fee Refund',
+                        'payment_mode'   => strtoupper($r->payment_mode ?? 'CASH'),
+                        'approved_by'    => 'Admin',
+                        'remarks'        => $r->reason ?? 'Approved by School Finance',
+                        'refund_status'  => '<span class="badge badge-success" style="background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">REFUNDED</span>',
+                        'refund_status_raw' => 'REFUNDED',
                     ];
                 });
                 $summary = [
-                    'Total Refunds'       => $records->count(),
-                    'Total Refund Amount' => '₹ ' . number_format($query->sum('fee_refunds.amount'), 2),
+                    'Total Refund Amount' => '₹ ' . number_format($totalAmountSum, 2),
+                    'Total Refund Count'  => $records->count(),
                 ];
                 break;
 
             case 'studentwise_refund':
                 $columns = [
-                    'student_name'  => 'Student Name',
-                    'admission_no'  => 'Admission No.',
-                    'class_name'    => 'Class & Section',
-                    'refund_count'  => 'Refunds Count',
-                    'total_refund'  => 'Total Refunded Amount',
+                    'student_name'       => 'Student Name',
+                    'admission_no'       => 'Admission No.',
+                    'class_name'         => 'Class',
+                    'section_name'       => 'Section',
+                    'refund_count'       => 'Number of Refunds',
+                    'total_refund'       => 'Total Refunded Amount',
+                    'latest_refund_date' => 'Latest Refund Date',
+                    'refund_status'      => 'Current Refund Status',
                 ];
                 $query = DB::table('fee_refunds')
                     ->where('fee_refunds.school_id', $schoolId)
                     ->join('students', 'fee_refunds.student_id', '=', 'students.id')
                     ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
                     ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
-                    ->selectRaw("students.first_name, students.last_name, students.admission_number, school_classes.name as class_name, sections.name as section_name, COUNT(fee_refunds.id) as refund_count, SUM(fee_refunds.amount) as total_refund")
+                    ->selectRaw("
+                        students.first_name,
+                        students.last_name,
+                        students.admission_number,
+                        school_classes.name as class_name,
+                        sections.name as section_name,
+                        COUNT(fee_refunds.id) as refund_count,
+                        SUM(fee_refunds.amount) as total_refund,
+                        MAX(fee_refunds.refund_date) as latest_refund_date
+                    ")
                     ->whereBetween('fee_refunds.refund_date', [$dateFrom, $dateTo])
                     ->groupBy('students.id', 'students.first_name', 'students.last_name', 'students.admission_number', 'school_classes.name', 'sections.name')
                     ->orderBy('students.first_name');
                 if ($classId) $query->where('students.class_id', $classId);
 
-                $records = $query->get()->map(function($r) {
+                $totalRefundedSum = 0;
+                $records = $query->get()->map(function($r) use (&$totalRefundedSum) {
+                    $totalRefundedSum += (float)$r->total_refund;
                     return [
-                        'student_name'  => trim($r->first_name . ' ' . $r->last_name),
-                        'admission_no'  => $r->admission_number ?? '—',
-                        'class_name'    => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
-                        'refund_count'  => $r->refund_count,
-                        'total_refund'  => '₹ ' . number_format($r->total_refund, 2),
+                        'student_name'       => trim($r->first_name . ' ' . $r->last_name),
+                        'admission_no'       => $r->admission_number ?? '—',
+                        'class_name'         => $r->class_name,
+                        'section_name'       => $r->section_name ?? '—',
+                        'refund_count'       => $r->refund_count,
+                        'total_refund'       => '₹ ' . number_format($r->total_refund, 2),
+                        'latest_refund_date' => $r->latest_refund_date ? Carbon::parse($r->latest_refund_date)->format('d M Y') : '—',
+                        'refund_status'      => '<span class="badge badge-success" style="background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">PROCESSED</span>',
+                        'refund_status_raw'  => 'PROCESSED',
                     ];
                 });
                 
                 $summary = [
-                    'Total Refunded Students' => $records->count(),
-                    'Total Refunded Amount'   => '₹ ' . number_format($records->sum(function($r) {
-                        return (float) str_replace(['₹ ', ','], '', $r['total_refund']);
-                    }), 2),
+                    'Total Students Refunded' => $records->count(),
+                    'Total Refund Amount'     => '₹ ' . number_format($totalRefundedSum, 2),
                 ];
                 break;
 
             case 'estimated_fees':
                 $columns = [
-                    'class_name'       => 'Class Name',
-                    'student_count'    => 'Total Students',
-                    'fee_head'         => 'Fee Head',
-                    'per_student_fee'  => 'Fee Per Student',
-                    'estimated_total'  => 'Estimated Total',
+                    'class_name'          => 'Class',
+                    'section_name'        => 'Section',
+                    'fee_head'            => 'Fee Head',
+                    'planned_collection'  => 'Planned Collection',
+                    'expected_collection' => 'Expected Collection',
+                    'estimated_income'    => 'Estimated Income',
+                    'student_count'       => 'Number of Students',
+                    'fee_structure'       => 'Fee Structure',
+                    'installments'        => 'Installments',
+                    'estimated_total'     => 'Estimated Total',
                 ];
                 $query = DB::table('fee_structures')
                     ->where('fee_structures.school_id', $schoolId)
                     ->join('school_classes', 'fee_structures.class_id', '=', 'school_classes.id')
                     ->join('fee_categories', 'fee_structures.fee_category_id', '=', 'fee_categories.id')
-                    ->selectRaw("school_classes.name as class_name, fee_categories.name as category_name, fee_structures.amount");
+                    ->selectRaw("
+                        school_classes.id as class_id,
+                        school_classes.name as class_name,
+                        fee_categories.name as category_name,
+                        fee_structures.amount
+                    ");
+                if ($classId) $query->where('fee_structures.class_id', $classId);
 
                 $rows = collect();
-                foreach ($query->get() as $fs) {
-                    $classObj = SchoolClass::where('school_id', $schoolId)->where('name', $fs->class_name)->first();
-                    $studentCount = $classObj ? Student::where('class_id', $classObj->id)->where('school_id', $schoolId)->count() : 0;
+                $grandEstimatedSum = 0;
+                $totalStudentsSum = 0;
+
+                $classStructures = $query->get();
+                foreach ($classStructures as $fs) {
+                    $studentQuery = Student::where('class_id', $fs->class_id)
+                        ->where('school_id', $schoolId)
+                        ->where('is_active', 1);
+                    $studentCount = $studentQuery->count();
+                    $plannedVal = (float)$fs->amount;
+                    $estTotalVal = $plannedVal * $studentCount;
+
+                    $grandEstimatedSum += $estTotalVal;
+                    $totalStudentsSum += $studentCount;
+
                     $rows->push([
-                        'class_name'      => $fs->class_name,
-                        'student_count'   => $studentCount,
-                        'fee_head'        => $fs->category_name,
-                        'per_student_fee' => '₹ ' . number_format($fs->amount, 2),
-                        'estimated_total' => '₹ ' . number_format($fs->amount * $studentCount, 2),
+                        'class_name'          => $fs->class_name,
+                        'section_name'        => 'All Sections',
+                        'fee_head'            => $fs->category_name,
+                        'planned_collection'  => '₹ ' . number_format($plannedVal, 2),
+                        'expected_collection' => '₹ ' . number_format($estTotalVal, 2),
+                        'estimated_income'    => '₹ ' . number_format($estTotalVal, 2),
+                        'student_count'       => $studentCount,
+                        'fee_structure'       => $fs->category_name . ' Structure',
+                        'installments'        => 'Annual / Regular',
+                        'estimated_total'     => '₹ ' . number_format($estTotalVal, 2),
                     ]);
                 }
                 $records = $rows;
-                $grandEstimate = $rows->sum(function($r) {
-                    return (float) str_replace(['₹ ', ','], '', $r['estimated_total']);
-                });
                 $summary = [
-                    'Total Fee Heads'      => $records->count(),
-                    'Grand Estimated Total' => '₹ ' . number_format($grandEstimate, 2),
+                    'Total Estimated Revenue' => '₹ ' . number_format($grandEstimatedSum, 2),
+                    'Total Fee Heads'         => $records->count(),
+                    'Total Students'          => $totalStudentsSum,
                 ];
                 break;
 
             case 'consolidated_fees':
                 $columns = [
-                    'student_name'   => 'Student Name',
-                    'admission_no'   => 'Admission No.',
-                    'class_name'     => 'Class & Section',
-                    'total_assigned' => 'Total Fees Assigned',
-                    'total_paid'     => 'Total Paid',
-                    'total_dues'     => 'Total Dues',
-                    'total_refund'   => 'Total Refunded',
-                    'net_balance'    => 'Net Balance',
+                    'student_name'        => 'Student Name',
+                    'admission_no'        => 'Admission No.',
+                    'class_name'          => 'Class',
+                    'section_name'        => 'Section',
+                    'total_assigned'      => 'Total Assigned',
+                    'total_paid'          => 'Total Paid',
+                    'total_discount'      => 'Total Discount',
+                    'total_fine'          => 'Total Fine',
+                    'total_refund'        => 'Total Refund',
+                    'total_dues'          => 'Total Due',
+                    'outstanding_balance' => 'Outstanding Balance',
+                    'status'              => 'Current Status',
                 ];
-                $studentsData = Student::where('students.school_id', $schoolId)
+                $query = Student::where('students.school_id', $schoolId)
                     ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
                     ->leftJoin('sections', 'students.section_id', '=', 'sections.id')
                     ->leftJoin('student_fees', 'students.id', '=', 'student_fees.student_id')
-                    ->selectRaw("students.id as student_id, students.admission_number, students.first_name, students.last_name, school_classes.name as class_name, sections.name as section_name, SUM(student_fees.amount) as total_assigned, SUM(student_fees.paid_amount) as total_paid")
+                    ->selectRaw("
+                        students.id as student_id,
+                        students.admission_number,
+                        students.first_name,
+                        students.last_name,
+                        school_classes.name as class_name,
+                        sections.name as section_name,
+                        SUM(student_fees.amount) as total_assigned,
+                        SUM(student_fees.paid_amount) as total_paid,
+                        SUM(COALESCE(student_fees.instant_discount_amount, 0)) as total_discount,
+                        SUM(COALESCE(student_fees.fine_amount_applied, 0)) as total_fine
+                    ")
                     ->groupBy('students.id', 'students.admission_number', 'students.first_name', 'students.last_name', 'school_classes.name', 'sections.name')
-                    ->orderBy('students.first_name')
-                    ->get();
+                    ->orderBy('students.first_name');
 
-                $records = $studentsData->map(function($s) {
-                    $totalRefund = DB::table('fee_refunds')->where('student_id', $s->student_id)->sum('amount');
+                if ($classId) $query->where('students.class_id', $classId);
+
+                $studentsData = $query->get();
+
+                $sumAssigned = 0;
+                $sumPaid = 0;
+                $sumDiscount = 0;
+                $sumFine = 0;
+                $sumRefund = 0;
+                $sumDues = 0;
+                $sumNetBalance = 0;
+
+                $records = $studentsData->map(function($s) use (&$sumAssigned, &$sumPaid, &$sumDiscount, &$sumFine, &$sumRefund, &$sumDues, &$sumNetBalance) {
+                    $totalRefund = (float) DB::table('fee_refunds')->where('student_id', $s->student_id)->sum('amount');
                     $totalAssigned = (float)($s->total_assigned ?? 0);
                     $totalPaid = (float)($s->total_paid ?? 0);
-                    $totalDues = max(0, $totalAssigned - $totalPaid);
-                    $netBalance = $totalDues - (float)$totalRefund;
+                    $totalDiscount = (float)($s->total_discount ?? 0);
+                    $totalFine = (float)($s->total_fine ?? 0);
+                    $totalDues = max(0, $totalAssigned + $totalFine - $totalPaid - $totalDiscount);
+                    $netBalance = max(0, $totalDues - $totalRefund);
+
+                    $sumAssigned += $totalAssigned;
+                    $sumPaid += $totalPaid;
+                    $sumDiscount += $totalDiscount;
+                    $sumFine += $totalFine;
+                    $sumRefund += $totalRefund;
+                    $sumDues += $totalDues;
+                    $sumNetBalance += $netBalance;
+
+                    if ($totalDues <= 0) {
+                        $statusBadge = '<span class="badge badge-success" style="background:#dcfce7; color:#166534; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">PAID</span>';
+                        $statusText = 'PAID';
+                    } elseif ($totalPaid > 0) {
+                        $statusBadge = '<span class="badge badge-warning" style="background:#fef3c7; color:#92400e; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">PARTIAL</span>';
+                        $statusText = 'PARTIAL';
+                    } else {
+                        $statusBadge = '<span class="badge badge-danger" style="background:#fee2e2; color:#991b1b; padding:2px 6px; border-radius:4px; font-weight:700; font-size:10px;">DUE</span>';
+                        $statusText = 'DUE';
+                    }
+
                     return [
-                        'student_name'   => trim($s->first_name . ' ' . $s->last_name),
-                        'admission_no'   => $s->admission_number ?? '—',
-                        'class_name'     => $s->class_name . ($s->section_name ? ' - ' . $s->section_name : ''),
-                        'total_assigned' => '₹ ' . number_format($totalAssigned, 2),
-                        'total_paid'     => '₹ ' . number_format($totalPaid, 2),
-                        'total_dues'     => '₹ ' . number_format($totalDues, 2),
-                        'total_refund'   => '₹ ' . number_format($totalRefund, 2),
-                        'net_balance'    => '₹ ' . number_format($netBalance, 2),
+                        'student_name'        => trim($s->first_name . ' ' . $s->last_name),
+                        'admission_no'        => $s->admission_number ?? '—',
+                        'class_name'          => $s->class_name,
+                        'section_name'        => $s->section_name ?? '—',
+                        'total_assigned'      => '₹ ' . number_format($totalAssigned, 2),
+                        'total_paid'          => '₹ ' . number_format($totalPaid, 2),
+                        'total_discount'      => '₹ ' . number_format($totalDiscount, 2),
+                        'total_fine'          => '₹ ' . number_format($totalFine, 2),
+                        'total_refund'        => '₹ ' . number_format($totalRefund, 2),
+                        'total_dues'          => '₹ ' . number_format($totalDues, 2),
+                        'outstanding_balance' => '₹ ' . number_format($netBalance, 2),
+                        'status'              => $statusBadge,
+                        'status_raw'          => $statusText,
                     ];
                 });
-                $totalAssignedAll = $studentsData->sum(fn($s) => (float)($s->total_assigned ?? 0));
-                $totalPaidAll     = $studentsData->sum(fn($s) => (float)($s->total_paid ?? 0));
+
                 $summary = [
-                    'Total Students'   => $records->count(),
-                    'Total Assigned'   => '₹ ' . number_format($totalAssignedAll, 2),
-                    'Total Collected'  => '₹ ' . number_format($totalPaidAll, 2),
-                    'Total Dues'       => '₹ ' . number_format(max(0, $totalAssignedAll - $totalPaidAll), 2),
+                    'Total Assigned Fees' => '₹ ' . number_format($sumAssigned, 2),
+                    'Total Paid'          => '₹ ' . number_format($sumPaid, 2),
+                    'Total Outstanding'   => '₹ ' . number_format($sumDues, 2),
+                    'Total Refund'        => '₹ ' . number_format($sumRefund, 2),
+                    'Net Balance'         => '₹ ' . number_format($sumNetBalance, 2),
                 ];
                 break;
         }
 
         $school = \App\Models\School::find($schoolId);
 
+        $transportRoutes      = $transportRoutes ?? collect();
+        $transportStops       = $transportStops ?? collect();
+        $routeIdFilter        = $routeIdFilter ?? '';
+        $stopNameFilter       = $stopNameFilter ?? '';
+        $vehicleReportRecords = $vehicleReportRecords ?? collect();
+        $vehicleSummary       = $vehicleSummary ?? [];
+
         return view('school.reports.detail', compact(
             'type', 'title', 'columns', 'records', 'summary',
-            'dateFrom', 'dateTo', 'sessionVal', 'dateType', 'sessions', 'classes', 'school'
+            'dateFrom', 'dateTo', 'sessionVal', 'dateType', 'sessions', 'classes', 'school',
+            'transportRoutes', 'transportStops', 'routeIdFilter', 'stopNameFilter',
+            'vehicleReportRecords', 'vehicleSummary'
         ));
+    }
+
+    public function exportDetailReportPdf(string $type, Request $request)
+    {
+        $schoolId = $this->schoolId();
+        $school   = School::find($schoolId);
+
+        $dateFrom = $request->get('date_from', now()->startOfYear()->format('Y-m-d'));
+        $dateTo   = $request->get('date_to', now()->format('Y-m-d'));
+        $sessionVal = $request->get('session', '');
+        $dateType = $request->get('date_type', 'payment_date');
+
+        $sessions = \App\Models\AcademicSession::where('school_id', $schoolId)->orderByDesc('is_current')->orderByDesc('name')->get();
+        $currentSession = $sessions->where('is_current', 1)->first() ?? $sessions->first();
+        if (!$sessionVal && $currentSession) {
+            $sessionVal = $currentSession->name;
+        }
+
+        $classes = SchoolClass::where('school_id', $schoolId)->orderBy('name')->get();
+        $classId = $request->get('class_id', '');
+        $paymentMode = $request->get('payment_mode', '');
+
+        // Generate response using existing detailReport view data
+        $view = $this->detailReport($type, $request);
+        $data = $view->getData();
+
+        $kpis = [];
+        if (!empty($data['summary'])) {
+            foreach ($data['summary'] as $lbl => $val) {
+                $kpis[] = ['label' => $lbl, 'value' => $val];
+            }
+        }
+
+        $exportHeaders = [];
+        if (!empty($data['columns'])) {
+            foreach ($data['columns'] as $key => $lbl) {
+                $align = in_array($key, [
+                    'amount', 'amount_paid', 'dues_amount', 'total_amount', 'paid_amount', 'due_amount',
+                    'transport_fee', 'monthly_fee', 'concession_amount', 'fine_amount', 'total_collected',
+                    'total_pending', 'total_assigned', 'net_balance', 'total_paid', 'total_discount',
+                    'total_fine', 'total_refund', 'total_dues', 'outstanding_balance', 'planned_collection',
+                    'expected_collection', 'estimated_income', 'per_student_fee', 'estimated_total'
+                ]) ? 'right' : 'left';
+                $exportHeaders[] = [
+                    'key'   => $key,
+                    'title' => $lbl,
+                    'align' => $align,
+                ];
+            }
+        }
+
+        $exportRows = [];
+        if (!empty($data['records'])) {
+            foreach ($data['records'] as $r) {
+                $rowArr = [];
+                foreach ($data['columns'] as $k => $lbl) {
+                    if (isset($r[$k . '_raw'])) {
+                        $rowArr[$k] = $r[$k . '_raw'];
+                    } else {
+                        $rowArr[$k] = strip_tags($r[$k] ?? '—');
+                    }
+                }
+                $exportRows[] = $rowArr;
+            }
+        }
+
+        $filterParts = [];
+        if (!empty($data['sessionVal'])) $filterParts[] = 'Session: ' . $data['sessionVal'];
+        if ($classId) {
+            $cls = SchoolClass::find($classId);
+            if ($cls) $filterParts[] = 'Class: ' . $cls->name;
+        }
+        if ($paymentMode) $filterParts[] = 'Mode: ' . strtoupper($paymentMode);
+        $filterSummary = !empty($filterParts) ? implode(' | ', $filterParts) : 'All Records';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.reports.pdf.fee-report-pdf', [
+            'school'        => $school,
+            'reportTitle'   => $data['title'] ?? 'Fee Report',
+            'sessionName'   => $data['sessionVal'] ?: 'Current Session',
+            'dateFrom'      => $data['dateFrom'] ?? $dateFrom,
+            'dateTo'        => $data['dateTo'] ?? $dateTo,
+            'filterSummary' => $filterSummary,
+            'kpis'          => $kpis,
+            'headers'       => $exportHeaders,
+            'rows'          => $exportRows,
+            'totals'        => $data['totals'] ?? [],
+        ]);
+
+        $pdf->setPaper('a4', 'landscape');
+        $fileName = str_replace([' ', '/', '\\', '&'], '_', $data['title'] ?? 'Fee_Report') . '_' . date('Ymd_His') . '.pdf';
+
+        return $pdf->download($fileName);
     }
 }
 

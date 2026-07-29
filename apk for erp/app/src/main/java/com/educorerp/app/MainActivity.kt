@@ -18,6 +18,13 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.appcompat.app.AppCompatActivity
 
+/**
+ * Android Native Presentation Layer
+ * 
+ * ARCHITECTURE DIRECTIVE:
+ * This Android application operates as an independent presentation layer consuming shared backend APIs.
+ * It does NOT depend on Web ERP Blade views. Any UI changes made here are strictly isolated to Mobile.
+ */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView

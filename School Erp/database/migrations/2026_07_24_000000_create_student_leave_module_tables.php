@@ -14,11 +14,25 @@ return new class extends Migration
     {
         // 1. Cleanup old/incomplete student leave entries if they exist
         if (Schema::hasTable('leave_applications')) {
-            // Delete old student leave records to allow a fresh student leave workflow restart
-            DB::table('leave_applications')
-                ->where('applicant_type', 'student')
-                ->orWhereNotNull('student_id')
-                ->delete();
+            $hasApplicantType = Schema::hasColumn('leave_applications', 'applicant_type');
+            $hasStudentId     = Schema::hasColumn('leave_applications', 'student_id');
+
+            if ($hasApplicantType || $hasStudentId) {
+                DB::table('leave_applications')
+                    ->where(function ($q) use ($hasApplicantType, $hasStudentId) {
+                        if ($hasApplicantType) {
+                            $q->where('applicant_type', 'student');
+                        }
+                        if ($hasStudentId) {
+                            if ($hasApplicantType) {
+                                $q->orWhereNotNull('student_id');
+                            } else {
+                                $q->whereNotNull('student_id');
+                            }
+                        }
+                    })
+                    ->delete();
+            }
         }
 
         // 2. Settings table for Student Leave
