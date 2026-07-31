@@ -648,7 +648,12 @@ class SchoolDashboardController extends Controller
         $todayBooksIssued = StudentDocument::where('school_id', $schoolId)->whereDate('created_at', $date)->count();
         $todayBooksReturned = 0;
         $todayNoticesShared = Notice::where('school_id', $schoolId)
-            ->whereDate('created_at', $date)
+            ->where(function($q) use ($date) {
+                $q->whereDate('publish_at', $date)
+                  ->orWhere(function($q2) use ($date) {
+                      $q2->whereNull('publish_at')->whereDate('created_at', $date);
+                  });
+            })
             ->count();
 
         // Column 3: Admissions & Academic

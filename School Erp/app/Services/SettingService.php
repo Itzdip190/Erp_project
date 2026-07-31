@@ -30,6 +30,8 @@ class SettingService
             'date_format' => 'Y-m-d',
             'prospectus_issue' => '1',
             'active_session' => '',
+            'student_id_prefix' => 'YAS',
+            'staff_id_prefix' => 'EMP',
 
             // 2. User Controls
             'allow_student_login' => '1',
@@ -169,7 +171,7 @@ class SettingService
             'show_inventory_previous_sessions_vouchers_due' => '0',
             'auto_approve_expense_voucher' => '0',
             'disable_previous_session_fees_payment' => '0',
-            'show_report_card_v2_in_student_profile' => '1',
+            'show_report_card_v2_in_student_profile' => '0',
             'show_payment_service_charges' => '0',
         ];
 

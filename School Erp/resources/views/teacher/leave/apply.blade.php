@@ -639,8 +639,11 @@
                 <div class="th-notif-wrapper" style="position: relative;">
                     <button type="button" class="th-icon-btn" id="teacherNotifBell" onclick="toggleNotifDropdown()" title="Notifications">
                         <i class="fas fa-bell"></i>
-                        <span class="badge-dot" id="notifBadgeDot" style="display: none;"></span>
-                        <span class="badge-count" id="notifBadgeCount" style="display: none;">0</span>
+                        @php
+                            $tUnread = \App\Services\NotificationService::getUnreadCount();
+                        @endphp
+                        <span class="badge-dot" id="notifBadgeDot" style="{{ $tUnread > 0 ? '' : 'display: none;' }}"></span>
+                        <span class="badge-count" id="notifBadgeCount" style="{{ $tUnread > 0 ? 'display: inline-flex;' : 'display: none;' }}">{{ $tUnread > 99 ? '99+' : $tUnread }}</span>
                     </button>
 
                     <!-- Notification Dropdown Panel -->

@@ -535,6 +535,35 @@
             </div>
         </div>
 
+        <!-- Identity Number Settings Card -->
+        <div class="setting-card" data-category="school_config">
+            <div class="setting-card-header">
+                <h2 class="setting-card-title"><i class="fas fa-id-card" style="color:#2563eb;"></i> Identity Number Settings</h2>
+                <span class="badge bg-primary" style="background:#2563eb;">ID Configuration</span>
+            </div>
+            <div class="setting-card-body">
+                <div class="setting-row">
+                    <div class="setting-label-box">
+                        <div class="setting-title">Student Admission Number Prefix</div>
+                        <div class="setting-desc">Configurable prefix for student admission numbers (e.g. YAS, ABC, SCH, DAV, KVS)</div>
+                    </div>
+                    <div class="setting-control-box">
+                        <input type="text" name="student_id_prefix" class="setting-input" style="width:280px; text-transform:uppercase;" value="{{ $settings['student_id_prefix'] ?? 'YAS' }}" placeholder="e.g. YAS">
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-label-box">
+                        <div class="setting-title">Staff Employee ID Prefix</div>
+                        <div class="setting-desc">Configurable prefix for staff employee IDs (e.g. EMP, STAFF, YAS-EMP, TCH)</div>
+                    </div>
+                    <div class="setting-control-box">
+                        <input type="text" name="staff_id_prefix" class="setting-input" style="width:280px; text-transform:uppercase;" value="{{ $settings['staff_id_prefix'] ?? 'EMP' }}" placeholder="e.g. EMP">
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 2. User & Portal Access Controls Card -->
         <div class="setting-card" data-category="user_control">
             <div class="setting-card-header">

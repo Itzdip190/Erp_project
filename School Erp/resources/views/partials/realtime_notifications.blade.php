@@ -183,24 +183,39 @@
         return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
-    window.markNotificationRead = function(id) {
+    window.markNotificationRead = function(id, event) {
+        if (event && event.target && (event.target.getAttribute('href') === '#' || event.target.getAttribute('href') === 'javascript:void(0);')) {
+            event.preventDefault();
+        }
         fetch(`/notifications/${id}/read`, {
             method: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
             }
-        }).then(() => fetchLatestNotifications());
+        }).then(() => {
+            fetchLatestNotifications();
+        }).catch(err => console.error('Mark read error:', err));
     };
 
     window.markAllNotifsAsRead = function() {
+        // Immediate optimistic UI badge & container update
+        updateBadgeOnly(0);
+        const listContainers = document.querySelectorAll('#notifListContainer, #sbNotifListContainer, .notif-drop #notifListContainer, .notif-drop div[style*="max-height"]');
+        listContainers.forEach(c => {
+            c.innerHTML = '<div class="nd-empty" style="padding:20px; text-align:center; color:#94a3b8; font-size:13px;"><i class="fas fa-check-circle" style="font-size:20px; color:#10b981; margin-bottom:6px; display:block;"></i>All notifications marked as read</div>';
+        });
+
         fetch("{{ route('notifications.read-all') }}", {
             method: 'POST',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
             }
-        }).then(() => fetchLatestNotifications());
+        })
+        .then(res => res.json())
+        .then(() => fetchLatestNotifications())
+        .catch(err => console.error('Mark all read error:', err));
     };
 
     document.addEventListener('DOMContentLoaded', initRealtimeStream);

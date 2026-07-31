@@ -67,6 +67,9 @@ class ApplyOverdueInstallmentFines extends Command
                         ->get();
 
                     foreach ($studentFees as $sf) {
+                        if ($sf->is_fine_applied === false || $sf->is_fine_applied === 0) {
+                            continue;
+                        }
                         if ($finePolicy->fee_component_id !== null && $finePolicy->fee_component_id !== $sf->fee_component_id) {
                             continue;
                         }
@@ -117,6 +120,9 @@ class ApplyOverdueInstallmentFines extends Command
                         ->get();
 
                     foreach ($studentFees as $sf) {
+                        if ($sf->is_fine_applied === false || $sf->is_fine_applied === 0) {
+                            continue;
+                        }
                         if ($finePolicy->fee_component_id !== null && $finePolicy->fee_component_id !== $sf->fee_component_id) {
                             continue;
                         }

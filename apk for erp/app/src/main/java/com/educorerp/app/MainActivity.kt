@@ -44,6 +44,10 @@ class MainActivity : AppCompatActivity() {
             webView = findViewById(R.id.webView)
             splashWebView = findViewById(R.id.splashWebView)
 
+            // Set white background to prevent any black screen flash during load
+            webView.setBackgroundColor(android.graphics.Color.WHITE)
+            splashWebView.setBackgroundColor(android.graphics.Color.WHITE)
+
             // 1. Configure Splash WebView (Plays HTML5/CSS Keyframe Animation)
             val splashSettings: WebSettings = splashWebView.settings
             splashSettings.javaScriptEnabled = true
@@ -64,6 +68,9 @@ class MainActivity : AppCompatActivity() {
             settings.loadWithOverviewMode = true
             settings.builtInZoomControls = false
             settings.displayZoomControls = false
+            settings.setNeedInitialFocus(false)
+            settings.mediaPlaybackRequiresUserGesture = false
+            settings.loadsImagesAutomatically = true
 
             // Enable Fast Disk Caching & High Render Priority
             settings.cacheMode = WebSettings.LOAD_DEFAULT
@@ -75,8 +82,11 @@ class MainActivity : AppCompatActivity() {
             CookieManager.getInstance().setAcceptCookie(true)
             CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
-            // Enable GPU Hardware Acceleration for 60 FPS Scrolling
+            // Enable GPU Hardware Acceleration & Smooth 60 FPS Scroll Optimization
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            webView.overScrollMode = View.OVER_SCROLL_NEVER
+            webView.isScrollbarFadingEnabled = true
+            webView.isHapticFeedbackEnabled = false
 
             // WebView Client handling page load completion
             webView.webViewClient = object : WebViewClient() {
@@ -87,6 +97,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     isPageLoaded = true
+                    dismissSplashWithAnimation()
                 }
 
                 override fun onReceivedError(
@@ -96,13 +107,14 @@ class MainActivity : AppCompatActivity() {
                 ) {
                     super.onReceivedError(view, request, error)
                     isPageLoaded = true
+                    dismissSplashWithAnimation()
                 }
             }
 
-            // Absolute Safety Timeout (4.5 seconds max) to guarantee splash dismissal
+            // Absolute Safety Timeout (3.5 seconds max) to guarantee splash dismissal
             mainHandler.postDelayed({
                 dismissSplashWithAnimation()
-            }, 4500)
+            }, 3500)
 
             // Load Target URL in background
             webView.loadUrl(targetUrl)

@@ -1420,9 +1420,15 @@ body.dark-mode #feeComponentSectionContainer {
         <div class="sw-badge-discount" style="background:#fffbeb; color:#b45309; border:1px solid #fde68a; font-weight:700; padding:6px 14px; border-radius:20px; font-size:0.85rem;">
             Discount: ₹{{ number_format($totalDiscount, 0) }}
         </div>
-        @if($totalFine > 0)
-        <div style="background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; font-weight:700; padding:6px 14px; border-radius:20px; font-size:0.85rem;">
-            Late Fine: ₹{{ number_format($totalFine, 0) }}
+        @php
+            $hasAnyFineRecord = $studentFees->contains(function($f) {
+                return floatval($f->fine_amount_applied) > 0 || $f->is_fine_applied === false || $f->is_fine_applied === 0;
+            });
+        @endphp
+        @if($totalFine > 0 || $hasAnyFineRecord)
+        <div onclick="openLateFineModal()" style="background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; font-weight:700; padding:6px 14px; border-radius:20px; font-size:0.85rem; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s ease;" title="Click to manage Late Fine for installments" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 6px -1px rgba(194, 65, 12, 0.15)';" onmouseout="this.style.transform='none'; this.style.boxShadow='none';">
+            <i class="fas fa-clock"></i> Late Fine: ₹{{ number_format($totalFine, 0) }}
+            <i class="fas fa-sliders-h" style="font-size:0.75rem; opacity:0.8; margin-left:2px;"></i>
         </div>
         @endif
         <div class="sw-badge-paid" style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; font-weight:700; padding:6px 14px; border-radius:20px; font-size:0.85rem;">
@@ -5153,5 +5159,271 @@ function getCandidateFeeElements(installmentNo, feeType) {
 }
 
 // Print behavior is now handled by the interactive successPopupModal dialog
+
+window.lateFineCache = null;
+
+function openLateFineModal(targetInstNo) {
+    const studentId = "{{ $viewStudent ? $viewStudent->id : '' }}";
+    if (!studentId) return;
+
+    const modal = document.getElementById('manageLateFineModal');
+    const loading = document.getElementById('lateFineLoadingState');
+    const empty = document.getElementById('lateFineEmptyState');
+    const form = document.getElementById('lateFineManagementForm');
+    const notice = document.getElementById('lateFineReadOnlyNotice');
+    const container = document.getElementById('lateFineInstallmentsContainer');
+
+    modal.style.display = 'flex';
+
+    const renderData = (data) => {
+        loading.style.display = 'none';
+        if (!data.success || !data.installments || data.installments.length === 0) {
+            empty.style.display = 'block';
+            form.style.display = 'none';
+            return;
+        }
+
+        empty.style.display = 'none';
+        form.style.display = 'block';
+
+        if (!data.can_manage) {
+            notice.style.display = 'block';
+            document.getElementById('saveLateFineBtn').disabled = true;
+            document.getElementById('saveLateFineBtn').style.opacity = '0.5';
+            document.getElementById('saveLateFineBtn').style.cursor = 'not-allowed';
+        } else {
+            notice.style.display = 'none';
+            document.getElementById('saveLateFineBtn').disabled = false;
+            document.getElementById('saveLateFineBtn').style.opacity = '1';
+            document.getElementById('saveLateFineBtn').style.cursor = 'pointer';
+        }
+
+        container.innerHTML = '';
+        data.installments.forEach(inst => {
+            const isApplied = inst.is_applied;
+            const card = document.createElement('div');
+            card.className = 'late-fine-inst-card';
+            card.style.cssText = 'border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 14px; background: #fafafa; transition: all 0.2s ease;';
+
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-weight:800; font-size:0.95rem; color:#0f172a;">${inst.installment_name}</span>
+                    <span class="status-badge-${inst.installment_no}" style="font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:12px; ${isApplied ? 'background:#dcfce7; color:#15803d; border:1px solid #86efac;' : 'background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5;'}">
+                        Current Status: ${inst.status_label}
+                    </span>
+                </div>
+                <div style="font-size:0.88rem; font-weight:700; color:#c2410c; margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                    <i class="fas fa-exclamation-circle"></i> Late Fine: ${inst.fine_formatted}
+                </div>
+                <div style="display:flex; gap:20px; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:10px 14px;">
+                    <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; font-size:0.85rem; color:#1e293b; margin:0;">
+                        <input type="radio" name="inst_status_${inst.installment_no}" value="applied" ${isApplied ? 'checked' : ''} ${!data.can_manage ? 'disabled' : ''} style="width:16px; height:16px; accent-color:#2563eb;" onchange="updateInstCardBadge(${inst.installment_no}, true)">
+                        <span>Apply</span>
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:700; font-size:0.85rem; color:#1e293b; margin:0;">
+                        <input type="radio" name="inst_status_${inst.installment_no}" value="not_applied" ${!isApplied ? 'checked' : ''} ${!data.can_manage ? 'disabled' : ''} style="width:16px; height:16px; accent-color:#dc2626;" onchange="updateInstCardBadge(${inst.installment_no}, false)">
+                        <span>Not Applied</span>
+                    </label>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        if (targetInstNo) {
+            const targetRadio = container.querySelector(`input[name="inst_status_${targetInstNo}"]`);
+            if (targetRadio) {
+                const targetCard = targetRadio.closest('.late-fine-inst-card');
+                if (targetCard) {
+                    targetCard.style.borderColor = '#2563eb';
+                    targetCard.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.15)';
+                    targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+        }
+    };
+
+    if (window.lateFineCache && window.lateFineCache.student_id == studentId) {
+        renderData(window.lateFineCache);
+    } else {
+        loading.style.display = 'block';
+        empty.style.display = 'none';
+        form.style.display = 'none';
+        notice.style.display = 'none';
+        container.innerHTML = '';
+    }
+
+    const formData = new FormData();
+    formData.append('_token', '{{ csrf_token() }}');
+    formData.append('action', 'get_late_fine_details');
+    formData.append('student_id', studentId);
+
+    fetch('{{ route("school.fees.student-wise") }}', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            window.lateFineCache = data;
+            renderData(data);
+        } else {
+            loading.style.display = 'none';
+            empty.style.display = 'block';
+        }
+    })
+    .catch(err => {
+        console.error('Late Fine Modal Error:', err);
+        loading.style.display = 'none';
+        empty.style.display = 'block';
+    });
+}
+
+function updateInstCardBadge(instNo, isApplied) {
+    const badge = document.querySelector(`.status-badge-${instNo}`);
+    if (badge) {
+        if (isApplied) {
+            badge.style.cssText = 'font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:12px; background:#dcfce7; color:#15803d; border:1px solid #86efac;';
+            badge.textContent = 'Current Status: Applied';
+        } else {
+            badge.style.cssText = 'font-size:0.75rem; font-weight:700; padding:3px 10px; border-radius:12px; background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5;';
+            badge.textContent = 'Current Status: Not Applied';
+        }
+    }
+}
+
+function closeLateFineModal() {
+    document.getElementById('manageLateFineModal').style.display = 'none';
+}
+
+function submitLateFineForm(event) {
+    event.preventDefault();
+    const btn = document.getElementById('saveLateFineBtn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Saving...';
+
+    const form = document.getElementById('lateFineManagementForm');
+    const studentId = document.getElementById('lateFineStudentId').value;
+    const reason = document.getElementById('lateFineReasonInput').value;
+
+    const radios = form.querySelectorAll('input[type="radio"]:checked');
+    const installments = [];
+
+    radios.forEach(radio => {
+        const name = radio.name;
+        const instNo = name.replace('inst_status_', '');
+        installments.push({
+            installment_no: parseInt(instNo),
+            status: radio.value
+        });
+    });
+
+    const payload = {
+        _token: '{{ csrf_token() }}',
+        action: 'manage_late_fine',
+        student_id: studentId,
+        reason: reason,
+        installments: installments
+    };
+
+    fetch('{{ route("school.fees.student-wise") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            window.lateFineCache = null;
+            if (data.total_fine_formatted !== undefined) {
+                const fineBadgeText = document.querySelector('[title*="Late Fine"]');
+                if (fineBadgeText) {
+                    fineBadgeText.innerHTML = `<i class="fas fa-clock"></i> Late Fine: ${data.total_fine_formatted} <i class="fas fa-sliders-h" style="font-size:0.75rem; opacity:0.8; margin-left:2px;"></i>`;
+                }
+                const dueBadgeText = document.querySelector('.sw-badge-due');
+                if (dueBadgeText && data.effective_due_formatted !== undefined) {
+                    dueBadgeText.innerHTML = `Due: ${data.effective_due_formatted}`;
+                }
+            }
+            closeLateFineModal();
+            window.location.reload();
+        } else {
+            alert(data.message || 'Error updating Late Fine settings.');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    })
+    .catch(err => {
+        console.error('Error submitting late fine changes:', err);
+        alert('An unexpected error occurred while saving changes.');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
 </script>
+
+{{-- ══════════════════════════════════════════════════════════════════════
+     MANAGE LATE FINE MODAL POPUP HTML
+══════════════════════════════════════════════════════════════════════ --}}
+<div class="sw-modal-overlay" id="manageLateFineModal" style="display:none; backdrop-filter: blur(4px); transition: all 0.3s ease; z-index:9999;" onclick="if(event.target===this) closeLateFineModal()">
+    <div class="sw-modal" style="width:520px; max-height:90vh; overflow-y:auto; border-radius:16px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); border: 1px solid rgba(226, 232, 240, 0.8); background:#ffffff; padding:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px; border-bottom: 1px solid #f1f5f9; padding-bottom:12px;">
+            <div>
+                <h3 style="margin:0; font-size:1.2rem; font-weight:800; color:var(--sw-blue); display:flex; align-items:center; gap:8px;">
+                    <i class="fas fa-clock" style="color:#c2410c;"></i> Manage Late Fine
+                </h3>
+                <p style="margin:4px 0 0 0; font-size:0.83rem; color:#64748b; font-weight:500;">
+                    Select the installment(s) for which you want to change the Late Fine status.
+                </p>
+            </div>
+            <button type="button" onclick="closeLateFineModal()" style="background:none; border:none; color:#94a3b8; font-size:1.2rem; cursor:pointer; padding:4px 8px; border-radius:6px; transition:all 0.2s ease;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div id="lateFineReadOnlyNotice" style="display:none; background:#fffbe8; border:1px solid #fef08a; border-radius:10px; padding:10px 12px; margin-bottom:14px; color:#854d0e; font-size:0.82rem; font-weight:600;">
+            <i class="fas fa-lock" style="margin-right:6px;"></i> View Only Mode: You do not have permission to change Late Fine settings.
+        </div>
+
+        <div id="lateFineLoadingState" style="text-align:center; padding:35px 10px; color:#64748b;">
+            <i class="fas fa-circle-notch fa-spin" style="font-size:2rem; color:var(--sw-blue); margin-bottom:12px;"></i>
+            <p style="font-size:0.88rem; font-weight:600; margin:0;">Loading Late Fine details...</p>
+        </div>
+
+        <div id="lateFineEmptyState" style="display:none; text-align:center; padding:35px 10px; color:#64748b;">
+            <i class="fas fa-info-circle" style="font-size:2rem; color:#94a3b8; margin-bottom:10px;"></i>
+            <p style="font-size:0.9rem; font-weight:700; margin:0 0 4px 0;">No Late Fine Applicable</p>
+            <p style="font-size:0.82rem; margin:0;">There are currently no overdue installments with late fines calculated for this student.</p>
+        </div>
+
+        <form id="lateFineManagementForm" onsubmit="submitLateFineForm(event)" style="display:none;">
+            @csrf
+            <input type="hidden" name="action" value="manage_late_fine">
+            <input type="hidden" name="student_id" id="lateFineStudentId" value="{{ $viewStudent ? $viewStudent->id : '' }}">
+
+            <div id="lateFineInstallmentsContainer" style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+                {{-- Dynamic Installment Cards --}}
+            </div>
+
+            <div class="sw-modal-field" style="margin-bottom:18px;">
+                <label style="font-weight:700; font-size:0.82rem; color:#334155;">Reason for Change (Optional)</label>
+                <input type="text" name="reason" id="lateFineReasonInput" placeholder="e.g. Approved by Principal / Special waiver" style="border-radius:8px; border:1px solid #cbd5e1; padding:8px 12px; width:100%; font-size:0.88rem;">
+            </div>
+
+            <div class="sw-modal-actions" style="display:flex; gap:10px; justify-content:flex-end; border-top:1px solid #f1f5f9; padding-top:14px; margin-top:10px;">
+                <button type="button" class="sw-modal-cancel" onclick="closeLateFineModal()" style="border-radius:8px; font-weight:700; background:#f1f5f9; color:#475569; border:none; padding:8px 18px; cursor:pointer;">Cancel</button>
+                <button type="submit" class="sw-modal-submit" id="saveLateFineBtn" style="border-radius:8px; font-weight:800; background:linear-gradient(135deg, #1e40af 0%, #2563eb 100%); color:#fff; border:none; padding:8px 22px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                    <i class="fas fa-check-circle"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 @endsection

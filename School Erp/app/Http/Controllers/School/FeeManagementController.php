@@ -1982,6 +1982,40 @@ class FeeManagementController extends Controller
             ->where('status', '!=', 'paid')
             ->get();
 
+        if ($studentFees->isEmpty()) {
+            return;
+        }
+
+        // Batch pre-fetch all fee schedules and transport fee schedules with fine policies
+        $schedIds = $studentFees->pluck('fee_schedule_id')
+            ->filter()
+            ->push($student->fee_schedule_id)
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $transportSchedIds = $studentFees->pluck('transport_fee_schedule_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $feeSchedules = !empty($schedIds)
+            ? \App\Models\FeeSchedule::where('school_id', $schoolId)
+                ->whereIn('id', $schedIds)
+                ->with('fine')
+                ->get()
+                ->keyBy('id')
+            : collect();
+
+        $transportFeeSchedules = !empty($transportSchedIds)
+            ? \App\Models\TransportFeeSchedule::where('school_id', $schoolId)
+                ->whereIn('id', $transportSchedIds)
+                ->with('fine')
+                ->get()
+                ->keyBy('id')
+            : collect();
+
         foreach ($studentFees as $sf) {
             $sched = null;
             $insts = [];
@@ -1991,19 +2025,13 @@ class FeeManagementController extends Controller
             if ($sf->misc_fee_id === null) {
                 $schedId = $sf->fee_schedule_id ?: $student->fee_schedule_id;
                 if ($schedId) {
-                    $sched = \App\Models\FeeSchedule::where('school_id', $schoolId)
-                        ->where('id', $schedId)
-                        ->with('fine')
-                        ->first();
+                    $sched = $feeSchedules->get($schedId);
                     if ($sched && $sched->fine && $sched->fine->status) {
                         $finePolicy = $sched->fine;
                         $insts = $sched->installments ?? [];
                     }
                 } elseif ($sf->transport_fee_schedule_id) {
-                    $sched = \App\Models\TransportFeeSchedule::where('school_id', $schoolId)
-                        ->where('id', $sf->transport_fee_schedule_id)
-                        ->with('fine')
-                        ->first();
+                    $sched = $transportFeeSchedules->get($sf->transport_fee_schedule_id);
                     if ($sched && $sched->fine && $sched->fine->status) {
                         $finePolicy = $sched->fine;
                         $insts = $sched->installments ?? [];
@@ -2047,11 +2075,19 @@ class FeeManagementController extends Controller
             if ($today->gt($graceDate)) {
                 $fineAmount = $finePolicy->calculateFor($sf, $inst['due_date'], $graceDays);
                 if ($fineAmount > 0) {
-                    $alreadyApplied = floatval($sf->fine_amount_applied ?? 0);
-                    if ($fineAmount != $alreadyApplied) {
-                        $sf->fine_amount_applied = $fineAmount;
-                        $sf->fine_applied_at = now();
-                        $sf->save();
+                    if ($sf->is_fine_applied === false || $sf->is_fine_applied === 0) {
+                        // Admin override: Late Fine set to Not Applied for this installment
+                        if (floatval($sf->fine_amount_applied) !== 0.00) {
+                            $sf->fine_amount_applied = 0.00;
+                            $sf->save();
+                        }
+                    } else {
+                        $alreadyApplied = floatval($sf->fine_amount_applied ?? 0);
+                        if ($fineAmount != $alreadyApplied) {
+                            $sf->fine_amount_applied = $fineAmount;
+                            $sf->fine_applied_at = now();
+                            $sf->save();
+                        }
                     }
                 }
             } else {
@@ -2383,6 +2419,235 @@ class FeeManagementController extends Controller
                     ->whereIn('id', $request->student_ids)
                     ->update(['fee_visible' => $request->visible]);
                 return response()->json(['success' => true]);
+            }
+
+            if ($action === 'get_late_fine_details') {
+                $studentId = $request->input('student_id');
+                $student = Student::where('school_id', $schoolId)->findOrFail($studentId);
+                self::applyOverdueFinesToStudent($student);
+
+                $studentFees = \App\Models\StudentFee::withoutGlobalScope('active')
+                    ->where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->where('status', '!=', 'paid')
+                    ->get();
+
+                $today = now()->startOfDay();
+                $grouped = $studentFees->groupBy('installment_no');
+                $installmentDetails = [];
+
+                // Pre-fetch all relevant FeeSchedule and TransportFeeSchedule models
+                $schedIds = $studentFees->pluck('fee_schedule_id')
+                    ->filter()
+                    ->push($student->fee_schedule_id)
+                    ->unique()
+                    ->values()
+                    ->toArray();
+
+                $transportSchedIds = $studentFees->pluck('transport_fee_schedule_id')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->toArray();
+
+                $feeSchedules = !empty($schedIds)
+                    ? \App\Models\FeeSchedule::where('school_id', $schoolId)
+                        ->whereIn('id', $schedIds)
+                        ->with('fine')
+                        ->get()
+                        ->keyBy('id')
+                    : collect();
+
+                $transportFeeSchedules = !empty($transportSchedIds)
+                    ? \App\Models\TransportFeeSchedule::where('school_id', $schoolId)
+                        ->whereIn('id', $transportSchedIds)
+                        ->with('fine')
+                        ->get()
+                        ->keyBy('id')
+                    : collect();
+
+                foreach ($grouped as $instNo => $fees) {
+                    $firstFee = $fees->first();
+                    $policyFineAmount = 0.00;
+                    $finePolicy = null;
+                    $instDueDate = null;
+                    $graceDays = 0;
+
+                    // Determine policy fine for this installment
+                    if ($firstFee->misc_fee_id === null) {
+                        $schedId = $firstFee->fee_schedule_id ?: $student->fee_schedule_id;
+                        if ($schedId) {
+                            $sched = $feeSchedules->get($schedId);
+                            if ($sched && $sched->fine && $sched->fine->status) {
+                                $finePolicy = $sched->fine;
+                                $insts = $sched->installments ?? [];
+                                $instData = collect($insts)->firstWhere('installment_no', $instNo);
+                                if ($instData && !empty($instData['due_date'])) {
+                                    $instDueDate = $instData['due_date'];
+                                    $graceDays = (int) ($instData['grace_days'] ?? $finePolicy->default_grace_days ?? 0);
+                                }
+                            }
+                        } elseif ($firstFee->transport_fee_schedule_id) {
+                            $sched = $transportFeeSchedules->get($firstFee->transport_fee_schedule_id);
+                            if ($sched && $sched->fine && $sched->fine->status) {
+                                $finePolicy = $sched->fine;
+                                $insts = $sched->installments ?? [];
+                                $instData = collect($insts)->firstWhere('installment_no', $instNo);
+                                if ($instData && !empty($instData['due_date'])) {
+                                    $instDueDate = $instData['due_date'];
+                                    $graceDays = (int) ($instData['grace_days'] ?? $finePolicy->default_grace_days ?? 0);
+                                }
+                            }
+                        }
+                    }
+
+                    if ($finePolicy && $instDueDate) {
+                        $dueDateObj = \Carbon\Carbon::parse($instDueDate)->startOfDay();
+                        $graceDateObj = $dueDateObj->copy()->addDays($graceDays);
+                        if ($today->gt($graceDateObj)) {
+                            // Sum policy fine across matching component fees
+                            foreach ($fees as $f) {
+                                if ($finePolicy->fee_component_id === null || $finePolicy->fee_component_id === $f->fee_component_id) {
+                                    $policyFineAmount += $finePolicy->calculateFor($f, $instDueDate, $graceDays);
+                                }
+                            }
+                        }
+                    }
+
+                    $currentAppliedFine = $fees->sum('fine_amount_applied');
+                    $isApplied = !$fees->contains(function ($f) {
+                        return $f->is_fine_applied === false || $f->is_fine_applied === 0;
+                    });
+
+                    $displayFine = max($policyFineAmount, $currentAppliedFine);
+
+                    if ($displayFine > 0 || $currentAppliedFine > 0 || !$isApplied) {
+                        $installmentDetails[] = [
+                            'installment_no' => (int) $instNo,
+                            'installment_name' => 'Installment ' . $instNo,
+                            'fine_amount' => floatval($displayFine),
+                            'fine_formatted' => '₹' . number_format($displayFine, 0),
+                            'is_applied' => (bool) $isApplied,
+                            'status_label' => $isApplied ? 'Applied' : 'Not Applied',
+                        ];
+                    }
+                }
+
+                // Sort by installment_no ascending
+                usort($installmentDetails, fn($a, $b) => $a['installment_no'] <=> $b['installment_no']);
+
+                $canManage = \App\Support\StaffAccessHelper::hasAccess('fee_management', 'student_wise_fee', 'edit');
+
+                return response()->json([
+                    'success' => true,
+                    'student_id' => $student->id,
+                    'student_name' => $student->full_name,
+                    'can_manage' => $canManage,
+                    'installments' => $installmentDetails,
+                ]);
+            }
+
+            if ($action === 'manage_late_fine') {
+                $canManage = \App\Support\StaffAccessHelper::hasAccess('fee_management', 'student_wise_fee', 'edit');
+                if (!$canManage) {
+                    if ($request->wantsJson()) {
+                        return response()->json(['success' => false, 'message' => 'You do not have permission to manage late fines.'], 403);
+                    }
+                    return back()->with('error', 'You do not have permission to manage late fines.');
+                }
+
+                $request->validate([
+                    'student_id' => 'required|exists:students,id',
+                    'installments' => 'required|array',
+                    'installments.*.installment_no' => 'required|integer',
+                    'installments.*.status' => 'required|in:applied,not_applied',
+                    'reason' => 'nullable|string|max:500',
+                ]);
+
+                $studentId = $request->input('student_id');
+                $student = Student::where('school_id', $schoolId)->findOrFail($studentId);
+                $reason = $request->input('reason');
+
+                // Pre-fetch all student fees for this student in a single query
+                $allStudentFees = \App\Models\StudentFee::withoutGlobalScope('active')
+                    ->where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->get();
+
+                $oldFineTotals = [];
+                $targetStatusMap = [];
+
+                foreach ($request->input('installments') as $item) {
+                    $instNo = (int) $item['installment_no'];
+                    $targetStatus = $item['status'];
+                    $shouldApply = ($targetStatus === 'applied');
+                    $targetStatusMap[$instNo] = $shouldApply;
+
+                    $instFees = $allStudentFees->where('installment_no', $instNo);
+                    if ($instFees->isEmpty()) {
+                        continue;
+                    }
+
+                    $oldFineTotals[$instNo] = floatval($instFees->sum('fine_amount_applied'));
+
+                    foreach ($instFees as $sf) {
+                        $sf->is_fine_applied = $shouldApply;
+                        if (!$shouldApply) {
+                            $sf->fine_amount_applied = 0.00;
+                        }
+                        $sf->save();
+                    }
+                }
+
+                // Recalculate fine policy & sync student fees ONCE after all updates
+                self::applyOverdueFinesToStudent($student);
+                self::syncStudentFees($student);
+
+                // Fetch fresh student fees after sync to record audit logs and calculate total
+                $refreshedFees = \App\Models\StudentFee::withoutGlobalScope('active')
+                    ->where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->get();
+
+                foreach ($targetStatusMap as $instNo => $shouldApply) {
+                    if (!isset($oldFineTotals[$instNo])) {
+                        continue;
+                    }
+                    $instFees = $refreshedFees->where('installment_no', $instNo);
+                    $newFineTotal = floatval($instFees->sum('fine_amount_applied'));
+
+                    \App\Models\LateFineAuditLog::create([
+                        'school_id' => $schoolId,
+                        'student_id' => $student->id,
+                        'user_id' => auth()->id(),
+                        'installment_no' => $instNo,
+                        'action' => $shouldApply ? 'applied' : 'removed',
+                        'old_fine' => $oldFineTotals[$instNo],
+                        'new_fine' => $newFineTotal,
+                        'reason' => $reason,
+                    ]);
+                }
+
+                $activeFees = $refreshedFees->where('status', '!=', 'paid');
+                $totalFine = floatval($activeFees->sum('fine_amount_applied'));
+
+                $totalAmount = floatval($refreshedFees->sum('amount'));
+                $totalPaid = floatval($refreshedFees->sum('paid_amount'));
+                $totalDiscount = floatval($refreshedFees->sum('instant_discount_amount'));
+                $effectiveDue = max(0, ($totalAmount + $totalFine) - ($totalPaid + $totalDiscount));
+
+                if ($request->wantsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Late Fine settings updated successfully!',
+                        'total_fine' => $totalFine,
+                        'total_fine_formatted' => '₹' . number_format($totalFine, 0),
+                        'effective_due' => $effectiveDue,
+                        'effective_due_formatted' => '₹' . number_format($effectiveDue, 0),
+                    ]);
+                }
+
+                return back()->with('success', 'Late Fine settings updated successfully!');
             }
             if ($action === 'add_student_misc_fee') {
                 $request->validate([
@@ -3200,34 +3465,10 @@ class FeeManagementController extends Controller
                             'payment_details'=> $paymentDetailsJson,
                         ]);
 
-                        // Send Central Notifications
+                        // Send Fee Notifications to Student & Parent Portals
                         $feeStudent = \App\Models\Student::find($studentId);
-                        $sName = $feeStudent ? trim($feeStudent->first_name . ' ' . ($feeStudent->last_name ?? '')) : 'Student';
-                        \App\Services\NotificationService::send([
-                            'school_id'      => $schoolId,
-                            'recipient_role' => 'school_admin',
-                            'title'          => 'Fee Payment Received',
-                            'message'        => "Fee payment of ₹" . number_format($rawAmountPaid, 2) . " collected for {$sName} (Receipt: {$receiptNo}).",
-                            'module'         => 'fee',
-                            'type'           => 'fee_paid',
-                            'related_id'     => $studentId,
-                            'icon'           => 'fa-receipt',
-                            'color'          => '#059669',
-                        ]);
-
-                        if ($feeStudent?->user_id) {
-                            \App\Services\NotificationService::send([
-                                'school_id'      => $schoolId,
-                                'user_id'        => $feeStudent->user_id,
-                                'recipient_role' => 'student',
-                                'title'          => 'Fee Payment Confirmed',
-                                'message'        => "Payment of ₹" . number_format($rawAmountPaid, 2) . " received. Receipt No: {$receiptNo}.",
-                                'module'         => 'fee',
-                                'type'           => 'fee_paid',
-                                'related_id'     => $studentId,
-                                'icon'           => 'fa-receipt',
-                                'color'          => '#059669',
-                            ]);
+                        if ($feeStudent) {
+                            \App\Services\FeeNotificationService::sendPaymentSuccessNotification($feeStudent, $instNo, floatval($rawAmountPaid));
                         }
 
 
@@ -3614,6 +3855,13 @@ class FeeManagementController extends Controller
 
                     return $invoiceToCancel->invoice_number;
                 });
+
+                if ($invoiceToCancel->type === 'payment') {
+                    $cStudent = \App\Models\Student::find($studentId);
+                    if ($cStudent) {
+                        \App\Services\FeeNotificationService::sendPaymentCancelledNotification($cStudent, $instNo);
+                    }
+                }
 
                 $isRefund = $invoiceToCancel->type === 'refund';
                 if ($request->wantsJson()) {
@@ -6027,6 +6275,11 @@ class FeeManagementController extends Controller
                     'remarks'         => $remarks,
                 ]);
 
+                $cStudent = \App\Models\Student::find($cheque->student_id);
+                if ($cStudent) {
+                    \App\Services\FeeNotificationService::sendPaymentSuccessNotification($cStudent, $instNo, floatval($cheque->amount));
+                }
+
             } elseif (in_array($newStatus, ['bounced', 'cancelled', 'returned', 'rejected'])) {
                 $cheque->status = $newStatus;
                 $cheque->save();
@@ -6081,6 +6334,11 @@ class FeeManagementController extends Controller
                         ->where('status', 'paid')
                         ->where('remarks', 'like', '%' . $cheque->cheque_number . '%')
                         ->update(['status' => 'cancelled']);
+
+                    $cStudent = \App\Models\Student::find($cheque->student_id);
+                    if ($cStudent) {
+                        \App\Services\FeeNotificationService::sendPaymentCancelledNotification($cStudent, $cheque->installment_no ?? 1);
+                    }
                 }
 
                 $invNo = 'INV-CHQ-' . strtoupper(substr($newStatus, 0, 3)) . '-' . now()->format('YmdHisu') . '-' . rand(10, 99);

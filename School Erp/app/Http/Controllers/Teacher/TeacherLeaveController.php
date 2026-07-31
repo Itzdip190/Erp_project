@@ -214,7 +214,6 @@ class TeacherLeaveController extends Controller
                 'offline_tests'         => 'school.examination.offline-tests',
                 'report_card_template'  => 'school.examination.report-card-template',
                 'report_card'           => 'school.examination.report-card',
-                'report_card_v2'        => 'school.examination.report-card-v2',
                 'admission_process'      => 'school.admissions.process',
                 'admission_settings'     => 'school.admissions.settings',
                 'enquiry_leads'          => 'school.admissions.enquiry-leads',

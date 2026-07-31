@@ -28,7 +28,8 @@ class FeatureVisibilityHelper
             'admission_report' => ['label' => 'New Admission Report', 'category' => 'student_management', 'default_web' => 1, 'default_mobile' => 1],
             'siblings' => ['label' => 'Siblings List Tracking', 'category' => 'student_management', 'default_web' => 1, 'default_mobile' => 1],
             'student_attendance' => ['label' => 'Mark Student Attendance', 'category' => 'student_management', 'default_web' => 1, 'default_mobile' => 1],
-            'bulk_attendance' => ['label' => 'Bulk Student Attendance Import', 'category' => 'student_management', 'default_web' => 1, 'default_mobile' => 1],
+            'bulk_attendance' => ['label' => 'Bulk Student Attendance Import', 'category' => 'student_management', 'default_web' => 1, 'default_mobile' => 0],
+            'student_bulk_attendance' => ['label' => 'Student Mark Bulk Attendance', 'category' => 'student_management', 'default_web' => 1, 'default_mobile' => 0],
             'student_report' => ['label' => 'Student Reports & Analytics', 'category' => 'student_management', 'default_web' => 1, 'default_mobile' => 1],
 
             // Staff Management Features
@@ -37,7 +38,7 @@ class FeatureVisibilityHelper
             'bulk_staff_import' => ['label' => 'Bulk Staff Import', 'category' => 'staff_management', 'default_web' => 1, 'default_mobile' => 1],
             'bulk_staff_photo' => ['label' => 'Bulk Staff Photo Upload', 'category' => 'staff_management', 'default_web' => 1, 'default_mobile' => 1],
             'staff_attendance' => ['label' => 'Mark Staff Attendance', 'category' => 'staff_management', 'default_web' => 1, 'default_mobile' => 1],
-            'staff_bulk_attendance' => ['label' => 'Staff Bulk Attendance', 'category' => 'staff_management', 'default_web' => 1, 'default_mobile' => 1],
+            'staff_bulk_attendance' => ['label' => 'Staff Bulk Attendance', 'category' => 'staff_management', 'default_web' => 1, 'default_mobile' => 0],
 
             // Timetable Features
             'class_timetable' => ['label' => 'Class Timetable', 'category' => 'timetable', 'default_web' => 1, 'default_mobile' => 1],
@@ -105,11 +106,36 @@ class FeatureVisibilityHelper
     public static function isVisible(string $featureKey, string $scope = 'web', ?int $schoolId = null): bool
     {
         $schoolId = $schoolId ?: (Auth::check() ? Auth::user()->school_id : null);
+
+        $userAgent = (function_exists('request') && request()) ? request()->header('User-Agent', '') : '';
+        $isMobileRequest = (function_exists('request') && request()) && (
+            request()->is('api*') ||
+            request()->is('mobile*') ||
+            request()->query('scope') === 'mobile' ||
+            request()->header('X-Mobile-App') ||
+            (bool)preg_match('/(android|iphone|ipod|mobile|opera m(ob|in)i)/i', $userAgent)
+        );
+
+        // HARD ENFORCEMENT: Bulk Attendance is 100% hidden on mobile applications
+        if (in_array($featureKey, ['bulk_attendance', 'student_bulk_attendance', 'staff_bulk_attendance', 'bulk_staff_attendance'], true)) {
+            if ($scope === 'mobile' || $isMobileRequest) {
+                return false;
+            }
+        }
+
+        // Auto-detect mobile request if scope is web
+        if ($scope === 'web' && $isMobileRequest) {
+            $scope = 'mobile';
+        }
+
         $cacheKey = "{$schoolId}_{$featureKey}_{$scope}";
 
         if (isset(self::$localCache[$cacheKey])) {
             return self::$localCache[$cacheKey];
         }
+
+        $registered = self::registeredFeatures();
+        $meta = $registered[$featureKey] ?? [];
 
         // 1. Check Master Feature Enable Toggle
         $masterKey = "feat_{$featureKey}_master";
@@ -121,7 +147,8 @@ class FeatureVisibilityHelper
 
         // 2. Check Portal-Specific Toggle
         $scopeKey = "feat_{$featureKey}_{$scope}";
-        $scopeVal = SettingService::get($scopeKey, '1', $schoolId);
+        $defaultVal = isset($meta["default_{$scope}"]) ? (string)$meta["default_{$scope}"] : '1';
+        $scopeVal = SettingService::get($scopeKey, $defaultVal, $schoolId);
         if ($scopeVal === '0' || $scopeVal === 0 || $scopeVal === false) {
             self::$localCache[$cacheKey] = false;
             return false;

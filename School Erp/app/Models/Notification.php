@@ -51,25 +51,40 @@ class Notification extends Model
 
     public function scopeForRecipient($query, $user, $role = null)
     {
-        return $query->where(function ($q) use ($user, $role) {
-            if ($user) {
-                $q->where('user_id', $user->id);
-            }
-            if ($role) {
-                $q->orWhere('recipient_role', $role);
-            }
-            if ($user && $user->hasRole('school_admin')) {
-                $q->orWhere('recipient_role', 'school_admin')
-                  ->orWhere('recipient_role', 'admin');
-            }
-            if ($user && $user->hasRole('teacher')) {
-                $q->orWhere('recipient_role', 'teacher');
-            }
-            if ($user && $user->hasRole('student')) {
-                $q->orWhere('recipient_role', 'student');
-            }
-            if ($user && $user->hasRole('parent')) {
-                $q->orWhere('recipient_role', 'parent');
+        if (!$user) {
+            return $query;
+        }
+
+        $userId = $user->id;
+        $userRoles = [];
+        if ($role) {
+            $userRoles[] = $role;
+        }
+        if ($user->hasRole('school_admin') || ($user->role ?? null) === 'school_admin' || $user->hasRole('admin') || ($user->role ?? null) === 'admin') {
+            $userRoles[] = 'school_admin';
+            $userRoles[] = 'admin';
+        }
+        if ($user->hasRole('teacher') || ($user->role ?? null) === 'teacher') {
+            $userRoles[] = 'teacher';
+        }
+        if ($user->hasRole('student') || ($user->role ?? null) === 'student') {
+            $userRoles[] = 'student';
+        }
+        if ($user->hasRole('parent') || ($user->role ?? null) === 'parent') {
+            $userRoles[] = 'parent';
+        }
+        $userRoles = array_values(array_unique(array_filter($userRoles)));
+
+        return $query->where(function ($q) use ($userId, $userRoles) {
+            // 1. Personal notification targeted directly to this user ID
+            $q->where('user_id', $userId);
+
+            // 2. Role-based broadcast notifications (where user_id is NULL) matching the user's role(s)
+            if (!empty($userRoles)) {
+                $q->orWhere(function ($subQ) use ($userRoles) {
+                    $subQ->whereNull('user_id')
+                         ->whereIn('recipient_role', $userRoles);
+                });
             }
         });
     }

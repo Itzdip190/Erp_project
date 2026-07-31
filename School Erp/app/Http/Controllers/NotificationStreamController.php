@@ -109,8 +109,9 @@ class NotificationStreamController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
+        $unreadOnly = $request->has('all') ? !$request->boolean('all') : $request->boolean('unread_only', true);
         $unreadCount = NotificationService::getUnreadCount($user);
-        $notifications = NotificationService::getNotifications($user, 25);
+        $notifications = NotificationService::getNotifications($user, 25, $unreadOnly);
 
         $items = $notifications->map(function ($n) {
             return [
@@ -150,6 +151,27 @@ class NotificationStreamController extends Controller
                 'is_read' => true,
                 'read_at' => Carbon::now(),
             ]);
+
+            if (\Illuminate\Support\Facades\Schema::hasTable('teacher_notifications')) {
+                try {
+                    \App\Models\TeacherNotification::where('user_id', $user->id)
+                        ->where('title', $notification->title)
+                        ->where('is_read', false)
+                        ->update([
+                            'is_read' => true,
+                            'read_at' => Carbon::now(),
+                        ]);
+                } catch (\Throwable $e) {}
+            }
+        } else {
+            if (\Illuminate\Support\Facades\Schema::hasTable('teacher_notifications')) {
+                try {
+                    \App\Models\TeacherNotification::where('id', $id)->update([
+                        'is_read' => true,
+                        'read_at' => Carbon::now(),
+                    ]);
+                } catch (\Throwable $e) {}
+            }
         }
 
         return response()->json(['success' => true]);
@@ -177,6 +199,23 @@ class NotificationStreamController extends Controller
             'is_read' => true,
             'read_at' => Carbon::now(),
         ]);
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('teacher_notifications')) {
+            try {
+                $staff = Staff::where('user_id', $user->id)->first();
+                \App\Models\TeacherNotification::where(function ($q) use ($user, $staff) {
+                    $q->where('user_id', $user->id);
+                    if ($staff) {
+                        $q->orWhere('staff_id', $staff->id);
+                    }
+                })
+                ->where('is_read', false)
+                ->update([
+                    'is_read' => true,
+                    'read_at' => Carbon::now(),
+                ]);
+            } catch (\Throwable $e) {}
+        }
 
         return response()->json(['success' => true]);
     }

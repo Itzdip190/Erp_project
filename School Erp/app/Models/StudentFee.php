@@ -65,11 +65,13 @@ class StudentFee extends Model
         'invoice_status',
         'fine_applied_at',
         'fine_amount_applied',
+        'is_fine_applied',
     ];
 
     protected $casts = [
         'fine_applied_at' => 'datetime',
         'fine_amount_applied' => 'decimal:2',
+        'is_fine_applied' => 'boolean',
     ];
 
     public function feeSchedule()

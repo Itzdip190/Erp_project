@@ -46,6 +46,7 @@ class Student extends Model
         'usn_srn_number',
         'blood_group',
         'religion',
+        'nationality',
         'caste',
         'sub_caste',
         'family_id',

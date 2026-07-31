@@ -85,7 +85,7 @@ class NotificationService
     /**
      * Fetch notifications for current user / role.
      */
-    public static function getNotifications($user = null, $limit = 20)
+    public static function getNotifications($user = null, $limit = 20, bool $unreadOnly = false)
     {
         $user = $user ?: auth()->user();
         if (!$user) return collect();
@@ -96,6 +96,10 @@ class NotificationService
         $query = Notification::query();
         if ($schoolId) {
             $query->where('school_id', $schoolId);
+        }
+
+        if ($unreadOnly) {
+            $query->where('is_read', false);
         }
 
         $query->forRecipient($user, $role);
