@@ -116,4 +116,27 @@ class TransportFeeSchedule extends Model
             ->where('is_active', true)
             ->first();
     }
+
+    public function getInstallmentName(int $instNo): string
+    {
+        $items = $this->installments ?? [];
+        if (!is_array($items)) {
+            return 'Installment ' . $instNo;
+        }
+
+        foreach ($items as $inst) {
+            if (isset($inst['installment_no']) && (int)$inst['installment_no'] === (int)$instNo) {
+                if (!empty($inst['name'])) {
+                    return $inst['name'];
+                }
+            }
+        }
+
+        $zeroIdx = $instNo - 1;
+        if (isset($items[$zeroIdx]['name']) && !empty($items[$zeroIdx]['name'])) {
+            return $items[$zeroIdx]['name'];
+        }
+
+        return 'Installment ' . $instNo;
+    }
 }

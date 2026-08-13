@@ -109,6 +109,11 @@ class StudentFee extends Model
         return $this->belongsTo(MiscFee::class, 'misc_fee_id');
     }
 
+    public function getInstallmentNameAttribute(): string
+    {
+        return \App\Services\FeeHelper::getInstallmentName($this);
+    }
+
     public static function syncTransportFees($schoolId)
     {
         $students = \App\Models\Student::where('school_id', $schoolId)

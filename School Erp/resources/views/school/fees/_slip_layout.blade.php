@@ -343,7 +343,7 @@
 
                     $renderItems->push((object)[
                         'installment_no' => $instNo,
-                        'description' => 'Installment ' . $instNo,
+                        'description' => \App\Services\FeeHelper::getInstallmentName(null, $instNo, $student ?? null),
                         'amount' => $totalAmount,
                         'misc_amount' => $miscAmount,
                         'instant_discount_amount' => $totalDiscount,
@@ -353,7 +353,7 @@
                     if ($fineAmount > 0) {
                         $renderItems->push((object)[
                             'installment_no' => $instNo,
-                            'description' => 'Late Fine - Installment ' . $instNo,
+                            'description' => 'Late Fine - ' . \App\Services\FeeHelper::getInstallmentName(null, $instNo, $student ?? null),
                             'amount' => $fineAmount,
                             'misc_amount' => 0,
                             'instant_discount_amount' => 0,
@@ -545,20 +545,11 @@
                 ->where('installment_no', $instNo)
                 ->first();
             if ($sf) {
-                if ($sf->feeSchedule && is_array($sf->feeSchedule->installments)) {
-                    $instIdx = $instNo - 1;
-                    $label = $sf->feeSchedule->installments[$instIdx]['name'] ?? null;
-                } elseif ($sf->transportFeeSchedule && is_array($sf->transportFeeSchedule->installments)) {
-                    $instIdx = $instNo - 1;
-                    $label = $sf->transportFeeSchedule->installments[$instIdx]['name'] ?? null;
-                }
-            }
-            if (!$label) {
-                if ($instNo >= 1 && $instNo <= 12) {
-                    $label = \Carbon\Carbon::create()->month($instNo)->format('F');
-                } else {
-                    $label = 'Installment ' . $instNo;
-                }
+                $label = $sf->installment_name;
+            } elseif (isset($student)) {
+                $label = \App\Services\FeeHelper::getInstallmentNameForStudent($student, $instNo);
+            } else {
+                $label = 'Installment ' . $instNo;
             }
             $installmentLabels[] = $label;
         }
@@ -599,6 +590,15 @@
             $showSchoolNameHeader = \App\Services\SettingService::get('show_school_name_transport_invoice', '1') == '1';
             $showSchoolLogoHeader = \App\Services\SettingService::get('show_school_logo_transport_invoice', '1') == '1';
         }
+        
+        $showAffiliation = $config?->inst_affiliation_no ?? true;
+        $showSchoolUrl = $config?->inst_school_url ?? true;
+        $showBoardLogo = $config?->inst_board_logo ?? false;
+
+        $showFeeDue = $config?->add_fee_due ?? true;
+        $showFeeDiscount = $config?->add_fee_discount ?? true;
+        $showFeeBalance = $config?->add_fee_balance ?? true;
+        $discountHeaderLabel = strtoupper($config?->discount_label ?? 'CONCESSION AMOUNT');
     @endphp
     <!-- School Header -->
     <div class="school-header" style="display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 20px;">
@@ -612,13 +612,20 @@
                 <h1 class="school-name" style="font-size: 26px; font-weight: bold; margin: 0; color: #000; font-family: Arial, sans-serif;">{{ $school->name }}</h1>
             @endif
             <p class="school-details" style="font-size: 14px; margin: 4px 0 0 0; color: #000; font-weight: bold;">{{ $school->address }}</p>
-            @if(!empty($school->udise_data['affiliation_number']))
+            @if($showAffiliation && !empty($school->udise_data['affiliation_number']))
                 <p class="school-details" style="font-size: 14px; margin: 4px 0 0 0; color: #000; font-weight: bold;">School Affiliation No : {{ $school->udise_data['affiliation_number'] }}</p>
             @endif
             <p class="school-details" style="font-size: 14px; margin: 4px 0 0 0; color: #000; font-weight: bold;">
-                Website:{{ $website }} | Contact:{{ $school->phone }}
+                @if($showSchoolUrl)Website:{{ $website }} | @endif Contact:{{ $school->phone }}
             </p>
         </div>
+        @if($showBoardLogo)
+            <div class="board-logo-container" style="position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: flex; align-items: center; justify-content: center;">
+                <div style="font-size: 12px; font-weight: bold; border: 1px solid #000; padding: 4px 8px; border-radius: 4px; color: #000;">
+                    {{ strtoupper($boardName) }} LOGO
+                </div>
+            </div>
+        @endif
     </div>
 
     <!-- Title and Copy Badge -->
@@ -638,35 +645,62 @@
     <div class="metadata-box" style="display: flex; justify-content: space-between; font-size: 14px; line-height: 1.6; margin-bottom: 20px; color: #000;">
         <div style="width: 48%;">
             <table style="border-collapse: collapse; border: none; width: 100%;">
+                @if($config?->details_receipt_no ?? true)
                 <tr style="border: none;">
-                    @if($config?->details_receipt_no ?? true)
-                        <td style="padding: 2px 0; border: none; width: 30%; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Receipt No:</td>
-                        <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>
-                            @if(isset($invoice))
-                                {{ $invoice->receipt_number }}
-                            @elseif(isset($receipt))
-                                {{ $receipt->receipt_number }}
-                            @else
-                                {{ $number }}
-                            @endif
-                        </strong></td>
-                    @else
-                        <td style="padding: 2px 0; border: none; width: 30%; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Bill No :</td>
-                        <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ $number }}</strong></td>
-                    @endif
+                    <td style="padding: 2px 0; border: none; width: 30%; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Receipt No:</td>
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>
+                        @if(isset($invoice))
+                            {{ $invoice->receipt_number }}
+                        @elseif(isset($receipt))
+                            {{ $receipt->receipt_number }}
+                        @else
+                            {{ $number }}
+                        @endif
+                    </strong></td>
                 </tr>
+                @endif
+                @if($config?->details_student_name ?? true)
                 <tr style="border: none;">
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Name:</td>
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ strtoupper($student->full_name) }}</strong></td>
                 </tr>
+                @endif
+                @if($config?->details_admission_no ?? true)
+                <tr style="border: none;">
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Admission No:</td>
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ strtoupper($student->admission_number ?? '—') }}</strong></td>
+                </tr>
+                @endif
+                @if($config?->details_father_name ?? false)
                 <tr style="border: none;">
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Father's Name :</td>
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ strtoupper($student->father_name ?? '—') }}</strong></td>
                 </tr>
+                @endif
+                @if($config?->details_mother_name ?? false)
                 <tr style="border: none;">
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Mother's Name :</td>
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ strtoupper($student->mother_name ?? '—') }}</strong></td>
                 </tr>
+                @endif
+                @if($config?->details_father_phone ?? false)
+                <tr style="border: none;">
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Father's Phone :</td>
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ $student->father_phone ?? '—' }}</strong></td>
+                </tr>
+                @endif
+                @if($config?->details_mother_phone ?? false)
+                <tr style="border: none;">
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Mother's Phone :</td>
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ $student->mother_phone ?? '—' }}</strong></td>
+                </tr>
+                @endif
+                @if($config?->details_address ?? false)
+                <tr style="border: none;">
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Address :</td>
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ $student->address ?? '—' }}</strong></td>
+                </tr>
+                @endif
                 <tr style="border: none;">
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Board :</td>
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ strtoupper($boardName) }}</strong></td>
@@ -675,14 +709,24 @@
         </div>
         <div style="width: 48%;">
             <table style="border-collapse: collapse; border: none; width: 100%;">
+                @if($config?->details_receipt_date ?? true)
                 <tr style="border: none;">
                     <td style="padding: 2px 0; border: none; width: 35%; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Date :</td>
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ \Carbon\Carbon::parse($date)->format('d-M-Y') }}</strong></td>
                 </tr>
+                @endif
+                @if($config?->details_class ?? true)
                 <tr style="border: none;">
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Class :</td>
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ strtoupper(optional($student->class)->name) }}{{ optional($student->section)->name ? '-' . strtoupper(optional($student->section)->name) : '' }}</strong></td>
                 </tr>
+                @endif
+                @if($config?->details_session ?? true)
+                <tr style="border: none;">
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Session :</td>
+                    <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ optional($student->academicSession)->name ?? 'Current Session' }}</strong></td>
+                </tr>
+                @endif
                 <tr style="border: none;">
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;">Installment:</td>
                     <td style="padding: 2px 0; border: none; color: #000; font-size: 14px; font-family: Arial, sans-serif; vertical-align: top;"><strong>{{ $installmentLabel }}</strong></td>
@@ -704,10 +748,16 @@
         <thead>
             <tr style="background-color: #faf2e2; border-bottom: 1.5px solid #c09553;">
                 <th style="padding: 10px; text-align: left; font-weight: bold; border-right: 1.5px solid #c09553; color: #000; font-size: 14px;">HEAD NAME</th>
+                @if($showFeeDue)
                 <th style="padding: 10px; text-align: right; font-weight: bold; border-right: 1.5px solid #c09553; color: #000; width: 15%; font-size: 14px;">ACTUAL AMOUNT</th>
-                <th style="padding: 10px; text-align: right; font-weight: bold; border-right: 1.5px solid #c09553; color: #000; width: 18%; font-size: 14px;">CONCESSION AMOUNT</th>
+                @endif
+                @if($showFeeDiscount)
+                <th style="padding: 10px; text-align: right; font-weight: bold; border-right: 1.5px solid #c09553; color: #000; width: 18%; font-size: 14px;">{{ $discountHeaderLabel }}</th>
+                @endif
                 <th style="padding: 10px; text-align: right; font-weight: bold; border-right: 1.5px solid #c09553; color: #000; width: 15%; font-size: 14px;">PAID AMOUNT</th>
+                @if($showFeeBalance)
                 <th style="padding: 10px; text-align: right; font-weight: bold; color: #000; width: 20%; font-size: 14px;">BALANCE</th>
+                @endif
             </tr>
         </thead>
         <tbody>
@@ -784,39 +834,57 @@
                     <td style="padding: 10px; text-align: left; border-right: 1.5px solid #c09553; color: #000; font-size: 14px; vertical-align: middle;">
                         {{ ($sf && $sf->misc_fee_id && $sf->miscFee) ? $sf->miscFee->fee_head_name : $item->description }}
                     </td>
+                    @if($showFeeDue)
                     <td style="padding: 10px; text-align: right; border-right: 1.5px solid #c09553; color: #000; font-size: 14px; vertical-align: middle;">
                         {{ number_format($actualVal, 2, '.', '') }}
                     </td>
+                    @endif
+                    @if($showFeeDiscount)
                     <td style="padding: 10px; text-align: right; border-right: 1.5px solid #c09553; color: #000; font-size: 14px; vertical-align: middle;">
                         {{ number_format($concessionVal, 2, '.', '') }}
                     </td>
+                    @endif
                     <td style="padding: 10px; text-align: right; border-right: 1.5px solid #c09553; color: #000; font-size: 14px; font-weight: bold; vertical-align: middle;">
                         {{ number_format($paidVal, 2, '.', '') }}
                     </td>
+                    @if($showFeeBalance)
                     <td style="padding: 10px; text-align: right; color: #000; font-size: 14px; vertical-align: middle;">
                         {{ number_format($dueVal, 2, '.', '') }}
                     </td>
+                    @endif
                 </tr>
             @endforeach
             
             <!-- Total Row -->
             <tr style="background-color: #ffffff; font-weight: bold;">
                 <td style="padding: 10px; text-align: left; border-right: 1.5px solid #c09553; color: #000; font-size: 14px; vertical-align: middle;">Total</td>
+                @if($showFeeDue)
                 <td style="padding: 10px; text-align: right; border-right: 1.5px solid #c09553; color: #000; font-size: 14px; vertical-align: middle;">
                     {{ number_format($totalActual, 2, '.', '') }}
                 </td>
+                @endif
+                @if($showFeeDiscount)
                 <td style="padding: 10px; text-align: right; border-right: 1.5px solid #c09553; color: #000; font-size: 14px; vertical-align: middle;">
                     {{ number_format($totalConcession, 2, '.', '') }}
                 </td>
+                @endif
                 <td style="padding: 10px; text-align: right; border-right: 1.5px solid #c09553; color: #000; font-size: 14px; font-weight: bold; vertical-align: middle;">
                     {{ number_format($totalPaid, 2, '.', '') }}
                 </td>
+                @if($showFeeBalance)
                 <td style="padding: 10px; text-align: right; color: #000; font-size: 14px; font-weight: bold; vertical-align: middle;">
                     {{ number_format($totalDue, 2, '.', '') }}
                 </td>
+                @endif
             </tr>
         </tbody>
     </table>
+
+    @if($config?->note_enabled && !empty($config?->note_text))
+    <div style="margin-bottom: 15px; padding: 8px 12px; background-color: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; font-size: 12.5px; color: #334155; font-family: Arial, sans-serif;">
+        <strong>Note:</strong> {{ $config->note_text }}
+    </div>
+    @endif
 
     <!-- Footer Area (Amount in words & Total Paid & Cashier) -->
     <div class="footer-area" style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 15px;">

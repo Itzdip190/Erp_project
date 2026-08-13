@@ -15,6 +15,7 @@ use App\Models\PaymentLink;
 use App\Models\FeeRefund;
 use App\Models\OptionalFeeMapping;
 use Carbon\Carbon;
+use App\Support\SearchHelper;
 
 class FeeManagementController extends Controller
 {
@@ -2524,7 +2525,7 @@ class FeeManagementController extends Controller
                     if ($displayFine > 0 || $currentAppliedFine > 0 || !$isApplied) {
                         $installmentDetails[] = [
                             'installment_no' => (int) $instNo,
-                            'installment_name' => 'Installment ' . $instNo,
+                            'installment_name' => \App\Services\FeeHelper::getInstallmentNameForStudent($student, (int)$instNo),
                             'fine_amount' => floatval($displayFine),
                             'fine_formatted' => '₹' . number_format($displayFine, 0),
                             'is_applied' => (bool) $isApplied,
@@ -3105,6 +3106,8 @@ class FeeManagementController extends Controller
                 }
                 // ── End Issue 1 Fix ──
 
+                $config = \App\Models\FeeConfiguration::where('school_id', $schoolId)->first();
+
                 $discountAmount    = floatval($request->input('instant_discount_amount', 0));
                 $discountType      = $request->input('instant_discount_type', 'flat');
                 $effectiveDiscount = 0;
@@ -3114,6 +3117,9 @@ class FeeManagementController extends Controller
                         $effectiveDiscount = round($discountableDueTemp * $percent / 100, 2);
                     } else {
                         $effectiveDiscount = min(max(0.00, $discountAmount), $discountableDueTemp);
+                    }
+                    if ($config?->round_off_discount) {
+                        $effectiveDiscount = round($effectiveDiscount);
                     }
                 }
                 
@@ -3145,9 +3151,8 @@ class FeeManagementController extends Controller
                     '_computed_total_due_before' => $totalAmountDueTemp,
                 ]);
 
-                $config = \App\Models\FeeConfiguration::where('school_id', $schoolId)->first();
-                $schoolPrefix = $config->school_fee_prefix ?? 'REC';
-                $transportPrefix = $config->transport_fee_prefix ?? 'TRN';
+                $schoolPrefix = $config?->school_fee_prefix ?? 'REC';
+                $transportPrefix = $config?->transport_fee_prefix ?? 'TRN';
 
                 $receiptDate = $request->input('receipt_date') ?: now()->toDateString();
                 $feeType     = $request->input('fee_type', 'tuition');
@@ -4203,6 +4208,8 @@ class FeeManagementController extends Controller
             $selectedSectionId = null;
         }
 
+        $search = trim((string) $request->get('search', ''));
+
         // ─── Detail view: single student ────────────────────────────────
         $viewStudentId = $request->get('view_student');
         $viewStudent   = null;
@@ -4644,13 +4651,8 @@ class FeeManagementController extends Controller
             $query->where('section_id', $selectedSectionId);
         }
 
-        $search = $request->get('search');
-        if ($search && strlen($search) >= 3) {
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%$search%")
-                  ->orWhere('last_name', 'like', "%$search%")
-                  ->orWhere('admission_number', 'like', "%$search%");
-            });
+        if ($search) {
+            SearchHelper::applyStudentSearch($query, $search);
         }
 
         if ($request->get('all_year')) {
@@ -5027,12 +5029,7 @@ class FeeManagementController extends Controller
             });
         }
         if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('admission_number', 'like', "%{$search}%");
-            });
+            SearchHelper::applyStudentSearch($query, $request->search);
         }
 
         $students = $query->paginate(25)->withQueryString();
@@ -5101,10 +5098,7 @@ class FeeManagementController extends Controller
                 $q->where('receipt_number', 'like', "%{$search}%")
                   ->orWhere('transaction_id', 'like', "%{$search}%")
                   ->orWhereHas('student', function($sq) use ($search) {
-                      $sq->where('first_name', 'like', "%{$search}%")
-                        ->orWhere('last_name', 'like', "%{$search}%")
-                        ->orWhere('admission_id', 'like', "%{$search}%")
-                        ->orWhere('admission_number', 'like', "%{$search}%");
+                      SearchHelper::applyStudentSearch($sq, $search);
                   });
             });
         }
@@ -5291,7 +5285,7 @@ class FeeManagementController extends Controller
                 
                 if (empty($components)) {
                     $components[] = [
-                        'name' => 'Installment ' . $invoice->installment_no,
+                        'name' => \App\Services\FeeHelper::getInstallmentNameForStudent($student, $invoice->installment_no ?? 1),
                         'amount' => $invoice->amount + $invoice->discount_amount,
                         'discount' => $invoice->discount_amount,
                         'paid' => $invoice->amount,
@@ -5304,9 +5298,9 @@ class FeeManagementController extends Controller
                 // Build descriptive installment label
                 if ($isTransport && count($transportMonths) > 0) {
                     $monthsStr = implode(', ', array_unique($transportMonths));
-                    $installmentLabel = 'Transport — Installment ' . $invoice->installment_no . ' (' . $monthsStr . ')';
+                    $installmentLabel = 'Transport — ' . \App\Services\FeeHelper::getInstallmentNameForStudent($student, $invoice->installment_no ?? 1) . ' (' . $monthsStr . ')';
                 } else {
-                    $installmentLabel = 'Installment ' . $invoice->installment_no;
+                    $installmentLabel = \App\Services\FeeHelper::getInstallmentNameForStudent($student, $invoice->installment_no ?? 1);
                 }
 
                 return [
@@ -5479,7 +5473,7 @@ class FeeManagementController extends Controller
                             $monthLabel = \Carbon\Carbon::parse($fee->due_date)->format('F Y');
                             $desc = 'Transport Installment ' . $fee->installment_no . ' — ' . $monthLabel;
                         } else {
-                            $desc = 'Installment ' . $fee->installment_no;
+                            $desc = \App\Services\FeeHelper::getInstallmentName($fee, $fee->installment_no, $student);
                         }
 
                         $isMisc = $fee->misc_fee_id !== null;
@@ -5530,7 +5524,7 @@ class FeeManagementController extends Controller
                             } elseif ($isTransportComp) {
                                 $desc = 'Transport Installment ' . $compInstNo;
                             } else {
-                                $desc = $comp['component_name'] ?? ('Installment ' . $compInstNo);
+                                $desc = $comp['component_name'] ?? \App\Services\FeeHelper::getInstallmentName($sf, $compInstNo, $student);
                             }
 
                             $isMisc = ($sf && $sf->misc_fee_id !== null)
@@ -5579,7 +5573,7 @@ class FeeManagementController extends Controller
                 $items = collect([
                     (object)[
                         'installment_no' => $invoice->installment_no,
-                        'description' => $isTransport ? ('Transport Installment ' . $invoice->installment_no) : ('Installment ' . $invoice->installment_no),
+                        'description' => $isTransport ? ('Transport Installment ' . $invoice->installment_no) : \App\Services\FeeHelper::getInstallmentNameForStudent($student, $invoice->installment_no),
                         'amount' => $invoice->amount + $invoice->discount_amount,
                         'instant_discount_amount' => $invoice->discount_amount,
                         'paid_amount' => $invoice->amount,
@@ -5888,13 +5882,7 @@ class FeeManagementController extends Controller
                 $query->where('students.transport_route', $request->transport_route);
             }
             if ($request->filled('search')) {
-                $search = $request->search;
-                $query->where(function($q) use ($search) {
-                    $q->where('students.first_name', 'like', "%{$search}%")
-                      ->orWhere('students.last_name', 'like', "%{$search}%")
-                      ->orWhere('students.admission_number', 'like', "%{$search}%")
-                      ->orWhere('students.father_name', 'like', "%{$search}%");
-                });
+                SearchHelper::applyStudentSearch($query, $request->search, 'students');
             }
 
             $query->orderBy('students.id', 'asc');

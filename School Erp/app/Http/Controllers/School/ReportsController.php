@@ -21,6 +21,7 @@ use App\Models\School;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Support\SearchHelper;
 
 class ReportsController extends Controller
 {
@@ -336,11 +337,7 @@ class ReportsController extends Controller
             if ($classId) $q->where('class_id', $classId);
             if ($sectionId) $q->where('section_id', $sectionId);
             if ($searchStudent) {
-                $q->where(function($sq) use ($searchStudent) {
-                    $sq->where('first_name', 'like', "%{$searchStudent}%")
-                       ->orWhere('last_name', 'like', "%{$searchStudent}%")
-                       ->orWhere('admission_number', 'like', "%{$searchStudent}%");
-                });
+                SearchHelper::applyStudentSearch($q, $searchStudent);
             }
         };
 
@@ -431,7 +428,7 @@ class ReportsController extends Controller
                     'class_section'    => ($st->class?->name ?? '—') . ($st->section ? ' - ' . $st->section->name : ''),
                     'roll_number'      => $st->roll_number ?? '—',
                     'fee_structure'    => $f->feeSchedule?->name ?? ($f->transport_fee_schedule_id ? 'Transport Fee' : 'General Fee'),
-                    'installment'      => 'Installment ' . ($f->installment_no ?? 1),
+                    'installment'      => $f->installment_name,
                     'component'        => $f->component?->name ?? ($f->transport_fee_schedule_id ? 'Transport' : 'Tuition/General'),
                     'actual_amount'    => '₹' . number_format($assigned, 2),
                     'discount'         => '₹' . number_format($disc, 2),
@@ -625,7 +622,7 @@ class ReportsController extends Controller
                     'student_name'     => $st->full_name,
                     'admission_number' => $st->admission_number,
                     'class_section'    => ($st->class?->name ?? '—') . ($st->section ? ' - ' . $st->section->name : ''),
-                    'installment_name' => 'Installment ' . ($f->installment_no ?? 1),
+                    'installment_name' => $f->installment_name,
                     'total_installment'=> '₹' . number_format($assigned, 2),
                     'paid_amount'      => '₹' . number_format($paid, 2),
                     'remaining_due'    => '₹' . number_format($remaining, 2),
@@ -2369,7 +2366,7 @@ class ReportsController extends Controller
                         'admission_no'  => $r->admission_number ?? '—',
                         'class_name'    => $r->class_name . ($r->section_name ? ' - ' . $r->section_name : ''),
                         'fee_head'      => $r->category_name ?? 'General Fee',
-                        'installment'   => 'Installment ' . ($r->installment_no ?? 1),
+                        'installment'   => \App\Services\FeeHelper::getInstallmentName(null, $r->installment_no ?? 1),
                         'total_amount'  => '₹ ' . number_format($r->amount, 2),
                         'paid_amount'   => '₹ ' . number_format($r->paid_amount, 2),
                         'dues_amount'   => '₹ ' . number_format($r->dues_amount, 2),

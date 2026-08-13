@@ -30,11 +30,15 @@ class ReportCardHistory extends Model
         'failed_position_text',
         'absent_position_text',
         'medical_position_text',
+        'consider_absent',
+        'consider_medical_leave',
     ];
 
     protected $casts = [
         'is_sent_to_students' => 'boolean',
         'sent_at' => 'datetime',
+        'consider_absent' => 'boolean',
+        'consider_medical_leave' => 'boolean',
     ];
 
     public function school()

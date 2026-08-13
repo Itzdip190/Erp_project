@@ -343,7 +343,7 @@
 
                     $renderItems->push((object)[
                         'installment_no' => $instNo,
-                        'description' => 'Installment ' . $instNo,
+                        'description' => \App\Services\FeeHelper::getInstallmentName(null, $instNo, $student ?? null),
                         'amount' => $totalAmount,
                         'misc_amount' => $miscAmount,
                         'instant_discount_amount' => $totalDiscount,
@@ -353,7 +353,7 @@
                     if ($fineAmount > 0) {
                         $renderItems->push((object)[
                             'installment_no' => $instNo,
-                            'description' => 'Late Fine - Installment ' . $instNo,
+                            'description' => 'Late Fine - ' . \App\Services\FeeHelper::getInstallmentName(null, $instNo, $student ?? null),
                             'amount' => $fineAmount,
                             'misc_amount' => 0,
                             'instant_discount_amount' => 0,
@@ -537,20 +537,11 @@
                 ->where('installment_no', $instNo)
                 ->first();
             if ($sf) {
-                if ($sf->feeSchedule && is_array($sf->feeSchedule->installments)) {
-                    $instIdx = $instNo - 1;
-                    $label = $sf->feeSchedule->installments[$instIdx]['name'] ?? null;
-                } elseif ($sf->transportFeeSchedule && is_array($sf->transportFeeSchedule->installments)) {
-                    $instIdx = $instNo - 1;
-                    $label = $sf->transportFeeSchedule->installments[$instIdx]['name'] ?? null;
-                }
-            }
-            if (!$label) {
-                if ($instNo >= 1 && $instNo <= 12) {
-                    $label = \Carbon\Carbon::create()->month($instNo)->format('F');
-                } else {
-                    $label = 'Installment ' . $instNo;
-                }
+                $label = $sf->installment_name;
+            } elseif (isset($student)) {
+                $label = \App\Services\FeeHelper::getInstallmentNameForStudent($student, $instNo);
+            } else {
+                $label = 'Installment ' . $instNo;
             }
             $installmentLabels[] = $label;
         }
@@ -602,6 +593,7 @@
     <div style="margin-bottom: 10px; font-size: 11px;">
         <table style="width: 100%; border-collapse: collapse; border: none;">
             <tr>
+                @if($config?->details_receipt_no ?? true)
                 <td style="width: 16%; padding: 2px 0; font-weight: bold;">Receipt No.:</td>
                 <td style="width: 34%; padding: 2px 0;">
                     @if(isset($invoice))
@@ -612,29 +604,46 @@
                         {{ $number }}
                     @endif
                 </td>
+                @endif
+                @if($config?->details_receipt_date ?? true)
                 <td style="width: 20%; padding: 2px 0; font-weight: bold;">Receipt Date:</td>
                 <td style="width: 30%; padding: 2px 0;">{{ \Carbon\Carbon::parse($date)->format('d/m/Y') }}</td>
+                @endif
             </tr>
             <tr>
+                @if($config?->details_session ?? true)
                 <td style="padding: 2px 0; font-weight: bold;">Session:</td>
                 <td style="padding: 2px 0;">{{ $sessionName }}</td>
+                @endif
+                @if($config?->details_student_name ?? true)
                 <td style="padding: 2px 0; font-weight: bold;">Student Name:</td>
                 <td style="padding: 2px 0; text-transform: uppercase;">{{ $student->full_name }}</td>
+                @endif
             </tr>
             <tr>
+                @if($config?->details_admission_no ?? true)
                 <td style="padding: 2px 0; font-weight: bold;">Admission No.:</td>
                 <td style="padding: 2px 0;">{{ $student->admission_number }}</td>
+                @endif
+                @if($config?->details_class ?? true)
                 <td style="padding: 2px 0; font-weight: bold;">Class & Section:</td>
                 <td style="padding: 2px 0; text-transform: uppercase;">
                     {{ optional($student->class)->name }}{{ optional($student->section)->name ? ' ' . optional($student->section)->name : '' }}
                 </td>
+                @endif
             </tr>
+            @if(($config?->details_father_name ?? false) || ($config?->details_mother_name ?? false))
             <tr>
+                @if($config?->details_father_name ?? false)
                 <td style="padding: 2px 0; font-weight: bold;">Father Name:</td>
                 <td style="padding: 2px 0; text-transform: uppercase;">{{ $student->father_name ?? '—' }}</td>
-                <td style="padding: 2px 0; font-weight: bold;">Month:</td>
-                <td style="padding: 2px 0;">{{ $installmentLabel }}</td>
+                @endif
+                @if($config?->details_mother_name ?? false)
+                <td style="padding: 2px 0; font-weight: bold;">Mother Name:</td>
+                <td style="padding: 2px 0; text-transform: uppercase;">{{ $student->mother_name ?? '—' }}</td>
+                @endif
             </tr>
+            @endif
         </table>
     </div>
 

@@ -1460,9 +1460,6 @@ body.dark-mode #feeComponentSectionContainer {
 <div class="sw-fee-record-wrap">
     <div class="sw-fee-record-header">
         <h3>Fee Record</h3>
-        <button class="sw-btn-add-discount" onclick="openAddDiscountModal()">
-            <i class="fas fa-tag"></i> ADD DISCOUNT
-        </button>
     </div>
 
     {{-- Applied discounts strip --}}
@@ -1493,7 +1490,8 @@ body.dark-mode #feeComponentSectionContainer {
 
                 @forelse($groupedFees as $instNo => $instFees)
                 @php
-                    $instLabel = 'Installment ' . $instNo;
+                    $firstInstFee = $instFees->first();
+                    $instLabel = \App\Services\FeeHelper::getInstallmentName($firstInstFee, $instNo);
                     $groupTotal = $instFees->sum('amount') + $instFees->sum('fine_amount_applied');
                     $groupDiscount = $instFees->sum('instant_discount_amount');
                     $groupPaid  = $instFees->sum('paid_amount');
@@ -2094,12 +2092,12 @@ body.dark-mode #feeComponentSectionContainer {
                        id="ref-check-{{ $sf->id }}" 
                        value="{{ $sf->id }}" 
                        data-amount="{{ $maxRefundable }}"
-                       data-label="{{ optional($sf->component)->component_name ?: (optional($sf->category)->name ?: 'Fee') }}{{ $sf->misc_fee_id ? ' (Miscellaneous Fee)' : '' }} - Inst {{ $sf->installment_no }}"
+                       data-label="{{ optional($sf->component)->component_name ?: (optional($sf->category)->name ?: 'Fee') }}{{ $sf->misc_fee_id ? ' (Miscellaneous Fee)' : '' }} - {{ $sf->installment_name }}"
                        style="width:18px; height:18px; accent-color:var(--sw-blue2); cursor:pointer;">
                 <div style="flex-grow:1;">
                     <div style="font-weight:700; font-size:.92rem; color:var(--sw-dark);">
                          {{ optional($sf->component)->component_name ?: (optional($sf->category)->name ?: 'Fee Component') }}{{ $sf->misc_fee_id ? ' (Miscellaneous Fee)' : '' }} 
-                         <span style="font-size:0.8rem; color:#64748b; font-weight:600;">(Installment {{ $sf->installment_no }})</span>
+                         <span style="font-size:0.8rem; color:#64748b; font-weight:600;">({{ $sf->installment_name }})</span>
                     </div>
                     <div style="font-size:.8rem; color:#64748b; margin-top:3px;">
                         Paid: <strong style="color:var(--sw-green);">₹{{ number_format($sf->paid_amount, 0) }}</strong> 
@@ -2482,7 +2480,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         $firstPendingDue = $sib->studentFees->where('installment_no', $firstPendingInst)->sum(function($f) {
                             return max(0, $f->amount - $f->instant_discount_amount - $f->paid_amount);
                         });
-                        $firstPendingLabel = 'Installment ' . $firstPendingInst;
+                        $firstPendingLabel = \App\Services\FeeHelper::getInstallmentName($firstPendingFee, $firstPendingInst, $sib);
                     @endphp
                     <button type="button" 
                             onclick="openMarkPaid({{ $sib->id }}, {{ $firstPendingInst }}, {{ $firstPendingDue }}, '{{ $firstPendingLabel }}', null, 'tuition')"
@@ -2521,7 +2519,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span>{{ $d->name }}</span>
                         @if($d->installment_no)
                             <span style="font-size:0.75rem; color:#d97706; font-weight:700; background:#fef3c7; padding:2px 8px; border-radius:4px;">
-                                Installment {{ $d->installment_no }} Only
+                                {{ \App\Services\FeeHelper::getInstallmentNameForStudent($viewStudent, $d->installment_no) }} Only
                             </span>
                         @else
                             <span style="font-size:0.75rem; color:#2563eb; font-weight:700; background:#dbeafe; padding:2px 8px; border-radius:4px;">
@@ -2594,7 +2592,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 'is_misc' => true,
                                 'component_name' => (optional($sf->component)->component_name ?: (optional($sf->category)->name ?: 'Fee')) . ' (Miscellaneous Fee)',
                                 'category_name' => optional($sf->category)->name ?? '-',
-                                'installment' => 'Installment ' . ($sf->installment_no ?? 1),
+                                'installment' => $sf->installment_name,
                                 'amount' => $sf->amount,
                                 'instant_discount_amount' => $sf->instant_discount_amount,
                                 'paid_amount' => $sf->paid_amount,
@@ -2950,7 +2948,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 {{ $invoice->created_at ? \Carbon\Carbon::parse($invoice->created_at)->timezone($sysTimezone)->format('h:i A') : '-' }}
                             @endif
                         </td>
-                        <td>Installment {{ is_array($comp) ? ($comp['installment_no'] ?? 1) : 1 }}</td>
+                        <td>{{ \App\Services\FeeHelper::getInstallmentNameForStudent($viewStudent, is_array($comp) ? ($comp['installment_no'] ?? 1) : 1) }}</td>
                         <td>
                             @if($compIndex === 0)
                                 <span style="text-transform: uppercase; font-size:0.7rem; font-weight:700; background:{{ $isBounced ? '#feb2b2' : ($isPendingCheque ? '#fef08a' : '#e2e8f0') }}; padding:3px 8px; border-radius:4px; color:{{ $isBounced ? '#9b2c2c' : ($isPendingCheque ? '#718096' : '#0f172a') }};">
@@ -3021,7 +3019,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </td>
                         <td>{{ $invoice->payment_date ? \Carbon\Carbon::parse($invoice->payment_date)->format('d M Y') : '-' }}</td>
                         <td>{{ $invoice->created_at ? \Carbon\Carbon::parse($invoice->created_at)->timezone($sysTimezone)->format('h:i A') : '-' }}</td>
-                        <td>Installment {{ $invoice->installment_no ?? 1 }}</td>
+                        <td>{{ \App\Services\FeeHelper::getInstallmentNameForStudent($viewStudent, $invoice->installment_no ?? 1) }}</td>
                         <td>
                             <span style="text-transform: uppercase; font-size:0.7rem; font-weight:700; background:{{ $isBounced ? '#feb2b2' : ($isPendingCheque ? '#fef08a' : '#e2e8f0') }}; padding:3px 8px; border-radius:4px; color:{{ $isBounced ? '#9b2c2c' : ($isPendingCheque ? '#718096' : '#0f172a') }};">
                                 {{ str_replace('_', ' ', $invoice->payment_mode ?? '') }}
@@ -3484,11 +3482,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
             <div class="sw-modal-field">
                 <label>Payment Mode</label>
+                @php
+                    $defMode = strtolower($config?->default_payment_mode ?? 'cash');
+                @endphp
                 <select name="payment_mode" id="modalPaymentMode" onchange="togglePaymentModeFields(this.value)">
-                    <option value="cash">Cash</option>
-                    <option value="online">Online / UPI</option>
-                    <option value="cheque">Cheque</option>
-                    <option value="bank_transfer">Bank Transfer</option>
+                    <option value="cash" {{ ($defMode === 'cash') ? 'selected' : '' }}>Cash</option>
+                    <option value="online" {{ ($defMode === 'online' || $defMode === 'upi') ? 'selected' : '' }}>Online / UPI</option>
+                    <option value="cheque" {{ ($defMode === 'cheque') ? 'selected' : '' }}>Cheque</option>
+                    <option value="bank_transfer" {{ ($defMode === 'bank_transfer' || $defMode === 'bank transfer') ? 'selected' : '' }}>Bank Transfer</option>
                 </select>
             </div>
 

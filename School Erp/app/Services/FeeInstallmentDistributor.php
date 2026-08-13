@@ -118,6 +118,42 @@ class FeeInstallmentDistributor
     }
 
     /**
+     * Validate whether an installment name matches allowed ERP formats.
+     */
+    public static function isValidInstallmentName(string $name): bool
+    {
+        $name = trim($name);
+
+        if (empty($name)) {
+            return false;
+        }
+
+        // Format 1: Installment N (e.g. Installment 1, Installment 2)
+        if (preg_match('/^Installment\s+[1-9]\d*$/i', $name)) {
+            return true;
+        }
+
+        // Format 2: Month Name + Year (e.g. June 2026, July 2026, August 2026)
+        $months = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec';
+        if (preg_match('/^(' . $months . ')\s+\d{4}$/i', $name)) {
+            return true;
+        }
+
+        // Format 3: Quarter Format (e.g. Q1 (Jun-Aug 2026), Q2 (Sep-Nov 2026))
+        $shortMonths = 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec';
+        if (preg_match('/^Q\d+\s*\((' . $shortMonths . ')-(' . $shortMonths . ')\s+\d{4}\)$/i', $name)) {
+            return true;
+        }
+
+        // Format 4: Session Format (e.g. Session 2026-27, Session 2026-2027)
+        if (preg_match('/^Session\s+\d{4}(-\d{2,4})?$/i', $name)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Validate manual edits to installments list.
      * Returns null if valid, or a string error message if invalid.
      */
@@ -132,7 +168,11 @@ class FeeInstallmentDistributor
         });
 
         foreach ($installments as $idx => $inst) {
-            $name = $inst['name'] ?? ('Installment ' . ($idx + 1));
+            $name = trim($inst['name'] ?? '');
+
+            if (!self::isValidInstallmentName($name)) {
+                return "Invalid Installment Name '{$name}'. Allowed formats:\n• Installment 1\n• June 2026\n• Q1 (Jun-Aug 2026)\n• Session 2026-27";
+            }
 
             if (empty($inst['start_date']) || empty($inst['end_date']) || empty($inst['due_date'])) {
                 return "Dates are required for all installments.";

@@ -19,13 +19,32 @@ return new class extends Migration
                 $table->string('phone');
                 $table->string('institute_name')->nullable();
                 $table->string('student_count')->nullable();
-                $table->string('role');
-                $table->string('city');
-                $table->string('state');
-                $table->string('country');
+                $table->string('role')->nullable();
+                $table->string('city')->nullable();
+                $table->string('state')->nullable();
+                $table->string('country')->nullable();
+                $table->string('booking_date')->nullable();
+                $table->string('booking_time')->nullable();
+                $table->string('timezone')->nullable();
+                $table->string('source')->default('Website');
                 $table->text('message')->nullable();
                 $table->string('status')->default('pending');
                 $table->timestamps();
+            });
+        } else {
+            Schema::table('demo_bookings', function (Blueprint $table) {
+                if (!Schema::hasColumn('demo_bookings', 'booking_date')) {
+                    $table->string('booking_date')->nullable()->after('country');
+                }
+                if (!Schema::hasColumn('demo_bookings', 'booking_time')) {
+                    $table->string('booking_time')->nullable()->after('booking_date');
+                }
+                if (!Schema::hasColumn('demo_bookings', 'timezone')) {
+                    $table->string('timezone')->nullable()->after('booking_time');
+                }
+                if (!Schema::hasColumn('demo_bookings', 'source')) {
+                    $table->string('source')->default('Website')->after('timezone');
+                }
             });
         }
     }

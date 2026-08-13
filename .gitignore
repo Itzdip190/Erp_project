@@ -34,3 +34,9 @@ School Erp/public/debug_mapper.txt
 School Erp/public/debug_payment.txt
 School Erp/public/test_transport_generation.php
 
+# Ignore JVM crash logs and DB dumps
+hs_err_pid*.log
+*.log
+School Erp/u219184746_erp1
+
+

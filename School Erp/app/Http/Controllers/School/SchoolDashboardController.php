@@ -22,6 +22,7 @@ use App\Models\StudentDocument;
 use App\Models\OfflineTest;
 use App\Models\SchoolExpense;
 use App\Models\SchoolIncome;
+use App\Support\SearchHelper;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\View\View;
@@ -115,8 +116,20 @@ class SchoolDashboardController extends Controller
             $studentMalePct = $studentFemalePct = $studentNotMappedPct = 0;
         }
 
-        $staffNotMappedCount = Staff::where('school_id', $schoolId)->where('is_active', true)->whereNull('department_id')->count();
-        $staffNotMappedPct = $totalStaffs > 0 ? round(($staffNotMappedCount / $totalStaffs) * 100, 1) : 0;
+        $staffMaleCount = Staff::where('school_id', $schoolId)->where('is_active', true)->whereIn('gender', ['male', 'Male'])->count();
+        $staffFemaleCount = Staff::where('school_id', $schoolId)->where('is_active', true)->whereIn('gender', ['female', 'Female'])->count();
+        $staffNotMappedCount = Staff::where('school_id', $schoolId)->where('is_active', true)->where(function($q) {
+            $q->whereNull('gender')->orWhereNotIn('gender', ['male', 'Male', 'female', 'Female']);
+        })->count();
+
+        $sumStaffMapped = $staffMaleCount + $staffFemaleCount + $staffNotMappedCount;
+        if ($sumStaffMapped > 0) {
+            $staffMalePct = round(($staffMaleCount / $sumStaffMapped) * 100, 1);
+            $staffFemalePct = round(($staffFemaleCount / $sumStaffMapped) * 100, 1);
+            $staffNotMappedPct = round(($staffNotMappedCount / $sumStaffMapped) * 100, 1);
+        } else {
+            $staffMalePct = $staffFemalePct = $staffNotMappedPct = 0;
+        }
 
         // Joining & Attrition
         $studentNewlyJoined = Student::where('school_id', $schoolId)
@@ -311,7 +324,11 @@ class SchoolDashboardController extends Controller
             'studentMalePct',
             'studentFemalePct',
             'studentNotMappedPct',
+            'staffMaleCount',
+            'staffFemaleCount',
             'staffNotMappedCount',
+            'staffMalePct',
+            'staffFemalePct',
             'staffNotMappedPct',
             'studentNewlyJoined',
             'studentExited',
@@ -875,6 +892,17 @@ class SchoolDashboardController extends Controller
             case 'students':
                 $title = 'Student Details';
                 $classes = \App\Models\SchoolClass::where('school_id', $schoolId)->with('sections')->get();
+                
+                $sessions = \App\Models\AcademicSession::where('school_id', $schoolId)->orderBy('name', 'desc')->get();
+                $sessionId = $request->get('session_id');
+                $selectedSession = null;
+                if ($sessionId) {
+                    $selectedSession = $sessions->firstWhere('id', $sessionId);
+                }
+                if (!$selectedSession) {
+                    $selectedSession = $sessions->firstWhere('is_current', true) ?? $sessions->first();
+                }
+
                 $rows = [];
                 $summary = [
                     'promoted' => 0,
@@ -891,19 +919,21 @@ class SchoolDashboardController extends Controller
                     'active' => 0
                 ];
 
-                $currentSession = \App\Models\AcademicSession::where('school_id', $schoolId)
-                    ->where('is_current', true)
-                    ->first();
-                $sessionStartDate = $currentSession ? $currentSession->start_date : now()->startOfYear();
-
                 foreach ($classes as $c) {
                     foreach ($c->sections as $sec) {
-                        $total = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id)->count();
-                        $active = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id)->where('is_active', true)->count();
+                        $query = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id);
+                        if ($selectedSession) {
+                            $query->where(function($q) use ($selectedSession) {
+                                $q->where('academic_session_id', $selectedSession->id)
+                                  ->orWhereNull('academic_session_id');
+                            });
+                        }
+                        $total = (clone $query)->count();
+                        $active = (clone $query)->where('is_active', true)->count();
                         $deactivated = $total - $active;
-                        $new = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id)->whereYear('admission_date', now()->year)->count();
+                        $new = (clone $query)->whereYear('admission_date', now()->year)->count();
                         $promoted = max(0, $active - $new);
-                        $today = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id)->whereDate('admission_date', today())->count();
+                        $today = (clone $query)->whereDate('admission_date', today())->count();
                         
                         $row = [
                             'class_section' => $c->name . ' ' . $sec->name,
@@ -930,7 +960,13 @@ class SchoolDashboardController extends Controller
 
                 $data = [
                     'summary' => $summary,
-                    'rows' => $rows
+                    'rows' => $rows,
+                    'sessions' => $sessions->map(fn($s) => [
+                        'id' => $s->id,
+                        'name' => $s->name,
+                        'is_current' => (bool)$s->is_current
+                    ])->values()->toArray(),
+                    'selected_session_id' => $selectedSession?->id
                 ];
                 break;
 
@@ -1628,32 +1664,35 @@ class SchoolDashboardController extends Controller
 
         $schoolId = auth()->user()->school_id;
 
-        // Fetch students of this school
-        $students = Student::where('school_id', $schoolId)
-            ->where(function($q) use ($query) {
-                $q->where('first_name', 'like', "%{$query}%")
-                  ->orWhere('last_name', 'like', "%{$query}%")
-                  ->orWhere('admission_number', 'like', "%{$query}%")
-                  ->orWhere('roll_number', 'like', "%{$query}%")
-                  ->orWhere('phone', 'like', "%{$query}%")
-                  ->orWhere('father_phone', 'like', "%{$query}%")
-                  ->orWhere('mother_phone', 'like', "%{$query}%")
-                  ->orWhere('guardian_phone', 'like', "%{$query}%")
-                  ->orWhere('whatsapp_number', 'like', "%{$query}%");
-            })
-            ->limit(5)
-            ->get(['id', 'first_name', 'last_name', 'admission_number', 'roll_number', 'photo', 'phone']);
+        $studentQuery = Student::where('school_id', $schoolId)
+            ->with(['schoolClass:id,name', 'section:id,name']);
+        SearchHelper::applyStudentSearch($studentQuery, $query);
 
-        // Fetch staff of this school
-        $staff = Staff::where('school_id', $schoolId)
-            ->where(function($q) use ($query) {
-                $q->where('first_name', 'like', "%{$query}%")
-                  ->orWhere('last_name', 'like', "%{$query}%")
-                  ->orWhere('employee_id', 'like', "%{$query}%")
-                  ->orWhere('email', 'like', "%{$query}%")
-                  ->orWhere('phone', 'like', "%{$query}%");
-            })
-            ->limit(5)
+        $students = $studentQuery->limit(5)
+            ->get(['id', 'first_name', 'last_name', 'admission_number', 'roll_number', 'photo', 'phone', 'father_phone', 'mother_phone', 'guardian_phone', 'class_id', 'section_id'])
+            ->map(function ($student) {
+                $className = $student->schoolClass ? $student->schoolClass->name : '';
+                $sectionName = $student->section ? $student->section->name : '';
+                $classDisplay = trim($className . ($sectionName ? ' ' . $sectionName : ''));
+
+                $phone = $student->phone ?: ($student->father_phone ?: ($student->mother_phone ?: $student->guardian_phone));
+
+                return [
+                    'id' => $student->id,
+                    'first_name' => $student->first_name,
+                    'last_name' => $student->last_name,
+                    'roll_number' => $student->roll_number,
+                    'photo' => $student->photo,
+                    'photo_url' => $student->photo_url,
+                    'phone' => $phone,
+                    'class_name' => $classDisplay,
+                ];
+            });
+
+        $staffQuery = Staff::where('school_id', $schoolId);
+        SearchHelper::applyStaffSearch($staffQuery, $query);
+
+        $staff = $staffQuery->limit(5)
             ->get(['id', 'first_name', 'last_name', 'employee_id', 'photo', 'phone']);
 
         return response()->json([

@@ -247,10 +247,86 @@ class Student extends Model
 
     public function getPhotoUrlAttribute(): string
     {
-        if ($this->photo) {
-            return Storage::disk('public')->url($this->photo);
+        return $this->resolvePhotoUrl() ?? $this->getBaseUrlPrefix() . '/images/avatar-student.png';
+    }
+
+    public function getBaseUrlPrefix(): string
+    {
+        $baseUrl = '';
+        try {
+            if (app()->bound('request') && request()) {
+                $req = request();
+                $schemeAndHost = $req->getSchemeAndHttpHost();
+                $base = rtrim($req->getBaseUrl(), '/');
+                $baseUrl = $schemeAndHost . $base;
+            }
+        } catch (\Throwable $e) {}
+
+        if (empty($baseUrl)) {
+            $baseUrl = rtrim(config('app.url', 'http://localhost'), '/');
         }
-        return asset('images/avatar-student.png');
+
+        return $baseUrl;
+    }
+
+    public function resolvePhotoUrl(): ?string
+    {
+        $baseUrl = $this->getBaseUrlPrefix();
+
+        if (!empty($this->photo)) {
+            $p = ltrim($this->photo, '/');
+            if (str_starts_with($p, 'http://') || str_starts_with($p, 'https://') || str_starts_with($p, 'data:image')) {
+                return $p;
+            }
+            $cleanPath = preg_replace('/^(public\/|uploads\/|storage\/)/', '', $p);
+            $baseName = basename($cleanPath);
+
+            $searchPaths = [
+                public_path('uploads/students/photos/' . $baseName) => '/uploads/students/photos/' . $baseName,
+                public_path('uploads/students/' . $baseName) => '/uploads/students/' . $baseName,
+                public_path('uploads/' . $cleanPath) => '/uploads/' . $cleanPath,
+                public_path($cleanPath) => '/' . $cleanPath,
+                public_path('storage/' . $cleanPath) => '/storage/' . $cleanPath,
+                storage_path('app/public/' . $cleanPath) => '/uploads/' . $cleanPath,
+            ];
+
+            foreach ($searchPaths as $sysPath => $webPath) {
+                if (file_exists($sysPath)) {
+                    return $baseUrl . $webPath;
+                }
+            }
+
+            return $baseUrl . '/uploads/' . $cleanPath;
+        }
+
+        // Search by admission_number or student ID in uploads directory if photo column was not set
+        $identifiers = array_filter([$this->admission_number, $this->admission_id, (string)$this->id]);
+        $extensions = ['jpg', 'jpeg', 'png', 'webp', 'JPG', 'PNG', 'JPEG', 'WEBP'];
+
+        foreach ($identifiers as $idVal) {
+            foreach ($extensions as $ext) {
+                $filename = $idVal . '.' . $ext;
+                if (file_exists(public_path('uploads/students/photos/' . $filename))) {
+                    return $baseUrl . '/uploads/students/photos/' . $filename;
+                }
+                if (file_exists(public_path('uploads/students/' . $filename))) {
+                    return $baseUrl . '/uploads/students/' . $filename;
+                }
+            }
+        }
+
+        // Fallback to father/guardian photo if available
+        foreach ([$this->father_photo, $this->guardian_photo, $this->mother_photo] as $guardianPic) {
+            if (!empty($guardianPic)) {
+                $cleanG = preg_replace('/^(public\/|uploads\/|storage\/)/', '', ltrim($guardianPic, '/'));
+                $baseG = basename($cleanG);
+                if (file_exists(public_path('uploads/students/photos/' . $baseG))) {
+                    return $baseUrl . '/uploads/students/photos/' . $baseG;
+                }
+            }
+        }
+
+        return null;
     }
 
     public function getAgeAttribute(): int
@@ -390,5 +466,16 @@ class Student extends Model
         }
         return (float) ($this->transport_pick_fare ?? 0) + (float) ($this->transport_drop_fare ?? 0);
     }
+
+    public function pendingDeletionRequest()
+    {
+        return $this->hasOne(StudentDeletionRequest::class, 'student_id')->where('status', 'pending');
+    }
+
+    public function deletionRequests()
+    {
+        return $this->hasMany(StudentDeletionRequest::class, 'student_id');
+    }
 }
+
 

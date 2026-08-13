@@ -32,7 +32,7 @@ class NotificationService
             'type'           => $data['type'] ?? 'info',
             'related_id'     => $data['related_id'] ?? null,
             'priority'       => $data['priority'] ?? 'normal',
-            'action_url'     => $data['action_url'] ?? null,
+            'action_url'     => $data['action_url'] ?? self::getDefaultActionUrl($data['module'] ?? 'general', $data['recipient_role'] ?? null),
             'icon'           => $data['icon'] ?? self::getDefaultIcon($data['module'] ?? 'general'),
             'color'          => $data['color'] ?? self::getDefaultColor($data['module'] ?? 'general'),
             'is_read'        => false,
@@ -156,5 +156,37 @@ class NotificationService
         if ($user->hasRole('student') || $user->role === 'student') return 'student';
         if ($user->hasRole('parent') || $user->role === 'parent') return 'parent';
         return $user->role ?? null;
+    }
+
+    /**
+     * Get default action URL per module and role.
+     */
+    public static function getDefaultActionUrl(string $module, ?string $recipientRole = null): ?string
+    {
+        try {
+            return match ($module) {
+                'exam', 'examination' => \Illuminate\Support\Facades\Route::has('school.examination.marks-entry')
+                    ? route('school.examination.marks-entry')
+                    : null,
+                'leave' => ($recipientRole === 'teacher' && \Illuminate\Support\Facades\Route::has('teacher.leave.apply'))
+                    ? route('teacher.leave.apply')
+                    : (\Illuminate\Support\Facades\Route::has('school.leave.staff') ? route('school.leave.staff') : null),
+                'student_leave' => ($recipientRole === 'parent' && \Illuminate\Support\Facades\Route::has('parent.leaves.index'))
+                    ? route('parent.leaves.index')
+                    : (\Illuminate\Support\Facades\Route::has('school.student-leave.index') ? route('school.student-leave.index') : null),
+                'fee', 'fees' => ($recipientRole === 'parent' && \Illuminate\Support\Facades\Route::has('parent.fees.index'))
+                    ? route('parent.fees.index')
+                    : (\Illuminate\Support\Facades\Route::has('school.fees.student-wise') ? route('school.fees.student-wise') : null),
+                'attendance' => ($recipientRole === 'parent' && \Illuminate\Support\Facades\Route::has('parent.attendance.index'))
+                    ? route('parent.attendance.index')
+                    : (\Illuminate\Support\Facades\Route::has('school.attendance.student.index') ? route('school.attendance.student.index') : null),
+                'communication', 'notice' => \Illuminate\Support\Facades\Route::has('school.communication.notice')
+                    ? route('school.communication.notice')
+                    : null,
+                default => null,
+            };
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }

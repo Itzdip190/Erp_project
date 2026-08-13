@@ -21,6 +21,10 @@ class DemoBooking extends Model
         'city',
         'state',
         'country',
+        'booking_date',
+        'booking_time',
+        'timezone',
+        'source',
         'message',
         'status',
     ];

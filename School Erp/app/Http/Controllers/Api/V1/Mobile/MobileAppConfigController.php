@@ -28,6 +28,8 @@ class MobileAppConfigController extends Controller
             $featureFlags[$key] = FeatureVisibilityHelper::isVisible($key, $scope, $schoolId);
         }
 
+        $feeConfig = $schoolId ? \App\Models\FeeConfiguration::where('school_id', $schoolId)->first() : null;
+
         return response()->json([
             'status' => 'success',
             'data' => [
@@ -42,6 +44,7 @@ class MobileAppConfigController extends Controller
                     'text_color' => '#0f172a',
                 ],
                 'features' => $featureFlags,
+                'fee_config' => $feeConfig,
                 'transport_settings' => [
                     'show_school_name_invoice' => \App\Services\SettingService::get('show_school_name_transport_invoice', '1') == '1',
                     'quarterly_payment_only' => \App\Services\SettingService::get('quarterly_transport_payment', '0') == '1',

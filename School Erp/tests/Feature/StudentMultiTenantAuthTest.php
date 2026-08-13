@@ -135,7 +135,7 @@ class StudentMultiTenantAuthTest extends TestCase
                 'password' => 'Student@2026!',
             ]);
 
-        $response->assertRedirect('/parent/dashboard');
+        $response->assertRedirect('/student/dashboard');
         $this->assertAuthenticated();
 
         $authUser = auth()->user();
@@ -174,7 +174,7 @@ class StudentMultiTenantAuthTest extends TestCase
                 'password' => 'Student@2026!',
             ]);
 
-        $response->assertRedirect('/parent/dashboard');
+        $response->assertRedirect('/student/dashboard');
         $this->assertAuthenticated();
 
         $authUser = auth()->user();

@@ -107,10 +107,10 @@
                 items.forEach(n => {
                     const iconClass = n.icon || 'fa-bell';
                     const color = n.color || '#8b5cf6';
-                    const isUnreadBg = !n.is_read ? 'background:#f8fafc; font-weight:600;' : '';
+                    const itemUrl = (n.action_url && n.action_url !== '#') ? n.action_url : 'javascript:void(0);';
                     
                     html += `
-                        <a href="${n.action_url || '#'}" class="nd-item" onclick="markNotificationRead(${n.id})" style="${isUnreadBg} display:flex; gap:10px; padding:10px; border-bottom:1px solid #f1f5f9; text-decoration:none; color:inherit;">
+                        <a href="${itemUrl}" class="nd-item" onclick="markNotificationRead(${n.id})" style="${isUnreadBg} display:flex; gap:10px; padding:10px; border-bottom:1px solid #f1f5f9; text-decoration:none; color:inherit;">
                             <div class="nd-ico" style="background: ${color}20; color: ${color}; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
                                 <i class="fas ${iconClass}"></i>
                             </div>

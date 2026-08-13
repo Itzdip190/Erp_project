@@ -391,24 +391,76 @@
             }
         });
 
-        // Add form submit listener to serialize data
+        // Add form submit listener to serialize data and enforce name validation
         if (parentForm) {
-            parentForm.addEventListener('submit', function() {
+            parentForm.addEventListener('submit', function(e) {
                 // Read current input values from DOM to capture final manual edits
                 const rows = tableBody.querySelectorAll('.ib-row');
                 const finalInstallments = [];
+                let hasError = false;
+
                 rows.forEach(row => {
+                    const nameInput = row.querySelector('.ib-name-input');
+                    const isValid = validateRowInput(nameInput);
+                    if (!isValid) {
+                        hasError = true;
+                    }
                     finalInstallments.push({
                         installment_no: parseInt(row.getAttribute('data-no')),
-                        name: row.querySelector('.ib-name-input').value,
+                        name: nameInput.value,
                         start_date: row.querySelector('.ib-start-input').value,
                         end_date: row.querySelector('.ib-end-input').value,
                         due_date: row.querySelector('.ib-end-input').value, // end_date is forced as due_date
                         grace_days: parseInt(row.querySelector('.ib-grace-input').value) || 0
                     });
                 });
+
+                if (hasError) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const firstErrInput = tableBody.querySelector('.ib-name-input[style*="ef4444"]');
+                    if (firstErrInput) firstErrInput.focus();
+                    return false;
+                }
+
                 hiddenSerialized.value = JSON.stringify(finalInstallments);
             });
+        }
+
+        function validateInstallmentName(name) {
+            name = (name || '').trim();
+            if (!name) return false;
+
+            // Format 1: Installment N (e.g. Installment 1, Installment 2)
+            if (/^Installment\s+[1-9]\d*$/i.test(name)) return true;
+
+            // Format 2: Month Name + Year (e.g. June 2026, July 2026)
+            const months = 'January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec';
+            if (new RegExp('^(' + months + ')\\s+\\d{4}$', 'i').test(name)) return true;
+
+            // Format 3: Quarter Format (e.g. Q1 (Jun-Aug 2026), Q2 (Sep-Nov 2026))
+            const shortMonths = 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec';
+            if (new RegExp('^Q\\d+\\s*\\((' + shortMonths + ')-(' + shortMonths + ')\\s+\\d{4}\\)$', 'i').test(name)) return true;
+
+            // Format 4: Session Format (e.g. Session 2026-27, Session 2026-2027)
+            if (/^Session\s+\d{4}(-\d{2,4})?$/i.test(name)) return true;
+
+            return false;
+        }
+
+        function validateRowInput(inputEl) {
+            if (!inputEl) return true;
+            const val = inputEl.value;
+            const errorDiv = inputEl.nextElementSibling;
+            if (validateInstallmentName(val)) {
+                inputEl.style.borderColor = '#cbd5e1';
+                if (errorDiv) errorDiv.style.display = 'none';
+                return true;
+            } else {
+                inputEl.style.borderColor = '#ef4444';
+                if (errorDiv) errorDiv.style.display = 'block';
+                return false;
+            }
         }
 
         // Functions
@@ -563,16 +615,24 @@
                 tr.innerHTML = `
                     <td style="font-weight:700; color:#64748b;">${inst.installment_no}</td>
                     <td>
-                        <input type="text" class="ib-table-input ib-name-input" value="${escapeHtml(inst.name)}" oninput="window.ibHandleEdit()">
+                        <input type="text" class="ib-table-input ib-name-input" value="${escapeHtml(inst.name)}" oninput="window.ibHandleEdit(this)" onchange="window.ibHandleEdit(this)">
+                        <div class="ib-name-error-msg" style="display:none; color:#ef4444; font-size:11px; font-weight:600; margin-top:4px; line-height:1.3;">
+                            Invalid Installment Name.<br>
+                            Allowed formats:<br>
+                            • Installment 1<br>
+                            • June 2026<br>
+                            • Q1 (Jun-Aug 2026)<br>
+                            • Session 2026-27
+                        </div>
                     </td>
                     <td>
-                        <input type="date" class="ib-table-input ib-start-input" value="${inst.start_date}" onchange="window.ibHandleEdit()">
+                        <input type="date" class="ib-table-input ib-start-input" value="${inst.start_date}" onchange="window.ibHandleEdit(this)">
                     </td>
                     <td>
-                        <input type="date" class="ib-table-input ib-end-input" value="${inst.end_date}" onchange="window.ibHandleEdit()">
+                        <input type="date" class="ib-table-input ib-end-input" value="${inst.end_date}" onchange="window.ibHandleEdit(this)">
                     </td>
                     <td>
-                        <input type="number" class="ib-table-input ib-grace-input" value="${inst.grace_days}" min="0" oninput="window.ibHandleEdit()">
+                        <input type="number" class="ib-table-input ib-grace-input" value="${inst.grace_days}" min="0" oninput="window.ibHandleEdit(this)">
                     </td>
                 `;
                 tableBody.appendChild(tr);
@@ -596,8 +656,11 @@
                 .replace(/'/g, "&#039;");
         }
 
-        window.ibHandleEdit = function() {
+        window.ibHandleEdit = function(inputEl) {
             isManuallyEdited = true;
+            if (inputEl && inputEl.classList.contains('ib-name-input')) {
+                validateRowInput(inputEl);
+            }
             serializeInstallments();
         };
 
