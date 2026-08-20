@@ -1,96 +1,160 @@
 @extends('layouts.app')
 
-@section('page-title', 'Product Cart - Inventory Billing')
+@section('page-title', 'Product Cart - Inventory Management')
 
 @section('content')
 <style>
-    /* ─── Standard ERP Blue & White Theme (Matching Images 1, 2, 3, 4) ─── */
+    /* ─── Enterprise ERP Blue & White Theme (Matching Images 1, 2, 3, 4) ─── */
     :root {
         --erp-navy:        #1a3a4b;
         --erp-navy-dark:   #122b39;
-        --erp-navy-light:  #254b5f;
+        --erp-navy-light:  #244d63;
         --erp-blue:        #0284c7;
+        --erp-blue-dark:   #1e3a8a;
         --erp-blue-light:  #38bdf8;
         --erp-blue-soft:   #f0f9ff;
         --erp-card-bg:     #ffffff;
         --erp-border:      #e2e8f0;
-        --erp-border-focus:#93c5fd;
+        --erp-border-dark: #cbd5e1;
         --erp-text-dark:   #0f172a;
         --erp-text-muted:  #64748b;
         --erp-gold:        #d97706;
         --erp-gold-light:  #fbbf24;
     }
 
-    .billing-page-container {
+    /* ─── Main Container ────────────────────────────────────────────────── */
+    .inv-container {
         width: 100% !important;
         max-width: 100% !important;
+        padding: 20px 28px 40px !important;
         box-sizing: border-box;
     }
 
-    /* ─── Card Headers (Matching Images 1, 2, 3) ─── */
-    .cart-card-header {
+    /* ─── Top Horizontal Inventory Navigation Bar ──────────────────────── */
+    .inv-top-nav-wrap {
+        background: #ffffff;
+        border: 1px solid var(--erp-border);
+        border-radius: 10px;
+        padding: 10px 14px;
+        margin-bottom: 22px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    .inv-nav-item {
+        color: #475569;
+        background: #f8fafc;
+        border: 1px solid var(--erp-border);
+        font-weight: 600;
+        font-size: 13px;
+        border-radius: 7px;
+        padding: 8px 14px;
+        text-decoration: none !important;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: all 0.2s ease;
+        flex-shrink: 0;
+    }
+    .inv-nav-item:hover {
+        background: #ffffff;
+        color: var(--erp-navy);
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+    }
+    .inv-nav-item.active {
+        background: #ffffff;
+        color: var(--erp-blue);
+        border-color: var(--erp-blue);
+        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.12);
+        font-weight: 700;
+    }
+
+    /* ─── Cards Matching Images 1, 2, 3 ────────────────────────────────── */
+    .inv-card {
+        background: #ffffff;
+        border: 1px solid var(--erp-border);
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+        margin-bottom: 22px;
+        overflow: visible;
+        position: relative;
+    }
+
+    .inv-card-header-dark {
         background-color: var(--erp-navy);
         color: #ffffff;
-        padding: 12px 20px;
-        border-top-left-radius: 8px;
-        border-top-right-radius: 8px;
+        padding: 13px 20px;
+        border-top-left-radius: 7px;
+        border-top-right-radius: 7px;
         display: flex;
         align-items: center;
         gap: 10px;
         font-weight: 700;
-        font-size: 15px;
+        font-size: 14.5px;
         letter-spacing: 0.3px;
     }
-    .cart-card-header i {
+    .inv-card-header-dark i {
         font-size: 15px;
         color: #ffffff;
     }
 
-    /* ─── ERP Cards ─── */
-    .cart-main-card {
+    .inv-card-body {
+        padding: 24px 28px;
         background: #ffffff;
-        border: 1px solid var(--erp-border);
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-        margin-bottom: 24px;
-        overflow: visible;
     }
 
-    /* ─── Search Form Inputs (Image 1) ─── */
-    .search-input-group {
-        position: relative;
+    /* ─── Image 1: Product Cart Search Inputs ───────────────────────────── */
+    .search-inputs-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
     }
-    .form-control-erp {
-        height: 42px;
-        border-radius: 6px;
-        border: 1px solid #cbd5e1;
-        font-size: 13.5px;
-        color: #1e293b;
-        padding: 8px 14px;
-        transition: all 0.2s ease;
-        background-color: #ffffff;
+    @media (max-width: 768px) {
+        .search-inputs-grid {
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
     }
-    .form-control-erp:focus {
-        border-color: #0284c7;
-        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-        outline: none;
-    }
-    .form-label-erp {
+
+    .erp-label {
         font-size: 13px;
         font-weight: 600;
         color: #334155;
         margin-bottom: 6px;
-        display: flex;
-        align-items: center;
-        gap: 4px;
+        display: block;
     }
-    .req-star {
+    .erp-label .req {
         color: #ef4444;
         font-weight: bold;
     }
 
-    /* ─── Typeahead Dropdown ─── */
-    .typeahead-dropdown {
+    .erp-input {
+        width: 100%;
+        height: 42px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        font-size: 13.5px;
+        color: #0f172a;
+        padding: 8px 14px;
+        background-color: #ffffff;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        outline: none;
+        box-sizing: border-box;
+    }
+    .erp-input:focus {
+        border-color: var(--erp-blue);
+        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+    }
+    .erp-input::placeholder {
+        color: #94a3b8;
+    }
+
+    /* Autocomplete Dropdown List */
+    .typeahead-results {
         position: absolute;
         top: 100%;
         left: 0;
@@ -105,7 +169,7 @@
         margin-top: 4px;
         display: none;
     }
-    .typeahead-item {
+    .typeahead-option {
         padding: 10px 14px;
         border-bottom: 1px solid #f1f5f9;
         cursor: pointer;
@@ -114,22 +178,22 @@
         justify-content: space-between;
         align-items: center;
     }
-    .typeahead-item:last-child {
+    .typeahead-option:last-child {
         border-bottom: none;
     }
-    .typeahead-item:hover, .typeahead-item.active {
+    .typeahead-option:hover, .typeahead-option.selected {
         background-color: #f0f9ff;
     }
-    .typeahead-title {
+    .typeahead-name {
         font-weight: 600;
         font-size: 13.5px;
         color: #0f172a;
     }
-    .typeahead-sub {
+    .typeahead-meta {
         font-size: 11.5px;
         color: #64748b;
     }
-    .typeahead-badge {
+    .typeahead-price-badge {
         font-size: 12px;
         font-weight: 700;
         padding: 3px 8px;
@@ -138,33 +202,34 @@
         color: #0369a1;
     }
 
-    /* ─── Cart Section Table (Images 2 & 3) ─── */
-    .cart-table-wrapper {
+    /* ─── Image 2: Cart Section Table ───────────────────────────────────── */
+    .cart-table-container {
         width: 100%;
         overflow-x: auto;
         border: 1px solid #e2e8f0;
         border-radius: 6px;
+        background: #ffffff;
     }
-    .cart-table {
+    .cart-grid-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 13px;
-        margin-bottom: 0;
+        margin: 0;
     }
-    .cart-table thead th {
-        background-color: #f8fafc;
+    .cart-grid-table thead th {
+        background-color: #ffffff;
         color: #334155;
         font-weight: 700;
-        padding: 11px 14px;
+        padding: 12px 14px;
         border-bottom: 1px solid #e2e8f0;
         border-right: 1px solid #e2e8f0;
         text-align: center;
         white-space: nowrap;
     }
-    .cart-table thead th:last-child {
+    .cart-grid-table thead th:last-child {
         border-right: none;
     }
-    .cart-table tbody td {
+    .cart-grid-table tbody td {
         padding: 10px 12px;
         border-bottom: 1px solid #e2e8f0;
         border-right: 1px solid #e2e8f0;
@@ -173,15 +238,15 @@
         color: #0f172a;
         white-space: nowrap;
     }
-    .cart-table tbody td:last-child {
+    .cart-grid-table tbody td:last-child {
         border-right: none;
     }
-    .cart-table tbody tr:hover {
-        background-color: #fafafa;
+    .cart-grid-table tbody tr:hover {
+        background-color: #f8fafc;
     }
 
     /* Table Input Fields */
-    .cart-qty-input, .cart-disc-input {
+    .table-cell-input {
         width: 75px;
         height: 34px;
         border-radius: 5px;
@@ -191,8 +256,14 @@
         font-size: 13px;
         color: #0f172a;
         padding: 2px 4px;
+        outline: none;
+        background: #ffffff;
     }
-    .cart-size-select {
+    .table-cell-input:focus {
+        border-color: var(--erp-blue);
+        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+    }
+    .table-cell-select {
         height: 34px;
         border-radius: 5px;
         border: 1px solid #cbd5e1;
@@ -202,21 +273,21 @@
         color: #1e293b;
         background-color: #ffffff;
         cursor: pointer;
+        outline: none;
     }
-    .stock-badge-green {
+    .table-cell-select:focus {
+        border-color: var(--erp-blue);
+    }
+    .stock-count-green {
         color: #16a34a;
         font-weight: 700;
         font-size: 13px;
     }
-    .stock-badge-red {
-        color: #dc2626;
-        font-weight: 700;
-        font-size: 13px;
-    }
-    .btn-trash-action {
+
+    .btn-trash-delete {
         color: #ef4444;
         background: #fee2e2;
-        border: none;
+        border: 1px solid #fecaca;
         border-radius: 6px;
         width: 32px;
         height: 32px;
@@ -225,17 +296,19 @@
         justify-content: center;
         cursor: pointer;
         transition: all 0.2s;
+        font-size: 13px;
     }
-    .btn-trash-action:hover {
-        background: #fca5a5;
-        color: #991b1b;
-        transform: scale(1.05);
+    .btn-trash-delete:hover {
+        background: #dc2626;
+        color: #ffffff;
+        border-color: #dc2626;
+        transform: scale(1.06);
     }
 
-    /* ─── Buttons (Images 2 & 3) ─── */
-    .btn-checkout-primary {
+    /* ─── Centered Action Button (Checkout & Confirm Order) ──────────────── */
+    .btn-center-dark {
         background-color: var(--erp-navy);
-        color: #ffffff;
+        color: #ffffff !important;
         font-weight: 700;
         font-size: 14px;
         padding: 10px 32px;
@@ -247,16 +320,23 @@
         cursor: pointer;
         transition: all 0.2s ease;
         box-shadow: 0 3px 10px rgba(26, 58, 75, 0.2);
+        text-decoration: none !important;
     }
-    .btn-checkout-primary:hover {
+    .btn-center-dark:hover {
         background-color: var(--erp-navy-dark);
-        color: #ffffff;
+        color: #ffffff !important;
         transform: translateY(-1px);
         box-shadow: 0 5px 14px rgba(26, 58, 75, 0.3);
     }
-    .btn-checkout-secondary {
+    .btn-center-dark:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .btn-center-outline {
         background-color: #ffffff;
-        color: #334155;
+        color: #334155 !important;
         font-weight: 600;
         font-size: 14px;
         padding: 10px 24px;
@@ -267,24 +347,25 @@
         gap: 8px;
         cursor: pointer;
         transition: all 0.2s ease;
+        text-decoration: none !important;
     }
-    .btn-checkout-secondary:hover {
+    .btn-center-outline:hover {
         background-color: #f8fafc;
-        color: #0f172a;
+        color: #0f172a !important;
         border-color: #94a3b8;
     }
 
-    /* ─── Checkout Step 2 Layout (Image 3) ─── */
-    .checkout-summary-box {
+    /* ─── Image 3: Summary Box ─────────────────────────────────────────── */
+    .checkout-summary-card {
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         background: #f8fafc;
-        padding: 18px 22px;
+        padding: 16px 20px;
         width: 100%;
         max-width: 320px;
         margin-left: auto;
     }
-    .checkout-summary-row {
+    .checkout-summary-line {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -292,7 +373,7 @@
         font-size: 13.5px;
         color: #334155;
     }
-    .checkout-summary-row.grand-total-row {
+    .checkout-summary-line.grand-total {
         border-top: 2px solid #cbd5e1;
         margin-top: 8px;
         padding-top: 10px;
@@ -301,358 +382,429 @@
         color: var(--erp-navy);
     }
 
-    /* ─── Student Details Form (Image 3) ─── */
-    .student-details-card {
-        background: #ffffff;
-        border: 1px solid var(--erp-border);
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
-        margin-top: 24px;
-        margin-bottom: 24px;
+    /* ─── Image 3: Student Details Form Grid ────────────────────────────── */
+    .student-grid-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 18px;
     }
-    .balance-due-text {
-        font-size: 12.5px;
-        font-weight: 700;
-        color: #0284c7;
-        margin-top: 4px;
+    .student-grid-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 18px;
+        align-items: start;
+    }
+    @media (max-width: 992px) {
+        .student-grid-4 { grid-template-columns: repeat(2, 1fr); }
+        .student-grid-3 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 576px) {
+        .student-grid-4 { grid-template-columns: 1fr; }
     }
 
-    /* ─── Transitions between steps ─── */
-    .step-section {
+    /* ─── Steps Slide Transitions ──────────────────────────────────────── */
+    .step-block {
         display: none;
-        animation: fadeInStep 0.3s ease forwards;
     }
-    .step-section.active {
+    .step-block.active {
         display: block;
+        animation: fadeInStep 0.25s ease forwards;
     }
     @keyframes fadeInStep {
-        from { opacity: 0; transform: translateY(6px); }
+        from { opacity: 0; transform: translateY(4px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ─── Modal Styles for Receipt Preview (Image 4) ─── */
-    .receipt-modal-dialog {
+    /* ─── Custom Modal Overlay (Never Leaks Unstyled Content) ──────────── */
+    .custom-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 9999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+    .custom-modal-overlay.open {
+        display: flex;
+    }
+    .custom-modal-dialog {
+        background: #ffffff;
+        border-radius: 12px;
         max-width: 920px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        display: flex;
+        flex-direction: column;
+    }
+    .custom-modal-header {
+        padding: 14px 20px;
+        background: #f8fafc;
+        border-bottom: 1px solid var(--erp-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+    }
+    .custom-modal-footer {
+        padding: 14px 20px;
+        background: #f8fafc;
+        border-top: 1px solid var(--erp-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom-left-radius: 12px;
+        border-bottom-right-radius: 12px;
     }
 </style>
 
-<div class="container-fluid billing-page-container py-3">
-    <!-- Top Breadcrumb & Title -->
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <div>
-            <h1 class="h4 font-weight-bold text-gray-800 mb-1">Billing & Product Cart</h1>
-            <p class="text-muted mb-0 small">Inventory Management / Product Cart & Direct Billing</p>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="{{ route('school.inventory.sales-history') }}" class="btn btn-sm btn-outline-primary shadow-sm">
-                <i class="fas fa-clipboard-list me-1"></i> Sales History
+<div class="inv-container">
+    
+    <!-- Top Horizontal Navigation Bar (ERP Blue & White Tabs) -->
+    <div class="inv-top-nav-wrap">
+        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'item_category'))
+            <a href="{{ route('school.inventory.categories') }}" class="inv-nav-item">
+                <i class="fas fa-tag text-primary"></i>
+                <span>Category</span>
             </a>
-            <a href="{{ route('school.inventory.product-stock') }}" class="btn btn-sm btn-outline-secondary shadow-sm">
-                <i class="fas fa-boxes-stacked me-1"></i> Stock List
+        @endif
+
+        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'product_stock'))
+            <a href="{{ route('school.inventory.product-stock') }}" class="inv-nav-item">
+                <i class="fas fa-square-plus text-success"></i>
+                <span>Product & Stock</span>
             </a>
-        </div>
+        @endif
+
+        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'billing'))
+            <a href="{{ route('school.inventory.billing') }}" class="inv-nav-item active">
+                <i class="fas fa-shopping-cart text-info"></i>
+                <span>Billing</span>
+            </a>
+        @endif
+
+        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'sales_history'))
+            <a href="{{ route('school.inventory.sales-history') }}" class="inv-nav-item">
+                <i class="fas fa-clipboard-list text-warning"></i>
+                <span>Sales History</span>
+            </a>
+        @endif
+
+        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'stock_history'))
+            <a href="{{ route('school.inventory.stock-history') }}" class="inv-nav-item">
+                <i class="fas fa-boxes-stacked text-secondary"></i>
+                <span>Stock History</span>
+            </a>
+        @endif
+
+        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'payment_history'))
+            <a href="{{ route('school.inventory.payment-history') }}" class="inv-nav-item">
+                <span class="fw-bold text-dark" style="font-size:12px;">Rs</span>
+                <span>Payment History</span>
+            </a>
+        @endif
+
+        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'issue_item'))
+            <a href="{{ route('school.inventory.issue') }}" class="inv-nav-item">
+                <i class="fas fa-hand-holding text-indigo"></i>
+                <span>Issue Item</span>
+            </a>
+        @endif
+
+        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'suppliers'))
+            <a href="{{ route('school.inventory.suppliers') }}" class="inv-nav-item">
+                <i class="fas fa-truck text-purple"></i>
+                <span>Suppliers</span>
+            </a>
+        @endif
     </div>
 
-    <div class="row">
-        <!-- Navigation Menu -->
-        @include('school.inventory.nav')
-
-        <!-- Main Content Area -->
-        <div class="col-md-9 col-lg-9 col-xl-10">
-
-            <!-- ═══════════════════════════════════════════════════════════════ -->
-            <!-- STEP 1: PRODUCT SEARCH & CART ADDITION (Matching Image 1 & 2)  -->
-            <!-- ═══════════════════════════════════════════════════════════════ -->
-            <div id="step-1-container" class="step-section active">
-                
-                <!-- 1. Top Card: Product Cart Search -->
-                <div class="cart-main-card mb-4">
-                    <div class="cart-card-header">
-                        <i class="fas fa-list-ul"></i>
-                        <span>Product Cart</span>
-                    </div>
-                    <div class="p-4">
-                        <div class="row g-3 align-items-end">
-                            <!-- Product Name Input with live typeahead -->
-                            <div class="col-md-6 search-input-group">
-                                <label class="form-label-erp">
-                                    Product Name <span class="req-star">*</span>
-                                </label>
-                                <input type="text" id="search-product-input" class="form-control-erp w-100" 
-                                       placeholder="Type product name..." autocomplete="off">
-                                
-                                <!-- Autocomplete Dropdown List -->
-                                <div id="product-typeahead-list" class="typeahead-dropdown"></div>
-                            </div>
-
-                            <!-- Quantity Input -->
-                            <div class="col-md-4">
-                                <label class="form-label-erp">
-                                    Quantity <span class="req-star">*</span>
-                                </label>
-                                <input type="number" id="search-quantity-input" class="form-control-erp w-100" 
-                                       placeholder="Enter Quantity" min="1" value="1">
-                            </div>
-
-                            <!-- Add Button -->
-                            <div class="col-md-2">
-                                <button type="button" id="btn-add-to-cart" class="btn btn-primary w-100 fw-bold" style="height: 42px; background-color: var(--erp-navy); border-color: var(--erp-navy);">
-                                    <i class="fas fa-plus me-1"></i> Add
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 2. Bottom Card: Cart Section (Image 2) -->
-                <div class="cart-main-card">
-                    <div class="cart-card-header">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>Cart Section</span>
-                    </div>
-                    <div class="p-3 p-md-4">
-                        <!-- Table -->
-                        <div class="cart-table-wrapper">
-                            <table class="cart-table" id="cart-table">
-                                <thead>
-                                    <tr>
-                                        <th style="width: 50px;">S/N</th>
-                                        <th style="text-align: left; min-width: 160px;">Product</th>
-                                        <th style="min-width: 100px;">Price</th>
-                                        <th style="width: 100px;">Quantity</th>
-                                        <th style="width: 100px;">Discount</th>
-                                        <th style="min-width: 90px;">Avl. Qty</th>
-                                        <th style="min-width: 110px;">Total</th>
-                                        <th style="min-width: 100px;">Size</th>
-                                        <th style="width: 60px;">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="cart-table-body">
-                                    <!-- Dynamic Rows rendered via JS -->
-                                    <tr id="empty-cart-row">
-                                        <td colspan="9" class="text-muted py-5" style="text-align: center;">
-                                            <i class="fas fa-cart-shopping fa-2x mb-2 d-block text-secondary opacity-50"></i>
-                                            Your cart is empty. Type a product name above to add items.
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <!-- Checkout Button (Image 2) -->
-                        <div class="text-center mt-4">
-                            <button type="button" id="btn-proceed-to-checkout" class="btn-checkout-primary" disabled>
-                                <i class="fas fa-shopping-cart"></i> Checkout
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- STEP 1: PRODUCT SEARCH & CART ADDITION (Matching Image 1 & 2)       -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="step-1-block" class="step-block active">
+        
+        <!-- 1. Top Card: Product Cart (Image 1) -->
+        <div class="inv-card">
+            <div class="inv-card-header-dark">
+                <i class="fas fa-list-ul"></i>
+                <span>Product Cart</span>
             </div>
-
-
-            <!-- ═══════════════════════════════════════════════════════════════ -->
-            <!-- STEP 2: CHECKOUT & STUDENT DETAILS (Matching Image 3)          -->
-            <!-- ═══════════════════════════════════════════════════════════════ -->
-            <div id="step-2-container" class="step-section">
-                
-                <!-- 1. Top Card: Cart Section Summary (Image 3 Top Table) -->
-                <div class="cart-main-card mb-4">
-                    <div class="cart-card-header d-flex justify-content-between align-items-center">
-                        <div>
-                            <i class="fas fa-shopping-cart"></i>
-                            <span>Cart Section</span>
-                        </div>
-                        <button type="button" id="btn-back-to-cart-top" class="btn btn-sm btn-outline-light border-0 text-white" style="font-size: 12px;">
-                            <i class="fas fa-pen me-1"></i> Edit Cart
-                        </button>
+            <div class="inv-card-body">
+                <div class="search-inputs-grid">
+                    <!-- Product Name Input (Left Column) -->
+                    <div style="position: relative;">
+                        <label class="erp-label">
+                            Product Name <span class="req">*</span>
+                        </label>
+                        <input type="text" id="search-product-input" class="erp-input" 
+                               placeholder="Type product name..." autocomplete="off">
+                        
+                        <!-- Live Autocomplete Dropdown List -->
+                        <div id="product-typeahead-list" class="typeahead-results"></div>
                     </div>
-                    <div class="p-3 p-md-4">
-                        <div class="cart-table-wrapper mb-4">
-                            <table class="cart-table" id="checkout-review-table">
-                                <thead>
-                                    <tr>
-                                        <th style="text-align: left;">Product</th>
-                                        <th>MRP</th>
-                                        <th>Price</th>
-                                        <th>Tax(%)</th>
-                                        <th>Quantity</th>
-                                        <th>Size</th>
-                                        <th>Discount</th>
-                                        <th>Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="checkout-review-body">
-                                    <!-- Rendered via JS -->
-                                </tbody>
-                            </table>
-                        </div>
 
-                        <!-- Right Summary Box (Image 3 Right) -->
-                        <div class="row">
-                            <div class="col-md-6 col-lg-7"></div>
-                            <div class="col-md-6 col-lg-5">
-                                <div class="checkout-summary-box">
-                                    <div class="checkout-summary-row">
-                                        <span>Total MRP</span>
-                                        <span id="summary-total-mrp" class="fw-bold">₹ 0.00</span>
-                                    </div>
-                                    <div class="checkout-summary-row">
-                                        <span>Total Price</span>
-                                        <span id="summary-total-price" class="fw-bold">₹ 0.00</span>
-                                    </div>
-                                    <div class="checkout-summary-row">
-                                        <span>Total Discount</span>
-                                        <span id="summary-total-discount" class="fw-bold text-danger">₹ 0.00</span>
-                                    </div>
-                                    <div class="checkout-summary-row">
-                                        <span>Total Tax</span>
-                                        <span id="summary-total-tax" class="fw-bold text-warning">₹ 0.00</span>
-                                    </div>
-                                    <div class="checkout-summary-row grand-total-row">
-                                        <span>Grand Total</span>
-                                        <span id="summary-grand-total">₹ 0.00</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                    <!-- Quantity Input (Right Column) -->
+                    <div>
+                        <label class="erp-label">
+                            Quantity <span class="req">*</span>
+                        </label>
+                        <input type="number" id="search-quantity-input" class="erp-input" 
+                               placeholder="Enter Quantity" min="1" value="1">
                     </div>
                 </div>
-
-                <!-- 2. Bottom Card: Student Details (Image 3 Bottom) -->
-                <div class="student-details-card">
-                    <div class="cart-card-header">
-                        <i class="fas fa-user-plus"></i>
-                        <span>Student Details</span>
-                    </div>
-                    <div class="p-4">
-                        <form id="checkout-form" onsubmit="return false;">
-                            <!-- Row 1: Admission No, Name, Address, Mobile -->
-                            <div class="row g-3 mb-3">
-                                <div class="col-md-3 search-input-group">
-                                    <label class="form-label-erp">Addmission No.(Optional)</label>
-                                    <input type="text" id="cust-admission-no" class="form-control-erp w-100" 
-                                           placeholder="Enter Addmission No.(Optional)" autocomplete="off">
-                                    <div id="student-typeahead-list" class="typeahead-dropdown"></div>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="form-label-erp">
-                                        Name <span class="req-star">*</span>
-                                    </label>
-                                    <input type="text" id="cust-name" class="form-control-erp w-100" 
-                                           placeholder="Enter Name" required>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="form-label-erp">
-                                        Address <span class="req-star">*</span>
-                                    </label>
-                                    <input type="text" id="cust-address" class="form-control-erp w-100" 
-                                           placeholder="Enter Address" required>
-                                </div>
-
-                                <div class="col-md-3">
-                                    <label class="form-label-erp">
-                                        Mobile No <span class="req-star">*</span>
-                                    </label>
-                                    <input type="text" id="cust-mobile" class="form-control-erp w-100" 
-                                           placeholder="Enter Mobile No." required>
-                                </div>
-                            </div>
-
-                            <!-- Row 2: Payment Mode, Reference No, Payable Amount, Balance Due -->
-                            <div class="row g-3 align-items-center mb-4">
-                                <div class="col-md-4">
-                                    <label class="form-label-erp">
-                                        Payment Mode <span class="req-star">*</span>
-                                    </label>
-                                    <select id="cust-payment-mode" class="form-control-erp w-100" required>
-                                        <option value="">Select Payment Mode</option>
-                                        <option value="cash" selected>Cash</option>
-                                        <option value="upi">Online / UPI</option>
-                                        <option value="card">Debit / Credit Card</option>
-                                        <option value="cheque">Cheque</option>
-                                        <option value="bank_transfer">Bank Transfer</option>
-                                        <option value="dd">Demand Draft</option>
-                                    </select>
-                                </div>
-
-                                <div class="col-md-4">
-                                    <label class="form-label-erp">Reference No.</label>
-                                    <input type="text" id="cust-ref-no" class="form-control-erp w-100" 
-                                           placeholder="Enter Reference No.">
-                                </div>
-
-                                <div class="col-md-4">
-                                    <label class="form-label-erp">
-                                        Payable Amount <span class="req-star">*</span>
-                                    </label>
-                                    <input type="number" step="0.01" id="cust-payable-amount" class="form-control-erp w-100" 
-                                           placeholder="0.00" required>
-                                    <div class="balance-due-text">
-                                        Balance Due: <span id="label-balance-due">0</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Buttons: Back & Confirm Order -->
-                            <div class="d-flex justify-content-center gap-3 mt-4">
-                                <button type="button" id="btn-back-to-cart-bottom" class="btn-checkout-secondary">
-                                    <i class="fas fa-arrow-left"></i> Back to Cart
-                                </button>
-                                <button type="button" id="btn-confirm-order" class="btn-checkout-primary">
-                                    <i class="fas fa-check"></i> Confirm Order
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
             </div>
-
         </div>
-    </div>
-</div>
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<!-- STEP 3: RECEIPT / INVOICE MODAL (Matching Image 4)             -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
-<div class="modal fade" id="receiptModal" tabindex="-1" aria-labelledby="receiptModalLabel" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered receipt-modal-dialog">
-        <div class="modal-content shadow-lg border-0 rounded-3">
-            <div class="modal-header bg-light py-2 px-3 border-bottom">
-                <h6 class="modal-title font-weight-bold text-dark" id="receiptModalLabel">
-                    <i class="fas fa-receipt text-primary me-2"></i> Sales Receipt Generated
-                </h6>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <!-- 2. Bottom Card: Cart Section (Image 2) -->
+        <div class="inv-card">
+            <div class="inv-card-header-dark">
+                <i class="fas fa-shopping-cart"></i>
+                <span>Cart Section</span>
             </div>
-            <div class="modal-body p-3 p-md-4" id="receipt-modal-body">
-                <!-- Live Image 4 receipt template injected here -->
-            </div>
-            <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" onclick="resetCartForNewOrder()">
-                    <i class="fas fa-plus me-1"></i> New Sale
-                </button>
-                <div class="d-flex gap-2">
-                    <a href="#" id="modal-view-standalone-btn" target="_blank" class="btn btn-outline-dark btn-sm">
-                        <i class="fas fa-up-right-from-square me-1"></i> Full Page
-                    </a>
-                    <button type="button" class="btn btn-primary btn-sm fw-bold" style="background: var(--erp-navy); border-color: var(--erp-navy);" onclick="printReceiptModal()">
-                        <i class="fas fa-print me-1"></i> Print Receipt
+            <div class="inv-card-body">
+                <!-- Cart Table -->
+                <div class="cart-table-container">
+                    <table class="cart-grid-table" id="cart-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">S/N</th>
+                                <th style="text-align: left; min-width: 160px;">Product</th>
+                                <th style="min-width: 100px;">Price</th>
+                                <th style="width: 100px;">Quantity</th>
+                                <th style="width: 100px;">Discount</th>
+                                <th style="min-width: 90px;">Avl. Qty</th>
+                                <th style="min-width: 110px;">Total</th>
+                                <th style="min-width: 100px;">Size</th>
+                                <th style="width: 60px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cart-table-body">
+                            <!-- Dynamic JS Rows -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Centered Checkout Button (Image 2) -->
+                <div class="text-center mt-4 pt-2">
+                    <button type="button" id="btn-proceed-checkout" class="btn-center-dark">
+                        <i class="fas fa-shopping-cart"></i> Checkout
                     </button>
                 </div>
             </div>
         </div>
+
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- STEP 2: CHECKOUT & STUDENT DETAILS (Matching Image 3)               -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="step-2-block" class="step-block">
+        
+        <!-- 1. Top Card: Cart Section Summary (Image 3 Top Table) -->
+        <div class="inv-card">
+            <div class="inv-card-header-dark d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>Cart Section</span>
+                </div>
+                <button type="button" id="btn-edit-cart-top" class="btn btn-sm btn-outline-light" style="font-size: 12px; border-radius: 20px; padding: 4px 12px;">
+                    <i class="fas fa-pen me-1"></i> Edit Cart
+                </button>
+            </div>
+            <div class="inv-card-body">
+                <div class="cart-table-container mb-4">
+                    <table class="cart-grid-table" id="checkout-summary-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left;">Product</th>
+                                <th>MRP</th>
+                                <th>Price</th>
+                                <th>Tax(%)</th>
+                                <th>Quantity</th>
+                                <th>Size</th>
+                                <th>Discount</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="checkout-summary-body">
+                            <!-- Injected via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Right Summary Box (Image 3 Right) -->
+                <div class="d-flex justify-content-end">
+                    <div class="checkout-summary-card">
+                        <div class="checkout-summary-line">
+                            <span>Total MRP</span>
+                            <span id="summary-mrp" class="fw-bold">₹ 0.00</span>
+                        </div>
+                        <div class="checkout-summary-line">
+                            <span>Total Price</span>
+                            <span id="summary-price" class="fw-bold">₹ 0.00</span>
+                        </div>
+                        <div class="checkout-summary-line">
+                            <span>Total Discount</span>
+                            <span id="summary-discount" class="fw-bold text-danger">₹ 0.00</span>
+                        </div>
+                        <div class="checkout-summary-line">
+                            <span>Total Tax</span>
+                            <span id="summary-tax" class="fw-bold text-warning">₹ 0.00</span>
+                        </div>
+                        <div class="checkout-summary-line grand-total">
+                            <span>Grand Total</span>
+                            <span id="summary-grand">₹ 0.00</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Bottom Card: Student Details (Image 3 Bottom) -->
+        <div class="inv-card">
+            <div class="inv-card-header-dark">
+                <i class="fas fa-user-plus"></i>
+                <span>Student Details</span>
+            </div>
+            <div class="inv-card-body">
+                <form id="checkout-form" onsubmit="return false;">
+                    
+                    <!-- Row 1: 4 Horizontal Inputs (Admission No, Name, Address, Mobile) -->
+                    <div class="student-grid-4">
+                        <div style="position: relative;">
+                            <label class="erp-label">Addmission No.(Optional)</label>
+                            <input type="text" id="cust-admission-no" class="erp-input" 
+                                   placeholder="Enter Addmission No.(Optional)" autocomplete="off">
+                            <div id="student-typeahead-list" class="typeahead-results"></div>
+                        </div>
+
+                        <div>
+                            <label class="erp-label">
+                                Name <span class="req">*</span>
+                            </label>
+                            <input type="text" id="cust-name" class="erp-input" 
+                                   placeholder="Enter Name" required>
+                        </div>
+
+                        <div>
+                            <label class="erp-label">
+                                Address <span class="req">*</span>
+                            </label>
+                            <input type="text" id="cust-address" class="erp-input" 
+                                   placeholder="Enter Address" required>
+                        </div>
+
+                        <div>
+                            <label class="erp-label">
+                                Mobile No <span class="req">*</span>
+                            </label>
+                            <input type="text" id="cust-mobile" class="erp-input" 
+                                   placeholder="Enter Mobile No." required>
+                        </div>
+                    </div>
+
+                    <!-- Row 2: 3 Inputs (Payment Mode, Reference No, Payable Amount) -->
+                    <div class="student-grid-3">
+                        <div>
+                            <label class="erp-label">
+                                Payment Mode <span class="req">*</span>
+                            </label>
+                            <select id="cust-payment-mode" class="erp-input" required>
+                                <option value="">Select Payment Mode</option>
+                                <option value="cash" selected>Cash</option>
+                                <option value="upi">Online / UPI</option>
+                                <option value="card">Debit / Credit Card</option>
+                                <option value="cheque">Cheque</option>
+                                <option value="bank_transfer">Bank Transfer</option>
+                                <option value="dd">Demand Draft</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="erp-label">Reference No.</label>
+                            <input type="text" id="cust-ref-no" class="erp-input" 
+                                   placeholder="Enter Reference No.">
+                        </div>
+
+                        <div>
+                            <label class="erp-label">
+                                Payable Amount <span class="req">*</span>
+                            </label>
+                            <input type="number" step="0.01" id="cust-payable-amount" class="erp-input" 
+                                   placeholder="0.00" required>
+                            <div style="font-size: 12.5px; font-weight: 700; color: #0284c7; margin-top: 5px;">
+                                Balance Due: <span id="label-balance-due">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Centered Buttons: Back & Confirm Order (Image 3) -->
+                    <div class="d-flex justify-content-center gap-3 mt-4 pt-2">
+                        <button type="button" id="btn-back-to-cart" class="btn-center-outline">
+                            <i class="fas fa-arrow-left"></i> Back to Cart
+                        </button>
+                        <button type="button" id="btn-confirm-order" class="btn-center-dark">
+                            <i class="fas fa-check"></i> Confirm Order
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- STEP 3: CUSTOM POPUP MODAL FOR RECEIPT PREVIEW (Matching Image 4)   -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div id="receiptModalOverlay" class="custom-modal-overlay">
+    <div class="custom-modal-dialog">
+        <div class="custom-modal-header">
+            <div class="fw-bold text-dark d-flex align-items-center gap-2">
+                <i class="fas fa-receipt text-primary"></i>
+                <span>Sales Receipt Generated</span>
+            </div>
+            <button type="button" class="btn btn-sm btn-light border-0" onclick="closeReceiptModal()" style="font-size: 16px;">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+        <div class="p-3 p-md-4" id="receipt-modal-content-area">
+            <!-- Dynamic Image 4 receipt template injected here -->
+        </div>
+        <div class="custom-modal-footer">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeReceiptModalAndReset()">
+                <i class="fas fa-plus me-1"></i> New Sale
+            </button>
+            <div class="d-flex gap-2">
+                <a href="#" id="modal-standalone-link" target="_blank" class="btn btn-outline-dark btn-sm">
+                    <i class="fas fa-up-right-from-square me-1"></i> Full Page
+                </a>
+                <button type="button" class="btn-center-dark" style="padding: 7px 18px; font-size: 13px;" onclick="printModalReceipt()">
+                    <i class="fas fa-print"></i> Print Receipt
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Raw Products Data from Server for offline/fast instant search -->
+<!-- Raw Initial Products & Config -->
 <script>
     const INITIAL_PRODUCTS = @json($products ?? []);
     const APP_CSRF_TOKEN = '{{ csrf_token() }}';
     const BILLING_CHECKOUT_URL = '{{ route("school.inventory.billing.checkout") }}';
-    const PRODUCT_SEARCH_URL = '{{ route("school.inventory.billing.search-products") }}';
     const STUDENT_SEARCH_URL = '{{ route("school.inventory.billing.search-students") }}';
     const RECEIPT_BASE_URL = '{{ url("/inventory/billing/receipt") }}';
     const SCHOOL_INFO = @json($school ?? (object)[]);
@@ -660,13 +812,13 @@
 
 <script>
     // ─────────────────────────────────────────────────────────────────────────
-    // Cart State & Logic
+    // Cart State & Initialization
     // ─────────────────────────────────────────────────────────────────────────
     let cartItems = [];
     let selectedProductForAdd = null;
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Pre-populate with starter sample if empty matching Image 2
+        // Pre-populate demo item matching Image 2
         if (INITIAL_PRODUCTS.length > 0) {
             const englishProd = INITIAL_PRODUCTS.find(p => p.name && p.name.toLowerCase().includes('english')) || INITIAL_PRODUCTS[0];
             if (englishProd) {
@@ -674,9 +826,9 @@
             }
         }
 
-        setupProductSearch();
-        setupStudentSearch();
-        setupEventListeners();
+        setupProductAutocomplete();
+        setupStudentAutocomplete();
+        setupEvents();
     });
 
     // Add Item to Cart
@@ -684,7 +836,6 @@
         qty = parseInt(qty) || 1;
         discount = parseFloat(discount) || 0;
 
-        // Get available sizes & stocks
         let stocks = product.stocks || [];
         let sizes = [];
         if (stocks.length > 0) {
@@ -697,12 +848,10 @@
 
         let size = defaultSize || sizes[0] || 'Free';
 
-        // Check if item with same ID and size exists
         let existingIndex = cartItems.findIndex(i => i.product_id === product.id && i.size === size);
         if (existingIndex > -1) {
             cartItems[existingIndex].quantity += qty;
         } else {
-            // Find stock details for this size
             let stockObj = stocks.find(s => s.size === size) || stocks[0] || null;
             let price = stockObj && stockObj.price ? parseFloat(stockObj.price) : parseFloat(product.price || 0);
             let mrp = stockObj && stockObj.mrp ? parseFloat(stockObj.mrp) : parseFloat(product.mrp || (price * 1.2));
@@ -731,12 +880,11 @@
     // Render Cart Table (Step 1 - Image 2)
     function renderCartTable() {
         const tbody = document.getElementById('cart-table-body');
-        const emptyRow = document.getElementById('empty-cart-row');
-        const checkoutBtn = document.getElementById('btn-proceed-to-checkout');
+        const checkoutBtn = document.getElementById('btn-proceed-checkout');
 
         if (cartItems.length === 0) {
             tbody.innerHTML = `
-                <tr id="empty-cart-row">
+                <tr>
                     <td colspan="9" class="text-muted py-5" style="text-align: center;">
                         <i class="fas fa-cart-shopping fa-2x mb-2 d-block text-secondary opacity-50"></i>
                         Your cart is empty. Type a product name above to add items.
@@ -754,9 +902,7 @@
             const lineTotal = (item.price * item.quantity) - item.discount;
             const formattedTotal = '₹ ' + formatNumber(lineTotal);
             const formattedPrice = '₹ ' + formatNumber(item.price);
-            const stockClass = item.avl_qty > 0 ? 'stock-badge-green' : 'stock-badge-green';
 
-            // Size Options dropdown
             let sizeOptions = '';
             item.available_sizes.forEach(sz => {
                 sizeOptions += `<option value="${sz}" ${sz === item.size ? 'selected' : ''}>${sz}</option>`;
@@ -770,24 +916,24 @@
                     </td>
                     <td>${formattedPrice}</td>
                     <td>
-                        <input type="number" min="1" class="cart-qty-input" value="${item.quantity}" 
-                               onchange="updateItemQty(${index}, this.value)">
+                        <input type="number" min="1" class="table-cell-input" value="${item.quantity}" 
+                               onchange="updateQty(${index}, this.value)">
                     </td>
                     <td>
-                        <input type="number" min="0" step="0.01" class="cart-disc-input" value="${item.discount}" 
-                               onchange="updateItemDiscount(${index}, this.value)">
+                        <input type="number" min="0" step="0.01" class="table-cell-input" value="${item.discount}" 
+                               onchange="updateDiscount(${index}, this.value)">
                     </td>
                     <td>
-                        <span class="${stockClass}">${item.avl_qty}</span>
+                        <span class="stock-count-green">${item.avl_qty}</span>
                     </td>
                     <td class="fw-bold text-dark">${formattedTotal}</td>
                     <td>
-                        <select class="cart-size-select" onchange="updateItemSize(${index}, this.value)">
+                        <select class="table-cell-select" onchange="updateSize(${index}, this.value)">
                             ${sizeOptions}
                         </select>
                     </td>
                     <td>
-                        <button type="button" class="btn-trash-action" title="Remove" onclick="removeItem(${index})">
+                        <button type="button" class="btn-trash-delete" title="Remove" onclick="deleteCartRow(${index})">
                             <i class="fas fa-trash-can"></i>
                         </button>
                     </td>
@@ -798,50 +944,46 @@
         tbody.innerHTML = html;
     }
 
-    // Update Quantity
-    function updateItemQty(index, val) {
+    function updateQty(index, val) {
         let q = parseInt(val) || 1;
         if (q < 1) q = 1;
         cartItems[index].quantity = q;
         renderCartTable();
     }
 
-    // Update Discount
-    function updateItemDiscount(index, val) {
+    function updateDiscount(index, val) {
         let d = parseFloat(val) || 0;
         if (d < 0) d = 0;
         cartItems[index].discount = d;
         renderCartTable();
     }
 
-    // Update Size & update price/stock for that size
-    function updateItemSize(index, newSize) {
+    function updateSize(index, newSize) {
         let item = cartItems[index];
         item.size = newSize;
 
         if (item.raw_stocks && item.raw_stocks.length > 0) {
-            let matchedStock = item.raw_stocks.find(s => s.size === newSize);
-            if (matchedStock) {
-                if (matchedStock.price) item.price = parseFloat(matchedStock.price);
-                if (matchedStock.mrp) item.mrp = parseFloat(matchedStock.mrp);
-                item.avl_qty = parseInt(matchedStock.stock);
+            let matched = item.raw_stocks.find(s => s.size === newSize);
+            if (matched) {
+                if (matched.price) item.price = parseFloat(matched.price);
+                if (matched.mrp) item.mrp = parseFloat(matched.mrp);
+                item.avl_qty = parseInt(matched.stock);
             }
         }
 
         renderCartTable();
     }
 
-    // Remove Item
-    function removeItem(index) {
+    function deleteCartRow(index) {
         cartItems.splice(index, 1);
         renderCartTable();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Step 2: Checkout Review & Calculations (Matching Image 3)
+    // Step 2: Checkout Review & Calculations (Image 3)
     // ─────────────────────────────────────────────────────────────────────────
-    function populateCheckoutStep() {
-        const tbody = document.getElementById('checkout-review-body');
+    function populateCheckoutReview() {
+        const tbody = document.getElementById('checkout-summary-body');
         let html = '';
 
         let totalMrp = 0;
@@ -879,30 +1021,29 @@
 
         let grandTotal = totalPrice - totalDiscount + totalTax;
 
-        document.getElementById('summary-total-mrp').innerText = '₹ ' + formatNumber(totalMrp);
-        document.getElementById('summary-total-price').innerText = '₹ ' + formatNumber(totalPrice);
-        document.getElementById('summary-total-discount').innerText = '₹ ' + formatNumber(totalDiscount);
-        document.getElementById('summary-total-tax').innerText = '₹ ' + formatNumber(totalTax);
-        document.getElementById('summary-grand-total').innerText = '₹ ' + formatNumber(grandTotal);
+        document.getElementById('summary-mrp').innerText = '₹ ' + formatNumber(totalMrp);
+        document.getElementById('summary-price').innerText = '₹ ' + formatNumber(totalPrice);
+        document.getElementById('summary-discount').innerText = '₹ ' + formatNumber(totalDiscount);
+        document.getElementById('summary-tax').innerText = '₹ ' + formatNumber(totalTax);
+        document.getElementById('summary-grand').innerText = '₹ ' + formatNumber(grandTotal);
 
-        // Pre-fill payable amount in student form
         const payableInput = document.getElementById('cust-payable-amount');
         payableInput.value = grandTotal.toFixed(2);
-        updateBalanceDue();
+        calcBalanceDue();
     }
 
-    function updateBalanceDue() {
-        let grandTotalText = document.getElementById('summary-grand-total').innerText.replace(/[₹\s,]/g, '');
-        let grandTotal = parseFloat(grandTotalText) || 0;
+    function calcBalanceDue() {
+        let grandText = document.getElementById('summary-grand').innerText.replace(/[₹\s,]/g, '');
+        let grand = parseFloat(grandText) || 0;
         let payable = parseFloat(document.getElementById('cust-payable-amount').value) || 0;
-        let balanceDue = Math.max(0, grandTotal - payable);
+        let balanceDue = Math.max(0, grand - payable);
         document.getElementById('label-balance-due').innerText = balanceDue.toFixed(2);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Search Autocomplete (Products & Students)
+    // Autocomplete Logic
     // ─────────────────────────────────────────────────────────────────────────
-    function setupProductSearch() {
+    function setupProductAutocomplete() {
         const input = document.getElementById('search-product-input');
         const list = document.getElementById('product-typeahead-list');
 
@@ -913,13 +1054,12 @@
                 return;
             }
 
-            // Filter from INITIAL_PRODUCTS or call API
             let matches = INITIAL_PRODUCTS.filter(p => 
                 p.name.toLowerCase().includes(query) || 
                 (p.category && (p.category.name || p.category).toLowerCase().includes(query))
             );
 
-            renderProductDropdown(matches);
+            renderProductResults(matches);
         });
 
         input.addEventListener('focus', function() {
@@ -928,7 +1068,20 @@
             }
         });
 
-        // Hide on click outside
+        // Enter key on Product search or Quantity adds directly
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                autoAddFromInput();
+            }
+        });
+        document.getElementById('search-quantity-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                autoAddFromInput();
+            }
+        });
+
         document.addEventListener('click', function(e) {
             if (!input.contains(e.target) && !list.contains(e.target)) {
                 list.style.display = 'none';
@@ -936,10 +1089,10 @@
         });
     }
 
-    function renderProductDropdown(products) {
+    function renderProductResults(products) {
         const list = document.getElementById('product-typeahead-list');
         if (products.length === 0) {
-            list.innerHTML = `<div class="p-3 text-muted text-center small">No matching products found.</div>`;
+            list.innerHTML = `<div class="p-3 text-muted text-center small">No matching products found. Press Enter to add custom item.</div>`;
             list.style.display = 'block';
             return;
         }
@@ -948,12 +1101,12 @@
         products.forEach(p => {
             let cat = p.category?.name || p.category || 'General';
             html += `
-                <div class="typeahead-item" onclick="selectProductFromSearch(${p.id})">
+                <div class="typeahead-option" onclick="pickProduct(${p.id})">
                     <div>
-                        <div class="typeahead-title">${escapeHtml(p.name)}</div>
-                        <div class="typeahead-sub">Category: ${escapeHtml(cat)} | Stock: ${p.total_stock}</div>
+                        <div class="typeahead-name">${escapeHtml(p.name)}</div>
+                        <div class="typeahead-meta">Category: ${escapeHtml(cat)} | Stock: ${p.total_stock}</div>
                     </div>
-                    <div class="typeahead-badge">₹ ${formatNumber(p.price)}</div>
+                    <div class="typeahead-price-badge">₹ ${formatNumber(p.price)}</div>
                 </div>
             `;
         });
@@ -962,35 +1115,61 @@
         list.style.display = 'block';
     }
 
-    function selectProductFromSearch(productId) {
+    function pickProduct(productId) {
         let product = INITIAL_PRODUCTS.find(p => p.id === productId);
         if (!product) return;
 
-        selectedProductForAdd = product;
-        document.getElementById('search-product-input').value = product.name;
+        let qty = parseInt(document.getElementById('search-quantity-input').value) || 1;
+        addItemToCart(product, qty);
+
+        document.getElementById('search-product-input').value = '';
+        document.getElementById('search-quantity-input').value = '1';
         document.getElementById('product-typeahead-list').style.display = 'none';
-        document.getElementById('search-quantity-input').focus();
     }
 
-    function setupStudentSearch() {
+    function autoAddFromInput() {
+        let name = document.getElementById('search-product-input').value.trim();
+        let qty = parseInt(document.getElementById('search-quantity-input').value) || 1;
+
+        if (!name) return;
+
+        let matched = INITIAL_PRODUCTS.find(p => p.name.toLowerCase() === name.toLowerCase()) || {
+            id: Math.floor(1000 + Math.random() * 9000),
+            name: name,
+            price: 100.00,
+            mrp: 120.00,
+            tax: 0.00,
+            total_stock: 50,
+            stocks: [{ size: 'Free', stock: 50, price: 100, mrp: 120 }],
+            selected_sizes: ['Free']
+        };
+
+        addItemToCart(matched, qty);
+
+        document.getElementById('search-product-input').value = '';
+        document.getElementById('search-quantity-input').value = '1';
+        document.getElementById('product-typeahead-list').style.display = 'none';
+    }
+
+    function setupStudentAutocomplete() {
         const input = document.getElementById('cust-admission-no');
         const list = document.getElementById('student-typeahead-list');
 
-        let debounceTimeout;
+        let timer;
         input.addEventListener('input', function() {
-            clearTimeout(debounceTimeout);
+            clearTimeout(timer);
             const query = this.value.trim();
             if (!query) {
                 list.style.display = 'none';
                 return;
             }
 
-            debounceTimeout = setTimeout(() => {
+            timer = setTimeout(() => {
                 fetch(`${STUDENT_SEARCH_URL}?admission_no=${encodeURIComponent(query)}`)
                     .then(res => res.json())
                     .then(data => {
                         if (data.success && data.students && data.students.length > 0) {
-                            renderStudentDropdown(data.students);
+                            renderStudentResults(data.students);
                         } else {
                             list.style.display = 'none';
                         }
@@ -1008,15 +1187,15 @@
         });
     }
 
-    function renderStudentDropdown(students) {
+    function renderStudentResults(students) {
         const list = document.getElementById('student-typeahead-list');
         let html = '';
         students.forEach(s => {
             html += `
-                <div class="typeahead-item" onclick='selectStudentFromSearch(${JSON.stringify(s)})'>
+                <div class="typeahead-option" onclick='pickStudent(${JSON.stringify(s)})'>
                     <div>
-                        <div class="typeahead-title">${escapeHtml(s.name)} (${escapeHtml(s.admission_no)})</div>
-                        <div class="typeahead-sub">Phone: ${escapeHtml(s.mobile || '—')} | ${escapeHtml(s.class_name || '')}</div>
+                        <div class="typeahead-name">${escapeHtml(s.name)} (${escapeHtml(s.admission_no)})</div>
+                        <div class="typeahead-meta">Phone: ${escapeHtml(s.mobile || '—')} | ${escapeHtml(s.class_name || '')}</div>
                     </div>
                 </div>
             `;
@@ -1025,7 +1204,7 @@
         list.style.display = 'block';
     }
 
-    function selectStudentFromSearch(student) {
+    function pickStudent(student) {
         document.getElementById('cust-admission-no').value = student.admission_no || '';
         document.getElementById('cust-name').value = student.name || '';
         document.getElementById('cust-address').value = student.address || '';
@@ -1034,78 +1213,38 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Event Listeners & Navigation
+    // Event Setup
     // ─────────────────────────────────────────────────────────────────────────
-    function setupEventListeners() {
-        // Add Button
-        document.getElementById('btn-add-to-cart').addEventListener('click', function() {
-            let prodName = document.getElementById('search-product-input').value.trim();
-            let qty = parseInt(document.getElementById('search-quantity-input').value) || 1;
-
-            if (!prodName) {
-                alert('Please enter or select a product name.');
-                return;
-            }
-
-            let product = selectedProductForAdd;
-            if (!product || product.name.toLowerCase() !== prodName.toLowerCase()) {
-                product = INITIAL_PRODUCTS.find(p => p.name.toLowerCase() === prodName.toLowerCase()) || {
-                    id: randId(),
-                    name: prodName,
-                    price: 100.00,
-                    mrp: 120.00,
-                    tax: 0.00,
-                    total_stock: 50,
-                    stocks: [{ size: 'Free', stock: 50, price: 100, mrp: 120 }],
-                    selected_sizes: ['Free']
-                };
-            }
-
-            addItemToCart(product, qty);
-
-            // Reset input
-            document.getElementById('search-product-input').value = '';
-            document.getElementById('search-quantity-input').value = '1';
-            selectedProductForAdd = null;
-        });
-
-        // Enter key on quantity adds item
-        document.getElementById('search-quantity-input').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.getElementById('btn-add-to-cart').click();
-            }
-        });
-
+    function setupEvents() {
         // Proceed to Checkout
-        document.getElementById('btn-proceed-to-checkout').addEventListener('click', function() {
+        document.getElementById('btn-proceed-checkout').addEventListener('click', function() {
             if (cartItems.length === 0) return;
-            populateCheckoutStep();
-            document.getElementById('step-1-container').classList.remove('active');
-            document.getElementById('step-2-container').classList.add('active');
+            populateCheckoutReview();
+            document.getElementById('step-1-block').classList.remove('active');
+            document.getElementById('step-2-block').classList.add('active');
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
 
-        // Back to Cart Buttons
-        const backToCart = () => {
-            document.getElementById('step-2-container').classList.remove('active');
-            document.getElementById('step-1-container').classList.add('active');
+        // Back to Cart
+        const goBack = () => {
+            document.getElementById('step-2-block').classList.remove('active');
+            document.getElementById('step-1-block').classList.add('active');
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
-        document.getElementById('btn-back-to-cart-top').addEventListener('click', backToCart);
-        document.getElementById('btn-back-to-cart-bottom').addEventListener('click', backToCart);
+        document.getElementById('btn-edit-cart-top').addEventListener('click', goBack);
+        document.getElementById('btn-back-to-cart').addEventListener('click', goBack);
 
-        // Payable Amount Change
-        document.getElementById('cust-payable-amount').addEventListener('input', updateBalanceDue);
+        // Payable Amount Input Change
+        document.getElementById('cust-payable-amount').addEventListener('input', calcBalanceDue);
 
-        // Confirm Order Submit
-        document.getElementById('btn-confirm-order').addEventListener('click', handleOrderSubmission);
+        // Confirm Order Button
+        document.getElementById('btn-confirm-order').addEventListener('click', submitOrder);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Order Submission & Receipt Generation (Image 4)
     // ─────────────────────────────────────────────────────────────────────────
-    function handleOrderSubmission() {
+    function submitOrder() {
         const name = document.getElementById('cust-name').value.trim();
         const address = document.getElementById('cust-address').value.trim();
         const mobile = document.getElementById('cust-mobile').value.trim();
@@ -1113,7 +1252,7 @@
         const payableAmount = parseFloat(document.getElementById('cust-payable-amount').value);
 
         if (!name) {
-            alert('Please enter Student / Customer Name.');
+            alert('Please enter Name.');
             document.getElementById('cust-name').focus();
             return;
         }
@@ -1178,9 +1317,9 @@
             confirmBtn.innerHTML = `<i class="fas fa-check"></i> Confirm Order`;
 
             if (data.success && data.sale) {
-                displayReceiptModal(data.sale);
+                showReceiptModal(data.sale);
             } else {
-                alert(data.message || 'Error processing order.');
+                alert(data.message || 'Error creating order.');
             }
         })
         .catch(err => {
@@ -1188,18 +1327,14 @@
             confirmBtn.innerHTML = `<i class="fas fa-check"></i> Confirm Order`;
             console.error('Checkout error:', err);
 
-            // Fallback: Generate sample receipt directly for preview
-            const fallbackSale = buildFallbackSaleObject(payload);
-            displayReceiptModal(fallbackSale);
+            // Fallback Sale Generation
+            const fallback = generateFallbackSale(payload);
+            showReceiptModal(fallback);
         });
     }
 
-    function buildFallbackSaleObject(payload) {
-        let totalMrp = 0;
-        let subTotal = 0;
-        let totalDiscount = 0;
-        let totalTax = 0;
-
+    function generateFallbackSale(payload) {
+        let totalMrp = 0, subTotal = 0, totalDiscount = 0, totalTax = 0;
         let processed = payload.items.map(item => {
             let iTotMrp = item.mrp * item.quantity;
             let iTotPrice = item.price * item.quantity;
@@ -1232,7 +1367,7 @@
         let due = Math.max(0, grandTotal - paid);
 
         return {
-            id: randId(),
+            id: Math.floor(1000 + Math.random() * 9000),
             invoice_number: 'INV-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.floor(1000 + Math.random() * 9000),
             receipt_number: 'RCPT-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.floor(1000 + Math.random() * 9000),
             admission_no: payload.admission_no || '—',
@@ -1255,11 +1390,11 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Display Image 4 Receipt inside Modal
+    // Display Image 4 Receipt inside Custom Modal
     // ─────────────────────────────────────────────────────────────────────────
-    function displayReceiptModal(sale) {
-        const modalBody = document.getElementById('receipt-modal-body');
-        document.getElementById('modal-view-standalone-btn').href = `${RECEIPT_BASE_URL}/${sale.id}`;
+    function showReceiptModal(sale) {
+        const container = document.getElementById('receipt-modal-content-area');
+        document.getElementById('modal-standalone-link').href = `${RECEIPT_BASE_URL}/${sale.id}`;
 
         let rowsHtml = '';
         sale.items.forEach(item => {
@@ -1281,8 +1416,8 @@
         });
 
         const receiptHtml = `
-            <div class="printable-invoice-content" id="printable-receipt-content" style="font-family: Arial, sans-serif; color: #000;">
-                <!-- School Header -->
+            <div id="printable-receipt-view" style="font-family: Arial, sans-serif; color: #000;">
+                <!-- School Header (Minimal Template) -->
                 <div style="display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 12px;">
                     ${sale.school?.logo_url ? `<img src="${sale.school.logo_url}" style="max-height: 50px; margin-right: 12px;">` : ''}
                     <div style="text-align: center;">
@@ -1408,7 +1543,7 @@
                 <!-- Footer Signatures -->
                 <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; margin-top: 25px; padding-top: 8px;">
                     <div style="color: #64748b; font-style: italic; font-size: 10px;">
-                        * System Generated Receipt
+                        * System Generated Inventory Receipt
                     </div>
                     <div style="text-align: center; border-top: 1px solid #000; padding-top: 4px; width: 130px; font-weight: bold;">
                         Authorized Sign
@@ -1417,16 +1552,25 @@
             </div>
         `;
 
-        modalBody.innerHTML = receiptHtml;
-
-        const modalElement = new bootstrap.Modal(document.getElementById('receiptModal'));
-        modalElement.show();
+        container.innerHTML = receiptHtml;
+        document.getElementById('receiptModalOverlay').classList.add('open');
     }
 
-    function printReceiptModal() {
-        const printContent = document.getElementById('printable-receipt-content').innerHTML;
-        const originalContent = document.body.innerHTML;
+    function closeReceiptModal() {
+        document.getElementById('receiptModalOverlay').classList.remove('open');
+    }
 
+    function closeReceiptModalAndReset() {
+        closeReceiptModal();
+        cartItems = [];
+        renderCartTable();
+        document.getElementById('checkout-form').reset();
+        document.getElementById('step-2-block').classList.remove('active');
+        document.getElementById('step-1-block').classList.add('active');
+    }
+
+    function printModalReceipt() {
+        const printContent = document.getElementById('printable-receipt-view').innerHTML;
         const win = window.open('', '', 'height=700,width=900');
         win.document.write(`
             <html>
@@ -1455,16 +1599,8 @@
         }, 300);
     }
 
-    function resetCartForNewOrder() {
-        cartItems = [];
-        renderCartTable();
-        document.getElementById('checkout-form').reset();
-        document.getElementById('step-2-container').classList.remove('active');
-        document.getElementById('step-1-container').classList.add('active');
-    }
-
     // ─────────────────────────────────────────────────────────────────────────
-    // Utility Helpers
+    // Utility Formatting
     // ─────────────────────────────────────────────────────────────────────────
     function formatNumber(num) {
         return parseFloat(num || 0).toLocaleString('en-IN', {
@@ -1481,10 +1617,6 @@
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
-    }
-
-    function randId() {
-        return Math.floor(1000 + Math.random() * 9000);
     }
 </script>
 @endsection
