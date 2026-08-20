@@ -702,19 +702,20 @@
                 </div>
                 <div class="inv-card-body p-3">
                     <form id="checkout-form" onsubmit="return false;">
-                        <!-- Row 1: 4 Inputs -->
+                        <!-- Row 1: 4 Inputs with Live Dual Autocomplete -->
                         <div class="student-grid-4">
                             <div style="position: relative;">
                                 <label class="erp-label">Addmission No.(Optional)</label>
                                 <input type="text" id="cust-admission-no" class="erp-input" 
                                        placeholder="Enter Addmission No." autocomplete="off">
-                                <div id="student-typeahead-list" class="typeahead-results"></div>
+                                <div id="student-admission-typeahead-list" class="typeahead-results"></div>
                             </div>
 
-                            <div>
+                            <div style="position: relative;">
                                 <label class="erp-label">Name <span class="req">*</span></label>
                                 <input type="text" id="cust-name" class="erp-input" 
-                                       placeholder="Enter Name" required>
+                                       placeholder="Enter Student Name" autocomplete="off" required>
+                                <div id="student-name-typeahead-list" class="typeahead-results"></div>
                             </div>
 
                             <div>
@@ -1182,64 +1183,136 @@
     }
 
     function setupStudentAutocomplete() {
-        const input = document.getElementById('cust-admission-no');
-        const list = document.getElementById('student-typeahead-list');
+        const admInput = document.getElementById('cust-admission-no');
+        const admList = document.getElementById('student-admission-typeahead-list');
+        const nameInput = document.getElementById('cust-name');
+        const nameList = document.getElementById('student-name-typeahead-list');
 
+        // Setup autocomplete for both inputs
+        bindStudentInputSearch(admInput, admList);
+        bindStudentInputSearch(nameInput, nameList);
+
+        // Hide when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!admInput.contains(e.target) && !admList.contains(e.target)) {
+                admList.style.display = 'none';
+            }
+            if (!nameInput.contains(e.target) && !nameList.contains(e.target)) {
+                nameList.style.display = 'none';
+            }
+        });
+
+        // Fast match on change if address or mobile is empty
+        admInput.addEventListener('change', function() {
+            autoLookupStudentIfEmpty(this.value.trim());
+        });
+        nameInput.addEventListener('change', function() {
+            autoLookupStudentIfEmpty(this.value.trim());
+        });
+    }
+
+    function bindStudentInputSearch(inputElem, listElem) {
         let timer;
-        input.addEventListener('input', function() {
+        inputElem.addEventListener('input', function() {
             clearTimeout(timer);
             const query = this.value.trim();
-            if (!query) {
-                list.style.display = 'none';
+            if (!query || query.length < 1) {
+                listElem.style.display = 'none';
                 return;
             }
 
             timer = setTimeout(() => {
-                fetch(`${STUDENT_SEARCH_URL}?admission_no=${encodeURIComponent(query)}`)
+                fetch(`${STUDENT_SEARCH_URL}?q=${encodeURIComponent(query)}`)
                     .then(res => res.json())
                     .then(data => {
                         if (data.success && data.students && data.students.length > 0) {
-                            renderStudentResults(data.students);
+                            renderStudentDropdown(listElem, data.students);
                         } else {
-                            list.style.display = 'none';
+                            listElem.style.display = 'none';
                         }
                     })
                     .catch(() => {
-                        list.style.display = 'none';
+                        listElem.style.display = 'none';
                     });
-            }, 250);
+            }, 180);
         });
 
-        document.addEventListener('click', function(e) {
-            if (!input.contains(e.target) && !list.contains(e.target)) {
-                list.style.display = 'none';
+        inputElem.addEventListener('focus', function() {
+            if (this.value.trim() && listElem.children.length > 0) {
+                listElem.style.display = 'block';
             }
         });
     }
 
-    function renderStudentResults(students) {
-        const list = document.getElementById('student-typeahead-list');
+    function renderStudentDropdown(listElem, students) {
         let html = '';
         students.forEach(s => {
             html += `
                 <div class="typeahead-option" onclick='pickStudent(${JSON.stringify(s)})'>
                     <div>
-                        <div class="typeahead-name">${escapeHtml(s.name)} (${escapeHtml(s.admission_no)})</div>
-                        <div class="typeahead-meta">Phone: ${escapeHtml(s.mobile || '—')} | ${escapeHtml(s.class_name || '')}</div>
+                        <div class="typeahead-name">
+                            <i class="fas fa-user-graduate text-primary me-1"></i>
+                            ${escapeHtml(s.name)}
+                        </div>
+                        <div class="typeahead-meta">
+                            Adm: <strong class="text-dark">${escapeHtml(s.admission_no || '—')}</strong>
+                            ${s.class_name ? ` | Class: <strong>${escapeHtml(s.class_name)}</strong>` : ''}
+                            ${s.mobile ? ` | Phone: ${escapeHtml(s.mobile)}` : ''}
+                        </div>
+                    </div>
+                    <div class="typeahead-price-badge" style="background:#eff6ff; color:#1d4ed8; font-size:11px;">
+                        Select <i class="fas fa-check"></i>
                     </div>
                 </div>
             `;
         });
-        list.innerHTML = html;
-        list.style.display = 'block';
+        listElem.innerHTML = html;
+        listElem.style.display = 'block';
     }
 
     function pickStudent(student) {
-        document.getElementById('cust-admission-no').value = student.admission_no || '';
-        document.getElementById('cust-name').value = student.name || '';
-        document.getElementById('cust-address').value = student.address || '';
-        document.getElementById('cust-mobile').value = student.mobile || '';
-        document.getElementById('student-typeahead-list').style.display = 'none';
+        const admInput = document.getElementById('cust-admission-no');
+        const nameInput = document.getElementById('cust-name');
+        const addrInput = document.getElementById('cust-address');
+        const mobInput = document.getElementById('cust-mobile');
+
+        admInput.value = student.admission_no || '';
+        nameInput.value = student.name || '';
+        addrInput.value = student.address || '';
+        mobInput.value = student.mobile || '';
+
+        const admList = document.getElementById('student-admission-typeahead-list');
+        const nameList = document.getElementById('student-name-typeahead-list');
+        if (admList) admList.style.display = 'none';
+        if (nameList) nameList.style.display = 'none';
+
+        // Flash visual feedback highlight
+        [admInput, nameInput, addrInput, mobInput].forEach(elem => {
+            if (elem) {
+                elem.style.borderColor = '#10b981';
+                elem.style.boxShadow = '0 0 0 3.5px rgba(16, 185, 129, 0.25)';
+                setTimeout(() => {
+                    elem.style.borderColor = '';
+                    elem.style.boxShadow = '';
+                }, 900);
+            }
+        });
+    }
+
+    function autoLookupStudentIfEmpty(query) {
+        if (!query) return;
+        const addrInput = document.getElementById('cust-address');
+        const mobInput = document.getElementById('cust-mobile');
+        if (addrInput.value.trim() && mobInput.value.trim()) return;
+
+        fetch(`${STUDENT_SEARCH_URL}?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && data.students && data.students.length === 1) {
+                    pickStudent(data.students[0]);
+                }
+            })
+            .catch(() => {});
     }
 
     // ─────────────────────────────────────────────────────────────────────────

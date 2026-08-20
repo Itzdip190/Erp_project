@@ -1152,12 +1152,12 @@ class InventoryController extends Controller
     }
 
     /**
-     * Search students via Ajax for Admission Number Auto-fill
+     * Search students via Ajax for Admission Number & Name Auto-fill
      */
     public function searchStudents(Request $request)
     {
         $schoolId = $this->getActiveSchoolId();
-        $query = trim($request->input('q', $request->input('admission_no', '')));
+        $query = trim($request->input('q', $request->input('admission_no', $request->input('name', ''))));
 
         if (empty($query)) {
             return response()->json(['success' => true, 'students' => []]);
@@ -1173,24 +1173,31 @@ class InventoryController extends Controller
                 $q->where('admission_number', 'LIKE', "%{$query}%")
                   ->orWhere('first_name', 'LIKE', "%{$query}%")
                   ->orWhere('last_name', 'LIKE', "%{$query}%")
+                  ->orWhereRaw("CONCAT(COALESCE(first_name,''), ' ', COALESCE(last_name,'')) LIKE ?", ["%{$query}%"])
                   ->orWhere('phone', 'LIKE', "%{$query}%")
-                  ->orWhere('emergency_contact', 'LIKE', "%{$query}%");
+                  ->orWhere('whatsapp_number', 'LIKE', "%{$query}%")
+                  ->orWhere('father_phone', 'LIKE', "%{$query}%")
+                  ->orWhere('mother_phone', 'LIKE', "%{$query}%");
             });
 
-            $students = $sQuery->limit(10)->get()->map(function($s) {
+            $students = $sQuery->limit(15)->get()->map(function($s) {
                 $addressParts = array_filter([
                     $s->address,
                     $s->address_line_2,
                     $s->city,
                     $s->pincode
                 ]);
-                $formattedAddress = !empty($addressParts) ? implode(', ', $addressParts) : ($s->address ?? '');
+                $formattedAddress = !empty($addressParts) ? implode(', ', $addressParts) : ($s->address ?: ($s->permanent_address ?: ''));
+
+                $mobileNumber = $s->phone ?: ($s->whatsapp_number ?: ($s->emergency_contact ?: ($s->father_phone ?: ($s->mother_phone ?: ''))));
+
+                $fullName = trim(($s->first_name ?? '') . ' ' . ($s->last_name ?? ''));
 
                 return [
                     'id' => $s->id,
-                    'admission_no' => $s->admission_number,
-                    'name' => trim(($s->first_name ?? '') . ' ' . ($s->last_name ?? '')),
-                    'mobile' => $s->phone ?: ($s->emergency_contact ?: ($s->father_phone ?: ($s->mother_phone ?: ''))),
+                    'admission_no' => $s->admission_number ?? '',
+                    'name' => $fullName,
+                    'mobile' => $mobileNumber,
                     'address' => $formattedAddress,
                     'class_name' => optional($s->class)->name ?? '',
                     'section_name' => optional($s->section)->name ?? '',
