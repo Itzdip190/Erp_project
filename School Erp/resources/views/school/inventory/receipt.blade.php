@@ -62,6 +62,25 @@
     $paidAmount = (float)($sale->paid_amount ?? $grandTotal);
     $dueAmount = (float)($sale->due_amount ?? max(0, $grandTotal - $paidAmount));
 
+    // Calculate tax percent if available
+    $taxRateLabel = 'Tax / GST';
+    $firstItemTaxPct = 0;
+    foreach ($items as $it) {
+        if (!empty($it->tax_percent) && floatval($it->tax_percent) > 0) {
+            $firstItemTaxPct = floatval($it->tax_percent);
+            break;
+        } elseif (!empty($it->tax) && floatval($it->tax) > 0) {
+            $firstItemTaxPct = floatval($it->tax);
+            break;
+        }
+    }
+    if ($firstItemTaxPct > 0) {
+        $taxRateLabel = 'Tax / GST (' . round($firstItemTaxPct, 1) . '%)';
+    }
+
+    // Ratio of paid amount for proportional distribution across rows
+    $paidRatio = ($grandTotal > 0) ? min(1.0, $paidAmount / $grandTotal) : 1.0;
+
     $schoolLogo = (!empty($school->logo) && \Illuminate\Support\Facades\Storage::disk('public')->exists($school->logo))
         ? \Illuminate\Support\Facades\Storage::disk('public')->url($school->logo)
         : null;
@@ -350,19 +369,13 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @php $sumActual = 0; $sumPaid = 0; $sumDue = 0; @endphp
                     @forelse($items as $item)
                         @php
                             $iPrice = (float)($item->price ?? 0);
                             $iQty = (int)($item->quantity ?? 1);
-                            $iTotPrice = (float)($item->total_price ?? ($iPrice * $iQty));
-                            $iDiscount = (float)($item->discount ?? 0);
-                            $iTax = (float)($item->total_tax ?? 0);
-                            $iNet = $iTotPrice - $iDiscount + $iTax;
-
-                            $sumActual += $iNet;
-                            $sumPaid += $iNet;
-                            $sumDue += 0;
+                            $iTotBase = (float)($item->total_price ?? ($iPrice * $iQty));
+                            $iPaidBase = round($iTotBase * $paidRatio, 2);
+                            $iDueBase = max(0, $iTotBase - $iPaidBase);
                         @endphp
                         <tr>
                             <td style="text-align: left;">
@@ -374,25 +387,52 @@
                                     x {{ $iQty }}
                                 @endif
                             </td>
-                            <td style="text-align: right;">{{ number_format($iNet, 0) }}</td>
-                            <td style="text-align: right;">{{ number_format($iNet, 0) }}</td>
-                            <td style="text-align: right;">0</td>
+                            <td style="text-align: right;">{{ number_format($iTotBase, 2) }}</td>
+                            <td style="text-align: right;">{{ number_format($iPaidBase, 2) }}</td>
+                            <td style="text-align: right;">{{ number_format($iDueBase, 2) }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td style="text-align: left;">Inventory Items</td>
-                            <td style="text-align: right;">{{ number_format($grandTotal, 0) }}</td>
-                            <td style="text-align: right;">{{ number_format($paidAmount, 0) }}</td>
-                            <td style="text-align: right;">{{ number_format($dueAmount, 0) }}</td>
+                            <td style="text-align: left;">Sub Total (Products)</td>
+                            <td style="text-align: right;">{{ number_format($subTotal, 2) }}</td>
+                            <td style="text-align: right;">{{ number_format(round($subTotal * $paidRatio, 2), 2) }}</td>
+                            <td style="text-align: right;">{{ number_format(max(0, $subTotal - round($subTotal * $paidRatio, 2)), 2) }}</td>
                         </tr>
-                        @php $sumActual = $grandTotal; $sumPaid = $paidAmount; $sumDue = $dueAmount; @endphp
                     @endforelse
+
+                    {{-- Explicit Tax / GST Row --}}
+                    @if($totalTax > 0)
+                        @php
+                            $paidTax = round($totalTax * $paidRatio, 2);
+                            $dueTax = max(0, $totalTax - $paidTax);
+                        @endphp
+                        <tr>
+                            <td style="text-align: left; font-weight: bold; color: #1e293b;">
+                                <i class="fas fa-percent me-1" style="font-size: 9px;"></i> {{ $taxRateLabel }}
+                            </td>
+                            <td style="text-align: right; font-weight: bold;">{{ number_format($totalTax, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold;">{{ number_format($paidTax, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold;">{{ number_format($dueTax, 2) }}</td>
+                        </tr>
+                    @endif
+
+                    {{-- Explicit Discount Row (If applicable) --}}
+                    @if($totalDiscount > 0)
+                        <tr>
+                            <td style="text-align: left; font-style: italic; color: #dc2626;">
+                                Discount (-)
+                            </td>
+                            <td style="text-align: right; color: #dc2626;">-{{ number_format($totalDiscount, 2) }}</td>
+                            <td style="text-align: right;">—</td>
+                            <td style="text-align: right;">—</td>
+                        </tr>
+                    @endif
 
                     <tr class="total-row">
                         <td style="text-align: left;">TOTAL</td>
-                        <td style="text-align: right;">{{ number_format($grandTotal, 0) }}</td>
-                        <td style="text-align: right;">{{ number_format($paidAmount, 0) }}</td>
-                        <td style="text-align: right;">{{ number_format($dueAmount, 0) }}</td>
+                        <td style="text-align: right;">{{ number_format($grandTotal, 2) }}</td>
+                        <td style="text-align: right;">{{ number_format($paidAmount, 2) }}</td>
+                        <td style="text-align: right;">{{ number_format($dueAmount, 2) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -400,13 +440,26 @@
             <!-- PAID Box -->
             <div class="slip-paid-box">
                 <span>PAID</span>
-                <span>Rs {{ number_format($paidAmount, 0) }}</span>
+                <span>Rs {{ number_format($paidAmount, 2) }}</span>
             </div>
 
             <!-- Details Block -->
             <div class="slip-details-block">
                 <div>Total Amount Paid: <strong>{{ convertNumberToWordsInventory($paidAmount) }}</strong></div>
                 <div style="margin-top: 2px;">Mode of Payment: <strong>{{ $paymentMode }}</strong></div>
+                <div style="margin-top: 2px; font-size: 10px; color: #334155;">
+                    Breakdown: Base: <strong>₹{{ number_format($subTotal, 2) }}</strong>
+                    @if($totalTax > 0)
+                        | Tax: <strong>₹{{ number_format($totalTax, 2) }}</strong>
+                    @endif
+                    @if($totalDiscount > 0)
+                        | Discount: <strong>₹{{ number_format($totalDiscount, 2) }}</strong>
+                    @endif
+                    | Total: <strong>₹{{ number_format($grandTotal, 2) }}</strong>
+                    @if($dueAmount > 0)
+                        | <span style="color: #dc2626; font-weight: bold;">Due: ₹{{ number_format($dueAmount, 2) }}</span>
+                    @endif
+                </div>
                 <div style="margin-top: 2px;">Remarks: <strong>Fee Payment / Product Purchase</strong></div>
             </div>
 
@@ -473,10 +526,9 @@
                         @php
                             $iPrice = (float)($item->price ?? 0);
                             $iQty = (int)($item->quantity ?? 1);
-                            $iTotPrice = (float)($item->total_price ?? ($iPrice * $iQty));
-                            $iDiscount = (float)($item->discount ?? 0);
-                            $iTax = (float)($item->total_tax ?? 0);
-                            $iNet = $iTotPrice - $iDiscount + $iTax;
+                            $iTotBase = (float)($item->total_price ?? ($iPrice * $iQty));
+                            $iPaidBase = round($iTotBase * $paidRatio, 2);
+                            $iDueBase = max(0, $iTotBase - $iPaidBase);
                         @endphp
                         <tr>
                             <td style="text-align: left;">
@@ -488,24 +540,52 @@
                                     x {{ $iQty }}
                                 @endif
                             </td>
-                            <td style="text-align: right;">{{ number_format($iNet, 0) }}</td>
-                            <td style="text-align: right;">{{ number_format($iNet, 0) }}</td>
-                            <td style="text-align: right;">0</td>
+                            <td style="text-align: right;">{{ number_format($iTotBase, 2) }}</td>
+                            <td style="text-align: right;">{{ number_format($iPaidBase, 2) }}</td>
+                            <td style="text-align: right;">{{ number_format($iDueBase, 2) }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td style="text-align: left;">Inventory Items</td>
-                            <td style="text-align: right;">{{ number_format($grandTotal, 0) }}</td>
-                            <td style="text-align: right;">{{ number_format($paidAmount, 0) }}</td>
-                            <td style="text-align: right;">{{ number_format($dueAmount, 0) }}</td>
+                            <td style="text-align: left;">Sub Total (Products)</td>
+                            <td style="text-align: right;">{{ number_format($subTotal, 2) }}</td>
+                            <td style="text-align: right;">{{ number_format(round($subTotal * $paidRatio, 2), 2) }}</td>
+                            <td style="text-align: right;">{{ number_format(max(0, $subTotal - round($subTotal * $paidRatio, 2)), 2) }}</td>
                         </tr>
                     @endforelse
 
+                    {{-- Explicit Tax / GST Row --}}
+                    @if($totalTax > 0)
+                        @php
+                            $paidTax = round($totalTax * $paidRatio, 2);
+                            $dueTax = max(0, $totalTax - $paidTax);
+                        @endphp
+                        <tr>
+                            <td style="text-align: left; font-weight: bold; color: #1e293b;">
+                                <i class="fas fa-percent me-1" style="font-size: 9px;"></i> {{ $taxRateLabel }}
+                            </td>
+                            <td style="text-align: right; font-weight: bold;">{{ number_format($totalTax, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold;">{{ number_format($paidTax, 2) }}</td>
+                            <td style="text-align: right; font-weight: bold;">{{ number_format($dueTax, 2) }}</td>
+                        </tr>
+                    @endif
+
+                    {{-- Explicit Discount Row (If applicable) --}}
+                    @if($totalDiscount > 0)
+                        <tr>
+                            <td style="text-align: left; font-style: italic; color: #dc2626;">
+                                Discount (-)
+                            </td>
+                            <td style="text-align: right; color: #dc2626;">-{{ number_format($totalDiscount, 2) }}</td>
+                            <td style="text-align: right;">—</td>
+                            <td style="text-align: right;">—</td>
+                        </tr>
+                    @endif
+
                     <tr class="total-row">
                         <td style="text-align: left;">TOTAL</td>
-                        <td style="text-align: right;">{{ number_format($grandTotal, 0) }}</td>
-                        <td style="text-align: right;">{{ number_format($paidAmount, 0) }}</td>
-                        <td style="text-align: right;">{{ number_format($dueAmount, 0) }}</td>
+                        <td style="text-align: right;">{{ number_format($grandTotal, 2) }}</td>
+                        <td style="text-align: right;">{{ number_format($paidAmount, 2) }}</td>
+                        <td style="text-align: right;">{{ number_format($dueAmount, 2) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -513,13 +593,26 @@
             <!-- PAID Box -->
             <div class="slip-paid-box">
                 <span>PAID</span>
-                <span>Rs {{ number_format($paidAmount, 0) }}</span>
+                <span>Rs {{ number_format($paidAmount, 2) }}</span>
             </div>
 
             <!-- Details Block -->
             <div class="slip-details-block">
                 <div>Total Amount Paid: <strong>{{ convertNumberToWordsInventory($paidAmount) }}</strong></div>
                 <div style="margin-top: 2px;">Mode of Payment: <strong>{{ $paymentMode }}</strong></div>
+                <div style="margin-top: 2px; font-size: 10px; color: #334155;">
+                    Breakdown: Base: <strong>₹{{ number_format($subTotal, 2) }}</strong>
+                    @if($totalTax > 0)
+                        | Tax: <strong>₹{{ number_format($totalTax, 2) }}</strong>
+                    @endif
+                    @if($totalDiscount > 0)
+                        | Discount: <strong>₹{{ number_format($totalDiscount, 2) }}</strong>
+                    @endif
+                    | Total: <strong>₹{{ number_format($grandTotal, 2) }}</strong>
+                    @if($dueAmount > 0)
+                        | <span style="color: #dc2626; font-weight: bold;">Due: ₹{{ number_format($dueAmount, 2) }}</span>
+                    @endif
+                </div>
                 <div style="margin-top: 2px;">Remarks: <strong>Fee Payment / Product Purchase</strong></div>
             </div>
 

@@ -1556,16 +1556,39 @@
         const admissionNo = sale.admission_no || 'JPPS06';
         const classSection = sale.class_name ? `${sale.class_name} ${sale.section_name || ''}`.trim() : (sale.class_section || 'NUR. A');
         const paymentMode = sale.payment_mode ? (sale.payment_mode.charAt(0).toUpperCase() + sale.payment_mode.slice(1)) : 'Cash';
-        const paidAmount = parseFloat(sale.paid_amount || sale.grand_total || 0);
-        const grandTotal = parseFloat(sale.grand_total || paidAmount);
-        const dueAmount = parseFloat(sale.due_amount || 0);
+        
+        const subTotal = parseFloat(sale.sub_total || 0);
+        const totalTax = parseFloat(sale.total_tax || 0);
+        const totalDiscount = parseFloat(sale.total_discount || 0);
+        const grandTotal = parseFloat(sale.grand_total || (subTotal - totalDiscount + totalTax));
+        const paidAmount = parseFloat(sale.paid_amount || grandTotal);
+        const dueAmount = parseFloat(sale.due_amount || Math.max(0, grandTotal - paidAmount));
+
+        // Proportional paid ratio for line-item accuracy
+        const paidRatio = (grandTotal > 0) ? Math.min(1.0, paidAmount / grandTotal) : 1.0;
+
+        // Detect Tax Rate label if available
+        let taxRateLabel = 'Tax / GST';
+        if (sale.items && sale.items.length > 0) {
+            for (let it of sale.items) {
+                let pct = parseFloat(it.tax_percent || it.tax || 0);
+                if (pct > 0) {
+                    taxRateLabel = `Tax / GST (${pct}%)`;
+                    break;
+                }
+            }
+        }
 
         // Build item rows for both slips
         let itemsHtml = '';
         if (sale.items && sale.items.length > 0) {
             sale.items.forEach(item => {
-                const itemNet = parseFloat(item.total_amount || (item.price * item.quantity));
+                const itemPrice = parseFloat(item.price || 0);
                 const itemQty = parseInt(item.quantity || 1);
+                const itemTotBase = parseFloat(item.total_price || (itemPrice * itemQty));
+                const itemPaidBase = Math.round(itemTotBase * paidRatio * 100) / 100;
+                const itemDueBase = Math.max(0, itemTotBase - itemPaidBase);
+
                 const itemSize = (item.size && item.size !== 'Free') ? ` (${item.size})` : '';
                 const itemQtyLabel = itemQty > 1 ? ` x ${itemQty}` : '';
                 const compName = `${escapeHtml(item.product_name || item.name)}${itemSize}${itemQtyLabel}`;
@@ -1573,19 +1596,51 @@
                 itemsHtml += `
                     <tr>
                         <td style="border: 1px solid #000; padding: 4px 6px; text-align: left;">${compName}</td>
-                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(itemNet)}</td>
-                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(itemNet)}</td>
-                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">0</td>
+                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(itemTotBase)}</td>
+                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(itemPaidBase)}</td>
+                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(itemDueBase)}</td>
                     </tr>
                 `;
             });
         } else {
+            const paidBase = Math.round(subTotal * paidRatio * 100) / 100;
+            const dueBase = Math.max(0, subTotal - paidBase);
             itemsHtml += `
                 <tr>
-                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: left;">Inventory Purchase</td>
-                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(grandTotal)}</td>
-                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(paidAmount)}</td>
-                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(dueAmount)}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: left;">Sub Total (Products)</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(subTotal)}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(paidBase)}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(dueBase)}</td>
+                </tr>
+            `;
+        }
+
+        // Add Tax / GST row if tax > 0
+        if (totalTax > 0) {
+            const paidTax = Math.round(totalTax * paidRatio * 100) / 100;
+            const dueTax = Math.max(0, totalTax - paidTax);
+            itemsHtml += `
+                <tr>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: left; font-weight: bold; color: #1e293b;">
+                        <i class="fas fa-percent" style="font-size: 9px; margin-right: 3px;"></i> ${taxRateLabel}
+                    </td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right; font-weight: bold;">${formatNumber(totalTax)}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right; font-weight: bold;">${formatNumber(paidTax)}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right; font-weight: bold;">${formatNumber(dueTax)}</td>
+                </tr>
+            `;
+        }
+
+        // Add Discount row if discount > 0
+        if (totalDiscount > 0) {
+            itemsHtml += `
+                <tr>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: left; font-style: italic; color: #dc2626;">
+                        Discount (-)
+                    </td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right; color: #dc2626;">-${formatNumber(totalDiscount)}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">—</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">—</td>
                 </tr>
             `;
         }
@@ -1659,6 +1714,13 @@
                 <div style="font-size: 10.5px; line-height: 1.4; margin-bottom: 22px;">
                     <div>Total Amount Paid: <strong>${amountInWords}</strong></div>
                     <div style="margin-top: 2px;">Mode of Payment: <strong>${escapeHtml(paymentMode)}</strong></div>
+                    <div style="margin-top: 2px; font-size: 10px; color: #334155;">
+                        Breakdown: Base: <strong>₹${formatNumber(subTotal)}</strong>
+                        ${totalTax > 0 ? ` | Tax: <strong>₹${formatNumber(totalTax)}</strong>` : ''}
+                        ${totalDiscount > 0 ? ` | Discount: <strong>₹${formatNumber(totalDiscount)}</strong>` : ''}
+                        | Total: <strong>₹${formatNumber(grandTotal)}</strong>
+                        ${dueAmount > 0 ? ` | <span style="color: #dc2626; font-weight: bold;">Due: ₹${formatNumber(dueAmount)}</span>` : ''}
+                    </div>
                     <div style="margin-top: 2px;">Remarks: <strong>Fee Payment / Product Purchase</strong></div>
                 </div>
 
