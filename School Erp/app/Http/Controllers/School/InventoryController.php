@@ -1385,6 +1385,16 @@ class InventoryController extends Controller
             ];
         }
 
+        $className = '';
+        $sectionName = '';
+        if ($studentId && \Illuminate\Support\Facades\Schema::hasTable('students')) {
+            $studentObj = \App\Models\Student::with(['class', 'section'])->find($studentId);
+            if ($studentObj) {
+                $className = optional($studentObj->class)->name ?? '';
+                $sectionName = optional($studentObj->section)->name ?? '';
+            }
+        }
+
         $responsePayload = [
             'id' => $saleId ?: rand(100, 999),
             'invoice_number' => $invoiceNumber,
@@ -1393,6 +1403,9 @@ class InventoryController extends Controller
             'customer_name' => $customerName,
             'customer_address' => $customerAddress,
             'customer_mobile' => $customerMobile,
+            'class_name' => $className,
+            'section_name' => $sectionName,
+            'class_section' => trim($className . ' ' . $sectionName) ?: '—',
             'payment_mode' => $paymentMode,
             'reference_no' => $referenceNo,
             'total_mrp' => number_format($totalMrp, 2, '.', ''),

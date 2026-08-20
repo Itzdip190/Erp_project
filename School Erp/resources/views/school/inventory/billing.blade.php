@@ -1493,169 +1493,153 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Display Image 4 Receipt inside Custom Modal
+    // Display Dual-Copy Minimal Receipt (Matching User's Screenshot)
     // ─────────────────────────────────────────────────────────────────────────
     function showReceiptModal(sale) {
         const container = document.getElementById('receipt-modal-content-area');
         document.getElementById('modal-standalone-link').href = `${RECEIPT_BASE_URL}/${sale.id}`;
 
-        let rowsHtml = '';
-        sale.items.forEach(item => {
-            rowsHtml += `
+        const schoolName = sale.school?.name || 'VEDANT PUBLIC SCHOOL';
+        const schoolAddress = sale.school?.address || 'Sctor 88A Gurgaon, Hariyana';
+        const schoolPhone = sale.school?.phone || '9451805575';
+        const schoolEmail = sale.school?.email || 'vedantpublicschool@gmail.com';
+        const schoolLogo = sale.school?.logo_url || '';
+
+        const receiptNo = sale.receipt_number || (sale.invoice_number || 'VPS-000010');
+        const receiptDate = sale.date_formatted || (sale.sale_date || new Date().toLocaleDateString('en-GB'));
+        const customerName = sale.customer_name || 'ATHARVA DIWEDI';
+        const admissionNo = sale.admission_no || 'JPPS06';
+        const classSection = sale.class_name ? `${sale.class_name} ${sale.section_name || ''}`.trim() : (sale.class_section || 'NUR. A');
+        const paymentMode = sale.payment_mode ? (sale.payment_mode.charAt(0).toUpperCase() + sale.payment_mode.slice(1)) : 'Cash';
+        const paidAmount = parseFloat(sale.paid_amount || sale.grand_total || 0);
+        const grandTotal = parseFloat(sale.grand_total || paidAmount);
+        const dueAmount = parseFloat(sale.due_amount || 0);
+
+        // Build item rows for both slips
+        let itemsHtml = '';
+        if (sale.items && sale.items.length > 0) {
+            sale.items.forEach(item => {
+                const itemNet = parseFloat(item.total_amount || (item.price * item.quantity));
+                const itemQty = parseInt(item.quantity || 1);
+                const itemSize = (item.size && item.size !== 'Free') ? ` (${item.size})` : '';
+                const itemQtyLabel = itemQty > 1 ? ` x ${itemQty}` : '';
+                const compName = `${escapeHtml(item.product_name || item.name)}${itemSize}${itemQtyLabel}`;
+
+                itemsHtml += `
+                    <tr>
+                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: left;">${compName}</td>
+                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(itemNet)}</td>
+                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(itemNet)}</td>
+                        <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">0</td>
+                    </tr>
+                `;
+            });
+        } else {
+            itemsHtml += `
                 <tr>
-                    <td style="text-align: left;">${escapeHtml(item.product_name || item.name)}</td>
-                    <td style="text-align: left;">${escapeHtml(item.size || 'Free')}</td>
-                    <td>${formatNumber(item.mrp)}</td>
-                    <td>${formatNumber(item.price)}</td>
-                    <td>${formatNumber(item.tax_percent || item.tax || 0)}</td>
-                    <td>${item.quantity}</td>
-                    <td>${formatNumber(item.total_mrp)}</td>
-                    <td>${formatNumber(item.total_price)}</td>
-                    <td>${formatNumber(item.total_tax)}</td>
-                    <td>${formatNumber(item.discount)}</td>
-                    <td><strong>${formatNumber(item.total_amount)}</strong></td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: left;">Inventory Purchase</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(grandTotal)}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(paidAmount)}</td>
+                    <td style="border: 1px solid #000; padding: 4px 6px; text-align: right;">${formatNumber(dueAmount)}</td>
                 </tr>
             `;
-        });
+        }
 
-        const receiptHtml = `
-            <div id="printable-receipt-view" style="font-family: Arial, sans-serif; color: #000;">
-                <!-- School Header (Minimal Template) -->
-                <div style="display: flex; align-items: center; justify-content: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 12px;">
-                    ${sale.school?.logo_url ? `<img src="${sale.school.logo_url}" style="max-height: 50px; margin-right: 12px;">` : ''}
-                    <div style="text-align: center;">
-                        <h2 style="font-size: 17px; font-weight: 800; margin: 0; text-transform: uppercase;">${sale.school?.name || 'School ERP'}</h2>
-                        <p style="font-size: 11px; margin: 2px 0;">${sale.school?.address || ''}</p>
-                        <p style="font-size: 11px; margin: 0;">Phone: ${sale.school?.phone || '—'}</p>
+        const amountInWords = convertNumberToWordsJS(paidAmount);
+
+        // Function to build a single slip
+        const renderSingleSlip = (copyType) => `
+            <div style="flex: 1; padding: 8px 12px; font-family: Arial, Helvetica, sans-serif; color: #000;">
+                <!-- Header -->
+                <div style="display: flex; align-items: center; border-bottom: 1.5px solid #000; padding-bottom: 8px; margin-bottom: 10px;">
+                    ${schoolLogo ? `<img src="${schoolLogo}" style="max-height: 44px; max-width: 44px; margin-right: 10px; object-fit: contain;">` : `
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #2563eb; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; margin-right: 10px;">
+                        ${schoolName.charAt(0).toUpperCase()}
+                    </div>`}
+                    <div style="flex-grow: 1; text-align: center;">
+                        <h2 style="font-size: 14px; font-weight: 800; text-transform: uppercase; margin: 0 0 2px;">${escapeHtml(schoolName)}</h2>
+                        <p style="font-size: 10px; margin: 0; line-height: 1.2;">${escapeHtml(schoolAddress)}</p>
+                        <p style="font-size: 10px; margin: 2px 0 0; line-height: 1.2;">Email: ${escapeHtml(schoolEmail)} | Phone: ${escapeHtml(schoolPhone)}</p>
                     </div>
                 </div>
 
-                <!-- Customer Details -->
-                <table style="width: 100%; font-size: 11px; border-collapse: collapse; margin-bottom: 12px;">
+                <!-- Metadata -->
+                <table style="width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 10px;">
                     <tr>
-                        <td style="width: 16%; font-weight: bold; padding: 2px 0;">Receipt No.:</td>
-                        <td style="width: 34%; padding: 2px 0;"><strong>${sale.receipt_number || sale.invoice_number}</strong></td>
-                        <td style="width: 18%; font-weight: bold; padding: 2px 0;">Receipt Date:</td>
-                        <td style="width: 32%; padding: 2px 0;">${sale.date_formatted || sale.sale_date}</td>
+                        <td style="width: 20%; font-weight: bold; padding: 2px 0;">Receipt No.:</td>
+                        <td style="width: 32%; padding: 2px 0;"><strong>${escapeHtml(receiptNo)}</strong></td>
+                        <td style="width: 20%; font-weight: bold; padding: 2px 0;">Receipt Date:</td>
+                        <td style="width: 28%; padding: 2px 0;">${escapeHtml(receiptDate)}</td>
                     </tr>
                     <tr>
-                        <td style="font-weight: bold; padding: 2px 0;">Customer Name:</td>
-                        <td style="padding: 2px 0; text-transform: uppercase;"><strong>${escapeHtml(sale.customer_name)}</strong></td>
+                        <td style="font-weight: bold; padding: 2px 0;">Student Name:</td>
+                        <td colspan="3" style="padding: 2px 0; text-transform: uppercase;"><strong>${escapeHtml(customerName)}</strong></td>
+                    </tr>
+                    <tr>
                         <td style="font-weight: bold; padding: 2px 0;">Admission No.:</td>
-                        <td style="padding: 2px 0;">${escapeHtml(sale.admission_no || '—')}</td>
+                        <td style="padding: 2px 0;"><strong>${escapeHtml(admissionNo)}</strong></td>
+                        <td style="font-weight: bold; padding: 2px 0;">Class & Section:</td>
+                        <td style="padding: 2px 0; text-transform: uppercase;"><strong>${escapeHtml(classSection)}</strong></td>
                     </tr>
-                    <tr>
-                        <td style="font-weight: bold; padding: 2px 0;">Contact No:</td>
-                        <td style="padding: 2px 0;">${escapeHtml(sale.customer_mobile || '—')}</td>
-                        <td style="font-weight: bold; padding: 2px 0;">Payment Mode:</td>
-                        <td style="padding: 2px 0; text-transform: uppercase;"><strong>${escapeHtml(sale.payment_mode)}</strong></td>
-                    </tr>
-                    ${sale.customer_address ? `
-                    <tr>
-                        <td style="font-weight: bold; padding: 2px 0;">Address:</td>
-                        <td colspan="3" style="padding: 2px 0;">${escapeHtml(sale.customer_address)}</td>
-                    </tr>` : ''}
                 </table>
 
-                <!-- PRODUCT DETAILS Gold Divider (Image 4) -->
-                <div style="display: flex; align-items: center; text-align: center; margin: 14px 0 8px;">
-                    <div style="flex: 1; border-bottom: 1px solid #d97706; opacity: 0.7;"></div>
-                    <span style="padding: 0 14px; font-size: 11px; font-weight: 800; color: #d97706; letter-spacing: 2.5px; text-transform: uppercase;">PRODUCT DETAILS</span>
-                    <div style="flex: 1; border-bottom: 1px solid #d97706; opacity: 0.7;"></div>
+                <!-- Items Table -->
+                <table style="width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 10px; border: 1px solid #000;">
+                    <thead>
+                        <tr style="background: #ffffff;">
+                            <th style="border: 1px solid #000; padding: 5px 6px; text-align: left; font-weight: 800; font-size: 10px;">COMPONENT</th>
+                            <th style="border: 1px solid #000; padding: 5px 6px; text-align: right; width: 22%; font-weight: 800; font-size: 10px;">ACTUAL AMOUNT</th>
+                            <th style="border: 1px solid #000; padding: 5px 6px; text-align: right; width: 18%; font-weight: 800; font-size: 10px;">PAID</th>
+                            <th style="border: 1px solid #000; padding: 5px 6px; text-align: right; width: 18%; font-weight: 800; font-size: 10px;">BALANCE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${itemsHtml}
+                        <tr style="font-weight: 800; border-top: 1.5px solid #000;">
+                            <td style="border: 1px solid #000; padding: 5px 6px; text-align: left;">TOTAL</td>
+                            <td style="border: 1px solid #000; padding: 5px 6px; text-align: right;">${formatNumber(grandTotal)}</td>
+                            <td style="border: 1px solid #000; padding: 5px 6px; text-align: right;">${formatNumber(paidAmount)}</td>
+                            <td style="border: 1px solid #000; padding: 5px 6px; text-align: right;">${formatNumber(dueAmount)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <!-- PAID Box -->
+                <div style="display: flex; justify-content: space-between; align-items: center; border: 1.5px solid #000; padding: 5px 8px; font-weight: 800; font-size: 11.5px; margin-bottom: 10px;">
+                    <span>PAID</span>
+                    <span>Rs ${formatNumber(paidAmount)}</span>
                 </div>
 
-                <!-- 11 Column Product Table (Image 4) -->
-                <div style="overflow-x: auto; margin-bottom: 12px;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 10.5px; border: 1px solid #cbd5e1;">
-                        <thead>
-                            <tr style="background: #1e3a8a; color: #ffffff;">
-                                <th style="padding: 6px 8px; text-align: left; border: 1px solid #2d4e61;">Product</th>
-                                <th style="padding: 6px 8px; text-align: left; border: 1px solid #2d4e61;">Size</th>
-                                <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">MRP</th>
-                                <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">Price</th>
-                                <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">Tax</th>
-                                <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">Quantity</th>
-                                <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">Total MRP</th>
-                                <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">Total Price</th>
-                                <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">Total Tax</th>
-                                <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">Discount</th>
-                                <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">Total Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rowsHtml}
-                        </tbody>
-                        <tfoot>
-                            <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #1e3a8a;">
-                                <td style="padding: 7px 8px; text-align: left;">Total</td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td style="padding: 7px 8px; text-align: right;">${formatNumber(sale.total_mrp)}</td>
-                                <td style="padding: 7px 8px; text-align: right;">${formatNumber(sale.sub_total)}</td>
-                                <td style="padding: 7px 8px; text-align: right;">${formatNumber(sale.total_tax)}</td>
-                                <td style="padding: 7px 8px; text-align: right;">${formatNumber(sale.total_discount)}</td>
-                                <td style="padding: 7px 8px; text-align: right;">${formatNumber(sale.grand_total)}</td>
-                            </tr>
-                        </tfoot>
-                    </table>
+                <!-- Details Block -->
+                <div style="font-size: 10.5px; line-height: 1.4; margin-bottom: 22px;">
+                    <div>Total Amount Paid: <strong>${amountInWords}</strong></div>
+                    <div style="margin-top: 2px;">Mode of Payment: <strong>${escapeHtml(paymentMode)}</strong></div>
+                    <div style="margin-top: 2px;">Remarks: <strong>Fee Payment / Product Purchase</strong></div>
                 </div>
 
-                <!-- 6 Summary Badge Boxes (Exact Image 4 Replication) -->
-                <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 16px;">
-                    <!-- 1. Sub Total -->
-                    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-top: 3px solid #d97706; border-radius: 6px; padding: 8px 4px; text-align: center;">
-                        <div style="color: #0284c7; font-size: 14px; margin-bottom: 2px;"><i class="fas fa-hourglass-half"></i></div>
-                        <div style="font-size: 9px; font-weight: 800; color: #d97706; text-transform: uppercase;">SUB TOTAL</div>
-                        <div style="font-size: 12.5px; font-weight: 800; color: #000;">${formatNumber(sale.sub_total)}</div>
+                <!-- Signatures -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 10.5px; margin-top: 10px;">
+                    <div style="font-style: italic; color: #475569; font-size: 10px; text-transform: uppercase;">
+                        ${copyType}
                     </div>
-                    <!-- 2. Total Discount -->
-                    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-top: 3px solid #d97706; border-radius: 6px; padding: 8px 4px; text-align: center;">
-                        <div style="color: #ef4444; font-size: 14px; margin-bottom: 2px;"><i class="fas fa-gift"></i></div>
-                        <div style="font-size: 9px; font-weight: 800; color: #d97706; text-transform: uppercase;">TOTAL DISCOUNT</div>
-                        <div style="font-size: 12.5px; font-weight: 800; color: #000;">${formatNumber(sale.total_discount)}</div>
-                    </div>
-                    <!-- 3. Total Tax -->
-                    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-top: 3px solid #d97706; border-radius: 6px; padding: 8px 4px; text-align: center;">
-                        <div style="color: #d97706; font-size: 14px; margin-bottom: 2px;"><i class="fas fa-indian-rupee-sign"></i></div>
-                        <div style="font-size: 9px; font-weight: 800; color: #d97706; text-transform: uppercase;">TOTAL TAX</div>
-                        <div style="font-size: 12.5px; font-weight: 800; color: #000;">${formatNumber(sale.total_tax)}</div>
-                    </div>
-                    <!-- 4. Grand Total (Solid Blue Card) -->
-                    <div style="background: #1e3a8a; border: 1px solid #1e3a8a; border-top: 3px solid #fbbf24; border-radius: 6px; padding: 8px 4px; text-align: center; color: #ffffff;">
-                        <div style="color: #fbbf24; font-size: 14px; margin-bottom: 2px;"><i class="fas fa-circle-check"></i></div>
-                        <div style="font-size: 9px; font-weight: 800; color: #fbbf24; text-transform: uppercase;">GRAND TOTAL</div>
-                        <div style="font-size: 13.5px; font-weight: 800; color: #ffffff;">${formatNumber(sale.grand_total)}</div>
-                    </div>
-                    <!-- 5. Paid Amount -->
-                    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-top: 3px solid #d97706; border-radius: 6px; padding: 8px 4px; text-align: center;">
-                        <div style="color: #d97706; font-size: 14px; margin-bottom: 2px;"><i class="fas fa-indian-rupee-sign"></i></div>
-                        <div style="font-size: 9px; font-weight: 800; color: #d97706; text-transform: uppercase;">PAID AMOUNT</div>
-                        <div style="font-size: 12.5px; font-weight: 800; color: #000;">${formatNumber(sale.paid_amount)}</div>
-                    </div>
-                    <!-- 6. Due Amount -->
-                    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-top: 3px solid #d97706; border-radius: 6px; padding: 8px 4px; text-align: center;">
-                        <div style="color: #d97706; font-size: 14px; margin-bottom: 2px;"><i class="fas fa-indian-rupee-sign"></i></div>
-                        <div style="font-size: 9px; font-weight: 800; color: #d97706; text-transform: uppercase;">DUE AMOUNT</div>
-                        <div style="font-size: 12.5px; font-weight: 800; color: #000;">${formatNumber(sale.due_amount)}</div>
-                    </div>
-                </div>
-
-                <!-- Footer Signatures -->
-                <div style="display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; margin-top: 25px; padding-top: 8px;">
-                    <div style="color: #64748b; font-style: italic; font-size: 10px;">
-                        * System Generated Inventory Receipt
-                    </div>
-                    <div style="text-align: center; border-top: 1px solid #000; padding-top: 4px; width: 130px; font-weight: bold;">
-                        Authorized Sign
+                    <div style="width: 120px; text-align: center; border-top: 1px solid #000; padding-top: 4px; font-weight: 800; font-size: 10.5px;">
+                        Accountant Sign
                     </div>
                 </div>
             </div>
         `;
 
-        container.innerHTML = receiptHtml;
+        const dualSlipHtml = `
+            <div id="printable-receipt-view" style="width: 100%; overflow-x: auto; background: #ffffff;">
+                <div style="display: flex; min-width: 700px; border: 1px solid #cbd5e1; padding: 12px; background: #ffffff;">
+                    ${renderSingleSlip('OFFICE COPY')}
+                    <div style="width: 1px; border-left: 1px dashed #64748b; margin: 0 6px;"></div>
+                    ${renderSingleSlip('STUDENT COPY')}
+                </div>
+            </div>
+        `;
+
+        container.innerHTML = dualSlipHtml;
         document.getElementById('receiptModalOverlay').classList.add('open');
     }
 
@@ -1675,18 +1659,19 @@
 
     function printModalReceipt() {
         const printContent = document.getElementById('printable-receipt-view').innerHTML;
-        const win = window.open('', '', 'height=700,width=900');
+        const win = window.open('', '', 'height=750,width=1050');
         win.document.write(`
             <html>
                 <head>
                     <title>Print Receipt</title>
                     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
                     <style>
-                        body { font-family: Arial, sans-serif; margin: 20px; color: #000; }
+                        * { box-sizing: border-box; margin: 0; padding: 0; }
+                        body { font-family: Arial, Helvetica, sans-serif; color: #000; padding: 10px; }
                         table { width: 100%; border-collapse: collapse; }
-                        th, td { padding: 5px 6px; }
                         @media print {
-                            body { margin: 0; }
+                            body { padding: 0; }
+                            @page { size: landscape; margin: 6mm 8mm; }
                         }
                     </style>
                 </head>
@@ -1704,13 +1689,57 @@
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Utility Formatting
+    // Utility Formatting & Words Converter
     // ─────────────────────────────────────────────────────────────────────────
     function formatNumber(num) {
         return parseFloat(num || 0).toLocaleString('en-IN', {
-            minimumFractionDigits: 2,
+            minimumFractionDigits: 0,
             maximumFractionDigits: 2
         });
+    }
+
+    function convertNumberToWordsJS(amount) {
+        const words = {
+            0: '', 1: 'ONE', 2: 'TWO', 3: 'THREE', 4: 'FOUR', 5: 'FIVE', 6: 'SIX',
+            7: 'SEVEN', 8: 'EIGHT', 9: 'NINE', 10: 'TEN', 11: 'ELEVEN', 12: 'TWELVE',
+            13: 'THIRTEEN', 14: 'FOURTEEN', 15: 'FIFTEEN', 16: 'SIXTEEN', 17: 'SEVENTEEN',
+            18: 'EIGHTEEN', 19: 'NINETEEN', 20: 'TWENTY', 30: 'THIRTY', 40: 'FORTY',
+            50: 'FIFTY', 60: 'SIXTY', 70: 'SEVENTY', 80: 'EIGHTY', 90: 'NINETY'
+        };
+
+        let num = Math.floor(amount || 0);
+        if (num === 0) return 'ZERO ONLY';
+
+        function numToWords(n) {
+            let str = '';
+            if (n >= 10000000) {
+                str += numToWords(Math.floor(n / 10000000)) + ' CRORE ';
+                n %= 10000000;
+            }
+            if (n >= 100000) {
+                str += numToWords(Math.floor(n / 100000)) + ' LAKH ';
+                n %= 100000;
+            }
+            if (n >= 1000) {
+                str += numToWords(Math.floor(n / 1000)) + ' THOUSAND ';
+                n %= 1000;
+            }
+            if (n >= 100) {
+                str += words[Math.floor(n / 100)] + ' HUNDRED ';
+                n %= 100;
+            }
+            if (n > 0) {
+                if (n < 20) {
+                    str += words[n] + ' ';
+                } else {
+                    str += words[Math.floor(n / 10) * 10] + ' ' + words[n % 10] + ' ';
+                }
+            }
+            return str.trim();
+        }
+
+        let result = numToWords(num);
+        return (result + ' ONLY').replace(/\s+/g, ' ');
     }
 
     function escapeHtml(text) {
