@@ -30,56 +30,13 @@
         box-sizing: border-box;
     }
 
-    /* ─── Top Horizontal Inventory Navigation Bar ──────────────────────── */
-    .inv-top-nav-wrap {
-        background: #ffffff;
-        border: 1px solid var(--erp-border);
-        border-radius: 10px;
-        padding: 10px 14px;
-        margin-bottom: 22px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        overflow-x: auto;
-        white-space: nowrap;
-    }
-    .inv-nav-item {
-        color: #475569;
-        background: #f8fafc;
-        border: 1px solid var(--erp-border);
-        font-weight: 600;
-        font-size: 13px;
-        border-radius: 7px;
-        padding: 8px 14px;
-        text-decoration: none !important;
-        display: inline-flex;
-        align-items: center;
-        gap: 7px;
-        transition: all 0.2s ease;
-        flex-shrink: 0;
-    }
-    .inv-nav-item:hover {
-        background: #ffffff;
-        color: var(--erp-navy);
-        border-color: #cbd5e1;
-        transform: translateY(-1px);
-    }
-    .inv-nav-item.active {
-        background: #ffffff;
-        color: var(--erp-blue);
-        border-color: var(--erp-blue);
-        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.12);
-        font-weight: 700;
-    }
-
     /* ─── Cards Matching Images 1, 2, 3 ────────────────────────────────── */
     .inv-card {
         background: #ffffff;
         border: 1px solid var(--erp-border);
         border-radius: 8px;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-        margin-bottom: 22px;
+        margin-bottom: 24px;
         overflow: visible;
         position: relative;
     }
@@ -468,65 +425,6 @@
 </style>
 
 <div class="inv-container">
-    
-    <!-- Top Horizontal Navigation Bar (ERP Blue & White Tabs) -->
-    <div class="inv-top-nav-wrap">
-        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'item_category'))
-            <a href="{{ route('school.inventory.categories') }}" class="inv-nav-item">
-                <i class="fas fa-tag text-primary"></i>
-                <span>Category</span>
-            </a>
-        @endif
-
-        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'product_stock'))
-            <a href="{{ route('school.inventory.product-stock') }}" class="inv-nav-item">
-                <i class="fas fa-square-plus text-success"></i>
-                <span>Product & Stock</span>
-            </a>
-        @endif
-
-        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'billing'))
-            <a href="{{ route('school.inventory.billing') }}" class="inv-nav-item active">
-                <i class="fas fa-shopping-cart text-info"></i>
-                <span>Billing</span>
-            </a>
-        @endif
-
-        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'sales_history'))
-            <a href="{{ route('school.inventory.sales-history') }}" class="inv-nav-item">
-                <i class="fas fa-clipboard-list text-warning"></i>
-                <span>Sales History</span>
-            </a>
-        @endif
-
-        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'stock_history'))
-            <a href="{{ route('school.inventory.stock-history') }}" class="inv-nav-item">
-                <i class="fas fa-boxes-stacked text-secondary"></i>
-                <span>Stock History</span>
-            </a>
-        @endif
-
-        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'payment_history'))
-            <a href="{{ route('school.inventory.payment-history') }}" class="inv-nav-item">
-                <span class="fw-bold text-dark" style="font-size:12px;">Rs</span>
-                <span>Payment History</span>
-            </a>
-        @endif
-
-        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'issue_item'))
-            <a href="{{ route('school.inventory.issue') }}" class="inv-nav-item">
-                <i class="fas fa-hand-holding text-indigo"></i>
-                <span>Issue Item</span>
-            </a>
-        @endif
-
-        @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'suppliers'))
-            <a href="{{ route('school.inventory.suppliers') }}" class="inv-nav-item">
-                <i class="fas fa-truck text-purple"></i>
-                <span>Suppliers</span>
-            </a>
-        @endif
-    </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- STEP 1: PRODUCT SEARCH & CART ADDITION (Matching Image 1 & 2)       -->
@@ -565,8 +463,8 @@
             </div>
         </div>
 
-        <!-- 2. Bottom Card: Cart Section (Image 2) -->
-        <div class="inv-card">
+        <!-- 2. Bottom Card: Cart Section (Image 2) - Shown ONLY after selecting product & quantity! -->
+        <div class="inv-card" id="cart-section-card" style="display: none;">
             <div class="inv-card-header-dark">
                 <i class="fas fa-shopping-cart"></i>
                 <span>Cart Section</span>
@@ -589,7 +487,7 @@
                             </tr>
                         </thead>
                         <tbody id="cart-table-body">
-                            <!-- Dynamic JS Rows -->
+                            <!-- Injected via JS when items are added -->
                         </tbody>
                     </table>
                 </div>
@@ -815,17 +713,10 @@
     // Cart State & Initialization
     // ─────────────────────────────────────────────────────────────────────────
     let cartItems = [];
-    let selectedProductForAdd = null;
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Pre-populate demo item matching Image 2
-        if (INITIAL_PRODUCTS.length > 0) {
-            const englishProd = INITIAL_PRODUCTS.find(p => p.name && p.name.toLowerCase().includes('english')) || INITIAL_PRODUCTS[0];
-            if (englishProd) {
-                addItemToCart(englishProd, 10, 0, 'Free');
-            }
-        }
-
+        // Starts empty so Image 1 view is clean!
+        renderCartTable();
         setupProductAutocomplete();
         setupStudentAutocomplete();
         setupEvents();
@@ -877,25 +768,19 @@
         renderCartTable();
     }
 
-    // Render Cart Table (Step 1 - Image 2)
+    // Render Cart Table (Step 1 - Image 2: Shown ONLY when items exist!)
     function renderCartTable() {
         const tbody = document.getElementById('cart-table-body');
-        const checkoutBtn = document.getElementById('btn-proceed-checkout');
+        const cartCard = document.getElementById('cart-section-card');
 
         if (cartItems.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="9" class="text-muted py-5" style="text-align: center;">
-                        <i class="fas fa-cart-shopping fa-2x mb-2 d-block text-secondary opacity-50"></i>
-                        Your cart is empty. Type a product name above to add items.
-                    </td>
-                </tr>
-            `;
-            checkoutBtn.disabled = true;
+            tbody.innerHTML = '';
+            cartCard.style.display = 'none'; // Hidden until product & quantity are selected!
             return;
         }
 
-        checkoutBtn.disabled = false;
+        // Show Cart Section (Image 2)
+        cartCard.style.display = 'block';
         let html = '';
 
         cartItems.forEach((item, index) => {
