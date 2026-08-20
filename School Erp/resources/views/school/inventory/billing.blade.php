@@ -4,25 +4,22 @@
 
 @section('content')
 <style>
-    /* ─── Enterprise ERP Blue & White Theme (Matching Images 1, 2, 3, 4) ─── */
+    /* ─── Standard ERP Royal Blue & White Theme (Matching Image 2 / Product Stock) ─── */
     :root {
-        --erp-navy:        #1a3a4b;
-        --erp-navy-dark:   #122b39;
-        --erp-navy-light:  #244d63;
-        --erp-blue:        #0284c7;
         --erp-blue-dark:   #1e3a8a;
-        --erp-blue-light:  #38bdf8;
-        --erp-blue-soft:   #f0f9ff;
+        --erp-blue:        #2563eb;
+        --erp-blue-light:  #3b82f6;
+        --erp-blue-soft:   #eff6ff;
+        --erp-blue-border: #dbeafe;
         --erp-card-bg:     #ffffff;
         --erp-border:      #e2e8f0;
-        --erp-border-dark: #cbd5e1;
         --erp-text-dark:   #0f172a;
         --erp-text-muted:  #64748b;
         --erp-gold:        #d97706;
         --erp-gold-light:  #fbbf24;
     }
 
-    /* ─── Main Container ────────────────────────────────────────────────── */
+    /* ─── Main Full Screen Container ───────────────────────────────────── */
     .inv-container {
         width: 100% !important;
         max-width: 100% !important;
@@ -30,41 +27,54 @@
         box-sizing: border-box;
     }
 
-    /* ─── Cards Matching Images 1, 2, 3 ────────────────────────────────── */
+    /* ─── ERP Cards (Matching Image 2) ─────────────────────────────────── */
     .inv-card {
         background: #ffffff;
         border: 1px solid var(--erp-border);
-        border-radius: 8px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+        border-radius: 14px;
+        box-shadow: 0 4px 20px rgba(37, 99, 235, 0.05);
         margin-bottom: 24px;
         overflow: visible;
         position: relative;
     }
 
-    .inv-card-header-dark {
-        background-color: var(--erp-navy);
+    .inv-card-header {
+        background: linear-gradient(135deg, var(--erp-blue-dark) 0%, var(--erp-blue) 60%, var(--erp-blue-light) 100%);
         color: #ffffff;
-        padding: 13px 20px;
-        border-top-left-radius: 7px;
-        border-top-right-radius: 7px;
+        padding: 16px 24px;
         display: flex;
         align-items: center;
-        gap: 10px;
-        font-weight: 700;
-        font-size: 14.5px;
-        letter-spacing: 0.3px;
+        justify-content: space-between;
+        border-top-left-radius: 13px;
+        border-top-right-radius: 13px;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
     }
-    .inv-card-header-dark i {
-        font-size: 15px;
+
+    .inv-card-header h5 {
+        margin: 0;
+        font-size: 15.5px;
+        font-weight: 800;
+        letter-spacing: 0.2px;
         color: #ffffff;
+        display: flex;
+        align-items: center;
+    }
+
+    .inv-card-header .hdr-icon {
+        font-size: 16px;
+        margin-right: 10px;
+        color: #ffffff;
+        opacity: 0.95;
     }
 
     .inv-card-body {
         padding: 24px 28px;
         background: #ffffff;
+        border-bottom-left-radius: 13px;
+        border-bottom-right-radius: 13px;
     }
 
-    /* ─── Image 1: Product Cart Search Inputs ───────────────────────────── */
+    /* ─── Product Cart Search Inputs ────────────────────────────────────── */
     .search-inputs-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -79,9 +89,9 @@
 
     .erp-label {
         font-size: 13px;
-        font-weight: 600;
-        color: #334155;
-        margin-bottom: 6px;
+        font-weight: 700;
+        color: var(--erp-text-dark);
+        margin-bottom: 7px;
         display: block;
     }
     .erp-label .req {
@@ -91,11 +101,11 @@
 
     .erp-input {
         width: 100%;
-        height: 42px;
-        border-radius: 6px;
-        border: 1px solid #cbd5e1;
+        height: 44px;
+        border-radius: 8px;
+        border: 1.5px solid #cbd5e1;
         font-size: 13.5px;
-        color: #0f172a;
+        color: var(--erp-text-dark);
         padding: 8px 14px;
         background-color: #ffffff;
         transition: border-color 0.2s, box-shadow 0.2s;
@@ -104,7 +114,7 @@
     }
     .erp-input:focus {
         border-color: var(--erp-blue);
-        box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+        box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.14);
     }
     .erp-input::placeholder {
         color: #94a3b8;
@@ -127,7 +137,7 @@
         display: none;
     }
     .typeahead-option {
-        padding: 10px 14px;
+        padding: 12px 16px;
         border-bottom: 1px solid #f1f5f9;
         cursor: pointer;
         transition: background 0.15s;
@@ -139,47 +149,161 @@
         border-bottom: none;
     }
     .typeahead-option:hover, .typeahead-option.selected {
-        background-color: #f0f9ff;
+        background-color: var(--erp-blue-soft);
     }
     .typeahead-name {
-        font-weight: 600;
+        font-weight: 700;
         font-size: 13.5px;
-        color: #0f172a;
+        color: var(--erp-text-dark);
     }
     .typeahead-meta {
         font-size: 11.5px;
-        color: #64748b;
+        color: var(--erp-text-muted);
     }
     .typeahead-price-badge {
-        font-size: 12px;
+        font-size: 12.5px;
         font-weight: 700;
-        padding: 3px 8px;
-        border-radius: 4px;
+        padding: 4px 10px;
+        border-radius: 6px;
         background: #e0f2fe;
         color: #0369a1;
     }
 
-    /* ─── Image 2: Cart Section Table ───────────────────────────────────── */
+    /* ─── Floating / Active Cart Pill Button on Main Page ───────────────── */
+    .btn-view-cart-trigger {
+        background: linear-gradient(135deg, var(--erp-blue) 0%, #1d4ed8 100%);
+        color: #ffffff !important;
+        font-weight: 700;
+        font-size: 13px;
+        padding: 8px 18px;
+        border-radius: 20px;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+        text-decoration: none !important;
+    }
+    .btn-view-cart-trigger:hover {
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
+    }
+
+    /* ─── Responsive Slider Drawer (Slide-Over Panel) ─────────────────── */
+    .inv-slider-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.5);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 1050;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    .inv-slider-backdrop.open {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .inv-slider-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 900px;
+        max-width: 100vw;
+        background: #ffffff;
+        z-index: 1060;
+        display: flex;
+        flex-direction: column;
+        box-shadow: -8px 0 35px rgba(0, 0, 0, 0.2);
+        transform: translateX(100%);
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .inv-slider-panel.open {
+        transform: translateX(0);
+    }
+
+    @media (max-width: 992px) {
+        .inv-slider-panel {
+            width: 100vw;
+        }
+    }
+
+    .inv-slider-header {
+        background: linear-gradient(135deg, var(--erp-blue-dark) 0%, var(--erp-blue) 60%, var(--erp-blue-light) 100%);
+        color: #ffffff;
+        padding: 16px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+    }
+    .inv-slider-header h4 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 800;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .btn-slider-close {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: #ffffff;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 15px;
+        transition: background 0.2s ease;
+    }
+    .btn-slider-close:hover {
+        background: rgba(255, 255, 255, 0.35);
+    }
+
+    .inv-slider-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        background: #ffffff;
+    }
+
+    /* ─── Cart Section Table inside Slider (Image 2) ───────────────────── */
     .cart-table-container {
         width: 100%;
         overflow-x: auto;
-        border: 1px solid #e2e8f0;
-        border-radius: 6px;
+        border: 1px solid var(--erp-border);
+        border-radius: 10px;
         background: #ffffff;
+        margin-bottom: 20px;
     }
     .cart-grid-table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         font-size: 13px;
         margin: 0;
     }
     .cart-grid-table thead th {
-        background-color: #ffffff;
-        color: #334155;
+        background-color: #f8fafc;
+        color: var(--erp-text-dark);
         font-weight: 700;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
         padding: 12px 14px;
-        border-bottom: 1px solid #e2e8f0;
-        border-right: 1px solid #e2e8f0;
+        border-bottom: 1.5px solid var(--erp-border);
+        border-right: 1px solid var(--erp-border);
         text-align: center;
         white-space: nowrap;
     }
@@ -187,45 +311,46 @@
         border-right: none;
     }
     .cart-grid-table tbody td {
-        padding: 10px 12px;
-        border-bottom: 1px solid #e2e8f0;
-        border-right: 1px solid #e2e8f0;
+        padding: 12px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        border-right: 1px solid var(--erp-border);
         vertical-align: middle;
         text-align: center;
-        color: #0f172a;
+        color: var(--erp-text-dark);
         white-space: nowrap;
     }
     .cart-grid-table tbody td:last-child {
         border-right: none;
     }
     .cart-grid-table tbody tr:hover {
-        background-color: #f8fafc;
+        background-color: var(--erp-blue-soft);
     }
 
     /* Table Input Fields */
     .table-cell-input {
         width: 75px;
         height: 34px;
-        border-radius: 5px;
-        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        border: 1.5px solid #cbd5e1;
         text-align: center;
-        font-weight: 600;
+        font-weight: 700;
         font-size: 13px;
-        color: #0f172a;
+        color: var(--erp-text-dark);
         padding: 2px 4px;
         outline: none;
         background: #ffffff;
+        transition: border-color 0.2s;
     }
     .table-cell-input:focus {
         border-color: var(--erp-blue);
-        box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
     }
     .table-cell-select {
         height: 34px;
-        border-radius: 5px;
-        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        border: 1.5px solid #cbd5e1;
         font-size: 12.5px;
-        font-weight: 500;
+        font-weight: 600;
         padding: 2px 8px;
         color: #1e293b;
         background-color: #ffffff;
@@ -237,7 +362,7 @@
     }
     .stock-count-green {
         color: #16a34a;
-        font-weight: 700;
+        font-weight: 800;
         font-size: 13px;
     }
 
@@ -262,43 +387,37 @@
         transform: scale(1.06);
     }
 
-    /* ─── Centered Action Button (Checkout & Confirm Order) ──────────────── */
-    .btn-center-dark {
-        background-color: var(--erp-navy);
+    /* ─── Buttons inside Slider (Image 2 & 3) ───────────────────────────── */
+    .btn-slider-checkout {
+        background: linear-gradient(135deg, var(--erp-blue) 0%, #1d4ed8 100%) !important;
         color: #ffffff !important;
         font-weight: 700;
         font-size: 14px;
-        padding: 10px 32px;
-        border-radius: 6px;
+        padding: 12px 36px;
+        border-radius: 8px;
         border: none;
         display: inline-flex;
         align-items: center;
         gap: 8px;
         cursor: pointer;
-        transition: all 0.2s ease;
-        box-shadow: 0 3px 10px rgba(26, 58, 75, 0.2);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
         text-decoration: none !important;
     }
-    .btn-center-dark:hover {
-        background-color: var(--erp-navy-dark);
-        color: #ffffff !important;
+    .btn-slider-checkout:hover {
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
         transform: translateY(-1px);
-        box-shadow: 0 5px 14px rgba(26, 58, 75, 0.3);
-    }
-    .btn-center-dark:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none;
+        box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
     }
 
-    .btn-center-outline {
-        background-color: #ffffff;
+    .btn-slider-back {
+        background: #f1f5f9;
         color: #334155 !important;
-        font-weight: 600;
-        font-size: 14px;
-        padding: 10px 24px;
-        border-radius: 6px;
-        border: 1px solid #cbd5e1;
+        font-weight: 700;
+        font-size: 13.5px;
+        padding: 11px 24px;
+        border-radius: 8px;
+        border: 1.5px solid #cbd5e1;
         display: inline-flex;
         align-items: center;
         gap: 8px;
@@ -306,21 +425,21 @@
         transition: all 0.2s ease;
         text-decoration: none !important;
     }
-    .btn-center-outline:hover {
-        background-color: #f8fafc;
+    .btn-slider-back:hover {
+        background: #e2e8f0;
         color: #0f172a !important;
-        border-color: #94a3b8;
     }
 
-    /* ─── Image 3: Summary Box ─────────────────────────────────────────── */
+    /* ─── Step 2: Summary Card & Student Details Form (Image 3) ────────── */
     .checkout-summary-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
+        border: 1px solid var(--erp-border);
+        border-radius: 10px;
         background: #f8fafc;
-        padding: 16px 20px;
+        padding: 18px 22px;
         width: 100%;
-        max-width: 320px;
+        max-width: 360px;
         margin-left: auto;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
     }
     .checkout-summary-line {
         display: flex;
@@ -334,12 +453,11 @@
         border-top: 2px solid #cbd5e1;
         margin-top: 8px;
         padding-top: 10px;
-        font-size: 15.5px;
+        font-size: 16px;
         font-weight: 800;
-        color: var(--erp-navy);
+        color: var(--erp-blue-dark);
     }
 
-    /* ─── Image 3: Student Details Form Grid ────────────────────────────── */
     .student-grid-4 {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -361,27 +479,27 @@
         .student-grid-4 { grid-template-columns: 1fr; }
     }
 
-    /* ─── Steps Slide Transitions ──────────────────────────────────────── */
-    .step-block {
+    /* ─── Drawer Steps Sliding ─────────────────────────────────────────── */
+    .slider-step-block {
         display: none;
     }
-    .step-block.active {
+    .slider-step-block.active {
         display: block;
         animation: fadeInStep 0.25s ease forwards;
     }
     @keyframes fadeInStep {
-        from { opacity: 0; transform: translateY(4px); }
+        from { opacity: 0; transform: translateY(6px); }
         to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ─── Custom Modal Overlay (Never Leaks Unstyled Content) ──────────── */
+    /* ─── Custom Modal Overlay for Image 4 Receipt ─────────────────────── */
     .custom-modal-overlay {
         position: fixed;
         inset: 0;
         background: rgba(15, 23, 42, 0.65);
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
-        z-index: 9999;
+        z-index: 1090;
         display: none;
         align-items: center;
         justify-content: center;
@@ -393,7 +511,7 @@
     }
     .custom-modal-dialog {
         background: #ffffff;
-        border-radius: 12px;
+        border-radius: 14px;
         max-width: 920px;
         width: 100%;
         max-height: 90vh;
@@ -403,14 +521,14 @@
         flex-direction: column;
     }
     .custom-modal-header {
-        padding: 14px 20px;
-        background: #f8fafc;
-        border-bottom: 1px solid var(--erp-border);
+        padding: 16px 22px;
+        background: linear-gradient(135deg, var(--erp-blue-dark) 0%, var(--erp-blue) 100%);
+        color: #ffffff;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border-top-left-radius: 12px;
-        border-top-right-radius: 12px;
+        border-top-left-radius: 13px;
+        border-top-right-radius: 13px;
     }
     .custom-modal-footer {
         padding: 14px 20px;
@@ -419,264 +537,261 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border-bottom-left-radius: 12px;
-        border-bottom-right-radius: 12px;
+        border-bottom-left-radius: 13px;
+        border-bottom-right-radius: 13px;
     }
 </style>
 
 <div class="inv-container">
 
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- STEP 1: PRODUCT SEARCH & CART ADDITION (Matching Image 1 & 2)       -->
+    <!-- 1. MAIN PAGE: PRODUCT SEARCH INPUTS (Image 1)                       -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <div id="step-1-block" class="step-block active">
-        
-        <!-- 1. Top Card: Product Cart (Image 1) -->
-        <div class="inv-card">
-            <div class="inv-card-header-dark">
-                <i class="fas fa-list-ul"></i>
-                <span>Product Cart</span>
-            </div>
-            <div class="inv-card-body">
-                <div class="search-inputs-grid">
-                    <!-- Product Name Input (Left Column) -->
-                    <div style="position: relative;">
-                        <label class="erp-label">
-                            Product Name <span class="req">*</span>
-                        </label>
-                        <input type="text" id="search-product-input" class="erp-input" 
-                               placeholder="Type product name..." autocomplete="off">
-                        
-                        <!-- Live Autocomplete Dropdown List -->
-                        <div id="product-typeahead-list" class="typeahead-results"></div>
-                    </div>
-
-                    <!-- Quantity Input (Right Column) -->
-                    <div>
-                        <label class="erp-label">
-                            Quantity <span class="req">*</span>
-                        </label>
-                        <input type="number" id="search-quantity-input" class="erp-input" 
-                               placeholder="Enter Quantity" min="1" value="1">
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 2. Bottom Card: Cart Section (Image 2) - Shown ONLY after selecting product & quantity! -->
-        <div class="inv-card" id="cart-section-card" style="display: none;">
-            <div class="inv-card-header-dark">
-                <i class="fas fa-shopping-cart"></i>
-                <span>Cart Section</span>
-            </div>
-            <div class="inv-card-body">
-                <!-- Cart Table -->
-                <div class="cart-table-container">
-                    <table class="cart-grid-table" id="cart-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 50px;">S/N</th>
-                                <th style="text-align: left; min-width: 160px;">Product</th>
-                                <th style="min-width: 100px;">Price</th>
-                                <th style="width: 100px;">Quantity</th>
-                                <th style="width: 100px;">Discount</th>
-                                <th style="min-width: 90px;">Avl. Qty</th>
-                                <th style="min-width: 110px;">Total</th>
-                                <th style="min-width: 100px;">Size</th>
-                                <th style="width: 60px;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="cart-table-body">
-                            <!-- Injected via JS when items are added -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Centered Checkout Button (Image 2) -->
-                <div class="text-center mt-4 pt-2">
-                    <button type="button" id="btn-proceed-checkout" class="btn-center-dark">
-                        <i class="fas fa-shopping-cart"></i> Checkout
-                    </button>
-                </div>
-            </div>
-        </div>
-
-    </div>
-
-
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <!-- STEP 2: CHECKOUT & STUDENT DETAILS (Matching Image 3)               -->
-    <!-- ═══════════════════════════════════════════════════════════════════ -->
-    <div id="step-2-block" class="step-block">
-        
-        <!-- 1. Top Card: Cart Section Summary (Image 3 Top Table) -->
-        <div class="inv-card">
-            <div class="inv-card-header-dark d-flex justify-content-between align-items-center">
-                <div class="d-flex align-items-center gap-2">
+    <div class="inv-card">
+        <div class="inv-card-header">
+            <h5><i class="fas fa-list-ul hdr-icon"></i>Product Cart</h5>
+            <div id="main-cart-indicator" style="display: none;">
+                <button type="button" class="btn-view-cart-trigger" onclick="openCartSlider()">
                     <i class="fas fa-shopping-cart"></i>
-                    <span>Cart Section</span>
-                </div>
-                <button type="button" id="btn-edit-cart-top" class="btn btn-sm btn-outline-light" style="font-size: 12px; border-radius: 20px; padding: 4px 12px;">
-                    <i class="fas fa-pen me-1"></i> Edit Cart
+                    <span>Cart (<span id="cart-item-count">0</span>)</span>
                 </button>
             </div>
-            <div class="inv-card-body">
-                <div class="cart-table-container mb-4">
-                    <table class="cart-grid-table" id="checkout-summary-table">
-                        <thead>
-                            <tr>
-                                <th style="text-align: left;">Product</th>
-                                <th>MRP</th>
-                                <th>Price</th>
-                                <th>Tax(%)</th>
-                                <th>Quantity</th>
-                                <th>Size</th>
-                                <th>Discount</th>
-                                <th>Total</th>
-                            </tr>
-                        </thead>
-                        <tbody id="checkout-summary-body">
-                            <!-- Injected via JS -->
-                        </tbody>
-                    </table>
+        </div>
+        <div class="inv-card-body">
+            <div class="search-inputs-grid">
+                <!-- Product Name Input (Left Column) -->
+                <div style="position: relative;">
+                    <label class="erp-label">
+                        Product Name <span class="req">*</span>
+                    </label>
+                    <input type="text" id="search-product-input" class="erp-input" 
+                           placeholder="Type product name..." autocomplete="off">
+                    
+                    <!-- Live Autocomplete Dropdown List -->
+                    <div id="product-typeahead-list" class="typeahead-results"></div>
                 </div>
 
-                <!-- Right Summary Box (Image 3 Right) -->
-                <div class="d-flex justify-content-end">
-                    <div class="checkout-summary-card">
-                        <div class="checkout-summary-line">
-                            <span>Total MRP</span>
-                            <span id="summary-mrp" class="fw-bold">₹ 0.00</span>
-                        </div>
-                        <div class="checkout-summary-line">
-                            <span>Total Price</span>
-                            <span id="summary-price" class="fw-bold">₹ 0.00</span>
-                        </div>
-                        <div class="checkout-summary-line">
-                            <span>Total Discount</span>
-                            <span id="summary-discount" class="fw-bold text-danger">₹ 0.00</span>
-                        </div>
-                        <div class="checkout-summary-line">
-                            <span>Total Tax</span>
-                            <span id="summary-tax" class="fw-bold text-warning">₹ 0.00</span>
-                        </div>
-                        <div class="checkout-summary-line grand-total">
-                            <span>Grand Total</span>
-                            <span id="summary-grand">₹ 0.00</span>
-                        </div>
-                    </div>
+                <!-- Quantity Input (Right Column) -->
+                <div>
+                    <label class="erp-label">
+                        Quantity <span class="req">*</span>
+                    </label>
+                    <input type="number" id="search-quantity-input" class="erp-input" 
+                           placeholder="Enter Quantity" min="1" value="1">
                 </div>
+            </div>
+
+            <!-- Helpful tip -->
+            <div class="d-flex align-items-center justify-content-between mt-3 pt-2 text-muted" style="font-size: 12.5px;">
+                <span><i class="fas fa-info-circle text-primary me-1"></i> Select a product from the list or press Enter to add items directly to your cart slider.</span>
+                <span id="cart-total-badge" class="fw-bold text-primary" style="display: none;"></span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- 2. CART SLIDER PANEL (Slide-over Drawer for Cart & Checkout)        -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<div id="cartSliderBackdrop" class="inv-slider-backdrop" onclick="closeCartSlider()"></div>
+
+<div id="cartSliderPanel" class="inv-slider-panel">
+    
+    <!-- Slider Header (Royal Blue Gradient) -->
+    <div class="inv-slider-header">
+        <h4 id="slider-header-title">
+            <i class="fas fa-shopping-cart"></i>
+            <span>Cart Section</span>
+        </h4>
+        <button type="button" class="btn-slider-close" onclick="closeCartSlider()" title="Close">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <!-- Slider Body -->
+    <div class="inv-slider-body">
+        
+        <!-- ─── SLIDER STEP 1: CART SECTION TABLE & CHECKOUT (Image 2) ─── -->
+        <div id="slider-step-1" class="slider-step-block active">
+            
+            <div class="cart-table-container">
+                <table class="cart-grid-table" id="cart-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px;">S/N</th>
+                            <th style="text-align: left; min-width: 150px;">Product</th>
+                            <th style="min-width: 95px;">Price</th>
+                            <th style="width: 90px;">Quantity</th>
+                            <th style="width: 90px;">Discount</th>
+                            <th style="min-width: 85px;">Avl. Qty</th>
+                            <th style="min-width: 100px;">Total</th>
+                            <th style="min-width: 95px;">Size</th>
+                            <th style="width: 55px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cart-table-body">
+                        <!-- Dynamically Injected Rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Centered Checkout Button (Image 2) -->
+            <div class="text-center mt-4 pt-2">
+                <button type="button" id="btn-proceed-checkout" class="btn-slider-checkout">
+                    <i class="fas fa-shopping-cart"></i> Checkout
+                </button>
             </div>
         </div>
 
-        <!-- 2. Bottom Card: Student Details (Image 3 Bottom) -->
-        <div class="inv-card">
-            <div class="inv-card-header-dark">
-                <i class="fas fa-user-plus"></i>
-                <span>Student Details</span>
+        <!-- ─── SLIDER STEP 2: SUMMARY & STUDENT DETAILS (Image 3) ─────── -->
+        <div id="slider-step-2" class="slider-step-block">
+            
+            <!-- Summary Table -->
+            <div class="cart-table-container mb-3">
+                <table class="cart-grid-table" id="checkout-summary-table">
+                    <thead>
+                        <tr>
+                            <th style="text-align: left;">Product</th>
+                            <th>MRP</th>
+                            <th>Price</th>
+                            <th>Tax(%)</th>
+                            <th>Quantity</th>
+                            <th>Size</th>
+                            <th>Discount</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="checkout-summary-body">
+                        <!-- Dynamically Injected -->
+                    </tbody>
+                </table>
             </div>
-            <div class="inv-card-body">
-                <form id="checkout-form" onsubmit="return false;">
-                    
-                    <!-- Row 1: 4 Horizontal Inputs (Admission No, Name, Address, Mobile) -->
-                    <div class="student-grid-4">
-                        <div style="position: relative;">
-                            <label class="erp-label">Addmission No.(Optional)</label>
-                            <input type="text" id="cust-admission-no" class="erp-input" 
-                                   placeholder="Enter Addmission No.(Optional)" autocomplete="off">
-                            <div id="student-typeahead-list" class="typeahead-results"></div>
-                        </div>
 
-                        <div>
-                            <label class="erp-label">
-                                Name <span class="req">*</span>
-                            </label>
-                            <input type="text" id="cust-name" class="erp-input" 
-                                   placeholder="Enter Name" required>
-                        </div>
-
-                        <div>
-                            <label class="erp-label">
-                                Address <span class="req">*</span>
-                            </label>
-                            <input type="text" id="cust-address" class="erp-input" 
-                                   placeholder="Enter Address" required>
-                        </div>
-
-                        <div>
-                            <label class="erp-label">
-                                Mobile No <span class="req">*</span>
-                            </label>
-                            <input type="text" id="cust-mobile" class="erp-input" 
-                                   placeholder="Enter Mobile No." required>
-                        </div>
+            <!-- Right Summary Box -->
+            <div class="d-flex justify-content-end mb-4">
+                <div class="checkout-summary-card">
+                    <div class="checkout-summary-line">
+                        <span>Total MRP</span>
+                        <span id="summary-mrp" class="fw-bold">₹ 0.00</span>
                     </div>
+                    <div class="checkout-summary-line">
+                        <span>Total Price</span>
+                        <span id="summary-price" class="fw-bold">₹ 0.00</span>
+                    </div>
+                    <div class="checkout-summary-line">
+                        <span>Total Discount</span>
+                        <span id="summary-discount" class="fw-bold text-danger">₹ 0.00</span>
+                    </div>
+                    <div class="checkout-summary-line">
+                        <span>Total Tax</span>
+                        <span id="summary-tax" class="fw-bold text-warning">₹ 0.00</span>
+                    </div>
+                    <div class="checkout-summary-line grand-total">
+                        <span>Grand Total</span>
+                        <span id="summary-grand">₹ 0.00</span>
+                    </div>
+                </div>
+            </div>
 
-                    <!-- Row 2: 3 Inputs (Payment Mode, Reference No, Payable Amount) -->
-                    <div class="student-grid-3">
-                        <div>
-                            <label class="erp-label">
-                                Payment Mode <span class="req">*</span>
-                            </label>
-                            <select id="cust-payment-mode" class="erp-input" required>
-                                <option value="">Select Payment Mode</option>
-                                <option value="cash" selected>Cash</option>
-                                <option value="upi">Online / UPI</option>
-                                <option value="card">Debit / Credit Card</option>
-                                <option value="cheque">Cheque</option>
-                                <option value="bank_transfer">Bank Transfer</option>
-                                <option value="dd">Demand Draft</option>
-                            </select>
-                        </div>
+            <!-- Student Details Form (Image 3) -->
+            <div class="inv-card mb-0">
+                <div class="inv-card-header py-2 px-3">
+                    <h5 style="font-size: 14px;"><i class="fas fa-user-plus hdr-icon"></i>Student Details</h5>
+                </div>
+                <div class="inv-card-body p-3">
+                    <form id="checkout-form" onsubmit="return false;">
+                        <!-- Row 1: 4 Inputs -->
+                        <div class="student-grid-4">
+                            <div style="position: relative;">
+                                <label class="erp-label">Addmission No.(Optional)</label>
+                                <input type="text" id="cust-admission-no" class="erp-input" 
+                                       placeholder="Enter Addmission No." autocomplete="off">
+                                <div id="student-typeahead-list" class="typeahead-results"></div>
+                            </div>
 
-                        <div>
-                            <label class="erp-label">Reference No.</label>
-                            <input type="text" id="cust-ref-no" class="erp-input" 
-                                   placeholder="Enter Reference No.">
-                        </div>
+                            <div>
+                                <label class="erp-label">Name <span class="req">*</span></label>
+                                <input type="text" id="cust-name" class="erp-input" 
+                                       placeholder="Enter Name" required>
+                            </div>
 
-                        <div>
-                            <label class="erp-label">
-                                Payable Amount <span class="req">*</span>
-                            </label>
-                            <input type="number" step="0.01" id="cust-payable-amount" class="erp-input" 
-                                   placeholder="0.00" required>
-                            <div style="font-size: 12.5px; font-weight: 700; color: #0284c7; margin-top: 5px;">
-                                Balance Due: <span id="label-balance-due">0</span>
+                            <div>
+                                <label class="erp-label">Address <span class="req">*</span></label>
+                                <input type="text" id="cust-address" class="erp-input" 
+                                       placeholder="Enter Address" required>
+                            </div>
+
+                            <div>
+                                <label class="erp-label">Mobile No <span class="req">*</span></label>
+                                <input type="text" id="cust-mobile" class="erp-input" 
+                                       placeholder="Enter Mobile No." required>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Centered Buttons: Back & Confirm Order (Image 3) -->
-                    <div class="d-flex justify-content-center gap-3 mt-4 pt-2">
-                        <button type="button" id="btn-back-to-cart" class="btn-center-outline">
-                            <i class="fas fa-arrow-left"></i> Back to Cart
-                        </button>
-                        <button type="button" id="btn-confirm-order" class="btn-center-dark">
-                            <i class="fas fa-check"></i> Confirm Order
-                        </button>
-                    </div>
+                        <!-- Row 2: 3 Inputs -->
+                        <div class="student-grid-3">
+                            <div>
+                                <label class="erp-label">Payment Mode <span class="req">*</span></label>
+                                <select id="cust-payment-mode" class="erp-input" required>
+                                    <option value="cash" selected>Cash</option>
+                                    <option value="upi">Online / UPI</option>
+                                    <option value="card">Debit / Credit Card</option>
+                                    <option value="cheque">Cheque</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="dd">Demand Draft</option>
+                                </select>
+                            </div>
 
-                </form>
+                            <div>
+                                <label class="erp-label">Reference No.</label>
+                                <input type="text" id="cust-ref-no" class="erp-input" 
+                                       placeholder="Enter Reference No.">
+                            </div>
+
+                            <div>
+                                <label class="erp-label">Payable Amount <span class="req">*</span></label>
+                                <input type="number" step="0.01" id="cust-payable-amount" class="erp-input" 
+                                       placeholder="0.00" required>
+                                <div style="font-size: 12.5px; font-weight: 700; color: var(--erp-blue); margin-top: 5px;">
+                                    Balance Due: <span id="label-balance-due">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Centered Action Buttons -->
+                        <div class="d-flex justify-content-center gap-3 mt-4 pt-2">
+                            <button type="button" id="btn-back-to-cart" class="btn-slider-back">
+                                <i class="fas fa-arrow-left"></i> Back to Cart
+                            </button>
+                            <button type="button" id="btn-confirm-order" class="btn-slider-checkout">
+                                <i class="fas fa-check"></i> Confirm Order
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
+
         </div>
 
     </div>
 
 </div>
 
+
 <!-- ═══════════════════════════════════════════════════════════════════ -->
-<!-- STEP 3: CUSTOM POPUP MODAL FOR RECEIPT PREVIEW (Matching Image 4)   -->
+<!-- 3. CUSTOM POPUP MODAL FOR RECEIPT PREVIEW (Image 4)                 -->
 <!-- ═══════════════════════════════════════════════════════════════════ -->
 <div id="receiptModalOverlay" class="custom-modal-overlay">
     <div class="custom-modal-dialog">
         <div class="custom-modal-header">
-            <div class="fw-bold text-dark d-flex align-items-center gap-2">
-                <i class="fas fa-receipt text-primary"></i>
+            <div class="fw-bold text-white d-flex align-items-center gap-2">
+                <i class="fas fa-receipt"></i>
                 <span>Sales Receipt Generated</span>
             </div>
-            <button type="button" class="btn btn-sm btn-light border-0" onclick="closeReceiptModal()" style="font-size: 16px;">
-                <i class="fas fa-xmark"></i>
+            <button type="button" class="btn-slider-close" onclick="closeReceiptModal()">
+                <i class="fas fa-times"></i>
             </button>
         </div>
         <div class="p-3 p-md-4" id="receipt-modal-content-area">
@@ -690,7 +805,7 @@
                 <a href="#" id="modal-standalone-link" target="_blank" class="btn btn-outline-dark btn-sm">
                     <i class="fas fa-up-right-from-square me-1"></i> Full Page
                 </a>
-                <button type="button" class="btn-center-dark" style="padding: 7px 18px; font-size: 13px;" onclick="printModalReceipt()">
+                <button type="button" class="btn-slider-checkout" style="padding: 7px 18px; font-size: 13px;" onclick="printModalReceipt()">
                     <i class="fas fa-print"></i> Print Receipt
                 </button>
             </div>
@@ -715,14 +830,24 @@
     let cartItems = [];
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Starts empty so Image 1 view is clean!
         renderCartTable();
         setupProductAutocomplete();
         setupStudentAutocomplete();
         setupEvents();
     });
 
-    // Add Item to Cart
+    // Open & Close Slider Drawer
+    function openCartSlider() {
+        document.getElementById('cartSliderBackdrop').classList.add('open');
+        document.getElementById('cartSliderPanel').classList.add('open');
+    }
+
+    function closeCartSlider() {
+        document.getElementById('cartSliderBackdrop').classList.remove('open');
+        document.getElementById('cartSliderPanel').classList.remove('open');
+    }
+
+    // Add Item to Cart and Open Slider
     function addItemToCart(product, qty = 1, discount = 0, defaultSize = null) {
         qty = parseInt(qty) || 1;
         discount = parseFloat(discount) || 0;
@@ -766,25 +891,37 @@
         }
 
         renderCartTable();
+        // Automatically open the slider drawer with the added item!
+        openCartSlider();
     }
 
-    // Render Cart Table (Step 1 - Image 2: Shown ONLY when items exist!)
+    // Render Cart Table inside Slider (Image 2)
     function renderCartTable() {
         const tbody = document.getElementById('cart-table-body');
-        const cartCard = document.getElementById('cart-section-card');
+        const cartIndicator = document.getElementById('main-cart-indicator');
+        const cartCount = document.getElementById('cart-item-count');
+        const totalBadge = document.getElementById('cart-total-badge');
 
         if (cartItems.length === 0) {
-            tbody.innerHTML = '';
-            cartCard.style.display = 'none'; // Hidden until product & quantity are selected!
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-muted py-5" style="text-align: center;">
+                        <i class="fas fa-cart-shopping fa-2x mb-2 d-block text-secondary opacity-50"></i>
+                        Your cart is empty. Type a product name on the left to add items.
+                    </td>
+                </tr>
+            `;
+            if (cartIndicator) cartIndicator.style.display = 'none';
+            if (totalBadge) totalBadge.style.display = 'none';
             return;
         }
 
-        // Show Cart Section (Image 2)
-        cartCard.style.display = 'block';
+        let totalCartSum = 0;
         let html = '';
 
         cartItems.forEach((item, index) => {
             const lineTotal = (item.price * item.quantity) - item.discount;
+            totalCartSum += lineTotal;
             const formattedTotal = '₹ ' + formatNumber(lineTotal);
             const formattedPrice = '₹ ' + formatNumber(item.price);
 
@@ -827,6 +964,14 @@
         });
 
         tbody.innerHTML = html;
+
+        // Update header indicator badge
+        if (cartIndicator) cartIndicator.style.display = 'block';
+        if (cartCount) cartCount.innerText = cartItems.length;
+        if (totalBadge) {
+            totalBadge.style.display = 'inline';
+            totalBadge.innerText = `Cart Total: ₹ ${formatNumber(totalCartSum)}`;
+        }
     }
 
     function updateQty(index, val) {
@@ -1101,23 +1246,21 @@
     // Event Setup
     // ─────────────────────────────────────────────────────────────────────────
     function setupEvents() {
-        // Proceed to Checkout
+        // Proceed to Checkout inside Slider
         document.getElementById('btn-proceed-checkout').addEventListener('click', function() {
             if (cartItems.length === 0) return;
             populateCheckoutReview();
-            document.getElementById('step-1-block').classList.remove('active');
-            document.getElementById('step-2-block').classList.add('active');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('slider-step-1').classList.remove('active');
+            document.getElementById('slider-step-2').classList.add('active');
+            document.getElementById('slider-header-title').innerHTML = `<i class="fas fa-user-plus"></i> <span>Checkout & Student Details</span>`;
         });
 
-        // Back to Cart
-        const goBack = () => {
-            document.getElementById('step-2-block').classList.remove('active');
-            document.getElementById('step-1-block').classList.add('active');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        };
-        document.getElementById('btn-edit-cart-top').addEventListener('click', goBack);
-        document.getElementById('btn-back-to-cart').addEventListener('click', goBack);
+        // Back to Cart inside Slider
+        document.getElementById('btn-back-to-cart').addEventListener('click', function() {
+            document.getElementById('slider-step-2').classList.remove('active');
+            document.getElementById('slider-step-1').classList.add('active');
+            document.getElementById('slider-header-title').innerHTML = `<i class="fas fa-shopping-cart"></i> <span>Cart Section</span>`;
+        });
 
         // Payable Amount Input Change
         document.getElementById('cust-payable-amount').addEventListener('input', calcBalanceDue);
@@ -1202,6 +1345,7 @@
             confirmBtn.innerHTML = `<i class="fas fa-check"></i> Confirm Order`;
 
             if (data.success && data.sale) {
+                closeCartSlider();
                 showReceiptModal(data.sale);
             } else {
                 alert(data.message || 'Error creating order.');
@@ -1214,6 +1358,7 @@
 
             // Fallback Sale Generation
             const fallback = generateFallbackSale(payload);
+            closeCartSlider();
             showReceiptModal(fallback);
         });
     }
@@ -1350,7 +1495,7 @@
                 <div style="overflow-x: auto; margin-bottom: 12px;">
                     <table style="width: 100%; border-collapse: collapse; font-size: 10.5px; border: 1px solid #cbd5e1;">
                         <thead>
-                            <tr style="background: #1a3a4b; color: #ffffff;">
+                            <tr style="background: #1e3a8a; color: #ffffff;">
                                 <th style="padding: 6px 8px; text-align: left; border: 1px solid #2d4e61;">Product</th>
                                 <th style="padding: 6px 8px; text-align: left; border: 1px solid #2d4e61;">Size</th>
                                 <th style="padding: 6px 8px; text-align: right; border: 1px solid #2d4e61;">MRP</th>
@@ -1368,7 +1513,7 @@
                             ${rowsHtml}
                         </tbody>
                         <tfoot>
-                            <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #1a3a4b;">
+                            <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #1e3a8a;">
                                 <td style="padding: 7px 8px; text-align: left;">Total</td>
                                 <td></td>
                                 <td></td>
@@ -1405,8 +1550,8 @@
                         <div style="font-size: 9px; font-weight: 800; color: #d97706; text-transform: uppercase;">TOTAL TAX</div>
                         <div style="font-size: 12.5px; font-weight: 800; color: #000;">${formatNumber(sale.total_tax)}</div>
                     </div>
-                    <!-- 4. Grand Total (Solid Card) -->
-                    <div style="background: #1a3a4b; border: 1px solid #1a3a4b; border-top: 3px solid #fbbf24; border-radius: 6px; padding: 8px 4px; text-align: center; color: #ffffff;">
+                    <!-- 4. Grand Total (Solid Blue Card) -->
+                    <div style="background: #1e3a8a; border: 1px solid #1e3a8a; border-top: 3px solid #fbbf24; border-radius: 6px; padding: 8px 4px; text-align: center; color: #ffffff;">
                         <div style="color: #fbbf24; font-size: 14px; margin-bottom: 2px;"><i class="fas fa-circle-check"></i></div>
                         <div style="font-size: 9px; font-weight: 800; color: #fbbf24; text-transform: uppercase;">GRAND TOTAL</div>
                         <div style="font-size: 13.5px; font-weight: 800; color: #ffffff;">${formatNumber(sale.grand_total)}</div>
@@ -1450,8 +1595,9 @@
         cartItems = [];
         renderCartTable();
         document.getElementById('checkout-form').reset();
-        document.getElementById('step-2-block').classList.remove('active');
-        document.getElementById('step-1-block').classList.add('active');
+        document.getElementById('slider-step-2').classList.remove('active');
+        document.getElementById('slider-step-1').classList.add('active');
+        document.getElementById('slider-header-title').innerHTML = `<i class="fas fa-shopping-cart"></i> <span>Cart Section</span>`;
     }
 
     function printModalReceipt() {
