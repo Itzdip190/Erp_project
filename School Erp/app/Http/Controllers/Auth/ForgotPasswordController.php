@@ -79,6 +79,21 @@ class ForgotPasswordController extends Controller
             return back()->withErrors(['login_input' => 'No account found matching this identifier.'])->withInput();
         }
 
+        // Check if school has disabled password reset
+        if ($user->school_id) {
+            $allowPasswordReset = \App\Services\SettingService::get('allow_password_reset', '1', $user->school_id);
+            if ($allowPasswordReset == '0' || $allowPasswordReset === false) {
+                $disabledMsg = 'Password Reset has been disabled by your School Administrator.';
+                if ($request->expectsJson() || $request->ajax()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $disabledMsg,
+                    ], 422);
+                }
+                return back()->withErrors(['login_input' => $disabledMsg])->withInput();
+            }
+        }
+
         // Generate token
         $token = Str::random(64);
         $emailIdentifier = !empty($user->email) ? $user->email : ($user->phone ?? 'user_' . $user->id . '@educorerp.com');
@@ -190,6 +205,14 @@ class ForgotPasswordController extends Controller
 
         if (!$user) {
             return back()->withErrors(['email' => 'User account not found.'])->withInput();
+        }
+
+        // Check if school has disabled password reset
+        if ($user->school_id) {
+            $allowPasswordReset = \App\Services\SettingService::get('allow_password_reset', '1', $user->school_id);
+            if ($allowPasswordReset == '0' || $allowPasswordReset === false) {
+                return back()->withErrors(['email' => 'Password Reset has been disabled by your School Administrator.'])->withInput();
+            }
         }
 
         $user->password = Hash::make($request->password);

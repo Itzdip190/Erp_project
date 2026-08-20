@@ -245,6 +245,14 @@ class Student extends Model
         return $this->admission_number;
     }
 
+    /**
+     * Alias for date_of_birth.
+     */
+    public function getDobAttribute()
+    {
+        return $this->date_of_birth;
+    }
+
     public function getPhotoUrlAttribute(): string
     {
         return $this->resolvePhotoUrl() ?? $this->getBaseUrlPrefix() . '/images/avatar-student.png';

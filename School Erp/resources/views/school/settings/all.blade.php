@@ -545,20 +545,20 @@
                 <div class="setting-row">
                     <div class="setting-label-box">
                         <div class="setting-title">Student Admission Number Prefix</div>
-                        <div class="setting-desc">Configurable prefix for student admission numbers (e.g. YAS, ABC, SCH, DAV, KVS)</div>
+                        <div class="setting-desc">Configurable prefix for student admission numbers (e.g. JPPS, DPS, 001, 150)</div>
                     </div>
                     <div class="setting-control-box">
-                        <input type="text" name="student_id_prefix" class="setting-input" style="width:280px; text-transform:uppercase;" value="{{ $settings['student_id_prefix'] ?? 'YAS' }}" placeholder="e.g. YAS">
+                        <input type="text" name="student_id_prefix" class="setting-input" style="width:280px; text-transform:uppercase;" value="{{ $settings['student_id_prefix'] ?? '' }}" placeholder="Leave blank or enter prefix e.g. JPPS or 001">
                     </div>
                 </div>
 
                 <div class="setting-row">
                     <div class="setting-label-box">
                         <div class="setting-title">Staff Employee ID Prefix</div>
-                        <div class="setting-desc">Configurable prefix for staff employee IDs (e.g. EMP, STAFF, YAS-EMP, TCH)</div>
+                        <div class="setting-desc">Configurable prefix for staff employee IDs (e.g. EMP, 001, STAFF)</div>
                     </div>
                     <div class="setting-control-box">
-                        <input type="text" name="staff_id_prefix" class="setting-input" style="width:280px; text-transform:uppercase;" value="{{ $settings['staff_id_prefix'] ?? 'EMP' }}" placeholder="e.g. EMP">
+                        <input type="text" name="staff_id_prefix" class="setting-input" style="width:280px; text-transform:uppercase;" value="{{ $settings['staff_id_prefix'] ?? '' }}" placeholder="Leave blank or enter prefix e.g. EMP or 001">
                     </div>
                 </div>
             </div>
@@ -609,6 +609,20 @@
                         <div class="toggle-switch-group">
                             <button type="button" class="toggle-btn btn-on {{ $settings['allow_staff_login'] == '1' ? 'active' : '' }}" onclick="setToggle('allow_staff_login', '1', this)"><i class="fas fa-power-off"></i> Turn On</button>
                             <button type="button" class="toggle-btn btn-off {{ $settings['allow_staff_login'] == '0' ? 'active' : '' }}" onclick="setToggle('allow_staff_login', '0', this)"><i class="fas fa-power-off"></i> Turn Off</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-row">
+                    <div class="setting-label-box">
+                        <div class="setting-title">Allow Password Reset</div>
+                        <div class="setting-desc">Permit resetting passwords for Students, Parents, Teachers, and Staff</div>
+                    </div>
+                    <div class="setting-control-box">
+                        <input type="hidden" name="allow_password_reset" id="val_allow_password_reset" value="{{ $settings['allow_password_reset'] ?? '1' }}">
+                        <div class="toggle-switch-group">
+                            <button type="button" class="toggle-btn btn-on {{ ($settings['allow_password_reset'] ?? '1') == '1' ? 'active' : '' }}" onclick="setToggle('allow_password_reset', '1', this)"><i class="fas fa-power-off"></i> Turn On</button>
+                            <button type="button" class="toggle-btn btn-off {{ ($settings['allow_password_reset'] ?? '1') == '0' ? 'active' : '' }}" onclick="setToggle('allow_password_reset', '0', this)"><i class="fas fa-power-off"></i> Turn Off</button>
                         </div>
                     </div>
                 </div>

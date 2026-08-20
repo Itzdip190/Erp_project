@@ -30,13 +30,14 @@ class SettingService
             'date_format' => 'Y-m-d',
             'prospectus_issue' => '1',
             'active_session' => '',
-            'student_id_prefix' => 'YAS',
-            'staff_id_prefix' => 'EMP',
+            'student_id_prefix' => '',
+            'staff_id_prefix' => '',
 
             // 2. User Controls
             'allow_student_login' => '1',
             'allow_parent_login' => '1',
             'allow_staff_login' => '1',
+            'allow_password_reset' => '1',
             'allow_online_admission' => '1',
             'allow_student_profile_edit' => '1',
             'show_fee_to_parents' => '1',

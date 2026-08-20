@@ -29,7 +29,7 @@
                             </div>
                             <div>
                                 <h6 class="fw-bold text-dark mb-1">Official Email</h6>
-                                <a href="mailto:vedantpublicschool@gmail.com" class="text-primary text-decoration-none fw-bold">vedantpublicschool@gmail.com</a>
+                                <a href="mailto:info@educorerp.com" class="text-primary text-decoration-none fw-bold">info@educorerp.com</a>
                             </div>
                         </div>
 

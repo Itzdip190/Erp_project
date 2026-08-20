@@ -440,7 +440,7 @@
                         </div>
                         <div class="phone-list-item">
                             <span class="phone-label">Email:</span>
-                            <a href="mailto:vedantpublicschool@gmail.com" class="phone-number" style="word-break: break-all; font-size: 0.85rem;">vedantpublicschool@gmail.com</a>
+                            <a href="mailto:info@educorerp.com" class="phone-number" style="word-break: break-all; font-size: 0.85rem;">info@educorerp.com</a>
                         </div>
                     </div>
 

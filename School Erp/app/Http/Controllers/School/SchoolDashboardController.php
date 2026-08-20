@@ -43,7 +43,15 @@ class SchoolDashboardController extends Controller
             ->first();
 
         // ── 1. TOP CARDS (HEADCOUNT, ACCOUNTS, FEE, ATTENDANCE) ───────────────
-        $totalStudents = Student::where('school_id', $schoolId)->where('is_active', true)->count();
+        $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
+        if ($currentSession) {
+            $sessId = $currentSession->id;
+            $totalStudentsQuery->where(function($q) use ($sessId) {
+                $q->where('academic_session_id', $sessId)
+                  ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $sessId));
+            });
+        }
+        $totalStudents = $totalStudentsQuery->count();
         $totalStaffs = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
 
         // Accounts counts
@@ -103,9 +111,35 @@ class SchoolDashboardController extends Controller
             : 0;
 
         // ── 2. ENROLLMENT OVERVIEW (GENDER, ATTRITION, ADMISSIONS) ───────────
-        $studentMaleCount = Student::where('school_id', $schoolId)->where('is_active', true)->where('gender', 'male')->count();
-        $studentFemaleCount = Student::where('school_id', $schoolId)->where('is_active', true)->where('gender', 'female')->count();
-        $studentNotMappedCount = Student::where('school_id', $schoolId)->where('is_active', true)->whereNull('section_id')->count();
+        $studentMaleCount = Student::where('school_id', $schoolId)->where('is_active', true)
+            ->when($currentSession, function($q) use ($currentSession) {
+                $sessId = $currentSession->id;
+                $q->where(function($sq) use ($sessId) {
+                    $sq->where('academic_session_id', $sessId)
+                       ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                });
+            })
+            ->where('gender', 'male')->count();
+
+        $studentFemaleCount = Student::where('school_id', $schoolId)->where('is_active', true)
+            ->when($currentSession, function($q) use ($currentSession) {
+                $sessId = $currentSession->id;
+                $q->where(function($sq) use ($sessId) {
+                    $sq->where('academic_session_id', $sessId)
+                       ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                });
+            })
+            ->where('gender', 'female')->count();
+
+        $studentNotMappedCount = Student::where('school_id', $schoolId)->where('is_active', true)
+            ->when($currentSession, function($q) use ($currentSession) {
+                $sessId = $currentSession->id;
+                $q->where(function($sq) use ($sessId) {
+                    $sq->where('academic_session_id', $sessId)
+                       ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                });
+            })
+            ->whereNull('section_id')->count();
         
         $sumMapped = $studentMaleCount + $studentFemaleCount + $studentNotMappedCount;
         if ($sumMapped > 0) {
@@ -485,9 +519,16 @@ class SchoolDashboardController extends Controller
             ->whereDate('date', today())
             ->count();
 
-        $totalStudents = Student::where('school_id', $schoolId)
-            ->where('is_active', true)
-            ->count();
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
+        if ($currentSession) {
+            $sessId = $currentSession->id;
+            $totalStudentsQuery->where(function($q) use ($sessId) {
+                $q->where('academic_session_id', $sessId)
+                  ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $sessId));
+            });
+        }
+        $totalStudents = $totalStudentsQuery->count();
 
         $staffPresentToday = StaffAttendance::where('school_id', $schoolId)
             ->whereDate('date', today())
@@ -555,7 +596,16 @@ class SchoolDashboardController extends Controller
             ->sum('amount_paid');
 
         // 2. Student Attendance
-        $totalStudents = Student::where('school_id', $schoolId)->where('is_active', true)->count();
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
+        if ($currentSession) {
+            $sessId = $currentSession->id;
+            $totalStudentsQuery->where(function($q) use ($sessId) {
+                $q->where('academic_session_id', $sessId)
+                  ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $sessId));
+            });
+        }
+        $totalStudents = $totalStudentsQuery->count();
         $studentAttendance = StudentAttendance::where('school_id', $schoolId)->whereDate('date', $date)->get();
         $studentPresent = $studentAttendance->where('status', 'present')->count();
         $studentMarked = $studentAttendance->count();
@@ -921,12 +971,23 @@ class SchoolDashboardController extends Controller
 
                 foreach ($classes as $c) {
                     foreach ($c->sections as $sec) {
-                        $query = Student::where('school_id', $schoolId)->where('class_id', $c->id)->where('section_id', $sec->id);
+                        $query = Student::where('school_id', $schoolId);
                         if ($selectedSession) {
-                            $query->where(function($q) use ($selectedSession) {
-                                $q->where('academic_session_id', $selectedSession->id)
-                                  ->orWhereNull('academic_session_id');
+                            $sessId = $selectedSession->id;
+                            $query->where(function($q) use ($sessId, $c, $sec) {
+                                $q->whereHas('studentSessions', function($sq) use ($sessId, $c, $sec) {
+                                    $sq->where('academic_session_id', $sessId)
+                                       ->where('class_id', $c->id)
+                                       ->where('section_id', $sec->id);
+                                })
+                                ->orWhere(function($mq) use ($sessId, $c, $sec) {
+                                    $mq->where('academic_session_id', $sessId)
+                                       ->where('class_id', $c->id)
+                                       ->where('section_id', $sec->id);
+                                });
                             });
+                        } else {
+                            $query->where('class_id', $c->id)->where('section_id', $sec->id);
                         }
                         $total = (clone $query)->count();
                         $active = (clone $query)->where('is_active', true)->count();
@@ -1369,8 +1430,20 @@ class SchoolDashboardController extends Controller
 
         $data = [];
 
+        $currentSession = AcademicSession::where('school_id', $schoolId)
+            ->where('is_current', true)
+            ->first();
+
         if ($box === 'overview') {
-            $totalStudents = Student::where('school_id', $schoolId)->where('is_active', true)->count();
+            $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
+            if ($currentSession) {
+                $sessId = $currentSession->id;
+                $totalStudentsQuery->where(function($q) use ($sessId) {
+                    $q->where('academic_session_id', $sessId)
+                      ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $sessId));
+                });
+            }
+            $totalStudents = $totalStudentsQuery->count();
             $totalStaffs = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
             $data = [
                 'totalStudents' => $totalStudents,
@@ -1421,7 +1494,15 @@ class SchoolDashboardController extends Controller
                 'feeCollectedPct' => $feeCollectedPct,
             ];
         } elseif ($box === 'attendance') {
-            $totalStudents = Student::where('school_id', $schoolId)->where('is_active', true)->count();
+            $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
+            if ($currentSession) {
+                $sessId = $currentSession->id;
+                $totalStudentsQuery->where(function($q) use ($sessId) {
+                    $q->where('academic_session_id', $sessId)
+                      ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $sessId));
+                });
+            }
+            $totalStudents = $totalStudentsQuery->count();
             $totalStaffs = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
 
             $markedStudentsToday = StudentAttendance::where('school_id', $schoolId)
@@ -1459,7 +1540,15 @@ class SchoolDashboardController extends Controller
                 'staffPresentToday' => $presentStaffToday,
             ];
         } elseif ($box === 'attrition') {
-            $totalStudents = Student::where('school_id', $schoolId)->where('is_active', true)->count();
+            $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
+            if ($currentSession) {
+                $sessId = $currentSession->id;
+                $totalStudentsQuery->where(function($q) use ($sessId) {
+                    $q->where('academic_session_id', $sessId)
+                      ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $sessId));
+                });
+            }
+            $totalStudents = $totalStudentsQuery->count();
             $totalStaffs = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
             $studentNewlyJoined = Student::where('school_id', $schoolId)->whereYear('admission_date', now()->year)->count();
             $studentExited = Student::where('school_id', $schoolId)->onlyTrashed()->count();

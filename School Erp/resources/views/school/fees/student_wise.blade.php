@@ -3432,7 +3432,7 @@ document.addEventListener('DOMContentLoaded', function() {
      MARK PAID MODAL
 ══════════════════════════════════════════════════════════════════════ --}}
 <div class="sw-modal-overlay" id="markPaidModal" style="display:none;" onclick="if(event.target===this) closeMarkPaid()">
-    <div class="sw-modal" style="width:480px; max-height:90vh; overflow-y:auto;">
+    <div class="sw-modal" style="width:650px; max-width:95vw; max-height:92vh; overflow-y:auto;">
         <h3><i class="fas fa-indian-rupee-sign" style="color:var(--sw-blue2);"></i> Record Payment</h3>
         <form method="POST" action="{{ route('school.fees.student-wise') }}" id="paymentForm">
             @csrf
@@ -3497,6 +3497,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <label id="transactionIdLabel">Transaction ID / Reference (Optional)</label>
                 <input type="text" name="transaction_id" id="modalTransactionId" placeholder="e.g. TXN9876543210">
                 <div id="modalChequeError" style="display:none; color:#dc2626; font-size:0.78rem; font-weight:700; margin-top:4px;">Cheque Number must contain digits only.</div>
+            </div>
+
+            <div class="sw-modal-field" id="remarksField">
+                <label id="remarksLabel">Remarks (Optional)</label>
+                <input type="text" name="remarks" id="modalRemarks" placeholder="e.g. Paid by parent / installment note">
             </div>
 
             <!-- Cheque Specific Fields -->
@@ -4099,7 +4104,10 @@ function openMarkPaid(studentId, installmentNo, dueAmt, label, studentFeeId = nu
             document.getElementById('modalReceiptNo').value = 'REC-' + Math.floor(100000 + Math.random() * 900000);
         });
     
-    // Reset payment mode
+    // Reset Remarks and payment mode
+    if (document.getElementById('modalRemarks')) {
+        document.getElementById('modalRemarks').value = '';
+    }
     const modeSelect = document.getElementById('modalPaymentMode');
     modeSelect.value = 'cash';
     togglePaymentModeFields('cash');

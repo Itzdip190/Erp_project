@@ -2765,6 +2765,7 @@ class FeeManagementController extends Controller
                     'amount_paid'          => 'required|numeric|min:0',
                     'payment_mode'         => 'required|string',
                     'transaction_id'       => 'nullable|string',
+                    'remarks'              => 'nullable|string',
                     'receipt_date'         => 'nullable|date',
                     'receipt_no'           => 'nullable|string',
                     'bank_name'            => 'nullable|string',
@@ -3508,7 +3509,9 @@ class FeeManagementController extends Controller
                             'payment_mode' => $paymentMode,
                             'payment_date' => $receiptDate,
                             'payment_details' => $paymentDetailsJson,
-                            'remarks' => $request->transaction_id ? ('Transaction ID: ' . $request->transaction_id) : 'Fee Payment',
+                            'remarks' => $request->filled('remarks')
+                                ? $request->remarks . ($request->transaction_id ? ' (Txn ID: ' . $request->transaction_id . ')' : '')
+                                : ($request->transaction_id ? ('Transaction ID: ' . $request->transaction_id) : 'Fee Payment'),
                         ]);
 
                         return $invNo;

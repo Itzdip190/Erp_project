@@ -30,7 +30,7 @@
         <div class="container d-flex flex-wrap justify-content-between align-items-center">
             <div class="d-flex align-items-center gap-3">
                 <span><i class="fas fa-headset me-1 text-primary"></i> For queries, contact:</span>
-                <a href="mailto:vedantpublicschool@gmail.com"><i class="fas fa-envelope me-1"></i> vedantpublicschool@gmail.com</a>
+                <a href="mailto:info@educorerp.com"><i class="fas fa-envelope me-1"></i> info@educorerp.com</a>
             </div>
             <div class="d-none d-sm-flex align-items-center gap-3">
                 <a href="tel:+919451805575"><i class="fas fa-phone-alt me-1"></i> +91 94518 05575</a>
@@ -199,7 +199,7 @@
 
                 <div class="col-lg-3">
                     <h5 class="footer-title">Get In Touch</h5>
-                    <p class="text-slate-400 mb-2" style="color: #94a3b8;"><i class="fas fa-envelope text-primary me-2"></i> vedantpublicschool@gmail.com</p>
+                    <p class="text-slate-400 mb-2" style="color: #94a3b8;"><i class="fas fa-envelope text-primary me-2"></i> info@educorerp.com</p>
                     <p class="text-slate-400 mb-2" style="color: #94a3b8;"><i class="fas fa-phone-alt text-primary me-2"></i> +91 94518 05575</p>
                     <p class="text-slate-400 mb-3" style="color: #94a3b8;"><i class="fas fa-map-marker-alt text-primary me-2"></i> Sector 88A Gurgaon, Haryana</p>
                     <a href="{{ route('landing.book-demo') }}" class="btn btn-sm btn-primary fw-bold px-3 py-2 rounded-3">

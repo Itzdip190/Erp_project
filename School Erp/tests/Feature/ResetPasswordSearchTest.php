@@ -459,5 +459,83 @@ class ResetPasswordSearchTest extends TestCase
             $this->assertFalse($this->parentUser->hasRole('student'));
         }
     }
+
+    #[Test]
+    public function test_22_initial_page_load_does_not_load_user_list()
+    {
+        $response = $this->actingAs($this->adminUser)
+            ->get(route('school.settings.reset-password'));
+
+        $response->assertStatus(200);
+        $viewUsers = $response->viewData('users');
+        $hasFilter = $response->viewData('hasFilter');
+
+        $this->assertFalse($hasFilter);
+        $this->assertCount(0, $viewUsers);
+        $response->assertSee('Search User Records');
+    }
+
+    #[Test]
+    public function test_23_multi_school_isolation_prevents_cross_school_data_leakage()
+    {
+        $otherSchool = School::create([
+            'name' => 'Other School B',
+            'code' => 'OSB',
+            'status' => 'active',
+        ]);
+
+        $otherUser = User::create([
+            'school_id' => $otherSchool->id,
+            'name' => 'Other School Student',
+            'email' => 'other.student@osb.com',
+            'phone' => '8887776665',
+            'password' => Hash::make('password123'),
+            'role' => 'student',
+            'is_active' => true,
+        ]);
+        $otherUser->assignRole('student');
+
+        // Admin of Yash International School searches with user_type=all & search text
+        $response = $this->actingAs($this->adminUser)
+            ->get(route('school.settings.reset-password', ['user_type' => 'student', 'search' => 'Other School']));
+
+        $response->assertStatus(200);
+        $response->assertDontSee('Other School Student');
+
+        $viewUsers = $response->viewData('users');
+        $this->assertNull($viewUsers->firstWhere('name', 'Other School Student'));
+    }
+
+    #[Test]
+    public function test_24_data_accuracy_for_student_father_mother_teacher_staff()
+    {
+        // 1. Search Father
+        $responseFather = $this->actingAs($this->adminUser)
+            ->get(route('school.settings.reset-password', ['user_type' => 'parent', 'search' => 'Ishaan Yadav']));
+
+        $responseFather->assertStatus(200);
+        $responseFather->assertSee('Ishaan Yadav');
+        $responseFather->assertSee('Father');
+        $responseFather->assertSee('ADM2026007'); // Child admission number
+        $responseFather->assertSee('LKG - C');    // Child class and section
+
+        // 2. Search Teacher
+        $responseTeacher = $this->actingAs($this->adminUser)
+            ->get(route('school.settings.reset-password', ['user_type' => 'teacher', 'search' => 'Gaurav Srivastava']));
+
+        $responseTeacher->assertStatus(200);
+        $responseTeacher->assertSee('Gaurav Srivastava');
+        $responseTeacher->assertSee('Teacher');
+        $responseTeacher->assertSee('EMP202601'); // Staff employee ID
+
+        // 3. Search Staff
+        $responseStaff = $this->actingAs($this->adminUser)
+            ->get(route('school.settings.reset-password', ['search' => 'Suresh Kumar']));
+
+        $responseStaff->assertStatus(200);
+        $responseStaff->assertSee('Suresh Kumar');
+        $responseStaff->assertSee('EMP202602');
+    }
 }
+
 
