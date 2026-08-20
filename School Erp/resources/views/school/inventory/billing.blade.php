@@ -492,7 +492,7 @@
         to { opacity: 1; transform: translateY(0); }
     }
 
-    /* ─── Custom Modal Overlay for Image 4 Receipt ─────────────────────── */
+    /* ─── Custom Modal Overlay for Receipt Preview ────────────────────── */
     .custom-modal-overlay {
         position: fixed;
         inset: 0;
@@ -512,7 +512,7 @@
     .custom-modal-dialog {
         background: #ffffff;
         border-radius: 14px;
-        max-width: 920px;
+        max-width: 1060px;
         width: 100%;
         max-height: 90vh;
         overflow-y: auto;
@@ -539,6 +539,51 @@
         justify-content: space-between;
         border-bottom-left-radius: 13px;
         border-bottom-right-radius: 13px;
+    }
+
+    /* ─── Direct Browser Print Styles (@media print) ───────────────────── */
+    @media print {
+        body {
+            background: #ffffff !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        body * {
+            visibility: hidden !important;
+        }
+        #printable-receipt-view, #printable-receipt-view * {
+            visibility: visible !important;
+        }
+        #printable-receipt-view {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            background: #ffffff !important;
+            z-index: 999999 !important;
+        }
+        .custom-modal-overlay {
+            position: static !important;
+            background: transparent !important;
+            padding: 0 !important;
+            display: block !important;
+        }
+        .custom-modal-dialog {
+            box-shadow: none !important;
+            border: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
+        }
+        .custom-modal-header, .custom-modal-footer, .inv-container, .inv-slider-panel, .inv-slider-backdrop, .no-print {
+            display: none !important;
+        }
+        @page {
+            size: landscape;
+            margin: 6mm 8mm;
+        }
     }
 </style>
 
@@ -1658,34 +1703,59 @@
     }
 
     function printModalReceipt() {
-        const printContent = document.getElementById('printable-receipt-view').innerHTML;
-        const win = window.open('', '', 'height=750,width=1050');
-        win.document.write(`
-            <html>
+        const printContent = document.getElementById('printable-receipt-view');
+        if (!printContent) {
+            window.print();
+            return;
+        }
+
+        try {
+            // Check if existing frame exists, remove it
+            let oldFrame = document.getElementById('inventory-print-iframe');
+            if (oldFrame) {
+                oldFrame.remove();
+            }
+
+            const iframe = document.createElement('iframe');
+            iframe.id = 'inventory-print-iframe';
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`
+                <!DOCTYPE html>
+                <html>
                 <head>
-                    <title>Print Receipt</title>
+                    <title>Sales Receipt</title>
                     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
                     <style>
                         * { box-sizing: border-box; margin: 0; padding: 0; }
-                        body { font-family: Arial, Helvetica, sans-serif; color: #000; padding: 10px; }
+                        body { font-family: Arial, Helvetica, sans-serif; color: #000; padding: 8px; background: #fff; }
                         table { width: 100%; border-collapse: collapse; }
-                        @media print {
-                            body { padding: 0; }
-                            @page { size: landscape; margin: 6mm 8mm; }
-                        }
+                        @page { size: landscape; margin: 6mm 8mm; }
                     </style>
                 </head>
                 <body>
-                    ${printContent}
+                    ${printContent.innerHTML}
                 </body>
-            </html>
-        `);
-        win.document.close();
-        win.focus();
-        setTimeout(() => {
-            win.print();
-            win.close();
-        }, 300);
+                </html>
+            `);
+            doc.close();
+
+            setTimeout(() => {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            }, 250);
+        } catch (err) {
+            console.warn('Iframe print error, invoking window.print():', err);
+            window.print();
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
