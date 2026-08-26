@@ -31,6 +31,11 @@ class StaffPayrollPayment extends Model
         'payment_date' => 'date',
     ];
 
+    public function school()
+    {
+        return $this->belongsTo(School::class, 'school_id');
+    }
+
     public function staffPayroll()
     {
         return $this->belongsTo(StaffPayroll::class, 'staff_payroll_id');

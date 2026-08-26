@@ -1,10 +1,16 @@
 package com.educorerp.app
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.animation.Animation
@@ -16,16 +22,27 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import com.google.firebase.messaging.FirebaseMessaging
+import org.json.JSONObject
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * Android Native Presentation Layer
  * 
  * ARCHITECTURE DIRECTIVE:
  * This Android application operates as an independent presentation layer consuming shared backend APIs.
- * It does NOT depend on Web ERP Blade views. Any UI changes made here are strictly isolated to Mobile.
+ * It integrates native Firebase Cloud Messaging for lock screen alerts and ringtones.
  */
 class MainActivity : AppCompatActivity() {
+
+    companion object {
+        const val TAG = "EduCorMainActivity"
+    }
 
     private lateinit var webView: WebView
     private lateinit var splashWebView: WebView
@@ -35,6 +52,18 @@ class MainActivity : AppCompatActivity() {
     private var isSplashDismissed = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    // Android 13+ Notification Permission Launcher
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Log.d(TAG, "POST_NOTIFICATIONS permission granted by user.")
+            initFirebaseToken()
+        } else {
+            Log.w(TAG, "POST_NOTIFICATIONS permission denied by user.")
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +72,15 @@ class MainActivity : AppCompatActivity() {
         try {
             webView = findViewById(R.id.webView)
             splashWebView = findViewById(R.id.splashWebView)
+
+            // Request Notification Permission on Android 13+ (API 33+)
+            checkAndRequestNotificationPermission()
+
+            // Initialize FCM Token & Sync with Server
+            initFirebaseToken()
+
+            // Handle Deep link from push notification intent
+            handleNotificationIntent(intent)
 
             // Set white background to prevent any black screen flash during load
             webView.setBackgroundColor(android.graphics.Color.WHITE)
@@ -125,6 +163,91 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkAndRequestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permissionCheck = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            )
+            if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
+                requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    private fun initFirebaseToken() {
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (!task.isSuccessful) {
+                    Log.w(TAG, "Fetching FCM registration token failed", task.exception)
+                    return@addOnCompleteListener
+                }
+
+                val token = task.result
+                Log.d(TAG, "Fetched FCM Device Token: $token")
+                saveTokenLocally(token)
+                syncTokenWithServer(token)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing FCM: ${e.message}")
+        }
+    }
+
+    private fun saveTokenLocally(token: String) {
+        val prefs = getSharedPreferences("educor_app_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("fcm_device_token", token).apply()
+    }
+
+    private fun syncTokenWithServer(token: String) {
+        Thread {
+            try {
+                val url = URL("https://www.educorerp.com/notifications/register-device")
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "POST"
+                conn.setRequestProperty("Content-Type", "application/json; utf-8")
+                conn.setRequestProperty("Accept", "application/json")
+                conn.doOutput = true
+                conn.connectTimeout = 8000
+                conn.readTimeout = 8000
+
+                val json = JSONObject().apply {
+                    put("token", token)
+                    put("platform", "android")
+                    put("device_name", "${Build.MANUFACTURER} ${Build.MODEL}")
+                }
+
+                OutputStreamWriter(conn.outputStream).use { writer ->
+                    writer.write(json.toString())
+                    writer.flush()
+                }
+
+                val responseCode = conn.responseCode
+                Log.d(TAG, "FCM token synced with server. HTTP Status: $responseCode")
+                conn.disconnect()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error syncing FCM token: ${e.message}")
+            }
+        }.start()
+    }
+
+    private fun handleNotificationIntent(intent: Intent?) {
+        val actionUrl = intent?.getStringExtra("action_url")
+        if (!actionUrl.isNullOrEmpty() && actionUrl != "/") {
+            val destination = if (actionUrl.startsWith("http")) actionUrl else targetUrl.trimEnd('/') + actionUrl
+            mainHandler.postDelayed({
+                if (::webView.isInitialized) {
+                    webView.loadUrl(destination)
+                }
+            }, 1000)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleNotificationIntent(intent)
+    }
+
     // JavaScript Interface to receive trigger from HTML animation
     inner class AndroidBridge {
         @JavascriptInterface
@@ -132,6 +255,12 @@ class MainActivity : AppCompatActivity() {
             mainHandler.post {
                 dismissSplashWithAnimation()
             }
+        }
+
+        @JavascriptInterface
+        fun getFcmToken(): String {
+            val prefs = getSharedPreferences("educor_app_prefs", Context.MODE_PRIVATE)
+            return prefs.getString("fcm_device_token", "") ?: ""
         }
     }
 

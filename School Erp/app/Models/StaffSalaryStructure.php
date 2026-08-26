@@ -46,6 +46,11 @@ class StaffSalaryStructure extends Model
         'is_active' => 'boolean',
     ];
 
+    public function school()
+    {
+        return $this->belongsTo(School::class, 'school_id');
+    }
+
     public function staff()
     {
         return $this->belongsTo(Staff::class, 'staff_id');

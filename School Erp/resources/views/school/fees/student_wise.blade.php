@@ -1413,6 +1413,10 @@ body.dark-mode #feeComponentSectionContainer {
     </a>
 
     {{-- Summary badges --}}
+    @php
+        $prevYearDueVal = $previousYearDue ?? 0;
+        $grandEffectiveDue = $effectiveDue + $prevYearDueVal;
+    @endphp
     <div class="sw-summary-bar" style="padding:8px 0; display:flex; flex-wrap:wrap; gap:10px;">
         <div class="sw-badge-receivable" style="background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; font-weight:700; padding:6px 14px; border-radius:20px; font-size:0.85rem;">
             Total Fee: ₹{{ number_format($totalOriginal, 0) }}
@@ -1437,6 +1441,11 @@ body.dark-mode #feeComponentSectionContainer {
         <div class="sw-badge-refunded" style="background:#f3e8ff; color:#6b21a8; border:1px solid #e9d5ff; font-weight:700; padding:6px 14px; border-radius:20px; font-size:0.85rem;">
             Refunded: ₹{{ number_format($totalRefunded, 0) }}
         </div>
+        @if($prevYearDueVal > 0)
+        <div class="sw-badge-prev-due" style="background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; font-weight:700; padding:6px 14px; border-radius:20px; font-size:0.85rem;" title="Unpaid outstanding fees carried forward from previous academic session(s)">
+            <i class="fas fa-history" style="margin-right:4px;"></i> Previous Year Due: ₹{{ number_format($prevYearDueVal, 0) }}
+        </div>
+        @endif
         @if($pendingCheques->isNotEmpty())
             @foreach($pendingCheques->groupBy('installment_no') as $instNo => $instCheques)
                 <div style="background:#fffbeb; color:#92400e; border:1px solid #fcd34d; font-weight:700; padding:6px 14px; border-radius:20px; font-size:0.85rem;"
@@ -1447,8 +1456,10 @@ body.dark-mode #feeComponentSectionContainer {
             @endforeach
         @endif
         <div class="sw-badge-due" style="background:#fef2f2; color:#991b1b; border:1px solid #fca5a5; font-weight:700; padding:6px 14px; border-radius:20px; font-size:0.85rem;">
-            Due: ₹{{ number_format($effectiveDue, 0) }}
-            @if($chequePendingAmt > 0)
+            Due: ₹{{ number_format($grandEffectiveDue, 0) }}
+            @if($prevYearDueVal > 0)
+                <span style="font-size:0.75rem; font-weight:500; color:#b91c1c; margin-left:4px;">(Curr: ₹{{ number_format($effectiveDue, 0) }} + Prev: ₹{{ number_format($prevYearDueVal, 0) }})</span>
+            @elseif($chequePendingAmt > 0)
                 <span style="font-size:0.75rem; font-weight:500; color:#b91c1c; margin-left:4px;">(after cheque)</span>
             @endif
         </div>
@@ -1475,8 +1486,106 @@ body.dark-mode #feeComponentSectionContainer {
     @endif
 
     <div class="sw-fee-record-row">
-        {{-- Left Stacked Column: Tuition then Transport --}}
+        {{-- Left Stacked Column: Previous Due, Tuition then Transport --}}
         <div class="sw-fee-record-col-left">
+            {{-- Previous Academic Year Due / Carry Forward Section --}}
+            @php
+                $unpaidPreviousYearFees = collect();
+                if (isset($previousYearFees) && $previousYearFees->isNotEmpty()) {
+                    $unpaidPreviousYearFees = $previousYearFees->filter(function($pvf) {
+                        $pvfDue = $pvf->remaining_due ?? max(0, floatval($pvf->amount) + floatval($pvf->fine_amount_applied ?? 0) - floatval($pvf->instant_discount_amount) - floatval($pvf->paid_amount));
+                        return $pvfDue > 0;
+                    })->values();
+                }
+                $prevDuesTotal = $previousYearDue ?? 0;
+            @endphp
+            @if($unpaidPreviousYearFees->isNotEmpty() && $prevDuesTotal > 0)
+            <div id="previous-year-fees-section" class="prev-due-collapse" style="width: 100%; margin-bottom: 20px; transition: opacity 0.3s ease;">
+                <div class="sw-fee-body" style="margin-top: 0; border: 1.5px solid #fed7aa; background: #fffaf5; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                    <div class="sw-prev-due-header" onclick="togglePrevDue(this)" style="background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; cursor: pointer; user-select: none;">
+                        <div style="display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 0.95rem;">
+                            <i class="fas fa-history"></i>
+                            <span>Previous Academic Year Due / Carry Forward</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div style="font-size: 0.82rem; font-weight: 700; background: rgba(255,255,255,0.22); padding: 4px 14px; border-radius: 14px; white-space: nowrap;">
+                                Outstanding Due: ₹{{ number_format($prevDuesTotal, 0) }}
+                            </div>
+                            <i class="fas fa-chevron-down prev-due-chevron" style="color: #fff; font-size: 0.9rem; transition: transform .2s ease;"></i>
+                        </div>
+                    </div>
+
+                    <div class="prev-due-content" id="prevDueContent" style="padding: 14px 16px; overflow-x: auto; display: none;">
+                        <table style="width: 100%; font-size: .87rem; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #ffedd5; color: #9a3412; font-weight: 700; font-size: .8rem; text-transform: uppercase;">
+                                    <th style="padding: 8px 10px; text-align: left; width: 40px;">Select</th>
+                                    <th style="padding: 8px 10px; text-align: left;">Academic Year / Head</th>
+                                    <th style="padding: 8px 10px; text-align: left;">Installment</th>
+                                    <th style="padding: 8px 10px; text-align: right;">Amount</th>
+                                    <th style="padding: 8px 10px; text-align: right;">Paid</th>
+                                    <th style="padding: 8px 10px; text-align: right;">Due</th>
+                                    <th style="padding: 8px 10px; text-align: center; width: 110px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($unpaidPreviousYearFees as $pvf)
+                                @php
+                                    $pvfDue = $pvf->remaining_due ?? max(0, floatval($pvf->amount) + floatval($pvf->fine_amount_applied ?? 0) - floatval($pvf->instant_discount_amount) - floatval($pvf->paid_amount));
+                                    $pvfSessName = optional(optional($pvf->feeSchedule)->academicSession)->name 
+                                        ?: (optional(optional($pvf->transportFeeSchedule)->academicSession)->name 
+                                        ?: (optional(optional($pvf->miscFee)->academicSession)->name 
+                                        ?: (optional(optional($pvf->student)->academicSession)->name ?: 'Prior Session')));
+                                    $pvfHead = optional($pvf->component)->component_name ?: (optional($pvf->category)->name ?: 'Previous Outstanding');
+                                    $pvfLabel = $pvfSessName . ' - ' . $pvfHead;
+                                    $pvfInstLabel = 'Installment ' . $pvf->installment_no . ' (' . $pvfSessName . ')';
+                                @endphp
+                                <tr style="border-bottom: 1px solid #fed7aa;">
+                                    <td style="padding: 8px 10px;">
+                                        <input type="checkbox" class="fee-item-checkbox" 
+                                               data-type="previous_due" 
+                                               data-id="{{ $pvf->id }}" 
+                                               data-due="{{ $pvfDue }}" 
+                                               data-paid="{{ $pvf->paid_amount }}" 
+                                               data-inst="{{ $pvf->installment_no }}" 
+                                               data-inst-label="{{ $pvfInstLabel }}"
+                                               data-label="{{ $pvfLabel }} - ₹{{ number_format($pvfDue, 2) }}"
+                                               onclick="event.stopPropagation(); updateSelectedFeesSummary()"
+                                               onchange="updateSelectedFeesSummary()"
+                                               style="width: 16px; height: 16px; cursor: pointer; accent-color: #ea580c;">
+                                    </td>
+                                    <td style="padding: 8px 10px;">
+                                        <div style="font-weight: 700; color: #9a3412;">{{ $pvfSessName }}</div>
+                                        <div style="font-size: 0.8rem; color: #64748b;">{{ $pvfHead }}</div>
+                                    </td>
+                                    <td style="padding: 8px 10px; color: #475569; font-weight: 600;">
+                                        Installment {{ $pvf->installment_no }}
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: #1e293b;">
+                                        ₹{{ number_format($pvf->amount, 0) }}
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: right; font-weight: 600; color: #16a34a;">
+                                        ₹{{ number_format($pvf->paid_amount, 0) }}
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: right; font-weight: 800; color: #dc2626;">
+                                        ₹{{ number_format($pvfDue, 0) }}
+                                    </td>
+                                    <td style="padding: 8px 10px; text-align: center;">
+                                        <button class="sw-mark-paid-btn" style="background: #ea580c; border-color: #ea580c; font-size: 0.8rem; padding: 4px 10px;"
+                                            onclick="openMarkPaid({{ $pvf->student_id }}, {{ $pvf->installment_no }}, {{ $pvfDue }}, 'Previous Year ({{ $pvfSessName }})', {{ $pvf->id }}, 'tuition', 0)"
+                                            title="Collect Payment for Previous Year Due">
+                                            Mark Paid
+                                        </button>
+                                    </td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            @endif
+
             {{-- Tuition & Class Fees --}}
             <div id="tuition-fees-section" style="width: 100%; transition: opacity 0.3s ease;">
             <div class="sw-fee-body" style="margin-top: 0;">
@@ -3210,13 +3319,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     return $carry + max(0, $f->amount - $f->instant_discount_amount - $f->paid_amount);
                 }, 0);
 
-                // Total dues across all academic years
-                $totalReceivable = $fees->sum('amount') - $fees->sum('instant_discount_amount');
-                $totalPaid       = $fees->sum('paid_amount');
-                $totalDue        = $fees->reduce(function($carry, $f) {
+                // Previous years / historical dues for this student (matched strictly by admission_number or cross-session studentFees)
+                $prevFees = collect();
+                if (!empty($student->admission_number) && isset($historicalFeesByAdmission)) {
+                    $prevFees = $historicalFeesByAdmission->get($student->admission_number, collect());
+                } else {
+                    $prevFees = $fees->filter(function($fee) use ($selectedSession) {
+                        if ($fee->feeSchedule && $fee->feeSchedule->academic_session_id && $fee->feeSchedule->academic_session_id != $selectedSession->id) {
+                            return true;
+                        }
+                        if ($fee->transportFeeSchedule && $fee->transportFeeSchedule->academic_session_id && $fee->transportFeeSchedule->academic_session_id != $selectedSession->id) {
+                            return true;
+                        }
+                        if ($fee->miscFee && $fee->miscFee->academic_session_id && $fee->miscFee->academic_session_id != $selectedSession->id) {
+                            return true;
+                        }
+                        if ($fee->due_date && $selectedSession->start_date && $fee->due_date < $selectedSession->start_date) {
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+                $previousYearDue = $prevFees->reduce(function($carry, $f) {
                     if ($f->status === 'refunded') return $carry;
-                    return $carry + max(0, $f->amount - $f->instant_discount_amount - $f->paid_amount);
+                    return $carry + max(0, floatval($f->amount) + floatval($f->fine_amount_applied ?? 0) - floatval($f->instant_discount_amount) - floatval($f->paid_amount));
                 }, 0);
+
+                // Total dues across all academic years (Current Session Fee Due + Carried Forward Previous Year Due)
+                $totalDue = $due + $previousYearDue;
 
                 $initials    = strtoupper(substr($student->first_name, 0, 1));
 
@@ -3778,18 +3908,43 @@ function toggleSelectInstallment(headerCheckbox, targetClass) {
     updateSelectedFeesSummary();
 }
 
+function togglePrevDue(headerEl) {
+    if (window.event && window.event.target && (window.event.target.tagName.toLowerCase() === 'input' || window.event.target.tagName.toLowerCase() === 'button')) {
+        return;
+    }
+    const section = document.getElementById('previous-year-fees-section');
+    if (!section) return;
+    section.classList.toggle('open');
+    const content = section.querySelector('.prev-due-content');
+    const chevron = section.querySelector('.prev-due-chevron');
+    if (content) {
+        const isOpen = section.classList.contains('open');
+        content.style.display = isOpen ? 'block' : 'none';
+        if (chevron) {
+            chevron.style.transform = isOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+    }
+}
+
+function onFeeItemCheckChange(cb) {
+    updateSelectedFeesSummary();
+}
+
 function updateSelectedFeesSummary() {
     // Section disable/fade logic based on selections
     const tuitionSection = document.getElementById('tuition-fees-section');
     const transportSection = document.getElementById('transport-fees-section');
+    const prevDueSection = document.getElementById('previous-year-fees-section');
 
     const tuitionCbs = document.querySelectorAll('#tuition-fees-section .fee-installment-checkbox, #tuition-fees-section .fee-item-checkbox');
     const transportCbs = document.querySelectorAll('#transport-fees-section .fee-installment-checkbox, #transport-fees-section .fee-item-checkbox');
+    const prevDueCbs = document.querySelectorAll('#previous-year-fees-section .fee-item-checkbox');
 
     const hasCheckedTuition = Array.from(tuitionCbs).some(cb => cb.checked);
     const hasCheckedTransport = Array.from(transportCbs).some(cb => cb.checked);
+    const hasCheckedPrevDue = Array.from(prevDueCbs).some(cb => cb.checked);
 
-    if (hasCheckedTuition) {
+    if (hasCheckedTuition || hasCheckedPrevDue) {
         // Disable Transport section
         if (transportSection) {
             transportSection.style.opacity = '0.4';
@@ -3807,6 +3962,15 @@ function updateSelectedFeesSummary() {
         tuitionCbs.forEach(cb => {
             cb.disabled = false;
         });
+
+        // Enable Previous Due section
+        if (prevDueSection) {
+            prevDueSection.style.opacity = '1';
+            prevDueSection.style.pointerEvents = 'auto';
+        }
+        prevDueCbs.forEach(cb => {
+            cb.disabled = false;
+        });
     } else if (hasCheckedTransport) {
         // Disable Tuition section
         if (tuitionSection) {
@@ -3814,6 +3978,15 @@ function updateSelectedFeesSummary() {
             tuitionSection.style.pointerEvents = 'none';
         }
         tuitionCbs.forEach(cb => {
+            cb.disabled = true;
+        });
+
+        // Disable Previous Due section
+        if (prevDueSection) {
+            prevDueSection.style.opacity = '0.4';
+            prevDueSection.style.pointerEvents = 'none';
+        }
+        prevDueCbs.forEach(cb => {
             cb.disabled = true;
         });
 
@@ -3826,12 +3999,20 @@ function updateSelectedFeesSummary() {
             cb.disabled = false;
         });
     } else {
-        // Enable both sections
+        // Enable all sections
         if (tuitionSection) {
             tuitionSection.style.opacity = '1';
             tuitionSection.style.pointerEvents = 'auto';
         }
         tuitionCbs.forEach(cb => {
+            cb.disabled = false;
+        });
+
+        if (prevDueSection) {
+            prevDueSection.style.opacity = '1';
+            prevDueSection.style.pointerEvents = 'auto';
+        }
+        prevDueCbs.forEach(cb => {
             cb.disabled = false;
         });
 

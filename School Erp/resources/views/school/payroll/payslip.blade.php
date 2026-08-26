@@ -747,9 +747,14 @@
                                             </span>
                                         </td>
                                         <td class="text-center">
-                                            <a href="{{ route('school.payroll.payslip.view', ['id' => $row->id, 'export' => 'pdf']) }}" class="btn-dl-payslip" target="_blank">
-                                                <i class="fas fa-download"></i> DOWNLOAD
-                                            </a>
+                                            <div class="d-inline-flex align-items-center gap-1">
+                                                <a href="{{ route('school.payroll.payslip.view', ['id' => $row->id, 'view' => 'slip']) }}" class="btn btn-sm btn-light border text-blue-700 shadow-sm px-2 py-1" target="_blank" title="View & Print Payslip">
+                                                    <i class="fas fa-eye text-blue-600"></i>
+                                                </a>
+                                                <a href="{{ route('school.payroll.payslip.view', ['id' => $row->id, 'export' => 'pdf']) }}" class="btn-dl-payslip" target="_blank" title="Download PDF Payslip">
+                                                    <i class="fas fa-download"></i> PDF
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach

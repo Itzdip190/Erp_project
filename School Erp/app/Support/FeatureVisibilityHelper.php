@@ -71,7 +71,10 @@ class FeatureVisibilityHelper
             'hostels' => ['label' => 'Hostel & Room Management', 'category' => 'hostel', 'default_web' => 1, 'default_mobile' => 1],
 
             // Library
-            'library_books' => ['label' => 'Book Catalog & Issue/Return', 'category' => 'library', 'default_web' => 1, 'default_mobile' => 1],
+            'library_basics' => ['label' => 'Library Basics', 'category' => 'library', 'default_web' => 1, 'default_mobile' => 1],
+            'catalogue' => ['label' => 'Catalogue', 'category' => 'library', 'default_web' => 1, 'default_mobile' => 1],
+            'transactions' => ['label' => 'Transactions', 'category' => 'library', 'default_web' => 1, 'default_mobile' => 1],
+            'library_dashboard' => ['label' => 'Library Dashboard', 'category' => 'library', 'default_web' => 1, 'default_mobile' => 1],
 
             // Inventory
             'inventory_items' => ['label' => 'Inventory Items & Stock Issue', 'category' => 'inventory', 'default_web' => 1, 'default_mobile' => 1],
@@ -88,6 +91,11 @@ class FeatureVisibilityHelper
             // Cards & Certificates
             'id_cards' => ['label' => 'ID Card Template & Generation', 'category' => 'certificates', 'default_web' => 1, 'default_mobile' => 1],
             'certificates' => ['label' => 'Certificate Creator & Printing', 'category' => 'certificates', 'default_web' => 1, 'default_mobile' => 1],
+
+            // Daily Tasks
+            'task_heads' => ['label' => 'Daily Task Heads', 'category' => 'daily_task', 'default_web' => 1, 'default_mobile' => 1],
+            'questions' => ['label' => 'Daily Task Question Setup', 'category' => 'daily_task', 'default_web' => 1, 'default_mobile' => 1],
+            'teacher_review' => ['label' => 'Teacher Review & Student Reports', 'category' => 'daily_task', 'default_web' => 1, 'default_mobile' => 1],
 
             // AI & Utilities
             'ai_assistant_widget' => ['label' => 'AI Assistant Chat Widget', 'category' => 'ai_assistant', 'default_web' => 1, 'default_mobile' => 1],

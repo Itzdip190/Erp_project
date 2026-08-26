@@ -173,6 +173,7 @@
     <!-- Filter Context -->
     <div class="filter-info">
         <strong>Applied Filters:</strong> 
+        Academic Session: {{ $filters['session'] ?? 'All Sessions' }} &nbsp;|&nbsp; 
         Class: {{ $filters['class'] }} &nbsp;|&nbsp; 
         Section: {{ $filters['section'] }} &nbsp;|&nbsp; 
         Status Scope: {{ $filters['status'] }} &nbsp;|&nbsp; 
@@ -254,51 +255,61 @@
         </thead>
         <tbody>
             @forelse($students as $index => $student)
+            @php
+                $targetSessionId = $exportSessionId ?? null;
+                $sessionRec = ($targetSessionId && $targetSessionId !== 'all')
+                    ? $student->studentSessions->firstWhere('academic_session_id', $targetSessionId)
+                    : $student->studentSessions->sortByDesc('academic_session_id')->first();
+                $expClass = $sessionRec?->schoolClass?->name ?? ($student->class?->name ?? '—');
+                $expSection = $sessionRec?->section?->name ?? ($student->section?->name ?? '—');
+                $expRoll = $sessionRec?->roll_number ?? ($student->roll_number ?? '—');
+                $expSession = $sessionRec?->academicSession?->name ?? ($student->academicSession?->name ?? ($student->admission_year ?? '—'));
+            @endphp
             <tr>
                 <td style="text-align: center; font-weight: bold;">{{ $index + 1 }}</td>
                 <td style="font-weight: bold;">{{ $student->admission_number ?? '—' }}</td>
                 <td>{{ $student->admission_date ? \Carbon\Carbon::parse($student->admission_date)->format('d/m/Y') : '—' }}</td>
-                <td>{{ $student->first_name ?? '—' }}</td>
-                <td>{{ $student->last_name ?? '—' }}</td>
-                <td><strong>{{ $student->full_name ?? '—' }}</strong></td>
-                <td>{{ $student->class?->name ?? '—' }}</td>
-                <td>{{ $student->section?->name ?? '—' }}</td>
-                <td>{{ $student->roll_number ?? '—' }}</td>
-                <td>{{ $student->academicSession?->name ?? ($student->admission_year ?? '—') }}</td>
-                <td>{{ $student->date_of_birth ? \Carbon\Carbon::parse($student->date_of_birth)->format('d/m/Y') : '—' }}</td>
-                <td>{{ ucfirst($student->gender ?? '—') }}</td>
-                <td>{{ $student->religion ?? '—' }}</td>
-                <td>{{ $student->caste ?? '—' }}</td>
-                <td>{{ $student->sub_caste ?? '—' }}</td>
-                <td>{{ $student->category_name ?? ($student->category?->name ?? '—') }}</td>
-                <td>{{ $student->sub_category ?? '—' }}</td>
-                <td>{{ $student->blood_group ?? '—' }}</td>
-                <td>{{ $student->any_allergy ?? '—' }}</td>
-                <td>{{ $student->medical_allergies ?? '—' }}</td>
-                <td>{{ $student->birthmark ?? '—' }}</td>
-                <td>{{ $student->national_id ?? '—' }}</td>
-                <td>{{ $student->father_name ?? '—' }}</td>
-                <td>{{ $student->father_phone ?? '—' }}</td>
-                <td>{{ $student->father_id ?? '—' }}</td>
-                <td>{{ $student->mother_name ?? '—' }}</td>
-                <td>{{ $student->mother_phone ?? '—' }}</td>
-                <td>{{ $student->mother_id ?? '—' }}</td>
-                <td>{{ $student->address ?? '—' }}</td>
-                <td>{{ $student->city ?? '—' }}</td>
-                <td>{{ $student->state ?? '—' }}</td>
-                <td>{{ $student->country ?? '—' }}</td>
-                <td>{{ $student->pincode ?? '—' }}</td>
-                <td>{{ $student->emergency_name ?? '—' }}</td>
-                <td>{{ $student->emergency_number ?? '—' }}</td>
-                <td>{{ $student->medical_doctor_phone ?? '—' }}</td>
-                <td>{{ $student->medical_doctor_name ?? '—' }}</td>
-                <td>{{ $student->email ?? '—' }}</td>
-                <td>{{ $student->admission_type ?? '—' }}</td>
-                <td>{{ $student->boarding_type ?? '—' }}</td>
-                <td>{{ $student->defence_personal ?? '—' }}</td>
-                <td>{{ $student->transport_route ?? ($student->transport_opted ? 'Yes' : 'No') }}</td>
+                <td>{{ $sessionRec?->first_name ?? ($student->first_name ?? '—') }}</td>
+                <td>{{ $sessionRec?->last_name ?? ($student->last_name ?? '—') }}</td>
+                <td><strong>{{ $sessionRec?->full_name ?? ($student->full_name ?? '—') }}</strong></td>
+                <td>{{ $expClass }}</td>
+                <td>{{ $expSection }}</td>
+                <td>{{ $expRoll }}</td>
+                <td>{{ $expSession }}</td>
+                <td>{{ ($sessionRec?->date_of_birth ?? $student->date_of_birth) ? \Carbon\Carbon::parse($sessionRec?->date_of_birth ?? $student->date_of_birth)->format('d/m/Y') : '—' }}</td>
+                <td>{{ ucfirst($sessionRec?->gender ?? ($student->gender ?? '—')) }}</td>
+                <td>{{ $sessionRec?->religion ?? ($student->religion ?? '—') }}</td>
+                <td>{{ $sessionRec?->caste ?? ($student->caste ?? '—') }}</td>
+                <td>{{ $sessionRec?->sub_caste ?? ($student->sub_caste ?? '—') }}</td>
+                <td>{{ $sessionRec?->category_name ?? ($student->category_name ?? ($student->category?->name ?? '—')) }}</td>
+                <td>{{ $sessionRec?->sub_category ?? ($student->sub_category ?? '—') }}</td>
+                <td>{{ $sessionRec?->blood_group ?? ($student->blood_group ?? '—') }}</td>
+                <td>{{ $sessionRec?->any_allergy ?? ($student->any_allergy ?? '—') }}</td>
+                <td>{{ $sessionRec?->medical_allergies ?? ($student->medical_allergies ?? '—') }}</td>
+                <td>{{ $sessionRec?->birthmark ?? ($student->birthmark ?? '—') }}</td>
+                <td>{{ $sessionRec?->national_id ?? ($student->national_id ?? '—') }}</td>
+                <td>{{ $sessionRec?->father_name ?? ($student->father_name ?? '—') }}</td>
+                <td>{{ $sessionRec?->father_phone ?? ($student->father_phone ?? '—') }}</td>
+                <td>{{ $sessionRec?->father_id ?? ($student->father_id ?? '—') }}</td>
+                <td>{{ $sessionRec?->mother_name ?? ($student->mother_name ?? '—') }}</td>
+                <td>{{ $sessionRec?->mother_phone ?? ($student->mother_phone ?? '—') }}</td>
+                <td>{{ $sessionRec?->mother_id ?? ($student->mother_id ?? '—') }}</td>
+                <td>{{ $sessionRec?->address ?? ($student->address ?? '—') }}</td>
+                <td>{{ $sessionRec?->city ?? ($student->city ?? '—') }}</td>
+                <td>{{ $sessionRec?->state ?? ($student->state ?? '—') }}</td>
+                <td>{{ $sessionRec?->country ?? ($student->country ?? '—') }}</td>
+                <td>{{ $sessionRec?->pincode ?? ($student->pincode ?? '—') }}</td>
+                <td>{{ $sessionRec?->emergency_name ?? ($student->emergency_name ?? '—') }}</td>
+                <td>{{ $sessionRec?->emergency_number ?? ($student->emergency_number ?? '—') }}</td>
+                <td>{{ $sessionRec?->medical_doctor_phone ?? ($student->medical_doctor_phone ?? '—') }}</td>
+                <td>{{ $sessionRec?->medical_doctor_name ?? ($student->medical_doctor_name ?? '—') }}</td>
+                <td>{{ $sessionRec?->email ?? ($student->email ?? '—') }}</td>
+                <td>{{ $sessionRec?->admission_type ?? ($student->admission_type ?? '—') }}</td>
+                <td>{{ $sessionRec?->boarding_type ?? ($student->boarding_type ?? '—') }}</td>
+                <td>{{ $sessionRec?->defence_personal ?? ($student->defence_personal ?? '—') }}</td>
+                <td>{{ $sessionRec?->transport_route ?? ($student->transport_route ?? ($student->transport_opted ? 'Yes' : 'No')) }}</td>
                 <td style="text-align: center;">
-                    @if($student->is_active)
+                    @if($sessionRec?->is_active ?? $student->is_active)
                         <span class="badge badge-active">Active</span>
                     @else
                         <span class="badge badge-inactive">Inactive</span>

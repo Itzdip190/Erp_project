@@ -1,10 +1,252 @@
+<!-- Firebase Web Push SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+
 <script>
 /**
- * SchoolCloud ERP Real-Time Notification & Dynamic Sync Engine
+ * SchoolCloud ERP Real-Time Notification & Firebase Background Push Engine
  */
 (function() {
+    const FIREBASE_CONFIG = {
+        projectId: 'erp-1-23074',
+        messagingSenderId: '628420405085',
+        appId: '1:628420405085:web:schoolerp'
+    };
+    const VAPID_KEY = 'BE40TJMbrT9egACxo9MEllPfrMK8Qa12dy8KnvBzOJM7SorOd521v7yrw4VbSYHxssJNMZQ6N61wkz8b61bRhI';
+
     let evtSource = null;
     let fallbackInterval = null;
+    let knownNotifIds = new Set();
+    let isInitialLoad = true;
+    let swRegistration = null;
+
+    // 1. Initialize Firebase Cloud Messaging for Background Lock-screen Push
+    function initFirebaseMessaging() {
+        if (!('serviceWorker' in navigator)) {
+            console.debug('ServiceWorker not supported');
+            return;
+        }
+
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+            .then(reg => {
+                swRegistration = reg;
+
+                if (typeof firebase !== 'undefined') {
+                    try {
+                        if (!firebase.apps.length) {
+                            firebase.initializeApp(FIREBASE_CONFIG);
+                        }
+                        const messaging = firebase.messaging();
+
+                        // Request permission and fetch real FCM Device Token from Google
+                        Notification.requestPermission().then(permission => {
+                            if (permission === 'granted') {
+                                messaging.getToken({
+                                    vapidKey: VAPID_KEY,
+                                    serviceWorkerRegistration: reg
+                                }).then(currentToken => {
+                                    if (currentToken) {
+                                        sendTokenToServer(currentToken);
+                                    }
+                                }).catch(err => {
+                                    console.debug('Error retrieving FCM token:', err);
+                                    fallbackLocalRegistration();
+                                });
+                            } else {
+                                fallbackLocalRegistration();
+                            }
+                        });
+
+                        // Foreground message listener
+                        messaging.onMessage(payload => {
+                            const item = {
+                                id: Date.now(),
+                                title: payload.notification?.title || payload.data?.title || 'School Notification',
+                                message: payload.notification?.body || payload.data?.body || '',
+                                action_url: payload.data?.action_url || '/',
+                                color: '#1d4ed8',
+                                icon: 'fa-bell',
+                                time: 'Just now'
+                            };
+                            playNotificationChime();
+                            showFloatingPushBanner(item);
+                        });
+                    } catch (e) {
+                        console.debug('Firebase initialization fallback:', e);
+                        fallbackLocalRegistration();
+                    }
+                }
+            })
+            .catch(err => {
+                console.debug('SW Registration failed:', err);
+                fallbackLocalRegistration();
+            });
+    }
+
+    function sendTokenToServer(token) {
+        const isAndroid = /android/i.test(navigator.userAgent);
+        const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+        const platform = isAndroid ? 'android' : (isIOS ? 'ios' : 'web');
+        const deviceName = isAndroid ? 'Android Phone' : (isIOS ? 'iPhone Device' : 'Desktop Browser');
+
+        fetch("{{ route('notifications.register-device') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+            },
+            body: JSON.stringify({
+                token: token,
+                platform: platform,
+                device_name: deviceName,
+                school_id: {{ auth()->check() ? (auth()->user()->school_id ?? 'null') : 'null' }}
+            })
+        }).catch(e => console.debug('Token save error:', e));
+    }
+
+    function fallbackLocalRegistration() {
+        let deviceToken = localStorage.getItem('school_erp_device_token');
+        if (!deviceToken) {
+            deviceToken = 'web_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+            localStorage.setItem('school_erp_device_token', deviceToken);
+        }
+        sendTokenToServer(deviceToken);
+    }
+
+    // 2. Synthesized Audio Chime Tone
+    function playNotificationChime() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+
+            const notes = [
+                { freq: 587.33, delay: 0.00, dur: 0.28 }, // D5
+                { freq: 880.00, delay: 0.12, dur: 0.32 }, // A5
+                { freq: 1174.66, delay: 0.24, dur: 0.45 } // D6
+            ];
+
+            notes.forEach(note => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(note.freq, ctx.currentTime + note.delay);
+
+                gain.gain.setValueAtTime(0.0001, ctx.currentTime + note.delay);
+                gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + note.delay + 0.04);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + note.delay + note.dur);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(ctx.currentTime + note.delay);
+                osc.stop(ctx.currentTime + note.delay + note.dur);
+            });
+
+            if (navigator.vibrate) {
+                navigator.vibrate([150, 75, 150]);
+            }
+        } catch (e) {
+            console.debug('Audio chime error:', e);
+        }
+    }
+
+    // 3. Floating Mobile Push Banner UI
+    function showFloatingPushBanner(item) {
+        if (!item) return;
+
+        let container = document.getElementById('mobilePushBannerContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'mobilePushBannerContainer';
+            container.style.cssText = `
+                position: fixed;
+                top: 16px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 999999;
+                width: calc(100% - 32px);
+                max-width: 420px;
+                pointer-events: none;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            `;
+            document.body.appendChild(container);
+        }
+
+        const banner = document.createElement('div');
+        banner.style.cssText = `
+            background: rgba(15, 23, 42, 0.96);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: #ffffff;
+            border-radius: 16px;
+            padding: 14px 16px;
+            box-shadow: 0 20px 40px -5px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            pointer-events: auto;
+            cursor: pointer;
+            animation: slideDownPush 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            position: relative;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        `;
+
+        const iconColor = item.color || '#38bdf8';
+        const iconClass = item.icon || 'fa-bell';
+        const itemUrl = (item.action_url && item.action_url !== '#') ? item.action_url : 'javascript:void(0);';
+
+        banner.innerHTML = `
+            <style>
+                @keyframes slideDownPush {
+                    0% { transform: translateY(-120%); opacity: 0; }
+                    100% { transform: translateY(0); opacity: 1; }
+                }
+                @keyframes slideUpPush {
+                    0% { transform: translateY(0); opacity: 1; }
+                    100% { transform: translateY(-120%); opacity: 0; }
+                }
+            </style>
+            <div style="width:38px; height:38px; border-radius:10px; background:${iconColor}25; color:${iconColor}; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:16px;">
+                <i class="fas ${iconClass}"></i>
+            </div>
+            <div style="flex:1; min-width:0;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;">
+                    <span style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8; letter-spacing:0.5px;">School Notification</span>
+                    <span style="font-size:10px; color:#64748b;">Just now</span>
+                </div>
+                <div style="font-weight:700; font-size:13px; color:#ffffff; line-height:1.3; margin-bottom:2px;">${escapeHtml(item.title)}</div>
+                <div style="font-size:12px; color:#cbd5e1; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${escapeHtml(item.message)}</div>
+            </div>
+            <button type="button" style="background:none; border:none; color:#94a3b8; font-size:14px; cursor:pointer; padding:0 4px;" onclick="event.stopPropagation(); this.closest('div').remove();">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+
+        banner.onclick = () => {
+            if (typeof markNotificationRead === 'function' && item.id) {
+                markNotificationRead(item.id);
+            }
+            if (itemUrl && itemUrl !== 'javascript:void(0);') {
+                window.location.href = itemUrl;
+            }
+            banner.remove();
+        };
+
+        container.appendChild(banner);
+
+        setTimeout(() => {
+            if (banner.parentNode) {
+                banner.style.animation = 'slideUpPush 0.3s forwards';
+                setTimeout(() => banner.remove(), 300);
+            }
+        }, 6000);
+    }
 
     function initRealtimeStream() {
         if (!window.EventSource) {
@@ -15,15 +257,13 @@
         try {
             evtSource = new EventSource("{{ route('notifications.stream') }}", { withCredentials: true });
 
-            evtSource.addEventListener('connected', function(e) {
-                // Connected successfully
-            });
+            evtSource.addEventListener('connected', function(e) {});
 
             evtSource.addEventListener('notification', function(e) {
                 try {
                     const data = JSON.parse(e.data);
                     if (data.type === 'new_notifications') {
-                        updateNavbarNotifications(data.items, data.unread_count);
+                        handleIncomingNotifications(data.items, data.unread_count);
                         triggerDynamicUISync();
                     }
                 } catch (err) {
@@ -44,7 +284,6 @@
                 if (evtSource) {
                     evtSource.close();
                 }
-                // Fallback to high-frequency polling on stream error
                 startPollingFallback();
             };
         } catch (err) {
@@ -69,11 +308,39 @@
         .then(res => res.json())
         .then(data => {
             if (data && typeof data.unread_count !== 'undefined') {
-                updateNavbarNotifications(data.notifications, data.unread_count);
+                handleIncomingNotifications(data.notifications, data.unread_count);
                 triggerDynamicUISync();
             }
         })
         .catch(err => console.error('Fetch notifications error:', err));
+    }
+
+    function handleIncomingNotifications(items, unreadCount) {
+        if (items && Array.isArray(items)) {
+            let hasNewItems = false;
+            let newestItem = null;
+
+            items.forEach(item => {
+                if (item && item.id) {
+                    if (!knownNotifIds.has(item.id)) {
+                        knownNotifIds.add(item.id);
+                        if (!isInitialLoad && !item.is_read) {
+                            hasNewItems = true;
+                            newestItem = item;
+                        }
+                    }
+                }
+            });
+
+            if (hasNewItems && newestItem) {
+                playNotificationChime();
+                showFloatingPushBanner(newestItem);
+            }
+
+            isInitialLoad = false;
+        }
+
+        updateNavbarNotifications(items, unreadCount);
     }
 
     function updateBadgeOnly(count) {
@@ -97,7 +364,6 @@
     function updateNavbarNotifications(items, unreadCount) {
         updateBadgeOnly(unreadCount);
 
-        // Update Admin Layout Dropdown
         const adminDropContainer = document.querySelector('.notif-drop #notifListContainer, .notif-drop div[style*="max-height"]');
         if (adminDropContainer && items) {
             if (items.length === 0) {
@@ -108,6 +374,7 @@
                     const iconClass = n.icon || 'fa-bell';
                     const color = n.color || '#8b5cf6';
                     const itemUrl = (n.action_url && n.action_url !== '#') ? n.action_url : 'javascript:void(0);';
+                    const isUnreadBg = !n.is_read ? 'background: rgba(37,99,235,0.06); font-weight:600;' : 'background: #ffffff;';
                     
                     html += `
                         <a href="${itemUrl}" class="nd-item" onclick="markNotificationRead(${n.id})" style="${isUnreadBg} display:flex; gap:10px; padding:10px; border-bottom:1px solid #f1f5f9; text-decoration:none; color:inherit;">
@@ -126,7 +393,6 @@
             }
         }
 
-        // Update Mobile & Panel Notification Containers
         const listContainers = document.querySelectorAll('#notifListContainer, #sbNotifListContainer');
         listContainers.forEach(container => {
             if (container === adminDropContainer) return;
@@ -199,7 +465,6 @@
     };
 
     window.markAllNotifsAsRead = function() {
-        // Immediate optimistic UI badge & container update
         updateBadgeOnly(0);
         const listContainers = document.querySelectorAll('#notifListContainer, #sbNotifListContainer, .notif-drop #notifListContainer, .notif-drop div[style*="max-height"]');
         listContainers.forEach(c => {
@@ -218,6 +483,11 @@
         .catch(err => console.error('Mark all read error:', err));
     };
 
-    document.addEventListener('DOMContentLoaded', initRealtimeStream);
+    window.playNotificationChime = playNotificationChime;
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initFirebaseMessaging();
+        initRealtimeStream();
+    });
 })();
 </script>

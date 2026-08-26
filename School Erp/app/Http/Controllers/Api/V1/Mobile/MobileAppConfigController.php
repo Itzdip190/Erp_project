@@ -30,15 +30,28 @@ class MobileAppConfigController extends Controller
 
         $feeConfig = $schoolId ? \App\Models\FeeConfiguration::where('school_id', $schoolId)->first() : null;
 
+        // Dynamic theme & mobile settings configured from Admin UI
+        $appName = \App\Services\SettingService::get('mobile_app_name', 'SchoolCloud ERP Mobile', $schoolId);
+        $primaryColor = \App\Services\SettingService::get('mobile_primary_color', '#1d4ed8', $schoolId);
+        $accentColor = \App\Services\SettingService::get('mobile_accent_color', '#3b82f6', $schoolId);
+        $appLogo = \App\Services\SettingService::get('mobile_app_logo', '', $schoolId);
+        $maintenance = \App\Services\SettingService::get('mobile_app_maintenance', '0', $schoolId) == '1';
+        $minVersion = \App\Services\SettingService::get('mobile_min_version', '1.0.0', $schoolId);
+        $forceUpdate = \App\Services\SettingService::get('mobile_force_update', '0', $schoolId) == '1';
+
         return response()->json([
             'status' => 'success',
             'data' => [
-                'app_name' => 'SchoolCloud ERP Mobile',
-                'version' => '1.0.0',
+                'app_name' => $appName,
+                'app_logo' => $appLogo,
+                'version' => \App\Services\SettingService::get('mobile_app_version', '2.4.0', $schoolId),
+                'min_version' => $minVersion,
+                'force_update_required' => $forceUpdate,
+                'maintenance_mode' => $maintenance,
                 'channel_scope' => $scope,
                 'theme' => [
-                    'primary' => '#1e293b',
-                    'accent' => '#3b82f6',
+                    'primary' => $primaryColor,
+                    'accent' => $accentColor,
                     'background' => '#f8fafc',
                     'card_bg' => '#ffffff',
                     'text_color' => '#0f172a',
@@ -56,6 +69,45 @@ class MobileAppConfigController extends Controller
                     'show_driver_contact' => \App\Services\SettingService::get('show_driver_contact_to_parents', '1') == '1',
                     'receipt_prefix' => \App\Services\SettingService::get('transport_receipt_prefix', 'TRN-'),
                 ],
+            ]
+        ]);
+    }
+
+    /**
+     * Get active mobile banners and slider promos for the authenticated user role.
+     */
+    public function banners(Request $request): JsonResponse
+    {
+        $user = Auth::user();
+        $schoolId = $user ? $user->school_id : null;
+        $role = $request->query('role', ($user ? ($user->roles->first()?->name ?? 'all') : 'all'));
+
+        $banners = [];
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('mobile_app_banners')) {
+                $query = \App\Models\MobileAppBanner::query();
+                if ($schoolId) {
+                    $query->where('school_id', $schoolId);
+                }
+                $banners = $query->active()
+                    ->forRole($role)
+                    ->get();
+            }
+        } catch (\Throwable $e) {}
+
+        $sliderConfig = [
+            'interval' => (int) \App\Services\SettingService::get('mobile_slider_interval', '4000', $schoolId),
+            'autoplay' => \App\Services\SettingService::get('mobile_slider_autoplay', '1', $schoolId) == '1',
+            'loop' => \App\Services\SettingService::get('mobile_slider_loop', '1', $schoolId) == '1',
+            'aspect_ratio' => \App\Services\SettingService::get('mobile_slider_ratio', '16_9', $schoolId),
+            'show_dots' => \App\Services\SettingService::get('mobile_slider_dots', '1', $schoolId) == '1',
+        ];
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'slider_config' => $sliderConfig,
+                'banners' => $banners,
             ]
         ]);
     }

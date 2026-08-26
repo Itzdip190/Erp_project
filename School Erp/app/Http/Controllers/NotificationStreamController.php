@@ -62,7 +62,11 @@ class NotificationStreamController extends Controller
                     $payload = [
                         'type'         => 'new_notifications',
                         'unread_count' => $unreadCount,
-                        'items'        => $newNotifs->map(function ($n) {
+                        'items'        => $newNotifs->map(function ($n) use ($user, $role) {
+                            $actionUrl = $n->action_url;
+                            if (empty($actionUrl) || $actionUrl === '#') {
+                                $actionUrl = NotificationService::getDefaultActionUrl($n->module, $role);
+                            }
                             return [
                                 'id'         => $n->id,
                                 'title'      => $n->title,
@@ -72,7 +76,7 @@ class NotificationStreamController extends Controller
                                 'icon'       => $n->icon,
                                 'color'      => $n->color,
                                 'time'       => $n->created_at->diffForHumans(),
-                                'action_url' => $n->action_url,
+                                'action_url' => $actionUrl,
                             ];
                         }),
                     ];
@@ -109,11 +113,20 @@ class NotificationStreamController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
-        $unreadOnly = $request->has('all') ? !$request->boolean('all') : $request->boolean('unread_only', true);
+        $unreadOnly = $request->boolean('unread_only', false);
+        if ($request->has('all') && $request->boolean('all')) {
+            $unreadOnly = false;
+        }
+
+        $role = $user->hasRole('school_admin') ? 'school_admin' : ($user->hasRole('teacher') ? 'teacher' : ($user->hasRole('student') ? 'student' : ($user->hasRole('parent') ? 'parent' : null)));
         $unreadCount = NotificationService::getUnreadCount($user);
         $notifications = NotificationService::getNotifications($user, 25, $unreadOnly);
 
-        $items = $notifications->map(function ($n) {
+        $items = $notifications->map(function ($n) use ($role) {
+            $actionUrl = $n->action_url;
+            if (empty($actionUrl) || $actionUrl === '#') {
+                $actionUrl = NotificationService::getDefaultActionUrl($n->module, $role);
+            }
             return [
                 'id'         => $n->id,
                 'title'      => $n->title,
@@ -123,9 +136,10 @@ class NotificationStreamController extends Controller
                 'icon'       => $n->icon ?: NotificationService::getDefaultIcon($n->module),
                 'color'      => $n->color ?: NotificationService::getDefaultColor($n->module),
                 'is_read'    => (bool) $n->is_read,
-                'time'       => $n->created_at->diffForHumans(),
-                'date_str'   => $n->created_at->format('d M Y, h:i A'),
-                'action_url' => $n->action_url,
+                'time'       => $n->created_at ? $n->created_at->diffForHumans() : 'Just now',
+                'time_ago'   => $n->created_at ? $n->created_at->diffForHumans() : 'Just now',
+                'date_str'   => $n->created_at ? $n->created_at->format('d M Y, h:i A') : '',
+                'action_url' => $actionUrl,
             ];
         });
 
@@ -330,4 +344,61 @@ class NotificationStreamController extends Controller
             'requests'       => $requests,
         ]);
     }
+
+    /**
+     * Auto-register web browser / mobile device for push notifications.
+     */
+    public function registerDevice(Request $request)
+    {
+        $user = Auth::user();
+        $schoolId = $user ? $user->school_id : (app()->bound('currentSchool') ? app('currentSchool')?->id : null);
+        if (!$schoolId && $request->filled('school_id')) {
+            $schoolId = (int)$request->input('school_id');
+        }
+        if (!$schoolId) {
+            $schoolId = \App\Models\School::first()?->id ?? 1;
+        }
+
+        $token = $request->input('token') ?: ($request->input('endpoint') ?: 'web_' . md5(($user?->id ?? 'guest') . '_' . $request->ip() . '_' . substr($request->userAgent() ?? '', 0, 50)));
+        $platform = $request->input('platform');
+        if (!$platform) {
+            $ua = $request->userAgent() ?? '';
+            $platform = preg_match('/(android)/i', $ua) ? 'android' : (preg_match('/(iphone|ipad|ipod)/i', $ua) ? 'ios' : 'web');
+        }
+
+        $deviceName = $request->input('device_name');
+        if (!$deviceName) {
+            $ua = $request->userAgent() ?? '';
+            if (preg_match('/(android)/i', $ua)) {
+                $deviceName = 'Android Mobile';
+            } elseif (preg_match('/(iphone|ipad)/i', $ua)) {
+                $deviceName = 'iPhone / iOS';
+            } else {
+                $deviceName = 'Web Browser';
+            }
+        }
+
+        if ($schoolId) {
+            \App\Models\FcmDeviceToken::updateOrCreate(
+                [
+                    'school_id' => $schoolId,
+                    'user_id'   => $user?->id,
+                    'token'     => $token,
+                ],
+                [
+                    'device_name' => $deviceName,
+                    'platform'    => $platform,
+                    'updated_at'  => now(),
+                ]
+            );
+        }
+
+        return response()->json([
+            'status'     => 'success',
+            'message'    => 'Device registered successfully for push notifications',
+            'registered' => true,
+            'token'      => $token,
+        ]);
+    }
 }
+

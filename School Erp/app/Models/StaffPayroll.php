@@ -63,6 +63,11 @@ class StaffPayroll extends Model
         'finalised_at' => 'datetime',
     ];
 
+    public function school()
+    {
+        return $this->belongsTo(School::class, 'school_id');
+    }
+
     public function staff()
     {
         return $this->belongsTo(Staff::class, 'staff_id');

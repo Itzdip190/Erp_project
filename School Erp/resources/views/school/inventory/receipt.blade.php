@@ -140,6 +140,41 @@
             background: #1d4ed8;
         }
 
+        /* ─── Cancelled Stamp / Watermark ──────────────────────────────────── */
+        .cancelled-watermark {
+            position: absolute;
+            top: 48%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-25deg);
+            font-size: 52px;
+            font-weight: 900;
+            color: rgba(220, 38, 38, 0.22);
+            border: 4px dashed rgba(220, 38, 38, 0.45);
+            padding: 8px 28px;
+            border-radius: 10px;
+            text-transform: uppercase;
+            letter-spacing: 6px;
+            pointer-events: none;
+            z-index: 15;
+            white-space: nowrap;
+        }
+        .cancelled-notice-bar {
+            background: #fee2e2;
+            border: 1.5px solid #ef4444;
+            color: #b91c1c;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
         /* ─── Dual Copy Container (A4 Landscape / Split Layout) ─────────────── */
         .dual-slip-container {
             max-width: 1060px;
@@ -149,12 +184,14 @@
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
             display: flex;
             padding: 16px;
+            position: relative;
         }
 
         .single-slip {
             flex: 1;
             padding: 8px 14px;
             position: relative;
+            overflow: hidden;
         }
 
         .slip-divider {
@@ -322,6 +359,13 @@
 
         <!-- 1. LEFT COPY: OFFICE COPY -->
         <div class="single-slip">
+            @if(isset($sale->status) && in_array(strtolower($sale->status), ['cancelled', 'cancel']))
+                <div class="cancelled-watermark">CANCELLED</div>
+                <div class="cancelled-notice-bar">
+                    <i class="fas fa-ban"></i> CANCELLED INVOICE (VOID)
+                </div>
+            @endif
+
             <!-- Header -->
             <div class="slip-header">
                 @if($schoolLogo)
@@ -475,6 +519,13 @@
 
         <!-- 2. RIGHT COPY: STUDENT COPY -->
         <div class="single-slip">
+            @if(isset($sale->status) && in_array(strtolower($sale->status), ['cancelled', 'cancel']))
+                <div class="cancelled-watermark">CANCELLED</div>
+                <div class="cancelled-notice-bar">
+                    <i class="fas fa-ban"></i> CANCELLED INVOICE (VOID)
+                </div>
+            @endif
+
             <!-- Header -->
             <div class="slip-header">
                 @if($schoolLogo)

@@ -403,10 +403,67 @@ class Student extends Model
         return $this->hasMany(StudentDocument::class);
     }
 
+    public function gatePasses()
+    {
+        return $this->hasMany(StudentGatePass::class);
+    }
+
     public function studentSessions()
     {
         return $this->hasMany(StudentSession::class);
     }
+
+    /**
+     * Get the student's enrollment record for a specific academic session.
+     */
+    public function studentSessionFor(?int $sessionId = null): ?StudentSession
+    {
+        $sessionId = $sessionId ?? $this->academic_session_id;
+        if (!$sessionId) {
+            return null;
+        }
+
+        if ($this->relationLoaded('studentSessions')) {
+            return $this->studentSessions->firstWhere('academic_session_id', $sessionId);
+        }
+
+        return $this->studentSessions()->where('academic_session_id', $sessionId)->first();
+    }
+
+    /**
+     * Get the student's full name in a specific academic session context.
+     */
+    public function getFullNameInSession(?int $sessionId = null): string
+    {
+        $session = $sessionId ? $this->studentSessionFor($sessionId) : null;
+        if ($session) {
+            $name = $session->full_name;
+            if (!empty($name)) {
+                return $name;
+            }
+        }
+        return $this->full_name;
+    }
+
+    /**
+     * Get a student's profile attribute or session record for a specific academic session.
+     */
+    public function getProfileInSession(?int $sessionId = null, ?string $key = null, $default = null)
+    {
+        $sessionId = $sessionId ?? $this->academic_session_id;
+        $session = $this->studentSessionFor($sessionId);
+        if ($session) {
+            if ($key !== null) {
+                return $session->getProfileAttribute($key, $default);
+            }
+            return $session;
+        }
+        if ($key !== null) {
+            return $this->getAttribute($key) ?? $default;
+        }
+        return null;
+    }
+
 
     public function attendances()
     {
@@ -483,6 +540,89 @@ class Student extends Model
     public function deletionRequests()
     {
         return $this->hasMany(StudentDeletionRequest::class, 'student_id');
+    }
+
+    /**
+     * Scope a query to only active, non-alumni, non-transferred students without TC.
+     */
+    public function scopeActiveStudents($query)
+    {
+        return $query->where('is_active', 1)
+                     ->where('is_alumni', 0)
+                     ->where(function($q) {
+                         $q->where('is_transfer', 0)->orWhereNull('is_transfer');
+                     })
+                     ->where(function($q) {
+                         $q->whereNull('tc_number')->orWhere('tc_number', '');
+                     });
+    }
+
+    /**
+     * Scope a query to students enrolled in a specific academic session, class, and/or section.
+     */
+    public function scopeInAcademicSession($query, ?int $sessionId = null, mixed $classId = null, mixed $sectionId = null)
+    {
+        if (!$sessionId) {
+            if (!empty($classId)) {
+                if (is_array($classId)) {
+                    $query->whereIn('class_id', $classId);
+                } else {
+                    $query->where('class_id', $classId);
+                }
+            }
+            if (!empty($sectionId)) {
+                if (is_array($sectionId)) {
+                    $query->whereIn('section_id', $sectionId);
+                } elseif (is_numeric($sectionId)) {
+                    $query->where('section_id', $sectionId);
+                } else {
+                    $query->whereHas('section', fn($q) => $q->where('name', $sectionId));
+                }
+            }
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($sessionId, $classId, $sectionId) {
+            $q->whereHas('studentSessions', function ($sq) use ($sessionId, $classId, $sectionId) {
+                $sq->where('academic_session_id', $sessionId);
+                if (!empty($classId)) {
+                    if (is_array($classId)) {
+                        $sq->whereIn('class_id', $classId);
+                    } else {
+                        $sq->where('class_id', $classId);
+                    }
+                }
+                if (!empty($sectionId)) {
+                    if (is_array($sectionId)) {
+                        $sq->whereIn('section_id', $sectionId);
+                    } elseif (is_numeric($sectionId)) {
+                        $sq->where('section_id', $sectionId);
+                    } else {
+                        $sq->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                    }
+                }
+            })->orWhere(function ($sq) use ($sessionId, $classId, $sectionId) {
+                // Fallback for students where student_sessions table record was not explicitly created
+                $sq->doesntHave('studentSessions')
+                   ->where('academic_session_id', $sessionId);
+                if (!empty($classId)) {
+                    if (is_array($classId)) {
+                        $sq->whereIn('class_id', $classId);
+                    } else {
+                        $sq->where('class_id', $classId);
+                    }
+                }
+                if (!empty($sectionId)) {
+                    if (is_array($sectionId)) {
+                        $sq->whereIn('section_id', $sectionId);
+                    } elseif (is_numeric($sectionId)) {
+                        $sq->where('section_id', $sectionId);
+                    } else {
+                        $sq->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                    }
+                }
+            });
+        });
     }
 }
 

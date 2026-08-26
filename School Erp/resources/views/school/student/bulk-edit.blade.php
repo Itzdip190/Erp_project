@@ -297,6 +297,14 @@
         <div class="excel-filters">
             <form action="{{ route('school.students.bulk-edit') }}" method="GET" class="d-flex align-items-center gap-2 flex-wrap w-100" id="filterForm">
                 <div style="min-width: 170px;">
+                    <select name="academic_session_id" class="form-select" onchange="this.form.submit()">
+                        @foreach($academicSessions as $ses)
+                            <option value="{{ $ses->id }}" {{ $selectedSessionId == $ses->id ? 'selected' : '' }}>{{ $ses->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div style="min-width: 170px;">
                     <select name="class_id" class="form-select" onchange="this.form.submit()">
                         <option value="">All Classes</option>
                         @foreach($classes as $cls)
@@ -331,7 +339,7 @@
                 </button>
 
                 @if($classId || $sectionId || $search || $status !== 'active')
-                    <a href="{{ route('school.students.bulk-edit') }}" class="btn btn-light" style="height:38px; border-radius:8px; font-weight:600; font-size:13px; border:1px solid #cbd5e1;">
+                    <a href="{{ route('school.students.bulk-edit', ['academic_session_id' => $selectedSessionId]) }}" class="btn btn-light" style="height:38px; border-radius:8px; font-weight:600; font-size:13px; border:1px solid #cbd5e1;">
                         <i class="fas fa-undo me-1"></i> Reset
                     </a>
                 @endif
@@ -341,6 +349,7 @@
         <!-- Form for Bulk Save -->
         <form id="bulkEditForm" action="{{ route('school.students.bulk-update') }}" method="POST">
             @csrf
+            <input type="hidden" name="academic_session_id" value="{{ $selectedSessionId }}">
             <div class="excel-table-wrap">
                 <table class="excel-table">
                     <thead>
@@ -367,6 +376,27 @@
                     </thead>
                     <tbody>
                         @forelse($students as $index => $student)
+                            @php
+                                $sessionRec = $selectedSessionId
+                                    ? $student->studentSessions->firstWhere('academic_session_id', $selectedSessionId)
+                                    : $student->studentSessions->sortByDesc('academic_session_id')->first();
+                                $bRoll = $sessionRec?->roll_number ?? $student->roll_number;
+                                $bFirstName = $sessionRec?->first_name ?? $student->first_name;
+                                $bLastName = $sessionRec?->last_name ?? $student->last_name;
+                                $bClassId = $sessionRec?->class_id ?? $student->class_id;
+                                $bSectionId = $sessionRec?->section_id ?? $student->section_id;
+                                $bGender = $sessionRec?->gender ?? $student->gender;
+                                $bDob = $sessionRec?->date_of_birth ?? $student->date_of_birth;
+                                $bPhone = $sessionRec?->phone ?? $student->phone;
+                                $bFatherName = $sessionRec?->father_name ?? $student->father_name;
+                                $bFatherPhone = $sessionRec?->father_phone ?? $student->father_phone;
+                                $bMotherName = $sessionRec?->mother_name ?? $student->mother_name;
+                                $bCategoryId = $sessionRec?->category_id ?? $student->category_id;
+                                $bBloodGroup = $sessionRec?->blood_group ?? $student->blood_group;
+                                $bNationalId = $sessionRec?->national_id ?? $student->national_id;
+                                $bAddress = $sessionRec?->address ?? $student->address;
+                                $bIsActive = ($sessionRec && $sessionRec->is_active !== null) ? $sessionRec->is_active : $student->is_active;
+                            @endphp
                             <tr data-student-id="{{ $student->id }}">
                                 <td class="col-num">{{ $index + 1 }}</td>
 
@@ -374,19 +404,19 @@
                                     <input type="text" data-field="admission_number" class="cell-input" value="{{ $student->admission_number }}" required oninput="markCellModified(this)">
                                 </td>
                                 <td>
-                                    <input type="text" data-field="roll_number" class="cell-input" value="{{ $student->roll_number }}" oninput="markCellModified(this)">
+                                    <input type="text" data-field="roll_number" class="cell-input" value="{{ $bRoll }}" oninput="markCellModified(this)">
                                 </td>
                                 <td>
-                                    <input type="text" data-field="first_name" class="cell-input" value="{{ $student->first_name }}" required oninput="markCellModified(this)">
+                                    <input type="text" data-field="first_name" class="cell-input" value="{{ $bFirstName }}" required oninput="markCellModified(this)">
                                 </td>
                                 <td>
-                                    <input type="text" data-field="last_name" class="cell-input" value="{{ $student->last_name }}" oninput="markCellModified(this)">
+                                    <input type="text" data-field="last_name" class="cell-input" value="{{ $bLastName }}" oninput="markCellModified(this)">
                                 </td>
                                 <td>
                                     <select data-field="class_id" class="cell-select" onchange="markCellModified(this)">
                                         <option value="">-- None --</option>
                                         @foreach($classes as $cls)
-                                            <option value="{{ $cls->id }}" {{ $student->class_id == $cls->id ? 'selected' : '' }}>{{ $cls->name }}</option>
+                                            <option value="{{ $cls->id }}" {{ $bClassId == $cls->id ? 'selected' : '' }}>{{ $cls->name }}</option>
                                         @endforeach
                                     </select>
                                 </td>
@@ -394,38 +424,38 @@
                                     <select data-field="section_id" class="cell-select" onchange="markCellModified(this)">
                                         <option value="">-- None --</option>
                                         @foreach($sections as $sec)
-                                            <option value="{{ $sec->id }}" {{ $student->section_id == $sec->id ? 'selected' : '' }}>{{ $sec->name }}</option>
+                                            <option value="{{ $sec->id }}" {{ $bSectionId == $sec->id ? 'selected' : '' }}>{{ $sec->name }}</option>
                                         @endforeach
                                     </select>
                                 </td>
                                 <td>
                                     <select data-field="gender" class="cell-select" onchange="markCellModified(this)">
                                         <option value="">-- Select --</option>
-                                        <option value="Male" {{ strtolower($student->gender) === 'male' ? 'selected' : '' }}>Male</option>
-                                        <option value="Female" {{ strtolower($student->gender) === 'female' ? 'selected' : '' }}>Female</option>
-                                        <option value="Other" {{ strtolower($student->gender) === 'other' ? 'selected' : '' }}>Other</option>
+                                        <option value="Male" {{ strtolower($bGender) === 'male' ? 'selected' : '' }}>Male</option>
+                                        <option value="Female" {{ strtolower($bGender) === 'female' ? 'selected' : '' }}>Female</option>
+                                        <option value="Other" {{ strtolower($bGender) === 'other' ? 'selected' : '' }}>Other</option>
                                     </select>
                                 </td>
                                 <td>
-                                    <input type="date" data-field="date_of_birth" class="cell-input" value="{{ $student->date_of_birth ? \Carbon\Carbon::parse($student->date_of_birth)->format('Y-m-d') : '' }}" onchange="markCellModified(this)">
+                                    <input type="date" data-field="date_of_birth" class="cell-input" value="{{ $bDob ? \Carbon\Carbon::parse($bDob)->format('Y-m-d') : '' }}" onchange="markCellModified(this)">
                                 </td>
                                 <td>
-                                    <input type="text" data-field="phone" class="cell-input" value="{{ $student->phone }}" oninput="markCellModified(this)">
+                                    <input type="text" data-field="phone" class="cell-input" value="{{ $bPhone }}" oninput="markCellModified(this)">
                                 </td>
                                 <td>
-                                    <input type="text" data-field="father_name" class="cell-input" value="{{ $student->father_name }}" oninput="markCellModified(this)">
+                                    <input type="text" data-field="father_name" class="cell-input" value="{{ $bFatherName }}" oninput="markCellModified(this)">
                                 </td>
                                 <td>
-                                    <input type="text" data-field="father_phone" class="cell-input" value="{{ $student->father_phone }}" oninput="markCellModified(this)">
+                                    <input type="text" data-field="father_phone" class="cell-input" value="{{ $bFatherPhone }}" oninput="markCellModified(this)">
                                 </td>
                                 <td>
-                                    <input type="text" data-field="mother_name" class="cell-input" value="{{ $student->mother_name }}" oninput="markCellModified(this)">
+                                    <input type="text" data-field="mother_name" class="cell-input" value="{{ $bMotherName }}" oninput="markCellModified(this)">
                                 </td>
                                 <td>
                                     <select data-field="category_id" class="cell-select" onchange="markCellModified(this)">
                                         <option value="">-- None --</option>
                                         @foreach($categories as $cat)
-                                            <option value="{{ $cat->id }}" {{ $student->category_id == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
+                                            <option value="{{ $cat->id }}" {{ $bCategoryId == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
                                         @endforeach
                                     </select>
                                 </td>
@@ -433,28 +463,28 @@
                                     <select data-field="blood_group" class="cell-select" onchange="markCellModified(this)">
                                         <option value="">-- None --</option>
                                         @foreach(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'] as $bg)
-                                            <option value="{{ $bg }}" {{ $student->blood_group === $bg ? 'selected' : '' }}>{{ $bg }}</option>
+                                            <option value="{{ $bg }}" {{ $bBloodGroup === $bg ? 'selected' : '' }}>{{ $bg }}</option>
                                         @endforeach
                                     </select>
                                 </td>
                                 <td>
-                                    <input type="text" data-field="national_id" class="cell-input" value="{{ $student->national_id }}" oninput="markCellModified(this)">
+                                    <input type="text" data-field="national_id" class="cell-input" value="{{ $bNationalId }}" oninput="markCellModified(this)">
                                 </td>
                                 <td>
-                                    <input type="text" data-field="address" class="cell-input" value="{{ $student->address }}" oninput="markCellModified(this)">
+                                    <input type="text" data-field="address" class="cell-input" value="{{ $bAddress }}" oninput="markCellModified(this)">
                                 </td>
                                 <td>
                                     <select data-field="is_active" class="cell-select" onchange="markCellModified(this)">
-                                        <option value="1" {{ $student->is_active ? 'selected' : '' }}>Active</option>
-                                        <option value="0" {{ !$student->is_active ? 'selected' : '' }}>Inactive</option>
+                                        <option value="1" {{ $bIsActive ? 'selected' : '' }}>Active</option>
+                                        <option value="0" {{ !$bIsActive ? 'selected' : '' }}>Inactive</option>
                                     </select>
                                 </td>
                             </tr>
                         @empty
                             <tr>
                                 <td colspan="18" class="text-center py-5 text-muted">
-                                    <i class="fas fa-folder-open fa-2x mb-2 d-block"></i>
-                                    No student records found matching the current filters.
+                                    <i class="fas fa-inbox fs-2 mb-2 d-block text-secondary"></i>
+                                    No student records found matching your filters.
                                 </td>
                             </tr>
                         @endforelse
@@ -462,11 +492,13 @@
                 </table>
             </div>
 
-            <!-- Footer Bar -->
+            <!-- Table Footer Controls -->
             <div class="excel-footer">
-                <div class="status-badge-wrap">
-                    <span class="badge bg-secondary" id="totalCountBadge">{{ count($students) }} Students Loaded</span>
-                    <span class="badge bg-warning text-dark d-none" id="modifiedCountBadge">0 fields modified</span>
+                <div class="d-flex align-items-center gap-3">
+                    <span>Total Loaded: <strong>{{ count($students) }}</strong> students</span>
+                    <span id="modifiedCountBadge" class="badge bg-warning text-dark d-none" style="font-size:12px; padding: 6px 12px; border-radius: 6px;">
+                        0 fields modified
+                    </span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
                     <button type="button" class="btn-excel-save" onclick="submitBulkEditForm()">
@@ -558,7 +590,10 @@
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                body: JSON.stringify({ students: studentsData })
+                body: JSON.stringify({
+                    academic_session_id: '{{ $selectedSessionId }}',
+                    students: studentsData
+                })
             });
 
             const result = await response.json();

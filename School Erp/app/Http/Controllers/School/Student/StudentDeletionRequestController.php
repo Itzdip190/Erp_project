@@ -41,49 +41,72 @@ class StudentDeletionRequestController extends Controller
         $user = auth()->user();
 
         $request->validate([
-            'student_id' => 'required|exists:students,id',
-            'reason'     => 'nullable|string|max:500',
+            'student_id'          => 'required|exists:students,id',
+            'academic_session_id' => 'nullable|integer',
+            'reason'              => 'nullable|string|max:500',
         ]);
 
         $student = Student::where('school_id', $schoolId)->findOrFail($request->student_id);
+        $sessionId = $request->input('academic_session_id') ?: $student->academic_session_id;
 
-        // Check if there is already a pending request for this student
-        $existing = StudentDeletionRequest::where('school_id', $schoolId)
+        // Check if there is already a pending request for this student in this academic session
+        $existingQuery = StudentDeletionRequest::where('school_id', $schoolId)
             ->where('student_id', $student->id)
-            ->where('status', 'pending')
-            ->first();
+            ->where('status', 'pending');
+
+        if ($sessionId) {
+            $existingQuery->where('academic_session_id', $sessionId);
+        }
+
+        $existing = $existingQuery->first();
 
         if ($existing) {
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'A deletion request for this student is already pending approval by the School Admin.'
+                    'message' => 'A deletion request for this student in this academic year is already pending approval by the School Admin.'
                 ], 422);
             }
-            return redirect()->back()->with('error', 'A deletion request for this student is already pending approval by the School Admin.');
+            return redirect()->back()->with('error', 'A deletion request for this student in this academic year is already pending approval by the School Admin.');
         }
 
-        // Create the deletion request (Student remains 100% active)
+        // Get session-specific enrollment details if available
+        $sessionRec = null;
+        if ($sessionId) {
+            $sessionRec = \App\Models\StudentSession::where('school_id', $schoolId)
+                ->where('student_id', $student->id)
+                ->where('academic_session_id', $sessionId)
+                ->with(['schoolClass', 'section', 'academicSession'])
+                ->first();
+        }
+
+        $className = $sessionRec?->schoolClass?->name ?? (optional($student->class)->name ?? 'N/A');
+        $sectionName = $sessionRec?->section?->name ?? (optional($student->section)->name ?? 'N/A');
+        $sessionName = $sessionRec?->academicSession?->name ?? (optional($student->academicSession)->name ?? '');
+
+        // Create the deletion request (Student remains 100% active in all years)
         $deletionRequest = StudentDeletionRequest::create([
-            'school_id'         => $schoolId,
-            'student_id'        => $student->id,
-            'admission_number'  => $student->admission_number ?? 'N/A',
-            'student_name'      => $student->full_name,
-            'class_name'        => optional($student->class)->name ?? 'N/A',
-            'section_name'      => optional($student->section)->name ?? 'N/A',
-            'reason'            => $request->input('reason'),
-            'requested_by'      => $user->id,
-            'requested_by_name' => $user->name ?? ($user->username ?? 'Staff'),
-            'requested_at'      => now(),
-            'status'            => 'pending',
+            'school_id'           => $schoolId,
+            'student_id'          => $student->id,
+            'academic_session_id' => $sessionId,
+            'admission_number'    => $student->admission_number ?? 'N/A',
+            'student_name'        => $student->full_name,
+            'class_name'          => $className,
+            'section_name'        => $sectionName,
+            'reason'              => $request->input('reason'),
+            'requested_by'        => $user->id,
+            'requested_by_name'   => $user->name ?? ($user->username ?? 'Staff'),
+            'requested_at'        => now(),
+            'status'              => 'pending',
         ]);
 
         // Trigger School Admin Notification inside the panel
+        $sessionInfo = $sessionName ? " [Session: {$sessionName}]" : '';
         NotificationService::send([
             'school_id'      => $schoolId,
             'recipient_role' => 'school_admin',
             'title'          => 'Student Deletion Request',
-            'message'        => "A deletion request has been submitted. Student: {$student->full_name}, Admission ID: " . ($student->admission_number ?? 'N/A') . ", Requested By: " . ($user->name ?? 'Staff') . ", Date: " . now()->format('d M Y, h:i A'),
+            'message'        => "A deletion request has been submitted{$sessionInfo}. Student: {$student->full_name}, Admission ID: " . ($student->admission_number ?? 'N/A') . ", Requested By: " . ($user->name ?? 'Staff') . ", Date: " . now()->format('d M Y, h:i A'),
             'module'         => 'student',
             'type'           => 'warning',
             'related_id'     => $deletionRequest->id,
@@ -103,7 +126,7 @@ class StudentDeletionRequestController extends Controller
     }
 
     /**
-     * Approve a deletion request and execute permanent deletion.
+     * Approve a deletion request and execute academic-year specific or permanent deletion.
      */
     public function approve(Request $request, $id)
     {
@@ -130,14 +153,52 @@ class StudentDeletionRequestController extends Controller
             'approved_at'      => now(),
         ]);
 
-        // THEN AND ONLY THEN: Execute existing ERP deletion logic
         $student = Student::withTrashed()->find($deletionRequest->student_id);
         if ($student) {
-            $student->update(['is_active' => 0]);
-            $student->delete();
+            $sessionId = $deletionRequest->academic_session_id;
 
-            // Trigger notification to parent
-            Log::info("Parent Notification: Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
+            if ($sessionId) {
+                // 1. Remove the student session record for the target academic year
+                \App\Models\StudentSession::where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->where('academic_session_id', $sessionId)
+                    ->delete();
+
+                // 2. Check if student has remaining active enrollments in any other academic years
+                $remainingSession = \App\Models\StudentSession::where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->orderByDesc('academic_session_id')
+                    ->first();
+
+                if ($remainingSession) {
+                    // Student still has active historical or future academic records!
+                    // DO NOT delete the permanent student master identity.
+                    if ($student->academic_session_id == $sessionId) {
+                        $student->update([
+                            'academic_session_id' => $remainingSession->academic_session_id,
+                            'class_id'            => $remainingSession->class_id,
+                            'section_id'          => $remainingSession->section_id,
+                            'roll_number'         => $remainingSession->roll_number,
+                        ]);
+                    }
+                } else {
+                    // Student has no other academic sessions anywhere.
+                    // Soft-delete the master student record.
+                    $student->update(['is_active' => 0]);
+                    $student->delete();
+                }
+            } else {
+                // Global student deletion (no session specified)
+                \App\Models\StudentSession::where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->delete();
+
+                $student->update(['is_active' => 0]);
+                $student->delete();
+            }
+
+            // Trigger notification log
+            Log::info("Parent Notification: Student {$student->full_name} has been removed from academic session. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
 
             Cache::forget('students_list_version_' . $schoolId);
             Cache::put('students_list_version_' . $schoolId, time(), 86400);
@@ -146,11 +207,11 @@ class StudentDeletionRequestController extends Controller
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Student deletion request approved. Student has been deleted.'
+                'message' => 'Student deletion request approved successfully.'
             ]);
         }
 
-        return redirect()->back()->with('success', 'Student deletion request approved. Student has been deleted.');
+        return redirect()->back()->with('success', 'Student deletion request approved successfully.');
     }
 
     /**

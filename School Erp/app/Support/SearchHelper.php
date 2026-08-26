@@ -40,7 +40,7 @@ class SearchHelper
     /**
      * Apply standardized student search on an Eloquent builder.
      */
-    public static function applyStudentSearch(Builder $builder, ?string $search, string $tablePrefix = ''): Builder
+    public static function applyStudentSearch(Builder $builder, ?string $search, string $tablePrefix = '', ?int $sessionId = null): Builder
     {
         $normalized = self::normalizeQuery($search);
         if ($normalized === '') {
@@ -51,7 +51,7 @@ class SearchHelper
         $lowerSearch = strtolower($normalized);
         $prefix = $tablePrefix ? rtrim($tablePrefix, '.') . '.' : '';
 
-        return $builder->where(function ($q) use ($normalized, $terms, $lowerSearch, $prefix) {
+        return $builder->where(function ($q) use ($normalized, $terms, $lowerSearch, $prefix, $sessionId) {
             // 1. Full concatenated name match (e.g. "Gaurav Yadav")
             $concatExpr = self::getConcatNameExpr($prefix);
             $q->whereRaw("{$concatExpr} LIKE ?", ['%' . $lowerSearch . '%']);
@@ -80,6 +80,17 @@ class SearchHelper
                   ->orWhereRaw("LOWER({$prefix}roll_number) LIKE ?", [$lowerTerm])
                   ->orWhereRaw("LOWER({$prefix}phone) LIKE ?", [$lowerTerm])
                   ->orWhereRaw("LOWER({$prefix}email) LIKE ?", [$lowerTerm]);
+            }
+
+            // 4. Session-specific search inside studentSessions if sessionId is provided
+            if ($sessionId) {
+                $q->orWhereHas('studentSessions', function ($sq) use ($sessionId, $lowerSearch) {
+                    $sq->where('academic_session_id', $sessionId)
+                       ->where(function ($sessionQ) use ($lowerSearch) {
+                           $sessionQ->whereRaw("LOWER(roll_number) LIKE ?", ['%' . $lowerSearch . '%'])
+                                    ->orWhereRaw("LOWER(session_data) LIKE ?", ['%' . $lowerSearch . '%']);
+                       });
+                });
             }
         });
     }

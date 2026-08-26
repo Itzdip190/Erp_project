@@ -15,6 +15,7 @@ class StudentDeletionRequest extends Model
     protected $fillable = [
         'school_id',
         'student_id',
+        'academic_session_id',
         'admission_number',
         'student_name',
         'class_name',
@@ -42,6 +43,11 @@ class StudentDeletionRequest extends Model
     public function student()
     {
         return $this->belongsTo(Student::class, 'student_id')->withTrashed();
+    }
+
+    public function academicSession()
+    {
+        return $this->belongsTo(AcademicSession::class, 'academic_session_id');
     }
 
     public function requester()

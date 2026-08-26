@@ -22,32 +22,63 @@ class NotificationService
             $schoolId = auth()->user()->school_id;
         }
 
+        // Auto-resolve recipient user & role if user_id is provided
+        $recipientUser = null;
+        $recipientRole = $data['recipient_role'] ?? null;
+        $staffId = $data['staff_id'] ?? null;
+
+        if (!empty($data['user_id'])) {
+            $recipientUser = \App\Models\User::with('roles')->find($data['user_id']);
+            if ($recipientUser) {
+                if (!$schoolId) {
+                    $schoolId = $recipientUser->school_id;
+                }
+                if (!$recipientRole) {
+                    $roleName = strtolower($recipientUser->roles->first()?->name ?? $recipientUser->role ?? '');
+                    if (str_contains($roleName, 'teacher')) {
+                        $recipientRole = 'teacher';
+                    } elseif (str_contains($roleName, 'student')) {
+                        $recipientRole = 'student';
+                    } elseif (str_contains($roleName, 'parent')) {
+                        $recipientRole = 'parent';
+                    } elseif (str_contains($roleName, 'admin')) {
+                        $recipientRole = 'school_admin';
+                    } else {
+                        $recipientRole = $recipientUser->role ?? 'staff';
+                    }
+                }
+                if (!$staffId && ($recipientRole === 'teacher' || $recipientRole === 'staff')) {
+                    $staffId = \App\Models\Staff::where('user_id', $recipientUser->id)->value('id');
+                }
+            }
+        }
+
         $notification = Notification::create([
             'school_id'      => $schoolId,
             'user_id'        => $data['user_id'] ?? null,
-            'recipient_role' => $data['recipient_role'] ?? null,
+            'recipient_role' => $recipientRole,
             'title'          => $data['title'] ?? 'Notification',
             'message'        => $data['message'] ?? '',
             'module'         => $data['module'] ?? 'general',
             'type'           => $data['type'] ?? 'info',
             'related_id'     => $data['related_id'] ?? null,
             'priority'       => $data['priority'] ?? 'normal',
-            'action_url'     => $data['action_url'] ?? self::getDefaultActionUrl($data['module'] ?? 'general', $data['recipient_role'] ?? null),
+            'action_url'     => $data['action_url'] ?? self::getDefaultActionUrl($data['module'] ?? 'general', $recipientRole),
             'icon'           => $data['icon'] ?? self::getDefaultIcon($data['module'] ?? 'general'),
             'color'          => $data['color'] ?? self::getDefaultColor($data['module'] ?? 'general'),
             'is_read'        => false,
         ]);
 
-        // Dual-write to TeacherNotification if recipient is a teacher for legacy support
-        if (($data['recipient_role'] ?? '') === 'teacher' || (!empty($data['user_id']) && Schema::hasTable('teacher_notifications'))) {
+        // Dual-write to TeacherNotification if recipient is a teacher for legacy dashboard queries
+        if ($recipientRole === 'teacher' || (!empty($data['user_id']) && Schema::hasTable('teacher_notifications'))) {
             try {
                 if (Schema::hasTable('teacher_notifications')) {
                     TeacherNotification::create([
                         'school_id'            => $schoolId,
                         'user_id'              => $data['user_id'] ?? null,
-                        'staff_id'             => $data['staff_id'] ?? null,
-                        'title'                => $data['title'],
-                        'message'              => $data['message'],
+                        'staff_id'             => $staffId,
+                        'title'                => $data['title'] ?? 'New Notification',
+                        'message'              => $data['message'] ?? '',
                         'type'                 => $data['type'] ?? 'general',
                         'leave_application_id' => $data['related_id'] ?? null,
                         'is_read'              => false,
@@ -179,7 +210,10 @@ class NotificationService
                     : (\Illuminate\Support\Facades\Route::has('school.fees.student-wise') ? route('school.fees.student-wise') : null),
                 'attendance' => ($recipientRole === 'parent' && \Illuminate\Support\Facades\Route::has('parent.attendance.index'))
                     ? route('parent.attendance.index')
-                    : (\Illuminate\Support\Facades\Route::has('school.attendance.student.index') ? route('school.attendance.student.index') : null),
+                    : (\Illuminate\Support\Facades\Route::has('school.attendance.students.index') ? route('school.attendance.students.index') : null),
+                'chat' => ($recipientRole === 'parent' && \Illuminate\Support\Facades\Route::has('parent.chat.index'))
+                    ? route('parent.chat.index')
+                    : (\Illuminate\Support\Facades\Route::has('school.communication.chat') ? route('school.communication.chat') : null),
                 'communication', 'notice' => \Illuminate\Support\Facades\Route::has('school.communication.notice')
                     ? route('school.communication.notice')
                     : null,

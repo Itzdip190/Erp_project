@@ -80,6 +80,7 @@ class PayrollController extends Controller
             'month_name' => $date->format('F'),  // "August"
             'year' => $date->year,
             'month' => $date->month,
+            'month_num' => $date->month,
             'days_in_month' => $date->daysInMonth,
         ];
     }
@@ -1346,6 +1347,11 @@ class PayrollController extends Controller
             return $this->generateSinglePayslipPdf($payroll->id);
         }
 
+        if ($request->get('view') === 'slip' || $request->has('print') || $request->get('preview') == 1) {
+            $data = $this->preparePayslipData($payroll->id);
+            return view('school.payroll.pdf-payslip', $data);
+        }
+
         $monthInfo = $this->parseMonthInput($payroll->payroll_month);
         $staffList = Staff::where('school_id', $schoolId)->where('is_active', true)->get();
 
@@ -1361,9 +1367,9 @@ class PayrollController extends Controller
     }
 
     /**
-     * Generate & Download Professional PDF Payslip
+     * Shared helper to prepare payslip calculation and display attributes
      */
-    public function generateSinglePayslipPdf($payrollId)
+    protected function preparePayslipData($payrollId): array
     {
         $schoolId = $this->getSchoolId();
         $payroll = StaffPayroll::where('school_id', $schoolId)
@@ -1371,40 +1377,199 @@ class PayrollController extends Controller
             ->findOrFail($payrollId);
 
         $staff = $payroll->staff;
-        $school = auth()->user()->school ?: $payroll->school;
+        
+        // Resolve active School instance
+        $school = null;
+        if (app()->bound('currentSchool') && app('currentSchool')) {
+            $school = app('currentSchool');
+        } elseif (auth()->check() && auth()->user()->school) {
+            $school = auth()->user()->school;
+        } elseif ($payroll->school) {
+            $school = $payroll->school;
+        }
+        if (!$school && $schoolId) {
+            $school = \App\Models\School::find($schoolId);
+        }
+
         $struct = StaffSalaryStructure::where('school_id', $schoolId)->where('staff_id', $staff->id)->first();
 
+        // School address formatting
+        $schoolAddress1 = '';
+        $schoolAddress2 = '';
+        if (!empty($school?->address)) {
+            $addrLines = preg_split('/[\r\n]+/', trim($school->address));
+            if (count($addrLines) > 1) {
+                $schoolAddress1 = trim($addrLines[0]);
+                $schoolAddress2 = trim($addrLines[1]);
+            } else {
+                $parts = explode(',', $school->address, 2);
+                $schoolAddress1 = trim($parts[0]);
+                $schoolAddress2 = isset($parts[1]) ? trim($parts[1]) : '';
+            }
+        }
+        if (empty($schoolAddress1)) {
+            $schoolAddress1 = $school?->address ?: 'School Campus, Main City Road';
+        }
+        if (empty($schoolAddress2) && !empty($school?->state)) {
+            $schoolAddress2 = $school->state . (!empty($school?->phone) ? ' &bull; Phone: ' . $school->phone : '');
+        }
+
+        // Resolve School Logo as Base64 for 100% reliable DomPDF and browser rendering
+        $schoolLogoBase64 = null;
+        if (!empty($school?->logo)) {
+            $cleanLogo = ltrim($school->logo, '/');
+            $possiblePaths = [
+                storage_path('app/public/' . $cleanLogo),
+                public_path('storage/' . $cleanLogo),
+                public_path($cleanLogo),
+                public_path('uploads/schools/' . basename($cleanLogo)),
+                storage_path('app/' . $cleanLogo),
+            ];
+            foreach ($possiblePaths as $p) {
+                if (file_exists($p) && is_file($p)) {
+                    $ext = strtolower(pathinfo($p, PATHINFO_EXTENSION));
+                    $mime = ($ext === 'svg') ? 'image/svg+xml' : (($ext === 'jpg' || $ext === 'jpeg') ? 'image/jpeg' : 'image/png');
+                    $schoolLogoBase64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($p));
+                    break;
+                }
+            }
+        }
+
+        // Employee Metadata
+        $joiningDate = '—';
+        if (!empty($staff?->joining_date)) {
+            try {
+                $joiningDate = \Carbon\Carbon::parse($staff->joining_date)->format('Y-m-d');
+            } catch (\Exception $e) {
+                $joiningDate = (string)$staff->joining_date;
+            }
+        } elseif (!empty($staff?->created_at)) {
+            $joiningDate = $staff->created_at->format('Y-m-d');
+        }
+
+        $payPeriod = $payroll->payroll_month ?: ($payroll->salary_month . ' ' . $payroll->salary_year);
+        
+        // Calculate days in month from payroll_month (e.g. July 2026 => 31 days)
+        $monthInfo = $this->parseMonthInput($payroll->payroll_month ?: ($payroll->salary_month . ' ' . $payroll->salary_year));
+        $daysInMonth = (int)($monthInfo['days_in_month'] ?? ($payroll->total_days ?: 30));
+        if ($daysInMonth <= 0) {
+            $daysInMonth = 30;
+        }
+        
+        // Calculate extra leave / attendance deduction days accurately
+        $extraLeaveDays = (float)($payroll->attendance_deduction_days ?: 0);
+        if ($extraLeaveDays <= 0 && (float)$payroll->attendance_deduction > 0 && (float)$payroll->basic_salary > 0) {
+            $dailyRate = (float)$payroll->basic_salary / 30;
+            $extraLeaveDays = round((float)$payroll->attendance_deduction / $dailyRate, 1);
+        }
+
+        if ($extraLeaveDays > 0) {
+            $calcWorked = max(0, $daysInMonth - $extraLeaveDays);
+        } elseif ((float)$payroll->payable_days > 0) {
+            $calcWorked = (float)$payroll->payable_days;
+        } elseif ((float)$payroll->present_days > 0) {
+            $calcWorked = (float)$payroll->present_days;
+        } else {
+            $calcWorked = $daysInMonth;
+        }
+
+        $workedValFormatted = (floor($calcWorked) == $calcWorked) ? (int)$calcWorked : $calcWorked;
+        $workedDaysDisplay = "{$workedValFormatted} / {$daysInMonth}";
+
+        $employeeName = $staff?->full_name ?: ($staff ? trim($staff->first_name . ' ' . $staff->last_name) : 'Employee');
+        $designation = $staff?->designation?->name ?: ($staff?->staff_type ?: 'Staff');
+        $department = $staff?->department?->name ?: 'General';
+
         // Salary components breakdown
+        $earningsList = [];
         $basicSalary = (float)$payroll->basic_salary;
+        if ($basicSalary <= 0 && (float)$payroll->gross_salary > 0) {
+            $basicSalary = (float)$payroll->gross_salary;
+        }
+        $earningsList[] = ['name' => 'Basic', 'amount' => $basicSalary];
+
         $hra = $struct ? (float)$struct->hra : (float)($staff?->additional_fields['salary_structure']['hra'] ?? 0);
         $da = $struct ? (float)$struct->da : (float)($staff?->additional_fields['salary_structure']['da'] ?? 0);
         $ta = $struct ? (float)$struct->ta : (float)($staff?->additional_fields['salary_structure']['ta'] ?? 0);
         $allowance = $struct ? (float)$struct->allowance : (float)($staff?->additional_fields['salary_structure']['allowance'] ?? 0);
-        
+
+        if ($allowance > 0) {
+            $earningsList[] = ['name' => 'Incentive Pay', 'amount' => $allowance];
+        }
+        if ($hra > 0) {
+            $earningsList[] = ['name' => 'House Rent Allowance', 'amount' => $hra];
+        }
+        if ($da > 0) {
+            $earningsList[] = ['name' => 'Dearness Allowance', 'amount' => $da];
+        }
+        if ($ta > 0) {
+            $earningsList[] = ['name' => 'Transport Allowance', 'amount' => $ta];
+        }
+
+        $totalCompAllowances = $hra + $da + $ta + $allowance;
+        $recordedAllowances = (float)($payroll->allowances ?: 0);
+        if ($recordedAllowances > $totalCompAllowances) {
+            $diffAllow = $recordedAllowances - $totalCompAllowances;
+            $earningsList[] = ['name' => 'Meal / Other Allowance', 'amount' => $diffAllow];
+        }
+
+        $deductionsList = [];
         $pf = $struct ? (float)$struct->pf : (float)($staff?->additional_fields['salary_structure']['pf'] ?? 0);
-        $esi = $struct ? (float)$struct->esi : (float)($staff?->additional_fields['salary_structure']['esi'] ?? 0);
         $profTax = $struct ? (float)$struct->prof_tax : (float)($staff?->additional_fields['salary_structure']['prof_tax'] ?? 0);
         $tds = $struct ? (float)$struct->tds : (float)($staff?->additional_fields['salary_structure']['tds'] ?? 0);
-        
-        $attendanceDeduction = (float)$payroll->attendance_deduction;
-        $totalComponentAllowances = $hra + $da + $ta + $allowance;
-        $totalComponentDeductions = $pf + $esi + $profTax + $tds;
+        $esi = $struct ? (float)$struct->esi : (float)($staff?->additional_fields['salary_structure']['esi'] ?? 0);
+        $attendanceDeduction = (float)($payroll->attendance_deduction ?: 0);
 
-        $otherDeductions = max(0, (float)$payroll->deductions - ($totalComponentDeductions + $attendanceDeduction));
-        $grossSalary = (float)$payroll->gross_salary > 0 ? (float)$payroll->gross_salary : ($basicSalary + $totalComponentAllowances);
-        $totalDeductions = (float)$payroll->deductions > 0 ? (float)$payroll->deductions : ($totalComponentDeductions + $attendanceDeduction + $otherDeductions);
-        $netSalary = (float)$payroll->net_payable;
+        if ($pf > 0) {
+            $deductionsList[] = ['name' => 'Provident Fund', 'amount' => $pf];
+        }
+        if ($profTax > 0) {
+            $deductionsList[] = ['name' => 'Professional Tax', 'amount' => $profTax];
+        }
+        if ($tds > 0) {
+            $deductionsList[] = ['name' => 'Tax Deducted at Source (TDS)', 'amount' => $tds];
+        }
+        if ($esi > 0) {
+            $deductionsList[] = ['name' => 'Employee State Insurance (ESI)', 'amount' => $esi];
+        }
+        if ($attendanceDeduction > 0) {
+            $deductionsList[] = ['name' => 'Attendance Deduction', 'amount' => $attendanceDeduction];
+        }
+
+        $compDeductionsSum = $pf + $profTax + $tds + $esi + $attendanceDeduction;
+        $totalDed = (float)($payroll->deductions ?: 0);
+        if ($totalDed > $compDeductionsSum) {
+            $extraDed = $totalDed - $compDeductionsSum;
+            $deductionsList[] = ['name' => 'Loan / Other Deduction', 'amount' => $extraDed];
+        }
+
+        $grossSalary = (float)$payroll->gross_salary > 0 ? (float)$payroll->gross_salary : array_sum(array_column($earningsList, 'amount'));
+        $totalDeductions = (float)$payroll->deductions > 0 ? (float)$payroll->deductions : array_sum(array_column($deductionsList, 'amount'));
+        $netSalary = (float)$payroll->net_payable > 0 ? (float)$payroll->net_payable : max(0, $grossSalary - $totalDeductions);
 
         $lastPayment = $payroll->payments?->last();
         $paymentDate = $lastPayment ? \Carbon\Carbon::parse($lastPayment->payment_date)->format('d M Y') : ($payroll->finalised_at ? $payroll->finalised_at->format('d M Y') : date('d M Y'));
 
         $netInWords = $this->convertNumberToWords($netSalary);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.payroll.pdf-payslip', [
+        return [
             'payroll' => $payroll,
             'staff' => $staff,
             'school' => $school,
+            'schoolLogoBase64' => $schoolLogoBase64,
+            'schoolAddress1' => $schoolAddress1,
+            'schoolAddress2' => $schoolAddress2,
+            'joiningDate' => $joiningDate,
+            'payPeriod' => $payPeriod,
+            'daysInMonth' => $daysInMonth,
+            'workedDays' => $workedDaysDisplay,
+            'calcWorked' => $calcWorked,
+            'employeeName' => $employeeName,
+            'designation' => $designation,
+            'department' => $department,
             'struct' => $struct,
+            'earningsList' => $earningsList,
+            'deductionsList' => $deductionsList,
             'basicSalary' => $basicSalary,
             'hra' => $hra,
             'da' => $da,
@@ -1415,17 +1580,33 @@ class PayrollController extends Controller
             'profTax' => $profTax,
             'tds' => $tds,
             'attendanceDeduction' => $attendanceDeduction,
-            'otherDeductions' => $otherDeductions,
             'grossSalary' => $grossSalary,
             'totalDeductions' => $totalDeductions,
             'netSalary' => $netSalary,
             'netInWords' => $netInWords,
             'paymentDate' => $paymentDate,
             'generatedDate' => date('d M Y h:i A'),
-        ])->setPaper('a4', 'portrait');
+        ];
+    }
+
+    /**
+     * Generate & Download Professional PDF Payslip
+     */
+    public function generateSinglePayslipPdf($payrollId)
+    {
+        $data = $this->preparePayslipData($payrollId);
+        $payroll = $data['payroll'];
+        $staff = $data['staff'];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.payroll.pdf-payslip', $data)
+            ->setPaper('a4', 'portrait');
 
         $empCode = $staff?->employee_id ?: 'EMP-' . $payroll->staff_id;
         $filename = 'payslip_' . strtolower(str_replace(' ', '_', $payroll->payroll_month)) . '_' . $empCode . '.pdf';
+
+        if (request()->get('stream') == 1) {
+            return $pdf->stream($filename);
+        }
 
         return $pdf->download($filename);
     }
@@ -1551,46 +1732,70 @@ class PayrollController extends Controller
      */
     protected function convertNumberToWords($number): string
     {
-        $no = floor($number);
-        $point = round(($number - $no) * 100);
-        $hundred = null;
-        $digits_1 = strlen($no);
-        $i = 0;
-        $str = array();
-        $words = array(
-            '0' => '', '1' => 'One', '2' => 'Two',
-            '3' => 'Three', '4' => 'Four', '5' => 'Five', '6' => 'Six',
-            '7' => 'Seven', '8' => 'Eight', '9' => 'Nine',
-            '10' => 'Ten', '11' => 'Eleven', '12' => 'Twelve',
-            '13' => 'Thirteen', '14' => 'Fourteen',
-            '15' => 'Fifteen', '16' => 'Sixteen', '17' => 'Seventeen',
-            '18' => 'Eighteen', '19' => 'Nineteen', '20' => 'Twenty',
-            '30' => 'Thirty', '40' => 'Forty', '50' => 'Fifty',
-            '60' => 'Sixty', '70' => 'Seventy', '80' => 'Eighty',
-            '90' => 'Ninety'
-        );
-        $digits = array('', 'Hundred', 'Thousand', 'Lakh', 'Crore');
-        while ($i < $digits_1) {
-            $divider = ($i == 2) ? 10 : 100;
-            $number = floor($no % $divider);
-            $no = floor($no / $divider);
-            $i += ($divider == 10) ? 1 : 2;
-            if ($number) {
-                $plural = (($counter = count($str)) && $number > 9) ? 's' : '';
-                $hundred = ($counter == 1 && $str[0]) ? ' and ' : '';
-                $str [] = ($number < 21) ? $words[$number] .
-                    " " . $digits[$counter] . $plural . " " . $hundred
-                    :
-                    $words[floor($number / 10) * 10]
-                    . " " . $words[$number % 10] . " "
-                    . $digits[$counter] . $plural . " " . $hundred;
-            } else $str[] = '';
+        $number = (float)$number;
+        if ($number <= 0) {
+            return 'Zero';
         }
-        $str = array_reverse($str);
-        $result = implode('', $str);
-        $points = ($point) ?
-            " and " . ($words[$point / 10] . " " . $words[$point % 10]) . " Paise" : '';
-        return trim($result) ? trim($result) . " Rupees Only" : "Zero Rupees";
+
+        $ones = [
+            0 => '', 1 => 'One', 2 => 'Two', 3 => 'Three', 4 => 'Four',
+            5 => 'Five', 6 => 'Six', 7 => 'Seven', 8 => 'Eight', 9 => 'Nine',
+            10 => 'Ten', 11 => 'Eleven', 12 => 'Twelve', 13 => 'Thirteen',
+            14 => 'Fourteen', 15 => 'Fifteen', 16 => 'Sixteen', 17 => 'Seventeen',
+            18 => 'Eighteen', 19 => 'Nineteen'
+        ];
+        $tens = [
+            2 => 'Twenty', 3 => 'Thirty', 4 => 'Forty', 5 => 'Fifty',
+            6 => 'Sixty', 7 => 'Seventy', 8 => 'Eighty', 9 => 'Ninety'
+        ];
+
+        $getHundreds = function ($num) use ($ones, $tens) {
+            $str = '';
+            if ($num >= 100) {
+                $str .= $ones[(int)floor($num / 100)] . ' Hundred ';
+                $num %= 100;
+            }
+            if ($num >= 20) {
+                $str .= $tens[(int)floor($num / 10)] . ' ';
+                $num %= 10;
+            }
+            if ($num > 0) {
+                $str .= $ones[(int)$num] . ' ';
+            }
+            return trim($str);
+        };
+
+        $integerPart = (int)floor($number);
+        $decimalPart = (int)round(($number - $integerPart) * 100);
+
+        $crore = (int)floor($integerPart / 10000000);
+        $remainder = $integerPart % 10000000;
+        $lakh = (int)floor($remainder / 100000);
+        $remainder %= 100000;
+        $thousand = (int)floor($remainder / 1000);
+        $remainder %= 1000;
+        $hundreds = $remainder;
+
+        $words = [];
+        if ($crore > 0) {
+            $words[] = $getHundreds($crore) . ' Crore';
+        }
+        if ($lakh > 0) {
+            $words[] = $getHundreds($lakh) . ' Lakh';
+        }
+        if ($thousand > 0) {
+            $words[] = $getHundreds($thousand) . ' Thousand';
+        }
+        if ($hundreds > 0) {
+            $words[] = $getHundreds($hundreds);
+        }
+
+        $result = implode(' ', array_filter($words));
+        if ($decimalPart > 0) {
+            $result .= ' and ' . $getHundreds($decimalPart) . ' Paise';
+        }
+
+        return trim($result) ?: 'Zero';
     }
 
     /**

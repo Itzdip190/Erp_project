@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "628420405085",
+    "project_id": "erp-1-23074",
+    "storage_bucket": "erp-1-23074.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:628420405085:android:4dd37d04886d16f1e9eab4",
+        "android_client_info": {
+          "package_name": "com.educorerp.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC53Sed8xgZkrSB18uxZDuXGOUw8A-uKik"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

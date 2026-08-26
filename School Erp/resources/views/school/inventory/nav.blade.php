@@ -86,22 +86,6 @@
                         <span>Payment History</span>
                     </a>
                 @endif
-
-                @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'issue_item'))
-                    <a href="{{ route('school.inventory.issue') }}"
-                        class="nav-link d-flex align-items-center {{ request()->routeIs('school.inventory.issue') ? 'active' : '' }}">
-                        <i class="fas fa-hand-holding nav-icon text-indigo"></i>
-                        <span>Issue Item</span>
-                    </a>
-                @endif
-
-                @if(\App\Support\StaffAccessHelper::hasAccess('inventory_management', 'suppliers'))
-                    <a href="{{ route('school.inventory.suppliers') }}"
-                        class="nav-link d-flex align-items-center {{ request()->routeIs('school.inventory.suppliers') ? 'active' : '' }}">
-                        <i class="fas fa-truck nav-icon text-purple"></i>
-                        <span>Suppliers</span>
-                    </a>
-                @endif
             </div>
         </div>
     </div>

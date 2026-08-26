@@ -77,6 +77,11 @@ class TransportFeeSchedule extends Model
         return $this->belongsTo(School::class);
     }
 
+    public function academicSession()
+    {
+        return $this->belongsTo(AcademicSession::class, 'academic_session_id');
+    }
+
     public function fine()
     {
         return $this->belongsTo(FeeFine::class, 'fine_id');

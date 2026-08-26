@@ -1718,11 +1718,19 @@ class SchoolDashboardController extends Controller
      */
     public function changeSession(Request $request)
     {
+        $user = auth()->user();
+        if (!$user || !$user->isSchoolAdmin()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Only School Admin has permission to change the academic year.',
+            ], 403);
+        }
+
         $request->validate([
             'academic_session_id' => 'required|exists:academic_sessions,id',
         ]);
 
-        $schoolId = auth()->user()->school_id;
+        $schoolId = $user->school_id;
 
         // Ensure the session belongs to the school
         $session = AcademicSession::where('school_id', $schoolId)
