@@ -230,6 +230,9 @@ class Student extends Model
         'age',
         'admission_id',
         'detailed_age',
+        'class_name',
+        'section_name',
+        'session_name',
     ];
 
     public function getFullNameAttribute(): string
@@ -428,6 +431,83 @@ class Student extends Model
         }
 
         return $this->studentSessions()->where('academic_session_id', $sessionId)->first();
+    }
+
+    /**
+     * Get the student's active class in the school's current active academic session.
+     */
+    public function getActiveSchoolClassAttribute(): ?SchoolClass
+    {
+        $schoolId = $this->school_id;
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+            ?? ($this->academicSession ?? AcademicSession::where('school_id', $schoolId)->first());
+
+        if ($currentSession) {
+            $sessionRecord = $this->studentSessionFor($currentSession->id);
+            if ($sessionRecord && $sessionRecord->schoolClass) {
+                return $sessionRecord->schoolClass;
+            }
+        }
+
+        if ($this->relationLoaded('studentSessions') && $this->studentSessions->isNotEmpty()) {
+            $latestSs = $this->studentSessions->sortByDesc('id')->first();
+            if ($latestSs && $latestSs->schoolClass) {
+                return $latestSs->schoolClass;
+            }
+        }
+
+        return $this->class;
+    }
+
+    /**
+     * Get the student's active section in the school's current active academic session.
+     */
+    public function getActiveSectionAttribute(): ?Section
+    {
+        $schoolId = $this->school_id;
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+            ?? ($this->academicSession ?? AcademicSession::where('school_id', $schoolId)->first());
+
+        if ($currentSession) {
+            $sessionRecord = $this->studentSessionFor($currentSession->id);
+            if ($sessionRecord && $sessionRecord->section) {
+                return $sessionRecord->section;
+            }
+        }
+
+        if ($this->relationLoaded('studentSessions') && $this->studentSessions->isNotEmpty()) {
+            $latestSs = $this->studentSessions->sortByDesc('id')->first();
+            if ($latestSs && $latestSs->section) {
+                return $latestSs->section;
+            }
+        }
+
+        return $this->section;
+    }
+
+    /**
+     * Get the student's active academic session (school's active session or fallback).
+     */
+    public function getActiveAcademicSessionAttribute(): ?AcademicSession
+    {
+        $schoolId = $this->school_id;
+        return AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+            ?? ($this->academicSession ?? AcademicSession::where('school_id', $schoolId)->first());
+    }
+
+    public function getClassNameAttribute(): string
+    {
+        return $this->active_school_class?->name ?? ($this->class?->name ?? 'N/A');
+    }
+
+    public function getSectionNameAttribute(): string
+    {
+        return $this->active_section?->name ?? ($this->section?->name ?? 'N/A');
+    }
+
+    public function getSessionNameAttribute(): string
+    {
+        return $this->active_academic_session?->name ?? ($this->academicSession?->name ?? 'N/A');
     }
 
     /**

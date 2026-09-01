@@ -124,6 +124,7 @@ class MainActivity : AppCompatActivity() {
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
             webView.overScrollMode = View.OVER_SCROLL_NEVER
             webView.isScrollbarFadingEnabled = true
+            webView.isHorizontalScrollBarEnabled = false
             webView.isHapticFeedbackEnabled = false
 
             // WebView Client handling page load completion

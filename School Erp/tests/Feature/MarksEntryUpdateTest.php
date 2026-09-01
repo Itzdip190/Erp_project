@@ -346,4 +346,96 @@ class MarksEntryUpdateTest extends TestCase
             'message' => 'Marks must be 0 when the student is marked as Absent or on Leave.'
         ]);
     }
+
+    public function test_academic_session_students_loaded_in_update_marks_drawer(): void
+    {
+        $schoolAdmin = User::where('email', 'admin@yis.com')->first();
+        $schoolId = $schoolAdmin->school_id;
+        $school = School::find($schoolId);
+
+        $session = \App\Models\AcademicSession::create([
+            'school_id' => $schoolId,
+            'name' => 'Apr 2026 - Mar 2027',
+            'start_date' => '2026-04-01',
+            'end_date' => '2027-03-31',
+            'is_current' => true,
+        ]);
+
+        $class = SchoolClass::where('school_id', $schoolId)->first();
+        $section = Section::where('school_id', $schoolId)->where('class_id', $class->id)->first();
+        $subject = Subject::where('school_id', $schoolId)->first();
+        $subject->update(['class_id' => $class->id, 'type' => 'Scholastic', 'is_mandatory' => true]);
+
+        // Create a student enrolled only through student_sessions table
+        $student = Student::create([
+            'school_id' => $schoolId,
+            'first_name' => 'Abhi',
+            'last_name' => 'Yanshu',
+            'admission_number' => 'JPPS55',
+            'admission_date' => '2026-04-01',
+            'date_of_birth' => '2014-05-16',
+            'gender' => 'male',
+            'guardian_name' => 'Anil Kumar Gupta',
+            'guardian_relationship' => 'father',
+            'guardian_phone' => '7355604986',
+            'address' => 'Test Address',
+            'city' => 'Test City',
+            'state' => 'Test State',
+            'pincode' => '123456',
+            'class_id' => $class->id,
+            'section_id' => $section ? $section->id : 1,
+            'academic_session_id' => $session->id,
+            'is_active' => true,
+        ]);
+
+        \App\Models\StudentSession::create([
+            'school_id' => $schoolId,
+            'student_id' => $student->id,
+            'class_id' => $class->id,
+            'section_id' => $section ? $section->id : 1,
+            'academic_session_id' => $session->id,
+            'roll_number' => '01',
+            'is_promoted' => false,
+        ]);
+
+        $exam = Exam::create([
+            'school_id' => $schoolId,
+            'name' => 'Pa-1',
+            'academic_year' => 'Apr 2026 - Mar 2027',
+            'status' => 'Ongoing & Completed',
+            'class_id' => $class->id,
+            'section_id' => $section ? $section->id : null,
+            'start_date' => '2026-08-01',
+            'end_date' => '2026-08-31',
+        ]);
+
+        $assessment = ExamAssessment::create([
+            'school_id' => $schoolId,
+            'exam_id' => $exam->id,
+            'subject_id' => $subject->id,
+            'class_id' => $class->id,
+            'name' => 'Half Yearly1',
+            'max_marks' => 50,
+            'pass_marks' => 17,
+        ]);
+
+        $headers = [
+            'X-School-Code' => $school ? $school->code : 'YIS2024'
+        ];
+
+        $secParam = $section ? "&section_id={$section->id}" : '';
+        $getResponse = $this->actingAs($schoolAdmin)
+            ->withHeaders($headers)
+            ->getJson(
+                "/school/examination/exams/{$exam->id}/update-marks-drawer-data?class_id={$class->id}{$secParam}&subject_id={$subject->id}&subject_type=Scholastic&student_status=active"
+            );
+
+        $getResponse->assertStatus(200);
+        $data = $getResponse->json();
+
+        $this->assertArrayHasKey('students', $data);
+        $this->assertNotEmpty($data['students']);
+        $studentIds = collect($data['students'])->pluck('id')->toArray();
+        $this->assertContains($student->id, $studentIds);
+    }
 }

@@ -54,24 +54,51 @@ class SchoolDashboardController extends Controller
         $totalStudents = $totalStudentsQuery->count();
         $totalStaffs = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
 
-        // Accounts counts
-        $totalFeeCollection = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
-        $totalSchoolIncome  = (float) SchoolIncome::where('school_id', $schoolId)
-            ->where('status', '!=', 'cancelled')
-            ->sum('amount');
-        $totalIncome  = $totalFeeCollection + $totalSchoolIncome;
-        $totalExpense = (float) SchoolExpense::where('school_id', $schoolId)
-            ->where('status', '!=', 'cancelled')
-            ->sum('amount');
+        // Accounts counts (Filtered by Active Academic Session)
+        $sessionFeePaymentsQuery = StudentFee::where('school_id', $schoolId)->where('paid_amount', '>', 0);
+        $totalSchoolIncomeQuery  = SchoolIncome::where('school_id', $schoolId)->where('status', '!=', 'cancelled');
+        $totalExpenseQuery       = SchoolExpense::where('school_id', $schoolId)->where('status', '!=', 'cancelled');
 
-        // Fee counts
-        $todayFeeCollection = (float) StudentFee::where('school_id', $schoolId)
+        if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+            $sessionFeePaymentsQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
+            $totalSchoolIncomeQuery->whereBetween('income_date', [$currentSession->start_date, $currentSession->end_date]);
+            $totalExpenseQuery->whereBetween('expense_date', [$currentSession->start_date, $currentSession->end_date]);
+        } elseif ($currentSession) {
+            $sessId = $currentSession->id;
+            $sessionFeePaymentsQuery->whereHas('student', function($sq) use ($sessId) {
+                $sq->where('academic_session_id', $sessId);
+            });
+        }
+
+        $sessionFeeCollection = (float) $sessionFeePaymentsQuery->sum('paid_amount');
+        $totalSchoolIncome    = (float) $totalSchoolIncomeQuery->sum('amount');
+        $totalIncome          = $sessionFeeCollection + $totalSchoolIncome;
+        $totalExpense         = (float) $totalExpenseQuery->sum('amount');
+
+        // Fee counts (Filtered by Active Academic Session)
+        $sessionFeeQuery = StudentFee::where('school_id', $schoolId);
+        if ($currentSession) {
+            $sessId = $currentSession->id;
+            $sessionFeeQuery->whereHas('student', function($sq) use ($sessId) {
+                $sq->where('academic_session_id', $sessId)
+                  ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+            });
+        }
+
+        $totalFeeCollectionQuery = (clone $sessionFeeQuery)->where('paid_amount', '>', 0);
+        if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+            $totalFeeCollectionQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
+        }
+        $totalFeeCollection = (float) $totalFeeCollectionQuery->sum('paid_amount');
+
+        $todayFeeCollection = (float) (clone $sessionFeeQuery)
             ->whereDate('updated_at', today())
             ->sum('paid_amount');
 
-        $todayFeeDue = (float) StudentFee::where('school_id', $schoolId)
+        $todayFeeDue = (float) (clone $sessionFeeQuery)
             ->whereDate('due_date', today())
             ->sum('amount');
+
         $todayFeeCollectionPct = 0;
         if ($todayFeeCollection > 0) {
             if ($todayFeeDue > 0) {
@@ -186,15 +213,23 @@ class SchoolDashboardController extends Controller
         $admissionCount = EnquiryLead::where('school_id', $schoolId)->whereIn('status', ['enrolled', 'admission'])->count();
 
         // ── 3. FINANCIAL MANAGEMENT OVERVIEW ─────────────────────────────────
-        // Income and Expense monthly data (April - February)
-        $months = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February'];
+        // Income and Expense monthly data (April - March)
+        $months = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
         $incomeData = array_fill(0, count($months), 0);
         $expenseData = array_fill(0, count($months), 0);
 
-        // Fetch paid amounts from database grouped by month
-        $feePayments = StudentFee::where('school_id', $schoolId)
-            ->where('paid_amount', '>', 0)
-            ->get();
+        // Fetch paid amounts from database grouped by month for active session
+        $feePaymentsQuery = StudentFee::where('school_id', $schoolId)
+            ->where('paid_amount', '>', 0);
+        if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+            $feePaymentsQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
+        } elseif ($currentSession) {
+            $sessId = $currentSession->id;
+            $feePaymentsQuery->whereHas('student', function($sq) use ($sessId) {
+                $sq->where('academic_session_id', $sessId);
+            });
+        }
+        $feePayments = $feePaymentsQuery->get();
 
         foreach ($feePayments as $payment) {
             $monthName = Carbon::parse($payment->updated_at)->format('F');
@@ -204,10 +239,13 @@ class SchoolDashboardController extends Controller
             }
         }
 
-        // Add general school incomes (income_control module) to incomeData
-        $schoolIncomeRecords = SchoolIncome::where('school_id', $schoolId)
-            ->where('status', '!=', 'cancelled')
-            ->get();
+        // Add general school incomes (income_control module) to incomeData for active session
+        $schoolIncomeQuery = SchoolIncome::where('school_id', $schoolId)
+            ->where('status', '!=', 'cancelled');
+        if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+            $schoolIncomeQuery->whereBetween('income_date', [$currentSession->start_date, $currentSession->end_date]);
+        }
+        $schoolIncomeRecords = $schoolIncomeQuery->get();
         foreach ($schoolIncomeRecords as $incRec) {
             $monthName = Carbon::parse($incRec->income_date)->format('F');
             $idx = array_search($monthName, $months);
@@ -216,10 +254,13 @@ class SchoolDashboardController extends Controller
             }
         }
 
-        // Populate expenseData from SchoolExpense table
-        $expenseRecords = SchoolExpense::where('school_id', $schoolId)
-            ->where('status', '!=', 'cancelled')
-            ->get();
+        // Populate expenseData from SchoolExpense table for active session
+        $expenseQuery = SchoolExpense::where('school_id', $schoolId)
+            ->where('status', '!=', 'cancelled');
+        if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+            $expenseQuery->whereBetween('expense_date', [$currentSession->start_date, $currentSession->end_date]);
+        }
+        $expenseRecords = $expenseQuery->get();
         foreach ($expenseRecords as $expRec) {
             $monthName = Carbon::parse($expRec->expense_date)->format('F');
             $idx = array_search($monthName, $months);
@@ -228,25 +269,29 @@ class SchoolDashboardController extends Controller
             }
         }
 
-        // Till Date (due_date <= today) Collected vs Due
+        // Till Date (due_date <= today) Collected vs Due (Filtered by Active Session)
         $schoolPendingChequesTotal = (float) \App\Models\PendingCheque::where('school_id', $schoolId)->where('status', 'pending')->sum('amount');
 
-        // Till Date (due_date <= today) Collected vs Due
-        $feeCollectedAmount = (float) StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->sum('paid_amount');
-        $feeDueAmount = max(0.00, (float) StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->sum(\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
+        $feeCollectedQuery = (clone $sessionFeeQuery)->where('due_date', '<=', today());
+        if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+            $feeCollectedQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
+        }
+        $feeCollectedAmount = (float) $feeCollectedQuery->sum('paid_amount');
+
+        $feeDueAmount = max(0.00, (float) (clone $sessionFeeQuery)->where('due_date', '<=', today())->sum(\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
         $feeTotalSum = $feeCollectedAmount + $feeDueAmount;
         $feeCollectedPct = $feeTotalSum > 0 ? round(($feeCollectedAmount / $feeTotalSum) * 100, 2) : 0;
         $feeDuePct = $feeTotalSum > 0 ? round(($feeDueAmount / $feeTotalSum) * 100, 2) : 0;
 
-        // Annual (all fees) Collected vs Due
-        $annualCollectedAmount = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
-        $annualDueAmount = max(0.00, (float) StudentFee::where('school_id', $schoolId)->sum(\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
+        // Annual (all fees) Collected vs Due (Filtered by Active Session)
+        $annualCollectedAmount = $totalFeeCollection;
+        $annualDueAmount = max(0.00, (float) (clone $sessionFeeQuery)->sum(\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
         $annualTotalSum = $annualCollectedAmount + $annualDueAmount;
         $annualCollectedPct = $annualTotalSum > 0 ? round(($annualCollectedAmount / $annualTotalSum) * 100, 2) : 0;
         $annualDuePct = $annualTotalSum > 0 ? round(($annualDueAmount / $annualTotalSum) * 100, 2) : 0;
 
         // Pending (till date)
-        $feePendingStudentsCount = StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->whereColumn('amount', '>', 'paid_amount')->distinct('student_id')->count();
+        $feePendingStudentsCount = (clone $sessionFeeQuery)->where('due_date', '<=', today())->whereColumn('amount', '>', 'paid_amount')->distinct('student_id')->count();
         $feePendingDueAmount = $feeDueAmount;
 
         // ── 4. ADMINISTRATIVE OPERATIONS OVERVIEW ────────────────────────────
@@ -424,17 +469,30 @@ class SchoolDashboardController extends Controller
         $month    = (int) $request->get('month', now()->month);
         $year     = (int) $request->get('year', now()->year);
 
+        $currentSession = AcademicSession::where('school_id', $schoolId)
+            ->where('is_current', true)
+            ->first();
+
         $labels = [];
         $data   = [];
         $total  = 0;
         $trend  = 0;
+
+        $sessionFeeQuery = StudentFee::where('school_id', $schoolId);
+        if ($currentSession) {
+            $sessId = $currentSession->id;
+            $sessionFeeQuery->whereHas('student', function($sq) use ($sessId) {
+                $sq->where('academic_session_id', $sessId)
+                  ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+            });
+        }
 
         if ($period === 'month') {
             $daysInMonth = Carbon::create($year, $month)->daysInMonth;
             for ($d = 1; $d <= $daysInMonth; $d++) {
                 $labels[] = $d . ' ' . Carbon::create($year, $month)->format('M');
                 $date = Carbon::create($year, $month, $d)->toDateString();
-                $data[] = (float) StudentFee::where('school_id', $schoolId)
+                $data[] = (float) (clone $sessionFeeQuery)
                     ->whereDate('updated_at', $date)
                     ->sum('paid_amount');
             }
@@ -443,7 +501,7 @@ class SchoolDashboardController extends Controller
             for ($i = 2; $i >= 0; $i--) {
                 $m = now()->subMonths($i);
                 $labels[] = $m->format('M Y');
-                $data[] = (float) StudentFee::where('school_id', $schoolId)
+                $data[] = (float) (clone $sessionFeeQuery)
                     ->whereYear('updated_at', $m->year)
                     ->whereMonth('updated_at', $m->month)
                     ->sum('paid_amount');
@@ -453,7 +511,7 @@ class SchoolDashboardController extends Controller
             for ($i = 11; $i >= 0; $i--) {
                 $m = now()->subMonths($i);
                 $labels[] = $m->format('M');
-                $data[] = (float) StudentFee::where('school_id', $schoolId)
+                $data[] = (float) (clone $sessionFeeQuery)
                     ->whereYear('updated_at', $m->year)
                     ->whereMonth('updated_at', $m->month)
                     ->sum('paid_amount');
@@ -1178,7 +1236,18 @@ class SchoolDashboardController extends Controller
 
             case 'total_collection':
                 $title = 'Total Fee Collections (Income)';
-                $fees = StudentFee::where('school_id', $schoolId)->where('paid_amount', '>', 0)->with('student')->get();
+                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+                $feesQuery = StudentFee::where('school_id', $schoolId)->where('paid_amount', '>', 0)->with('student');
+                if ($selectedSession && $selectedSession->start_date && $selectedSession->end_date) {
+                    $feesQuery->whereBetween('updated_at', [$selectedSession->start_date->startOfDay(), $selectedSession->end_date->endOfDay()]);
+                } elseif ($selectedSession) {
+                    $sessId = $selectedSession->id;
+                    $feesQuery->whereHas('student', function($sq) use ($sessId) {
+                        $sq->where('academic_session_id', $sessId)
+                          ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                    });
+                }
+                $fees = $feesQuery->get();
                 foreach ($fees as $fee) {
                     $data[] = [
                         'receipt_id' => 'REC-' . $fee->id,
@@ -1192,13 +1261,27 @@ class SchoolDashboardController extends Controller
 
             case 'income':
                 $title = 'Total Income Details';
-                $receipts = \App\Models\FeeReceipt::where('school_id', $schoolId)
+                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+                $receiptsQuery = \App\Models\FeeReceipt::where('school_id', $schoolId)
                     ->where('amount_paid', '>', 0)
-                    ->with(['student.class', 'student.section'])
-                    ->get();
-                
-                if ($receipts->isEmpty()) {
-                    $fees = StudentFee::where('school_id', $schoolId)->where('paid_amount', '>', 0)->with('student')->get();
+                    ->with(['student.class', 'student.section']);
+                $schoolIncomesQuery = SchoolIncome::where('school_id', $schoolId)
+                    ->where('status', '!=', 'cancelled');
+
+                if ($selectedSession && $selectedSession->start_date && $selectedSession->end_date) {
+                    $receiptsQuery->whereBetween('payment_date', [$selectedSession->start_date, $selectedSession->end_date]);
+                    $schoolIncomesQuery->whereBetween('income_date', [$selectedSession->start_date, $selectedSession->end_date]);
+                }
+
+                $receipts = $receiptsQuery->get();
+                $schoolIncomes = $schoolIncomesQuery->get();
+
+                if ($receipts->isEmpty() && $schoolIncomes->isEmpty()) {
+                    $feesQuery = StudentFee::where('school_id', $schoolId)->where('paid_amount', '>', 0)->with('student');
+                    if ($selectedSession && $selectedSession->start_date && $selectedSession->end_date) {
+                        $feesQuery->whereBetween('updated_at', [$selectedSession->start_date->startOfDay(), $selectedSession->end_date->endOfDay()]);
+                    }
+                    $fees = $feesQuery->get();
                     foreach ($fees as $fee) {
                         $data[] = [
                             'receipt_id' => 'REC-' . $fee->id,
@@ -1226,22 +1309,38 @@ class SchoolDashboardController extends Controller
                             'income_name' => 'School Fee'
                         ];
                     }
+                    foreach ($schoolIncomes as $inc) {
+                        $data[] = [
+                            'receipt_id' => $inc->receipt_no ?? ('INC-' . $inc->id),
+                            'student' => $inc->received_from ?? '—',
+                            'amount' => '₹ ' . number_format($inc->amount, 2),
+                            'date' => $inc->income_date ? Carbon::parse($inc->income_date)->format('Y-m-d') : $inc->created_at->format('Y-m-d'),
+                            'status' => ucfirst($inc->status ?? 'Paid'),
+                            'payment_mode' => ucfirst($inc->payment_mode ?? '—'),
+                            'category' => ucfirst($inc->category ?? 'Other'),
+                            'sub_category' => '—',
+                            'income_name' => $inc->title ?? 'General Income'
+                        ];
+                    }
                 }
                 break;
 
             case 'expense':
                 $title = 'School Expenses';
-                $expenses = SchoolExpense::where('school_id', $schoolId)
-                    ->where('status', '!=', 'cancelled')
-                    ->latest('expense_date')
-                    ->get();
+                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+                $expenseQuery = SchoolExpense::where('school_id', $schoolId)
+                    ->where('status', '!=', 'cancelled');
+                if ($selectedSession && $selectedSession->start_date && $selectedSession->end_date) {
+                    $expenseQuery->whereBetween('expense_date', [$selectedSession->start_date, $selectedSession->end_date]);
+                }
+                $expenses = $expenseQuery->latest('expense_date')->get();
                 $data = [];
                 foreach ($expenses as $exp) {
                     $data[] = [
                         'expense_id' => 'EXP-' . $exp->id,
                         'category' => ucfirst($exp->category),
                         'amount' => '₹ ' . number_format($exp->amount, 2),
-                        'date' => $exp->expense_date,
+                        'date' => $exp->expense_date ? Carbon::parse($exp->expense_date)->format('Y-m-d') : '—',
                         'status' => ucfirst($exp->status ?? 'Paid')
                     ];
                 }
@@ -1249,7 +1348,16 @@ class SchoolDashboardController extends Controller
 
             case 'today_collection':
                 $title = "Today's Fee Collection";
-                $fees = StudentFee::where('school_id', $schoolId)->whereDate('updated_at', today())->where('paid_amount', '>', 0)->with('student')->get();
+                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+                $feesQuery = StudentFee::where('school_id', $schoolId)->whereDate('updated_at', today())->where('paid_amount', '>', 0)->with('student');
+                if ($selectedSession) {
+                    $sessId = $selectedSession->id;
+                    $feesQuery->whereHas('student', function($sq) use ($sessId) {
+                        $sq->where('academic_session_id', $sessId)
+                          ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                    });
+                }
+                $fees = $feesQuery->get();
                 foreach ($fees as $fee) {
                     $data[] = [
                         'receipt_id' => 'REC-' . $fee->id,
@@ -1315,7 +1423,16 @@ class SchoolDashboardController extends Controller
 
             case 'fee_pending':
                 $title = "Students with Dues / Pending Fees";
-                $pending = StudentFee::where('school_id', $schoolId)->whereColumn('amount', '>', 'paid_amount')->with('student')->get();
+                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+                $pendingQuery = StudentFee::where('school_id', $schoolId)->whereColumn('amount', '>', 'paid_amount')->with('student');
+                if ($selectedSession) {
+                    $sessId = $selectedSession->id;
+                    $pendingQuery->whereHas('student', function($sq) use ($sessId) {
+                        $sq->where('academic_session_id', $sessId)
+                          ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                    });
+                }
+                $pending = $pendingQuery->get();
                 foreach ($pending as $fee) {
                     $due = $fee->amount - $fee->paid_amount;
                     $data[] = [
@@ -1391,11 +1508,25 @@ class SchoolDashboardController extends Controller
 
             case 'class_fee_report':
                 $title = 'Class-Wise Fee Report';
+                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
                 $classes = \App\Models\SchoolClass::where('school_id', $schoolId)->get();
                 foreach ($classes as $c) {
-                    $studentIds = Student::where('school_id', $schoolId)->where('class_id', $c->id)->pluck('id');
-                    $totalFee = (float) StudentFee::where('school_id', $schoolId)->whereIn('student_id', $studentIds)->sum('amount');
-                    $paid = (float) StudentFee::where('school_id', $schoolId)->whereIn('student_id', $studentIds)->sum('paid_amount');
+                    $studentQuery = Student::where('school_id', $schoolId)->where('class_id', $c->id);
+                    if ($selectedSession) {
+                        $sessId = $selectedSession->id;
+                        $studentQuery->where(function($q) use ($sessId) {
+                            $q->where('academic_session_id', $sessId)
+                              ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $sessId));
+                        });
+                    }
+                    $studentIds = $studentQuery->pluck('id');
+                    $feeQuery = StudentFee::where('school_id', $schoolId)->whereIn('student_id', $studentIds);
+                    $totalFee = (float) (clone $feeQuery)->sum('amount');
+                    $paidQuery = (clone $feeQuery);
+                    if ($selectedSession && $selectedSession->start_date && $selectedSession->end_date) {
+                        $paidQuery->whereBetween('updated_at', [$selectedSession->start_date->startOfDay(), $selectedSession->end_date->endOfDay()]);
+                    }
+                    $paid = (float) $paidQuery->sum('paid_amount');
                     $due = max(0, $totalFee - $paid);
                     
                     $data[] = [
@@ -1450,27 +1581,51 @@ class SchoolDashboardController extends Controller
                 'totalStaffs' => $totalStaffs,
             ];
         } elseif ($box === 'accounts') {
-            $totalFeeCollection = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
-            $totalSchoolIncome  = (float) SchoolIncome::where('school_id', $schoolId)
-                ->where('status', '!=', 'cancelled')
-                ->sum('amount');
-            $totalIncome = $totalFeeCollection + $totalSchoolIncome;
+            $feePaymentsQuery = StudentFee::where('school_id', $schoolId)->where('paid_amount', '>', 0);
+            $schoolIncomeQuery = SchoolIncome::where('school_id', $schoolId)->where('status', '!=', 'cancelled');
+            $expenseQuery = SchoolExpense::where('school_id', $schoolId)->where('status', '!=', 'cancelled');
 
-            $totalExpense = (float) SchoolExpense::where('school_id', $schoolId)
-                ->where('status', '!=', 'cancelled')
-                ->sum('amount');
+            if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+                $feePaymentsQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
+                $schoolIncomeQuery->whereBetween('income_date', [$currentSession->start_date, $currentSession->end_date]);
+                $expenseQuery->whereBetween('expense_date', [$currentSession->start_date, $currentSession->end_date]);
+            } elseif ($currentSession) {
+                $sessId = $currentSession->id;
+                $feePaymentsQuery->whereHas('student', function($sq) use ($sessId) {
+                    $sq->where('academic_session_id', $sessId);
+                });
+            }
+
+            $totalFeeCollection = (float) $feePaymentsQuery->sum('paid_amount');
+            $totalSchoolIncome  = (float) $schoolIncomeQuery->sum('amount');
+            $totalIncome        = $totalFeeCollection + $totalSchoolIncome;
+            $totalExpense       = (float) $expenseQuery->sum('amount');
 
             $data = [
                 'totalIncome' => number_format($totalIncome),
                 'totalExpense' => number_format($totalExpense),
             ];
         } elseif ($box === 'fee') {
-            $todayFeeCollection = (float) StudentFee::where('school_id', $schoolId)
+            $sessionFeeQuery = StudentFee::where('school_id', $schoolId);
+            if ($currentSession) {
+                $sessId = $currentSession->id;
+                $sessionFeeQuery->whereHas('student', function($sq) use ($sessId) {
+                    $sq->where('academic_session_id', $sessId)
+                      ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                });
+            }
+
+            $todayFeeCollection = (float) (clone $sessionFeeQuery)
                 ->whereDate('updated_at', today())
                 ->sum('paid_amount');
-            $totalFeeCollection = (float) StudentFee::where('school_id', $schoolId)->sum('paid_amount');
+
+            $totalFeeCollectionQuery = (clone $sessionFeeQuery)->where('paid_amount', '>', 0);
+            if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+                $totalFeeCollectionQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
+            }
+            $totalFeeCollection = (float) $totalFeeCollectionQuery->sum('paid_amount');
             
-            $todayFeeDue = (float) StudentFee::where('school_id', $schoolId)
+            $todayFeeDue = (float) (clone $sessionFeeQuery)
                 ->whereDate('due_date', today())
                 ->sum('amount');
             $todayFeeCollectionPct = 0;
@@ -1482,8 +1637,12 @@ class SchoolDashboardController extends Controller
                 }
             }
 
-            $feeCollectedAmount = (float) StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->sum('paid_amount');
-            $feeDueAmount = (float) StudentFee::where('school_id', $schoolId)->where('due_date', '<=', today())->whereColumn('amount', '>', 'paid_amount')->sum(\DB::raw('amount - paid_amount'));
+            $feeCollectedQuery = (clone $sessionFeeQuery)->where('due_date', '<=', today());
+            if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+                $feeCollectedQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
+            }
+            $feeCollectedAmount = (float) $feeCollectedQuery->sum('paid_amount');
+            $feeDueAmount = (float) (clone $sessionFeeQuery)->where('due_date', '<=', today())->whereColumn('amount', '>', 'paid_amount')->sum(\DB::raw('amount - paid_amount'));
             $feeTotalSum = $feeCollectedAmount + $feeDueAmount;
             $feeCollectedPct = $feeTotalSum > 0 ? round(($feeCollectedAmount / $feeTotalSum) * 100, 2) : 0;
 
@@ -1590,6 +1749,10 @@ class SchoolDashboardController extends Controller
         $schoolId = auth()->user()->school_id;
         $filter = $request->get('filter', 'This Year');
 
+        $currentSession = AcademicSession::where('school_id', $schoolId)
+            ->where('is_current', true)
+            ->first();
+
         $labels = [];
         $incomeData = [];
         $expenseData = [];
@@ -1617,7 +1780,18 @@ class SchoolDashboardController extends Controller
                 }
             }
 
-            // Add monthly expenses by day
+            $monthIncomes = SchoolIncome::where('school_id', $schoolId)
+                ->whereMonth('income_date', now()->month)
+                ->whereYear('income_date', now()->year)
+                ->where('status', '!=', 'cancelled')
+                ->get();
+            foreach ($monthIncomes as $incRec) {
+                $day = Carbon::parse($incRec->income_date)->day;
+                if ($day <= $daysInMonth) {
+                    $incomeData[$day - 1] += (float) $incRec->amount;
+                }
+            }
+
             $monthExpenses = SchoolExpense::where('school_id', $schoolId)
                 ->whereMonth('expense_date', now()->month)
                 ->whereYear('expense_date', now()->year)
@@ -1654,7 +1828,18 @@ class SchoolDashboardController extends Controller
                 }
             }
 
-            // Add last 6 months expenses
+            $last6Incomes = SchoolIncome::where('school_id', $schoolId)
+                ->where('income_date', '>=', now()->subMonths(5)->startOfMonth())
+                ->where('status', '!=', 'cancelled')
+                ->get();
+            foreach ($last6Incomes as $incRec) {
+                $monthName = Carbon::parse($incRec->income_date)->format('F');
+                $idx = array_search($monthName, $labels);
+                if ($idx !== false) {
+                    $incomeData[$idx] += (float) $incRec->amount;
+                }
+            }
+
             $last6Expenses = SchoolExpense::where('school_id', $schoolId)
                 ->where('expense_date', '>=', now()->subMonths(5)->startOfMonth())
                 ->where('status', '!=', 'cancelled')
@@ -1671,14 +1856,29 @@ class SchoolDashboardController extends Controller
             $totalExpense = array_sum($expenseData);
 
         } else {
-            $labels = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February'];
+            $labels = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
             $incomeData = array_fill(0, count($labels), 0);
             $expenseData = array_fill(0, count($labels), 0);
 
-            $feePayments = StudentFee::where('school_id', $schoolId)
-                ->where('paid_amount', '>', 0)
-                ->get();
+            $feePaymentsQuery = StudentFee::where('school_id', $schoolId)
+                ->where('paid_amount', '>', 0);
+            $schoolIncomeQuery = SchoolIncome::where('school_id', $schoolId)
+                ->where('status', '!=', 'cancelled');
+            $expenseQuery = SchoolExpense::where('school_id', $schoolId)
+                ->where('status', '!=', 'cancelled');
 
+            if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
+                $feePaymentsQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
+                $schoolIncomeQuery->whereBetween('income_date', [$currentSession->start_date, $currentSession->end_date]);
+                $expenseQuery->whereBetween('expense_date', [$currentSession->start_date, $currentSession->end_date]);
+            } elseif ($currentSession) {
+                $sessId = $currentSession->id;
+                $feePaymentsQuery->whereHas('student', function($sq) use ($sessId) {
+                    $sq->where('academic_session_id', $sessId);
+                });
+            }
+
+            $feePayments = $feePaymentsQuery->get();
             foreach ($feePayments as $payment) {
                 $monthName = Carbon::parse($payment->updated_at)->format('F');
                 $idx = array_search($monthName, $labels);
@@ -1687,10 +1887,16 @@ class SchoolDashboardController extends Controller
                 }
             }
 
-            // Annual expense data from SchoolExpense
-            $allExpenses = SchoolExpense::where('school_id', $schoolId)
-                ->where('status', '!=', 'cancelled')
-                ->get();
+            $schoolIncomes = $schoolIncomeQuery->get();
+            foreach ($schoolIncomes as $incRec) {
+                $monthName = Carbon::parse($incRec->income_date)->format('F');
+                $idx = array_search($monthName, $labels);
+                if ($idx !== false) {
+                    $incomeData[$idx] += (float) $incRec->amount;
+                }
+            }
+
+            $allExpenses = $expenseQuery->get();
             foreach ($allExpenses as $expRec) {
                 $monthName = Carbon::parse($expRec->expense_date)->format('F');
                 $idx = array_search($monthName, $labels);
@@ -1699,8 +1905,7 @@ class SchoolDashboardController extends Controller
                 }
             }
 
-            $totalFeeCollection = array_sum($incomeData);
-            $totalIncome = $totalFeeCollection;
+            $totalIncome = array_sum($incomeData);
             $totalExpense = array_sum($expenseData);
         }
 

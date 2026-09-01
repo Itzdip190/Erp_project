@@ -331,7 +331,7 @@ body.sidebar-collapsed .main {
         </div>
 
         <div class="footer" style="margin-top: 20px;">
-            <span>© 2026 {{ $school?->name ?? 'SchoolCloud ERP' }}. All rights reserved.</span>
+            <span>© 2026 {{ $school?->name ?? 'EducorERP' }}. All rights reserved.</span>
             <span>Version 2.0.0 &nbsp;|&nbsp; 🔒 Secure & Trusted</span>
         </div>
     </div>
@@ -365,17 +365,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.classList.add('sidebar-collapsed');
         }
     }
-
-    // Accordion toggle
-    document.querySelectorAll('.sb-hdr').forEach(hdr => {
-        hdr.addEventListener('click', () => {
-            const submenu = hdr.nextElementSibling;
-            if (submenu && submenu.classList.contains('sb-submenu')) {
-                hdr.classList.toggle('open');
-                submenu.classList.toggle('open');
-            }
-        });
-    });
 
     // Auto-expand current active menu
     document.querySelectorAll('.sb-submenu').forEach(submenu => {

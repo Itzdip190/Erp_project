@@ -4562,8 +4562,8 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
                 $studentFees = StudentFee::where('school_id', $schoolId)
                     ->where('student_id', $viewStudentId)
                     ->where(function($query) use ($selectedSession, $viewStudent) {
-                        $query->where(function($q) use ($viewStudent) {
-                            $q->where('fee_schedule_id', $viewStudent->fee_schedule_id);
+                        $query->whereHas('feeSchedule', function($q) use ($selectedSession) {
+                            $q->where('academic_session_id', $selectedSession->id);
                         })->orWhereHas('transportFeeSchedule', function($q) use ($selectedSession) {
                             $q->where('academic_session_id', $selectedSession->id);
                         })->orWhereHas('miscFee', function($q) use ($selectedSession) {
@@ -4573,6 +4573,11 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
                               ->whereNull('transport_fee_schedule_id')
                               ->whereNull('misc_fee_id')
                               ->whereBetween('due_date', [$selectedSession->start_date, $selectedSession->end_date]);
+                        })->orWhere(function($q) use ($viewStudent, $selectedSession) {
+                            if ($viewStudent->fee_schedule_id) {
+                                $q->where('fee_schedule_id', $viewStudent->fee_schedule_id)
+                                  ->whereHas('feeSchedule', fn($sq) => $sq->where('academic_session_id', $selectedSession->id));
+                            }
                         });
                     })
                     ->with(['category', 'component'])
@@ -4771,7 +4776,10 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
                 })->values();
 
                 // Retrieve explicit matching fee schedule name
-                if ($viewStudent->fee_schedule_id) {
+                $firstSchedFee = $studentFees->first(fn($f) => !empty($f->fee_schedule_id) && $f->feeSchedule);
+                if ($firstSchedFee) {
+                    $feeScheduleName = $firstSchedFee->feeSchedule->name;
+                } elseif ($viewStudent->fee_schedule_id) {
                     $feeScheduleName = optional($viewStudent->feeSchedule)->name;
                 }
 
@@ -4847,33 +4855,60 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
         $showDeactivated = $request->get('show_deactivated') == '1';
         $showDeleted = $request->get('show_deleted') == '1';
 
-        $query = Student::where('school_id', $schoolId)
-            ->where('academic_session_id', optional($selectedSession)->id);
-
-        if (!$showDeactivated) {
-            $query->where('is_active', 1);
-        }
+        $query = Student::where('school_id', $schoolId);
 
         if ($showDeleted) {
             $query->withTrashed();
         }
 
-        // ── Load all studentFees to correctly aggregate dues across all years/sessions ──
-        $query->with(['class', 'section', 'feeSchedule', 'studentFees' => function ($q) use ($schoolId) {
-            $q->where('school_id', $schoolId)
-              ->with(['feeSchedule', 'transportFeeSchedule', 'miscFee']);
-        }]);
-        // ── End Issue 3 Fix ──
-
-        if ($selectedClassId) {
-            $query->where('class_id', $selectedClassId);
+        if (!$showDeactivated) {
+            $query->where(function($q) {
+                $q->whereNull('is_active')->orWhere('is_active', 1);
+            })
+            ->where('is_alumni', 0)
+            ->where(function($q) {
+                $q->where('is_transfer', 0)->orWhereNull('is_transfer');
+            })
+            ->where(function($q) {
+                $q->whereNull('tc_number')->orWhere('tc_number', '');
+            });
         }
-        if ($selectedSectionId) {
-            $query->where('section_id', $selectedSectionId);
+
+        if ($selectedSession) {
+            $query->where(function($sessionScope) use ($selectedSession, $selectedClassId, $selectedSectionId, $schoolId) {
+                $sessionScope->inAcademicSession($selectedSession->id, $selectedClassId, $selectedSectionId);
+
+                if (empty($selectedClassId) && empty($selectedSectionId)) {
+                    $sessionScope->orWhereHas('studentFees', function($fq) use ($selectedSession, $schoolId) {
+                        $fq->withoutGlobalScope('active')
+                           ->where('school_id', $schoolId)
+                           ->where(function($feeQuery) use ($selectedSession) {
+                               $feeQuery->whereHas('feeSchedule', function($sq) use ($selectedSession) {
+                                   $sq->where('academic_session_id', $selectedSession->id);
+                               })->orWhereHas('transportFeeSchedule', function($sq) use ($selectedSession) {
+                                   $sq->where('academic_session_id', $selectedSession->id);
+                               })->orWhereHas('miscFee', function($sq) use ($selectedSession) {
+                                   $sq->where('academic_session_id', $selectedSession->id);
+                               })->orWhere(function($sq) use ($selectedSession) {
+                                   if ($selectedSession->start_date && $selectedSession->end_date) {
+                                       $sq->whereBetween('due_date', [$selectedSession->start_date, $selectedSession->end_date]);
+                                   }
+                               });
+                           });
+                    });
+                }
+            });
+        } else {
+            if ($selectedClassId) {
+                $query->where('class_id', $selectedClassId);
+            }
+            if ($selectedSectionId) {
+                $query->where('section_id', $selectedSectionId);
+            }
         }
 
         if ($search) {
-            SearchHelper::applyStudentSearch($query, $search);
+            SearchHelper::applyStudentSearch($query, $search, '', $selectedSession?->id);
         }
 
         if ($request->get('all_year')) {
@@ -4882,13 +4917,33 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
             });
         }
 
+        // ── Load all studentFees and studentSessions to correctly aggregate and display session data ──
+        $query->with([
+            'class',
+            'section',
+            'feeSchedule',
+            'studentSessions.schoolClass',
+            'studentSessions.section',
+            'studentFees' => function ($q) use ($schoolId) {
+                $q->where('school_id', $schoolId)
+                  ->with(['feeSchedule', 'transportFeeSchedule', 'miscFee']);
+            }
+        ]);
+
         $studentsWithFees = $query->paginate(25)->withQueryString();
 
-        // Load/reload all studentFees
-        $studentsWithFees->load(['class', 'section', 'feeSchedule', 'studentFees' => function ($q) use ($schoolId) {
-            $q->where('school_id', $schoolId)
-              ->with(['feeSchedule', 'transportFeeSchedule', 'miscFee']);
-        }]);
+        // Load/reload all studentFees and studentSessions
+        $studentsWithFees->load([
+            'class',
+            'section',
+            'feeSchedule',
+            'studentSessions.schoolClass',
+            'studentSessions.section',
+            'studentFees' => function ($q) use ($schoolId) {
+                $q->where('school_id', $schoolId)
+                  ->with(['feeSchedule', 'transportFeeSchedule', 'miscFee']);
+            }
+        ]);
 
         // Pre-load historical previous session fees grouped by admission_number for list view students
         $pageAdmissionNumbers = $studentsWithFees->pluck('admission_number')->filter()->unique()->toArray();

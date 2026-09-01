@@ -890,4 +890,129 @@ class PreviousYearFeeCarryForwardTest extends TestCase
         $viewResponse->assertStatus(200);
         $viewResponse->assertViewHas('previousYearDue', 0.00);
     }
+
+    /**
+     * TEST 14: Promoted student visibility in previous academic session listing and old dues payment.
+     * Scenario:
+     * - Student "SuperStart Yash" in 2025-2026 Class UKG Section A has ₹10,000 fee due.
+     * - Student is promoted to 2026-2027 Class 1 Section A.
+     * - When viewing Student Wise Fees in 2025-2026 filtered by Class UKG and Section A:
+     *   Student MUST be visible, show UKG A, and show ₹10,000 due.
+     * - When viewing Student Wise Fees in 2026-2027 filtered by Class 1 and Section A:
+     *   Student MUST be visible, show Class 1 A, and show ₹10,000 carried-forward due.
+     * - Pay ₹10,000 for 2025-2026 fee.
+     * - Next session (2026-2027) carry-forward due automatically reduces to ₹0.
+     */
+    public function test_promoted_student_visible_in_previous_academic_session_list_and_can_pay_old_dues(): void
+    {
+        $student = $this->createTestStudent([
+            'admission_number' => 'JPPS_YASH',
+            'first_name' => 'SuperStart',
+            'last_name' => 'Yash',
+            'academic_session_id' => $this->session2025->id,
+            'class_id' => $this->classUkg->id,
+            'section_id' => $this->sectionA->id,
+            'fee_schedule_id' => $this->schedule2025->id,
+        ]);
+
+        // StudentSession record for 2025-2026
+        \App\Models\StudentSession::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'academic_session_id' => $this->session2025->id,
+            'class_id' => $this->classUkg->id,
+            'section_id' => $this->sectionA->id,
+            'is_promoted' => true,
+        ]);
+
+        // 2025-2026 Fee: ₹10,000
+        $fee2025 = StudentFee::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'fee_category_id' => $this->feeCategory->id,
+            'fee_schedule_id' => $this->schedule2025->id,
+            'fee_component_id' => $this->feeComponent->id,
+            'installment_no' => 1,
+            'amount' => 10000.00,
+            'paid_amount' => 0.00,
+            'due_date' => '2025-05-10',
+            'status' => 'pending',
+        ]);
+
+        // Promote student to 2026-2027 Class 1 Section A
+        $student->update([
+            'academic_session_id' => $this->session2026->id,
+            'class_id' => $this->classOne->id,
+            'section_id' => $this->sectionA->id,
+            'fee_schedule_id' => $this->schedule2026->id,
+        ]);
+
+        \App\Models\StudentSession::create([
+            'school_id' => $this->school->id,
+            'student_id' => $student->id,
+            'academic_session_id' => $this->session2026->id,
+            'class_id' => $this->classOne->id,
+            'section_id' => $this->sectionA->id,
+            'is_promoted' => false,
+        ]);
+
+        // 1. Verify Student Wise Fees LIST VIEW in 2025-2026 (UKG A)
+        $listResponse2025 = $this->actingAs($this->admin)->get(route('school.fees.student-wise', [
+            'academic_session_id' => $this->session2025->id,
+            'class_id' => $this->classUkg->id,
+            'section_id' => $this->sectionA->id,
+        ]));
+
+        $listResponse2025->assertStatus(200);
+        $listResponse2025->assertSee('SuperStart Yash');
+        $listResponse2025->assertSee('JPPS_YASH');
+        $listResponse2025->assertSee('UKG');
+        $listResponse2025->assertSee('UKG Schedule 2025');
+
+        // 2. Verify Student Wise Fees LIST VIEW in 2026-2027 (Class 1 A)
+        $listResponse2026 = $this->actingAs($this->admin)->get(route('school.fees.student-wise', [
+            'academic_session_id' => $this->session2026->id,
+            'class_id' => $this->classOne->id,
+            'section_id' => $this->sectionA->id,
+        ]));
+
+        $listResponse2026->assertStatus(200);
+        $listResponse2026->assertSee('SuperStart Yash');
+        $listResponse2026->assertSee('Class 1');
+
+        // 3. Verify Detail View in 2025-2026
+        $detailResponse2025 = $this->actingAs($this->admin)->get(route('school.fees.student-wise', [
+            'view_student' => $student->id,
+            'academic_session_id' => $this->session2025->id,
+        ]));
+
+        $detailResponse2025->assertStatus(200);
+        $detailResponse2025->assertSee('SuperStart Yash');
+        $detailResponse2025->assertSee('UKG Schedule 2025');
+
+        // 4. Pay ₹10,000 for 2025-2026 fee in previous session
+        $payResponse = $this->actingAs($this->admin)->post(route('school.fees.student-wise'), [
+            'action' => 'mark_paid',
+            'student_id' => $student->id,
+            'installment_no' => 1,
+            'student_fee_id' => $fee2025->id,
+            'amount_paid' => 10000.00,
+            'payment_mode' => 'cash',
+            'receipt_date' => '2026-05-15',
+            'receipt_no' => 'REC-YASH-01',
+        ]);
+
+        $this->assertEquals(10000.00, floatval($fee2025->fresh()->paid_amount));
+        $this->assertEquals('paid', $fee2025->fresh()->status);
+
+        // 5. Verify that in 2026-2027, the carry-forward due is now ₹0
+        $detailResponse2026 = $this->actingAs($this->admin)->get(route('school.fees.student-wise', [
+            'view_student' => $student->id,
+            'academic_session_id' => $this->session2026->id,
+        ]));
+
+        $detailResponse2026->assertStatus(200);
+        $detailResponse2026->assertViewHas('previousYearDue', 0.00);
+    }
 }
+

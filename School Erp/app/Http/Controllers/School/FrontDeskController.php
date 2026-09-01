@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
+use App\Mail\VisitorPassMail;
 use App\Models\School;
 use App\Models\Staff;
 use App\Models\Student;
 use App\Models\Visitor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -111,6 +114,12 @@ class FrontDeskController extends Controller
             $registeredVisitor = Visitor::where('school_id', $schoolId)->find(session('registered_visitor_id'));
         }
 
+        $school = Auth::user()?->school ?? School::find($schoolId);
+        $schoolCode = $school?->code ? strtoupper($school->code) : 'EDUZEN';
+        $publicFormUrl = route('public.visitor.register', ['schoolCode' => $schoolCode]);
+        $qrData = rawurlencode($publicFormUrl);
+        $qrCodeImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={$qrData}";
+
         return view('school.front_desk.visitor_registration', compact(
             'staffMembers',
             'visitorTypes',
@@ -118,7 +127,11 @@ class FrontDeskController extends Controller
             'visitPurposes',
             'securityGates',
             'idProofTypes',
-            'registeredVisitor'
+            'registeredVisitor',
+            'school',
+            'schoolCode',
+            'publicFormUrl',
+            'qrCodeImageUrl'
         ));
     }
 
@@ -1088,5 +1101,364 @@ class FrontDeskController extends Controller
             'totalVendors',
             'todayVendors'
         ));
+    }
+
+    /**
+     * Display Visitor Requests list (QR Self-Registrations).
+     */
+    public function visitorRequests(Request $request)
+    {
+        $schoolId = $this->getSchoolId();
+        $school = Auth::user()?->school ?? School::find($schoolId);
+
+        $tab = $request->input('tab', 'pending');
+        $search = trim($request->input('search', ''));
+
+        $query = Visitor::where('school_id', $schoolId)
+            ->where('is_self_registered', true);
+
+        if ($tab === 'pending') {
+            $query->where('status', 'pending');
+        } elseif ($tab === 'approved') {
+            $query->whereIn('status', ['checked_in', 'checked_out', 'approved']);
+        } elseif ($tab === 'rejected') {
+            $query->where('status', 'rejected');
+        }
+
+        if ($search) {
+            $query->where(function($q) use ($search) {
+                $q->where('full_name', 'LIKE', "%{$search}%")
+                  ->orWhere('mobile_number', 'LIKE', "%{$search}%")
+                  ->orWhere('email', 'LIKE', "%{$search}%")
+                  ->orWhere('pass_number', 'LIKE', "%{$search}%")
+                  ->orWhere('host_name', 'LIKE', "%{$search}%")
+                  ->orWhere('whom_to_meet_type', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $requests = $query->orderBy('id', 'desc')->paginate(15)->withQueryString();
+
+        // Stats
+        $pendingCount = Visitor::where('school_id', $schoolId)->where('is_self_registered', true)->where('status', 'pending')->count();
+        $approvedCount = Visitor::where('school_id', $schoolId)->where('is_self_registered', true)->whereIn('status', ['checked_in', 'checked_out', 'approved'])->count();
+        $rejectedCount = Visitor::where('school_id', $schoolId)->where('is_self_registered', true)->where('status', 'rejected')->count();
+        $totalCount = Visitor::where('school_id', $schoolId)->where('is_self_registered', true)->count();
+
+        // Public QR details
+        $schoolCode = $school?->code ? strtoupper($school->code) : 'EDUZEN';
+        $publicFormUrl = route('public.visitor.register', ['schoolCode' => $schoolCode]);
+        $qrData = rawurlencode($publicFormUrl);
+        $qrCodeImageUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={$qrData}";
+
+        return view('school.front_desk.visitor_requests', compact(
+            'requests',
+            'tab',
+            'search',
+            'pendingCount',
+            'approvedCount',
+            'rejectedCount',
+            'totalCount',
+            'school',
+            'schoolCode',
+            'publicFormUrl',
+            'qrCodeImageUrl'
+        ));
+    }
+
+    /**
+     * Approve visitor request and automatically email visitor card.
+     */
+    public function approveVisitorRequest(Request $request, $id)
+    {
+        $schoolId = $this->getSchoolId();
+        $visitor = Visitor::where('school_id', $schoolId)->findOrFail($id);
+
+        $school = $visitor->school ?? School::find($schoolId);
+
+        // Update metadata snapshot if needed
+        $metaData = $visitor->meta_data ?: [];
+        $metaData['school_name'] = $school?->name ?? 'School ERP';
+        $metaData['school_code'] = $school?->code ? strtoupper($school->code) : 'EDUZEN';
+        $metaData['approved_by_name'] = Auth::user()?->name ?? 'Front Desk Staff';
+
+        $visitor->update([
+            'status'       => 'checked_in',
+            'approved_at'  => now(),
+            'approved_by'  => Auth::id(),
+            'check_in_at'  => $visitor->check_in_at ?? now(),
+            'meta_data'    => $metaData,
+        ]);
+
+        // Send email to visitor
+        $emailSent = false;
+        $emailError = null;
+
+        if (!empty($visitor->email)) {
+            try {
+                Mail::to($visitor->email)->send(new VisitorPassMail($visitor));
+                $emailSent = true;
+            } catch (\Throwable $e) {
+                Log::error("Failed to send visitor pass email to {$visitor->email}: " . $e->getMessage());
+                $emailError = $e->getMessage();
+            }
+        }
+
+        $msg = "Visitor request for {$visitor->full_name} (Pass: {$visitor->pass_number}) approved successfully!";
+        if ($emailSent) {
+            $msg .= " Digital Visitor Card has been emailed to {$visitor->email}.";
+        } elseif (!empty($visitor->email)) {
+            $msg .= " (Note: Mail server error: " . ($emailError ?? 'Check mail settings') . ")";
+        }
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success'    => true,
+                'message'    => $msg,
+                'visitor'    => $visitor,
+                'email_sent' => $emailSent,
+                'print_url'  => route('school.front-desk.visitor.print', $visitor->id),
+            ]);
+        }
+
+        return redirect()->back()->with('success', $msg);
+    }
+
+    /**
+     * Reject visitor request.
+     */
+    public function rejectVisitorRequest(Request $request, $id)
+    {
+        $schoolId = $this->getSchoolId();
+        $visitor = Visitor::where('school_id', $schoolId)->findOrFail($id);
+
+        $reason = trim($request->input('rejection_reason', 'Request rejected by front desk.'));
+
+        $visitor->update([
+            'status'           => 'rejected',
+            'rejection_reason' => $reason,
+            'approved_by'      => Auth::id(),
+        ]);
+
+        $msg = "Visitor request for {$visitor->full_name} has been rejected.";
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'visitor' => $visitor,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $msg);
+    }
+
+    /**
+     * Public Self-Registration form rendered when scanning QR code at gate.
+     */
+    public function publicVisitorForm(Request $request, $schoolCode)
+    {
+        $school = School::where('code', $schoolCode)
+            ->orWhere('id', $schoolCode)
+            ->firstOrFail();
+
+        $schoolId = $school->id;
+
+        // Staff members for host suggestions
+        $staffMembers = Staff::where('school_id', $schoolId)
+            ->select('id', 'first_name', 'last_name', 'designation_id')
+            ->with(['designation:id,name'])
+            ->orderBy('first_name')
+            ->limit(100)
+            ->get();
+
+        $visitorTypes = [
+            'Parent / Guardian',
+            'Vendor / Supplier',
+            'Guest / Dignitary',
+            'Contractor / Maintenance',
+            'Job Applicant',
+            'Alumni',
+            'Official / Inspector',
+            'Relative / Friend',
+            'Other Official',
+        ];
+
+        $whomToMeetTypes = [
+            'Principal / Management',
+            'Teacher / Faculty',
+            'Administration / Front Desk',
+            'Student',
+            'Accounts / Fee Counter',
+            'Sports / Transport',
+            'Hostel Warden',
+            'Other Staff',
+        ];
+
+        $visitPurposes = [
+            'Parent-Teacher Interaction',
+            'Fee Payment / Accounts Enquiry',
+            'New Admission Enquiry',
+            'Official Meeting / Inspection',
+            'Vendor Delivery / Maintenance',
+            'Document Submission / Verification',
+            'Student Pickup / Early Departure',
+            'Job Interview',
+            'Personal / Casual Visit',
+            'Other',
+        ];
+
+        $idProofTypes = [
+            'Aadhaar Card',
+            'PAN Card',
+            'Driving License',
+            'Voter ID',
+            'Passport',
+            'Employee ID',
+            'School / College ID',
+            'Other Government ID',
+        ];
+
+        $securityGates = [
+            'Main Gate 1',
+            'Gate No. 2 (North)',
+            'Gate No. 3 (Rear)',
+            'Reception Entry',
+        ];
+
+        return view('public.visitor_self_registration', compact(
+            'school',
+            'staffMembers',
+            'visitorTypes',
+            'whomToMeetTypes',
+            'visitPurposes',
+            'idProofTypes',
+            'securityGates'
+        ));
+    }
+
+    /**
+     * Store public self-registration from QR scan.
+     */
+    public function storePublicVisitorRegistration(Request $request, $schoolCode)
+    {
+        $school = School::where('code', $schoolCode)
+            ->orWhere('id', $schoolCode)
+            ->firstOrFail();
+
+        $schoolId = $school->id;
+
+        $validated = $request->validate([
+            'visitor_type'             => 'required|string|max:100',
+            'full_name'                => 'required|string|max:150',
+            'gender'                   => 'nullable|string|in:Male,Female,Other',
+            'dob'                      => 'nullable|date',
+            'mobile_number'            => ['required', 'string', 'max:25'],
+            'alternate_mobile'         => 'nullable|string|max:25',
+            'email'                    => 'required|email|max:150',
+            'street_address'           => 'nullable|string|max:500',
+            'state'                    => 'nullable|string|max:100',
+            'city'                     => 'nullable|string|max:100',
+            'pincode'                  => 'nullable|string|max:20',
+            'whom_to_meet_type'        => 'required|string|max:100',
+            'host_name'                => 'nullable|string|max:150',
+            'security_gate'            => 'nullable|string|max:100',
+            'entourage_count'          => 'required|integer|min:1|max:100',
+            'visit_purpose'            => 'required|string|max:150',
+            'detailed_purpose_remarks' => 'nullable|string|max:1000',
+            'id_proof_type'            => 'nullable|string|max:100',
+            'id_proof_number'          => 'nullable|string|max:100',
+            'vehicle_number'           => 'nullable|string|max:50',
+            'security_notes'           => 'nullable|string|max:1000',
+            'photo'                    => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'webcam_photo'             => 'nullable|string',
+        ]);
+
+        // Process photo
+        $photoPath = null;
+        if ($request->hasFile('photo')) {
+            $file = $request->file('photo');
+            $filename = 'visitor_self_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $photoPath = $file->storeAs("visitors/{$schoolId}", $filename, 'public');
+        } elseif ($request->filled('webcam_photo') && str_starts_with($request->input('webcam_photo'), 'data:image')) {
+            $dataUrl = $request->input('webcam_photo');
+            if (preg_match('/^data:image\/(\w+);base64,/', $dataUrl, $type)) {
+                $data = substr($dataUrl, strpos($dataUrl, ',') + 1);
+                $type = strtolower($type[1]);
+                if (!in_array($type, ['jpg', 'jpeg', 'gif', 'png', 'webp'])) {
+                    $type = 'jpg';
+                }
+                $data = base64_decode($data);
+                if ($data !== false) {
+                    $filename = 'visitor_self_cam_' . uniqid() . '.' . $type;
+                    $relativePath = "visitors/{$schoolId}/" . $filename;
+                    Storage::disk('public')->put($relativePath, $data);
+                    $photoPath = $relativePath;
+                }
+            }
+        }
+
+        $passNumber = Visitor::generatePassNumber($schoolId);
+
+        $schoolLogo = null;
+        if ($school->logo) {
+            $schoolLogo = str_starts_with($school->logo, 'http') ? $school->logo : asset('storage/' . ltrim($school->logo, '/'));
+        }
+
+        $metaData = [
+            'school_name'        => $school->name ?? 'School ERP',
+            'school_code'        => $school->code ? strtoupper($school->code) : 'EDUZEN',
+            'school_phone'       => $school->phone ?? '',
+            'school_address'     => $school->address ?? '',
+            'school_logo'        => $schoolLogo,
+            'registered_by_name' => 'Self Registration (QR Scan)',
+        ];
+
+        $visitor = Visitor::create([
+            'school_id'                => $schoolId,
+            'academic_session_id'      => null,
+            'registered_by'            => null,
+            'pass_number'              => $passNumber,
+            'visitor_type'             => $validated['visitor_type'],
+            'full_name'                => $validated['full_name'],
+            'gender'                   => $validated['gender'] ?? null,
+            'dob'                      => $validated['dob'] ?? null,
+            'mobile_number'            => $validated['mobile_number'],
+            'alternate_mobile'         => $validated['alternate_mobile'] ?? null,
+            'email'                    => $validated['email'],
+            'street_address'           => $validated['street_address'] ?? null,
+            'state'                    => $validated['state'] ?? null,
+            'city'                     => $validated['city'] ?? null,
+            'pincode'                  => $validated['pincode'] ?? null,
+            'whom_to_meet_type'        => $validated['whom_to_meet_type'],
+            'host_name'                => $validated['host_name'] ?? null,
+            'security_gate'            => $validated['security_gate'] ?? 'Main Gate 1',
+            'entourage_count'          => $validated['entourage_count'] ?? 1,
+            'visit_purpose'            => $validated['visit_purpose'],
+            'detailed_purpose_remarks' => $validated['detailed_purpose_remarks'] ?? null,
+            'id_proof_type'            => $validated['id_proof_type'] ?? null,
+            'id_proof_number'          => $validated['id_proof_number'] ?? null,
+            'vehicle_number'           => $validated['vehicle_number'] ?? null,
+            'photo_path'               => $photoPath,
+            'security_notes'           => $validated['security_notes'] ?? null,
+            'status'                   => 'pending',
+            'is_self_registered'       => true,
+            'meta_data'                => $metaData,
+        ]);
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success'     => true,
+                'message'     => 'Your visitor registration request has been submitted successfully!',
+                'pass_number' => $passNumber,
+                'visitor'     => $visitor,
+            ]);
+        }
+
+        return redirect()->back()
+            ->with('request_submitted', true)
+            ->with('submitted_pass_number', $passNumber)
+            ->with('submitted_visitor_name', $visitor->full_name)
+            ->with('submitted_email', $visitor->email)
+            ->with('school_name', $school->name);
     }
 }

@@ -1272,11 +1272,15 @@ body.dark-mode #feeComponentSectionContainer {
     $effectiveDue = max(0, $totalDue - $chequePendingAmt);
 
     $activeTab       = request('tab', 'fee_record');
+
+    $viewStudentSession = $viewStudent->studentSessionFor($selectedSession->id);
+    $viewStudentClass = $viewStudentSession?->schoolClass ?? $viewStudent->class;
+    $viewStudentSection = $viewStudentSession?->section ?? $viewStudent->section;
 @endphp
 
 {{-- detail top bar --}}
 <div class="sw-detail-topbar">
-    <a href="{{ route('school.fees.student-wise', ['academic_session_id' => $selectedSession->id, 'class_id' => $viewStudent->class_id, 'section_id' => $viewStudent->section_id]) }}"
+    <a href="{{ route('school.fees.student-wise', ['academic_session_id' => $selectedSession->id, 'class_id' => $viewStudentClass?->id ?? $viewStudent->class_id, 'section_id' => $viewStudentSection?->id ?? $viewStudent->section_id]) }}"
        class="sw-back-btn" title="Back"><i class="fas fa-chevron-left"></i></a>
     @if($viewStudent->photo)
         <img src="{{ $viewStudent->photo_url }}" alt="{{ $viewStudent->full_name }}" style="width:42px; height:42px; border-radius:50%; object-fit:cover; flex-shrink:0;">
@@ -1311,8 +1315,8 @@ body.dark-mode #feeComponentSectionContainer {
             <div class="sw-info-row">
                 <span class="sw-info-label">Class</span>
                 <span class="sw-info-value">
-                    {{ optional($viewStudent->class)->name ?? 'N/A' }}
-                    {{ optional($viewStudent->section)->name ? ' ' . $viewStudent->section->name : '' }}
+                    {{ optional($viewStudentClass)->name ?? 'N/A' }}
+                    {{ optional($viewStudentSection)->name ? ' ' . $viewStudentSection->name : '' }}
                 </span>
             </div>
             <div class="sw-info-row">
@@ -3350,9 +3354,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 $initials    = strtoupper(substr($student->first_name, 0, 1));
 
-                // Fee schedule: Show only if explicitly assigned
-                $schedName = optional($student->feeSchedule)->name;
+                // Fee schedule: Show only if explicitly assigned for this session or student
+                $schedFee = $sessionFees->first(fn($f) => !empty($f->fee_schedule_id) && $f->feeSchedule);
+                $schedName = $schedFee ? $schedFee->feeSchedule->name : (
+                    ($student->feeSchedule && $student->feeSchedule->academic_session_id == $selectedSession->id)
+                        ? $student->feeSchedule->name
+                        : optional($student->feeSchedule)->name
+                );
 
+                $sessionRec = $student->studentSessionFor($selectedSession->id);
+                $displayClass = $sessionRec?->schoolClass ?? $student->class;
+                $displaySection = $sessionRec?->section ?? $student->section;
 
                 $rowNum = ($studentsWithFees->currentPage() - 1) * $studentsWithFees->perPage() + $idx + 1;
             @endphp
@@ -3374,8 +3386,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td style="font-weight:600;color:#374151;">{{ $student->admission_number ?? '-' }}</td>
                 <td style="font-weight:600;color:#374151;">{{ $student->father_name ?? '-' }}</td>
                 <td>
-                    <strong style="color:var(--sw-blue);">{{ optional($student->class)->name ?? '-' }}</strong>
-                    {{ optional($student->section)->name ? ' ' . $student->section->name : '' }}
+                    <strong style="color:var(--sw-blue);">{{ optional($displayClass)->name ?? '-' }}</strong>
+                    {{ optional($displaySection)->name ? ' ' . $displaySection->name : '' }}
                 </td>
                 <td style="font-size:.88rem;color:#374151;">{{ $schedName ?: '-' }}</td>
                 <td>
@@ -3409,7 +3421,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </td>
                 <td>
-                    <a href="{{ route('school.fees.student-wise', ['view_student' => $student->id, 'academic_session_id' => $selectedSession->id, 'class_id' => $student->class_id, 'section_id' => $student->section_id]) }}"
+                    <a href="{{ route('school.fees.student-wise', ['view_student' => $student->id, 'academic_session_id' => $selectedSession->id, 'class_id' => $displayClass?->id ?? $student->class_id, 'section_id' => $displaySection?->id ?? $student->section_id]) }}"
                        class="sw-view-btn" title="View Fee Details">
                         <i class="fas fa-eye"></i>
                     </a>

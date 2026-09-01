@@ -106,6 +106,370 @@
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
+    .btn-qr-scanner-trigger {
+        background: #ffffff;
+        color: var(--theme-blue);
+        border: 1.5px solid #ffffff;
+        border-radius: 24px;
+        padding: 6px 15px;
+        font-size: 12.5px;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        transition: all 0.22s ease;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+        text-decoration: none;
+    }
+
+    .btn-qr-scanner-trigger:hover {
+        background: #f8fafc;
+        transform: translateY(-2px);
+        box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
+        color: #1e40af;
+    }
+
+    /* QR Generator Modal - Ultra Premium Theme */
+    .qr-modal-dialog {
+        background: #ffffff;
+        border-radius: 22px;
+        width: 100%;
+        max-width: 580px;
+        overflow: hidden;
+        box-shadow: 0 25px 60px -10px rgba(15, 23, 42, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+        animation: fadeInScale 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+        border: none;
+    }
+
+    .qr-modal-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #2563eb 100%);
+        color: #ffffff;
+        padding: 18px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: relative;
+    }
+
+    .qr-modal-header .hdr-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .qr-modal-icon-badge {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        color: #60a5fa;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .qr-modal-title {
+        font-size: 16.5px;
+        font-weight: 800;
+        margin: 0;
+        letter-spacing: -0.2px;
+        color: #ffffff;
+    }
+
+    .qr-modal-sub {
+        font-size: 11.5px;
+        color: #93c5fd;
+        margin: 0;
+    }
+
+    .qr-modal-close-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.12);
+        border: none;
+        color: #ffffff;
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .qr-modal-close-btn:hover {
+        background: rgba(239, 68, 68, 0.85);
+        transform: scale(1.05);
+    }
+
+    .qr-gold-stripe {
+        background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 50%, #f59e0b 100%);
+        height: 4px;
+        width: 100%;
+    }
+
+    /* Premium Standee Showcase Card */
+    .qr-showcase-box {
+        background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        border: 1.5px solid #e2e8f0;
+        border-radius: 18px;
+        padding: 22px 20px;
+        text-align: center;
+        position: relative;
+        box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.8), 0 8px 20px rgba(0, 0, 0, 0.03);
+    }
+
+    .qr-smart-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #0f172a;
+        color: #38bdf8;
+        font-size: 10.5px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .qr-school-heading {
+        font-size: 18px;
+        font-weight: 900;
+        color: #0f172a;
+        margin-bottom: 4px;
+        letter-spacing: -0.3px;
+    }
+
+    .qr-code-pill-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 800;
+        color: #1e40af;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    .qr-code-pill-badge .code-highlight {
+        color: #dc2626;
+    }
+
+    /* Target Scanner Bracket Box */
+    .qr-target-container {
+        position: relative;
+        display: inline-block;
+        padding: 14px;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 12px 30px -8px rgba(37, 99, 235, 0.22), 0 4px 10px rgba(0,0,0,0.04);
+        margin-bottom: 14px;
+        border: 2px solid #e0e7ff;
+    }
+
+    .scanner-corner {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border-color: #2563eb;
+        border-style: solid;
+        pointer-events: none;
+    }
+
+    .corner-tl { top: 6px; left: 6px; border-width: 3px 0 0 3px; border-radius: 6px 0 0 0; }
+    .corner-tr { top: 6px; right: 6px; border-width: 3px 3px 0 0; border-radius: 0 6px 0 0; }
+    .corner-bl { bottom: 6px; left: 6px; border-width: 0 0 3px 3px; border-radius: 0 0 0 6px; }
+    .corner-br { bottom: 6px; right: 6px; border-width: 0 3px 3px 0; border-radius: 0 0 6px 0; }
+
+    .qr-target-img {
+        width: 175px;
+        height: 175px;
+        display: block;
+        border-radius: 8px;
+    }
+
+    .qr-scan-badge-prompt {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        color: #1d4ed8;
+        padding: 5px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 800;
+        margin-bottom: 14px;
+    }
+
+    /* 3 Step Visual Journey */
+    .qr-step-journey {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 4px;
+    }
+
+    .step-pill-item {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #334155;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .step-pill-item i {
+        color: #2563eb;
+    }
+
+    .step-arrow-divider {
+        color: #94a3b8;
+        font-size: 10px;
+    }
+
+    /* Integrated URL Copy Box */
+    .url-copy-wrapper {
+        background: #f8fafc;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 12px;
+        padding: 4px 5px 4px 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .url-copy-wrapper:focus-within {
+        border-color: #2563eb;
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .url-copy-input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: #1e293b;
+        outline: none;
+        padding: 4px 0;
+    }
+
+    .btn-copy-gradient {
+        background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        padding: 7px 16px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-copy-gradient:hover {
+        background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 100%);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+        color: #ffffff;
+    }
+
+    /* Action Buttons in Modal */
+    .btn-modal-print {
+        flex: 1.2;
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-size: 12.5px;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        transition: all 0.2s;
+        box-shadow: 0 3px 8px rgba(15, 23, 42, 0.2);
+    }
+
+    .btn-modal-print:hover {
+        background: #020617;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.3);
+        color: #ffffff;
+    }
+
+    .btn-modal-download {
+        flex: 1;
+        background: #ffffff;
+        color: #334155;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 9px 14px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+
+    .btn-modal-download:hover {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+        color: #0f172a;
+    }
+
+    .btn-modal-open {
+        flex: 1;
+        background: var(--theme-blue-light);
+        color: var(--theme-blue);
+        border: 1.5px solid var(--theme-blue-border);
+        border-radius: 10px;
+        padding: 9px 14px;
+        font-size: 12px;
+        font-weight: 800;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .btn-modal-open:hover {
+        background: var(--theme-blue);
+        color: #ffffff;
+        border-color: var(--theme-blue);
+    }
+
     .visitor-card-body {
         padding: 26px 30px;
     }
@@ -787,8 +1151,13 @@
                 </div>
                 <span>Visitor Registration</span>
             </div>
-            <div class="stat-pill">
-                <i class="fas fa-id-card"></i> Gate Entry Form
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" id="btnOpenQrModal" class="btn-qr-scanner-trigger" onclick="openQrGeneratorModal()" title="Generate Gate QR Code for Visitor Self-Registration">
+                    <i class="fas fa-qrcode"></i> Generate Scanner / QR
+                </button>
+                <div class="stat-pill">
+                    <i class="fas fa-id-card"></i> Gate Entry Form
+                </div>
             </div>
         </div>
 
@@ -1173,6 +1542,96 @@
     </div>
 </div>
 
+<!-- QR Code Generator Lightbox Modal - Ultra Premium Theme -->
+<div class="custom-modal-overlay" id="qrGeneratorModalOverlay" style="display: none;">
+    <div class="qr-modal-dialog">
+        <!-- Header -->
+        <div class="qr-modal-header">
+            <div class="hdr-left">
+                <div class="qr-modal-icon-badge">
+                    <i class="fas fa-qrcode"></i>
+                </div>
+                <div>
+                    <h5 class="qr-modal-title">Visitor Self-Registration Portal</h5>
+                    <p class="qr-modal-sub">Smart Front Gate QR Scanner & Standee Poster</p>
+                </div>
+            </div>
+            <button type="button" class="qr-modal-close-btn" onclick="closeQrGeneratorModal()">&times;</button>
+        </div>
+        <div class="qr-gold-stripe"></div>
+
+        <!-- Body -->
+        <div class="p-4">
+            <!-- Showcase Card -->
+            <div class="qr-showcase-box">
+                <span class="qr-smart-pill">
+                    <i class="fas fa-bolt"></i> Smart Gate Self-Service QR
+                </span>
+                
+                <h4 class="qr-school-heading">{{ $school->name ?? 'School Campus' }}</h4>
+                
+                <div>
+                    <div class="qr-code-pill-badge">
+                        <span>SCHOOL CODE:</span>
+                        <span class="code-highlight">{{ $schoolCode ?? 'EDUZEN' }}</span>
+                    </div>
+                </div>
+
+                <!-- Futuristic Scanner Target Frame -->
+                <div>
+                    <div class="qr-target-container">
+                        <div class="scanner-corner corner-tl"></div>
+                        <div class="scanner-corner corner-tr"></div>
+                        <div class="scanner-corner corner-bl"></div>
+                        <div class="scanner-corner corner-br"></div>
+                        <img src="{{ $qrCodeImageUrl ?? '' }}" alt="Visitor Form QR" class="qr-target-img" id="modalQrCodeImg">
+                    </div>
+                </div>
+
+                <div>
+                    <div class="qr-scan-badge-prompt">
+                        <i class="fas fa-camera"></i> Point Phone Camera to Scan & Register
+                    </div>
+                </div>
+
+                <!-- 3-Step Journey -->
+                <div class="qr-step-journey">
+                    <div class="step-pill-item"><i class="fas fa-qrcode"></i> 1. Scan QR</div>
+                    <span class="step-arrow-divider"><i class="fas fa-chevron-right"></i></span>
+                    <div class="step-pill-item"><i class="fas fa-user-edit"></i> 2. Fill Form</div>
+                    <span class="step-arrow-divider"><i class="fas fa-chevron-right"></i></span>
+                    <div class="step-pill-item"><i class="fas fa-envelope-open-text"></i> 3. Pass to Email</div>
+                </div>
+            </div>
+
+            <!-- Direct URL Integrated Box -->
+            <div class="mb-3 mt-3">
+                <label class="custom-label mb-1 fw-bold text-dark" style="font-size: 12px;">Direct Portal Registration URL</label>
+                <div class="url-copy-wrapper">
+                    <i class="fas fa-globe text-primary ms-1" style="font-size: 13px;"></i>
+                    <input type="text" id="qrPublicFormUrlInput" class="url-copy-input" readonly value="{{ $publicFormUrl ?? '' }}">
+                    <button type="button" id="btnCopyQrLink" class="btn-copy-gradient" onclick="copyQrLink()">
+                        <i class="fas fa-copy"></i> Copy Link
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <button type="button" class="btn-modal-print" onclick="printQrPoster()">
+                    <i class="fas fa-print"></i> Print Gate Poster
+                </button>
+                <button type="button" class="btn-modal-download" onclick="downloadQrImage()">
+                    <i class="fas fa-download"></i> Download QR
+                </button>
+                <a href="{{ $publicFormUrl ?? '#' }}" target="_blank" class="btn-modal-open">
+                    <i class="fas fa-external-link-alt"></i> Open Form
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     let currentPrintUrl = '#';
 
@@ -1268,7 +1727,11 @@
         const qrData = encodeURIComponent(v.pass_number);
         document.getElementById('cardQrCodeImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${qrData}`;
 
-        document.getElementById('scanCardModalOverlay').classList.add('active');
+        const scanModal = document.getElementById('scanCardModalOverlay');
+        if (scanModal) {
+            scanModal.classList.add('active');
+            scanModal.style.setProperty('display', 'flex', 'important');
+        }
     }
 
     function printGeneratedPass() {
@@ -1280,7 +1743,11 @@
     }
 
     function closeScanCardAndNew() {
-        document.getElementById('scanCardModalOverlay').classList.remove('active');
+        const scanModal = document.getElementById('scanCardModalOverlay');
+        if (scanModal) {
+            scanModal.classList.remove('active');
+            scanModal.style.setProperty('display', 'none', 'important');
+        }
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1346,7 +1813,10 @@
 
     function openWebcamModal() {
         cameraErrorMsg.style.display = 'none';
-        cameraOverlay.classList.add('active');
+        if (cameraOverlay) {
+            cameraOverlay.classList.add('active');
+            cameraOverlay.style.setProperty('display', 'flex', 'important');
+        }
 
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } })
@@ -1387,7 +1857,10 @@
             webcamStream.getTracks().forEach(track => track.stop());
             webcamStream = null;
         }
-        cameraOverlay.classList.remove('active');
+        if (cameraOverlay) {
+            cameraOverlay.classList.remove('active');
+            cameraOverlay.style.setProperty('display', 'none', 'important');
+        }
     }
 
     if (cameraOverlay) {
@@ -1485,6 +1958,188 @@
         if (v.photo_url && !photoPreviewImg.src) {
             setPhotoPreview(v.photo_url);
         }
+    }
+
+    // QR Code Modal Functions
+    function openQrGeneratorModal() {
+        const modal = document.getElementById('qrGeneratorModalOverlay');
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.setProperty('display', 'flex', 'important');
+        }
+    }
+
+    function closeQrGeneratorModal() {
+        const modal = document.getElementById('qrGeneratorModalOverlay');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById('qrGeneratorModalOverlay');
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeQrGeneratorModal();
+                }
+            });
+        }
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeQrGeneratorModal();
+            }
+        });
+
+        const btn = document.getElementById('btnOpenQrModal');
+        if (btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                openQrGeneratorModal();
+            });
+        }
+    });
+
+    function copyQrLink() {
+        const input = document.getElementById('qrPublicFormUrlInput');
+        if (!input) return;
+        input.select();
+        input.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(input.value).then(() => {
+            const btn = document.getElementById('btnCopyQrLink');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check text-success"></i> Copied!';
+            setTimeout(() => { btn.innerHTML = orig; }, 2000);
+        }).catch(() => {
+            document.execCommand('copy');
+            alert('Link copied to clipboard!');
+        });
+    }
+
+    function printQrPoster() {
+        const schoolName = @json($school->name ?? 'School Campus');
+        const schoolCode = @json($schoolCode ?? 'EDUZEN');
+        const qrImgUrl = @json($qrCodeImageUrl ?? '');
+
+        const posterHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Visitor Gate Pass QR Poster - ${schoolName}</title>
+                <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+                    body { background: #f8fafc; padding: 40px; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+                    .standee-poster {
+                        width: 520px;
+                        background: #ffffff;
+                        border: 4px solid #1d4ed8;
+                        border-radius: 24px;
+                        padding: 36px 30px;
+                        text-align: center;
+                        box-shadow: 0 20px 50px rgba(0,0,0,0.12);
+                    }
+                    .poster-header-badge {
+                        background: #1d4ed8;
+                        color: #ffffff;
+                        font-size: 13px;
+                        font-weight: 800;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                        padding: 6px 18px;
+                        border-radius: 20px;
+                        display: inline-block;
+                        margin-bottom: 16px;
+                    }
+                    .school-name {
+                        font-size: 24px;
+                        font-weight: 900;
+                        color: #0f172a;
+                        margin-bottom: 6px;
+                        line-height: 1.2;
+                    }
+                    .school-sub {
+                        font-size: 13px;
+                        color: #64748b;
+                        margin-bottom: 24px;
+                    }
+                    .qr-display-box {
+                        background: #f1f5f9;
+                        border: 3px dashed #2563eb;
+                        border-radius: 20px;
+                        padding: 24px;
+                        display: inline-block;
+                        margin-bottom: 24px;
+                    }
+                    .qr-img {
+                        width: 220px;
+                        height: 220px;
+                        display: block;
+                        margin: 0 auto;
+                    }
+                    .scan-instructions {
+                        font-size: 18px;
+                        font-weight: 800;
+                        color: #1d4ed8;
+                        margin-bottom: 8px;
+                    }
+                    .scan-subtext {
+                        font-size: 13px;
+                        color: #475569;
+                        line-height: 1.5;
+                    }
+                    .poster-footer {
+                        margin-top: 26px;
+                        padding-top: 18px;
+                        border-top: 1px solid #e2e8f0;
+                        font-size: 11px;
+                        color: #94a3b8;
+                    }
+                    @media print {
+                        body { background: transparent; padding: 0; }
+                        .standee-poster { border: 3px solid #1d4ed8; box-shadow: none; width: 100%; max-width: 600px; margin: 0 auto; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="standee-poster">
+                    <div class="poster-header-badge">Front Gate Visitor Portal</div>
+                    <h1 class="school-name">${schoolName}</h1>
+                    <p class="school-sub">School Code: <strong>${schoolCode}</strong></p>
+                    
+                    <div class="qr-display-box">
+                        <img src="${qrImgUrl}" alt="Scan QR" class="qr-img">
+                    </div>
+
+                    <div class="scan-instructions">📲 Scan with Phone Camera to Register</div>
+                    <p class="scan-subtext">Fill in your visit details on your mobile. Once approved, your Digital Visitor Pass will be delivered directly to your email!</p>
+
+                    <div class="poster-footer">
+                        Powered by SchoolCloud ERP • Front Desk Visitor Security System
+                    </div>
+                </div>
+                <script>
+                    window.onload = function() { window.print(); }
+                <\/script>
+            </body>
+            </html>
+        `;
+        const printWin = window.open('', '_blank');
+        printWin.document.write(posterHtml);
+        printWin.document.close();
+    }
+
+    function downloadQrImage() {
+        const qrUrl = @json($qrCodeImageUrl ?? '');
+        if (!qrUrl) return;
+        const link = document.createElement('a');
+        link.href = qrUrl;
+        link.download = `visitor_qr_${@json($schoolCode ?? 'school')}.png`;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 </script>
 @endsection

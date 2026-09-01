@@ -237,27 +237,136 @@ class VisitorRegistrationTest extends TestCase
     }
 
     /**
-     * Test 8: Print pass badge route renders visitor details.
+     * Test 9: Public Visitor Self-Registration page loads for valid school.
      */
-    public function test_print_visitor_pass_renders(): void
+    public function test_public_visitor_self_registration_page_loads(): void
     {
-        $visitor = Visitor::create([
-            'school_id'         => $this->school->id,
-            'pass_number'       => 'PASS-EDUZEN-0099',
-            'visitor_type'      => 'Guest / Dignitary',
-            'full_name'         => 'Dr. Arvind Mehra',
-            'mobile_number'     => '9988776655',
-            'whom_to_meet_type' => 'Principal / Management',
-            'security_gate'     => 'Main Gate 1',
-            'entourage_count'   => 1,
-            'visit_purpose'     => 'Official Meeting / Inspection',
-        ]);
-
-        $response = $this->actingAs($this->admin)->get(route('school.front-desk.visitor.print', $visitor->id));
+        $response = $this->get(route('public.visitor.register', ['schoolCode' => $this->school->code ?: $this->school->id]));
 
         $response->assertStatus(200);
-        $response->assertSee('Dr. Arvind Mehra');
-        $response->assertSee('PASS-EDUZEN-0099');
-        $response->assertSee('VISITOR ENTRY PASS', false);
+        $response->assertSee($this->school->name);
+        $response->assertSee('Visitor Self-Registration');
+        $response->assertSee('Personal Information');
+    }
+
+    /**
+     * Test 10: Public Visitor Self-Registration stores pending request.
+     */
+    public function test_public_visitor_self_registration_submits_pending_request(): void
+    {
+        $payload = [
+            'visitor_type'      => 'Parent / Guardian',
+            'full_name'         => 'Anita Roy',
+            'mobile_number'     => '9876543299',
+            'email'             => 'anita.roy@example.com',
+            'whom_to_meet_type' => 'Principal / Management',
+            'visit_purpose'     => 'New Admission Enquiry',
+            'entourage_count'   => 1,
+        ];
+
+        $response = $this->post(route('public.visitor.register.store', ['schoolCode' => $this->school->code ?: $this->school->id]), $payload);
+
+        $response->assertSessionHas('request_submitted', true);
+
+        $visitor = Visitor::where('school_id', $this->school->id)->where('email', 'anita.roy@example.com')->first();
+        $this->assertNotNull($visitor);
+        $this->assertEquals('pending', $visitor->status);
+        $this->assertTrue($visitor->is_self_registered);
+        $this->assertStringStartsWith('PASS-', $visitor->pass_number);
+    }
+
+    /**
+     * Test 11: School Admin can view Visitor Requests dashboard.
+     */
+    public function test_school_admin_can_view_visitor_requests(): void
+    {
+        Visitor::create([
+            'school_id'          => $this->school->id,
+            'pass_number'        => 'PASS-EDUZEN-0101',
+            'visitor_type'       => 'Guest',
+            'full_name'          => 'Dr. Karan Singhania',
+            'mobile_number'      => '9871112233',
+            'email'              => 'karan@example.com',
+            'whom_to_meet_type'  => 'Principal / Management',
+            'security_gate'      => 'Main Gate 1',
+            'entourage_count'    => 1,
+            'visit_purpose'      => 'Official Meeting / Inspection',
+            'status'             => 'pending',
+            'is_self_registered' => true,
+        ]);
+
+        $response = $this->actingAs($this->admin)->get(route('school.front-desk.visitor-requests'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Dr. Karan Singhania');
+        $response->assertSee('PASS-EDUZEN-0101');
+        $response->assertSee('Pending Requests');
+    }
+
+    /**
+     * Test 12: School Admin approves request and triggers VisitorPassMail.
+     */
+    public function test_school_admin_approval_updates_status_and_sends_email(): void
+    {
+        \Illuminate\Support\Facades\Mail::fake();
+
+        $visitor = Visitor::create([
+            'school_id'          => $this->school->id,
+            'pass_number'        => 'PASS-EDUZEN-0102',
+            'visitor_type'       => 'Parent / Guardian',
+            'full_name'          => 'Meena Kumari',
+            'mobile_number'      => '9870001122',
+            'email'              => 'meena.kumari@example.com',
+            'whom_to_meet_type'  => 'Teacher / Faculty',
+            'security_gate'      => 'Main Gate 1',
+            'entourage_count'    => 1,
+            'visit_purpose'      => 'Parent-Teacher Interaction',
+            'status'             => 'pending',
+            'is_self_registered' => true,
+        ]);
+
+        $response = $this->actingAs($this->admin)->post(route('school.front-desk.visitor-requests.approve', $visitor->id));
+
+        $response->assertSessionHas('success');
+
+        $visitor->refresh();
+        $this->assertEquals('checked_in', $visitor->status);
+        $this->assertNotNull($visitor->approved_at);
+        $this->assertEquals($this->admin->id, $visitor->approved_by);
+
+        \Illuminate\Support\Facades\Mail::assertSent(\App\Mail\VisitorPassMail::class, function ($mail) use ($visitor) {
+            return $mail->hasTo('meena.kumari@example.com') && $mail->visitor->id === $visitor->id;
+        });
+    }
+
+    /**
+     * Test 13: School Admin rejection updates status to rejected with reason.
+     */
+    public function test_school_admin_rejection_updates_status(): void
+    {
+        $visitor = Visitor::create([
+            'school_id'          => $this->school->id,
+            'pass_number'        => 'PASS-EDUZEN-0103',
+            'visitor_type'       => 'Vendor / Supplier',
+            'full_name'          => 'Vikram Seth',
+            'mobile_number'      => '9873334455',
+            'whom_to_meet_type'  => 'Administration / Front Desk',
+            'security_gate'      => 'Main Gate 1',
+            'entourage_count'    => 1,
+            'visit_purpose'      => 'Vendor Delivery / Maintenance',
+            'status'             => 'pending',
+            'is_self_registered' => true,
+        ]);
+
+        $response = $this->actingAs($this->admin)->post(route('school.front-desk.visitor-requests.reject', $visitor->id), [
+            'rejection_reason' => 'Vendor deliveries allowed after 3 PM only.'
+        ]);
+
+        $response->assertSessionHas('success');
+
+        $visitor->refresh();
+        $this->assertEquals('rejected', $visitor->status);
+        $this->assertEquals('Vendor deliveries allowed after 3 PM only.', $visitor->rejection_reason);
     }
 }
+

@@ -41,6 +41,10 @@ class Visitor extends Model
         'photo_path',
         'security_notes',
         'status',
+        'is_self_registered',
+        'rejection_reason',
+        'approved_at',
+        'approved_by',
         'check_in_at',
         'check_out_at',
         'meta_data',
@@ -50,9 +54,30 @@ class Visitor extends Model
         'dob' => 'date',
         'check_in_at' => 'datetime',
         'check_out_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'is_self_registered' => 'boolean',
         'meta_data' => 'array',
         'entourage_count' => 'integer',
     ];
+
+    /**
+     * Scope for pending visitor self-registration requests.
+     */
+    public function scopePendingRequests($query, ?int $schoolId = null)
+    {
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+        return $query->where('status', 'pending');
+    }
+
+    /**
+     * Get user who approved this request.
+     */
+    public function approvedByUser()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
 
     /**
      * Get the school that owns the visitor record.
