@@ -15,6 +15,16 @@ class Student extends Model
 
     protected static function booted()
     {
+        static::updating(function ($student) {
+            if ($student->isDirty('admission_number') && !empty($student->getOriginal('admission_number'))) {
+                $orig = (string) $student->getOriginal('admission_number');
+                // If original was an auto-generated STU... placeholder or new one is explicitly assigned, accept it
+                if (!preg_match('/^STU\d{4,}/i', $orig) && empty($student->admission_number)) {
+                    $student->admission_number = $orig;
+                }
+            }
+        });
+
         static::saved(function ($student) {
             if ($student->wasRecentlyCreated || $student->wasChanged(['class_id', 'section_id', 'boarding_type', 'fee_schedule_id'])) {
                 try {
@@ -280,12 +290,43 @@ class Student extends Model
         return $baseUrl;
     }
 
-    public function resolvePhotoUrl(): ?string
+    public function resolvePhotoUrl(?int $sessionId = null): ?string
     {
         $baseUrl = $this->getBaseUrlPrefix();
+        $targetSessionId = $sessionId;
 
-        if (!empty($this->photo)) {
-            $p = ltrim($this->photo, '/');
+        if (!$targetSessionId) {
+            try {
+                if (app()->bound('request') && request()) {
+                    $reqSession = request()->get('academic_session_id') ?? request()->get('session_id');
+                    if ($reqSession && is_numeric($reqSession)) {
+                        $targetSessionId = (int)$reqSession;
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        if (!$targetSessionId) {
+            $targetSessionId = $this->academic_session_id ?? $this->active_academic_session?->id;
+        }
+
+        $photo = null;
+        if ($targetSessionId) {
+            $sessionRecord = $this->studentSessionFor($targetSessionId);
+            if ($sessionRecord) {
+                $sessionPhoto = $sessionRecord->getProfileAttribute('photo');
+                if (!empty($sessionPhoto)) {
+                    $photo = $sessionPhoto;
+                }
+            }
+        }
+
+        if (empty($photo)) {
+            $photo = $this->photo;
+        }
+
+        if (!empty($photo)) {
+            $p = ltrim($photo, '/');
             if (str_starts_with($p, 'http://') || str_starts_with($p, 'https://') || str_starts_with($p, 'data:image')) {
                 return $p;
             }
@@ -294,17 +335,21 @@ class Student extends Model
 
             $searchPaths = [
                 public_path('uploads/students/photos/' . $baseName) => '/uploads/students/photos/' . $baseName,
-                public_path('uploads/students/' . $baseName) => '/uploads/students/' . $baseName,
-                public_path('uploads/' . $cleanPath) => '/uploads/' . $cleanPath,
-                public_path($cleanPath) => '/' . $cleanPath,
-                public_path('storage/' . $cleanPath) => '/storage/' . $cleanPath,
-                storage_path('app/public/' . $cleanPath) => '/uploads/' . $cleanPath,
+                public_path('uploads/students/' . $baseName)        => '/uploads/students/' . $baseName,
+                public_path('uploads/' . $cleanPath)                => '/uploads/' . $cleanPath,
+                public_path($cleanPath)                             => '/' . $cleanPath,
+                public_path('storage/' . $cleanPath)                => '/storage/' . $cleanPath,
+                storage_path('app/public/' . $cleanPath)            => '/uploads/' . $cleanPath,
             ];
 
             foreach ($searchPaths as $sysPath => $webPath) {
                 if (file_exists($sysPath)) {
                     return $baseUrl . $webPath;
                 }
+            }
+
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($cleanPath)) {
+                return \Illuminate\Support\Facades\Storage::disk('public')->url($cleanPath);
             }
 
             return $baseUrl . '/uploads/' . $cleanPath;
@@ -338,6 +383,30 @@ class Student extends Model
         }
 
         return null;
+    }
+
+    /**
+     * Get the raw photo path for a specific academic session.
+     */
+    public function getPhotoInSession(?int $sessionId = null): ?string
+    {
+        $sessionId = $sessionId ?? $this->academic_session_id;
+        $session = $sessionId ? $this->studentSessionFor($sessionId) : null;
+        if ($session) {
+            $p = $session->getProfileAttribute('photo');
+            if (!empty($p)) {
+                return $p;
+            }
+        }
+        return $this->photo;
+    }
+
+    /**
+     * Get the full URL for the student photo in a specific academic session.
+     */
+    public function getPhotoUrlInSession(?int $sessionId = null): string
+    {
+        return $this->resolvePhotoUrl($sessionId) ?? $this->getBaseUrlPrefix() . '/images/avatar-student.png';
     }
 
     public function getAgeAttribute(): int
@@ -572,6 +641,11 @@ class Student extends Model
     }
 
     public function studentFees()
+    {
+        return $this->hasMany(StudentFee::class, 'student_id');
+    }
+
+    public function fees()
     {
         return $this->hasMany(StudentFee::class, 'student_id');
     }

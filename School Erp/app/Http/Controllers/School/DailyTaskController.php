@@ -705,7 +705,8 @@ class DailyTaskController extends Controller
         if ($teacherContext['isTeacher'] && !empty($teacherContext['classTeacherSectionIds'])) {
             if ($reviewType === 'class_teacher' && !in_array($sectionId, $teacherContext['classTeacherSectionIds'])) {
                 $sec = Section::find($sectionId);
-                if ($sec && $sec->class_teacher_id && $sec->class_teacher_id != $staffId && $sec->class_teacher_id != $user->id) {
+                $isCt = ($sec && ($sec->class_teacher_id == $staffId || $sec->class_teacher_id == $user->id || $sec->assistant_class_teacher_id == $staffId || $sec->assistant_class_teacher_id == $user->id));
+                if ($sec && ($sec->class_teacher_id || $sec->assistant_class_teacher_id) && !$isCt) {
                     return response()->json(['success' => false, 'message' => 'Unauthorized: Another staff member is assigned as Class Teacher for this section.'], 403);
                 }
             }

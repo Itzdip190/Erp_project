@@ -1364,7 +1364,7 @@ class FeeManagementController extends Controller
         }
 
         // Synchronize student fees and installments
-        self::syncStudentFees($student);
+        self::syncStudentFees($student, $targetSessionId);
 
         // Also sync discounts!
         if ($targetSessionId) {
@@ -1385,12 +1385,22 @@ class FeeManagementController extends Controller
             'description' => 'Automatically generated category for ' . $component->component_name
         ]);
 
-        // Strictly scoped: find students in this school's class/section only
-        $query = \App\Models\Student::where('school_id', $schoolId)
-            ->where('class_id', $classWiseFee->class_id);
+        // Get the schedule for this school to use as fallback for students without fee_schedule_id
+        $scheduleForSchool = \App\Models\FeeSchedule::where('school_id', $schoolId)
+            ->where('id', $classWiseFee->fee_schedule_id)
+            ->first();
+        $classWiseFeeScheduleId = $classWiseFee->fee_schedule_id;
+        $cwfSessionId = $classWiseFee->academic_session_id ?: optional($scheduleForSchool)->academic_session_id;
 
-        if ($classWiseFee->section_id) {
-            $query->where('section_id', $classWiseFee->section_id);
+        // Strictly scoped: find students in this school's session, class, and section only
+        $query = \App\Models\Student::where('school_id', $schoolId);
+        if ($cwfSessionId) {
+            $query->inAcademicSession($cwfSessionId, $classWiseFee->class_id, $classWiseFee->section_id);
+        } else {
+            $query->where('class_id', $classWiseFee->class_id);
+            if ($classWiseFee->section_id) {
+                $query->where('section_id', $classWiseFee->section_id);
+            }
         }
 
         // Filter by category mapped from boarding_type — strictly within this school
@@ -1404,23 +1414,49 @@ class FeeManagementController extends Controller
             ->whereRaw('LOWER(name) = ?', ['transport'])
             ->first();
 
-        // Get the schedule for this school to use as fallback for students without fee_schedule_id
-        $scheduleForSchool = \App\Models\FeeSchedule::where('school_id', $schoolId)
-            ->where('id', $classWiseFee->fee_schedule_id)
-            ->first();
-        $classWiseFeeScheduleId = $classWiseFee->fee_schedule_id;
+        $students = $query->get()->filter(function($student) use ($classWiseFee, $dayBoardingCat, $hostelCat, $transportCat, $classWiseFeeScheduleId, $scheduleForSchool, $schoolId, $cwfSessionId) {
+            $isEnrolledInSession = !$cwfSessionId 
+                || ($student->academic_session_id == $cwfSessionId) 
+                || $student->studentSessions()->where('academic_session_id', $cwfSessionId)->exists();
 
-        $students = $query->get()->filter(function($student) use ($classWiseFee, $dayBoardingCat, $hostelCat, $transportCat, $classWiseFeeScheduleId) {
+            // If student has no fee schedule assigned yet, check if this schedule is applicable as default
+            // ONLY assign if student belongs to this session
+            if (!$student->fee_schedule_id && $scheduleForSchool && $isEnrolledInSession) {
+                $sessRec = $cwfSessionId ? $student->studentSessions()->where('academic_session_id', $cwfSessionId)->first() : null;
+                $clsName = optional($sessRec?->schoolClass ?? $student->class)->name;
+                $secName = optional($sessRec?->section ?? $student->section)->name;
+                if (\App\Services\FeeHelper::isScheduleApplicable($scheduleForSchool, $clsName, $secName)) {
+                    $hasOtherScheduleFees = \App\Models\StudentFee::withoutGlobalScopes()
+                        ->where('school_id', $schoolId)
+                        ->where('student_id', $student->id)
+                        ->whereNotNull('fee_schedule_id')
+                        ->where('fee_schedule_id', '!=', $classWiseFeeScheduleId)
+                        ->exists();
+                    if (!$hasOtherScheduleFees) {
+                        $student->fee_schedule_id = $classWiseFeeScheduleId;
+                        $student->saveQuietly();
+                    }
+                }
+            }
+
             // The student's fee schedule must match the class-wise fee schedule exactly
-            if ($student->fee_schedule_id != $classWiseFeeScheduleId) {
+            if ($student->fee_schedule_id && $student->fee_schedule_id != $classWiseFeeScheduleId) {
                 return false;
             }
 
             // Target Category validation
             $targetCatId = $classWiseFee->student_category_id;
+            if (empty($targetCatId)) {
+                return true;
+            }
+
             if ($transportCat && $targetCatId == $transportCat->id) {
                 // For Transport category, only apply if student has transport_opted = true
                 return (bool) $student->transport_opted;
+            }
+
+            if ($student->category_id && $student->category_id == $targetCatId) {
+                return true;
             }
 
             if ($dayBoardingCat && $targetCatId == $dayBoardingCat->id) {
@@ -1432,12 +1468,8 @@ class FeeManagementController extends Controller
                 return !empty($student->boarding_type) && stripos($student->boarding_type, 'hostel') !== false;
             }
 
-            // Fallback: if student category/boarding type is completely empty, default match to Day boarding category
-            if ($dayBoardingCat && $targetCatId == $dayBoardingCat->id) {
-                return true;
-            }
-
-            return false;
+            // Fallback for default categories
+            return empty($student->category_id) || empty($student->boarding_type);
         });
 
         foreach ($students as $student) {
@@ -1631,17 +1663,43 @@ class FeeManagementController extends Controller
         }
     }
 
-    public static function syncStudentFees($student)
+    public static function syncStudentFees($student, $targetSessionId = null)
     {
         $schoolId = $student->school_id;
         $studentScheduleId = $student->fee_schedule_id;
 
-        // Determine the student's current academic session and all schedule IDs belonging to it
-        $currentSessionId = $student->academic_session_id;
+        $sched = null;
+        if ($studentScheduleId) {
+            $sched = \App\Models\FeeSchedule::where('school_id', $schoolId)->find($studentScheduleId);
+        }
+
+        // Determine target academic session:
+        // Priority 1: Explicit targetSessionId passed in
+        // Priority 2: Student's academic_session_id
+        // Priority 3: Academic session of the student's assigned fee schedule
+        // Priority 4: School's current active academic session
+        $targetSessionId = $targetSessionId ?: ($student->academic_session_id ?? $sched?->academic_session_id);
+        if (!$targetSessionId) {
+            $currentSession = \App\Models\AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? \App\Models\AcademicSession::where('school_id', $schoolId)->first();
+            $targetSessionId = $currentSession?->id;
+        }
+
+        // If the student's assigned schedule belongs to a different session than targetSessionId, reset it for targetSessionId
+        if ($studentScheduleId && $sched && $targetSessionId && $sched->academic_session_id != $targetSessionId) {
+            $studentScheduleId = null;
+            $sched = null;
+            if ($student->academic_session_id == $targetSessionId) {
+                $student->fee_schedule_id = null;
+                $student->saveQuietly();
+            }
+        }
+
+        // Determine all schedule IDs belonging to this target session
         $currentSessionScheduleIds = [];
-        if ($currentSessionId) {
+        if ($targetSessionId) {
             $currentSessionScheduleIds = \App\Models\FeeSchedule::where('school_id', $schoolId)
-                ->where('academic_session_id', $currentSessionId)
+                ->where('academic_session_id', $targetSessionId)
                 ->pluck('id')
                 ->toArray();
         } elseif ($studentScheduleId) {
@@ -1660,8 +1718,30 @@ class FeeManagementController extends Controller
         }
         $pendingChequeFeeIds = array_unique(array_filter(array_map('intval', $pendingChequeFeeIds)));
 
-        // Delete all unpaid/unlocked student fees belonging to other schedules of the CURRENT session only
-        // Strictly protect fees from previous academic sessions
+        // Purge any unpaid orphan fee records belonging to sessions where the student was never enrolled
+        $enrolledSessionIds = \App\Services\FeeHelper::getStudentEnrolledSessionIds($student);
+        if (!empty($enrolledSessionIds)) {
+            \App\Models\StudentFee::withoutGlobalScope('active')
+                ->where('school_id', $schoolId)
+                ->where('student_id', $student->id)
+                ->where('paid_amount', '<=', 0)
+                ->where('instant_discount_amount', '<=', 0)
+                ->whereNotIn('id', $pendingChequeFeeIds)
+                ->where('status', '!=', 'refunded')
+                ->where(function($q) use ($enrolledSessionIds) {
+                    $q->whereHas('feeSchedule', function($sq) use ($enrolledSessionIds) {
+                        $sq->whereNotIn('academic_session_id', $enrolledSessionIds);
+                    })->orWhereHas('transportFeeSchedule', function($sq) use ($enrolledSessionIds) {
+                        $sq->whereNotIn('academic_session_id', $enrolledSessionIds);
+                    })->orWhereHas('miscFee', function($sq) use ($enrolledSessionIds) {
+                        $sq->whereNotIn('academic_session_id', $enrolledSessionIds);
+                    });
+                })
+                ->delete();
+        }
+
+        // Delete all unpaid/unlocked student fees belonging to other schedules of the target session only
+        // Strictly protect fees from previous academic sessions, transport fees, misc fees, and pending cheques
         \App\Models\StudentFee::withoutGlobalScope('active')
             ->where('school_id', $schoolId)
             ->where('student_id', $student->id)
@@ -1682,18 +1762,20 @@ class FeeManagementController extends Controller
             ->whereNotIn('id', $pendingChequeFeeIds)
             ->where('status', '!=', 'refunded')
             ->whereNull('misc_fee_id')
+            ->whereNull('transport_fee_schedule_id')
             ->delete();
 
-        // Auto-heal duplicate fee records by component/category name within the current schedule/session
+        // Auto-heal duplicate fee records by component/category name within the target session
         $allStudentFees = \App\Models\StudentFee::withoutGlobalScopes()
             ->where('school_id', $schoolId)
             ->where('student_id', $student->id)
             ->whereNull('misc_fee_id')
+            ->whereNull('transport_fee_schedule_id')
             ->where(function($q) use ($studentScheduleId, $currentSessionScheduleIds) {
-                if ($studentScheduleId) {
-                    $q->where('fee_schedule_id', $studentScheduleId);
-                } elseif (!empty($currentSessionScheduleIds)) {
+                if (!empty($currentSessionScheduleIds)) {
                     $q->whereIn('fee_schedule_id', $currentSessionScheduleIds);
+                } elseif ($studentScheduleId) {
+                    $q->where('fee_schedule_id', $studentScheduleId);
                 }
             })
             ->with(['component', 'category'])
@@ -1803,15 +1885,24 @@ class FeeManagementController extends Controller
             return;
         }
 
+        $sessionRec = null;
+        if ($targetSessionId) {
+            $sessionRec = $student->relationLoaded('studentSessions')
+                ? $student->studentSessions->firstWhere('academic_session_id', $targetSessionId)
+                : $student->studentSessions()->where('academic_session_id', $targetSessionId)->first();
+        }
+        $effectiveClassId = $sessionRec?->class_id ?? $student->class_id;
+        $effectiveSectionId = $sessionRec?->section_id ?? $student->section_id;
+
         // Fetch all active ClassWiseFee structures for this student's class matching the student's schedule
         $classWiseFeesQuery = \App\Models\ClassWiseFee::where('school_id', $schoolId)
-            ->where('class_id', $student->class_id)
+            ->where('class_id', $effectiveClassId)
             ->where('fee_schedule_id', $studentScheduleId)
             ->where('is_active', true);
 
-        if ($student->section_id) {
-            $classWiseFeesQuery->where(function($q) use ($student) {
-                $q->where('section_id', $student->section_id)
+        if ($effectiveSectionId) {
+            $classWiseFeesQuery->where(function($q) use ($effectiveSectionId) {
+                $q->where('section_id', $effectiveSectionId)
                   ->orWhereNull('section_id');
             });
         } else {
@@ -1845,22 +1936,23 @@ class FeeManagementController extends Controller
 
         $classWiseFees = $classWiseFeesQuery->get();
 
-        if ($student->section_id) {
+        if ($effectiveSectionId) {
             $classWiseFees = $classWiseFees->groupBy(function($item) {
                 return $item->fee_schedule_id . '-' . $item->student_category_id . '-' . $item->fee_component_id;
-            })->map(function($group) use ($student) {
-                return $group->where('section_id', $student->section_id)->first() ?? $group->whereNull('section_id')->first();
+            })->map(function($group) use ($effectiveSectionId) {
+                return $group->where('section_id', $effectiveSectionId)->first() ?? $group->whereNull('section_id')->first();
             })->values();
         }
 
         // Clean up unpaid student fees of the CURRENT session that do not correspond to any active class-wise configuration
-        // Strictly protect fees from previous academic sessions
+        // Strictly protect fees from previous academic sessions, transport fees, misc fees, and pending cheques
         $unpaidFeesQuery = \App\Models\StudentFee::withoutGlobalScope('active')
             ->where('school_id', $schoolId)
             ->where('student_id', $student->id)
             ->where('paid_amount', '<=', 0)
             ->where('instant_discount_amount', '<=', 0)
             ->whereNull('misc_fee_id')
+            ->whereNull('transport_fee_schedule_id')
             ->whereNotIn('id', $pendingChequeFeeIds)
             ->where('status', '!=', 'refunded');
 
@@ -4405,7 +4497,7 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
                 ->find($viewStudentId);
 
             if ($viewStudent) {
-                self::syncStudentFees($viewStudent);
+                self::syncStudentFees($viewStudent, optional($selectedSession)->id);
                 \App\Models\StudentFee::syncTransportFees($schoolId);
 
                 // Check if class-wise transport fee is active
@@ -4585,12 +4677,14 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
                     ->get();
 
                 // ── Query Previous Academic Year Fee Records for this student (identified strictly by admission_number) ──
-                if (!empty($previousSessionIds)) {
+                if (!empty($previousSessionIds) && \App\Services\FeeHelper::isStudentEnrolledInPreviousSessions($viewStudent, $previousSessionIds, $selectedSession)) {
                     $linkedStudentIds = collect([$viewStudent->id]);
                     if (!empty($viewStudent->admission_number)) {
-                        $matchedIds = \App\Models\Student::where('school_id', $schoolId)
+                        $matchedStudents = \App\Models\Student::where('school_id', $schoolId)
                             ->where('admission_number', $viewStudent->admission_number)
-                            ->pluck('id');
+                            ->with(['studentSessions'])
+                            ->get();
+                        $matchedIds = $matchedStudents->filter(fn($mst) => \App\Services\FeeHelper::isStudentEnrolledInPreviousSessions($mst, $previousSessionIds, $selectedSession))->pluck('id');
                         $linkedStudentIds = $linkedStudentIds->merge($matchedIds)->unique();
                     }
                     $linkedStudentIdsArray = $linkedStudentIds->toArray();
@@ -4776,11 +4870,13 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
                 })->values();
 
                 // Retrieve explicit matching fee schedule name
-                $firstSchedFee = $studentFees->first(fn($f) => !empty($f->fee_schedule_id) && $f->feeSchedule);
+                $firstSchedFee = $studentFees->first(fn($f) => !empty($f->fee_schedule_id) && $f->feeSchedule && optional($f->feeSchedule)->academic_session_id == $selectedSession->id);
                 if ($firstSchedFee) {
                     $feeScheduleName = $firstSchedFee->feeSchedule->name;
-                } elseif ($viewStudent->fee_schedule_id) {
+                } elseif ($viewStudent->fee_schedule_id && optional($viewStudent->feeSchedule)->academic_session_id == $selectedSession->id) {
                     $feeScheduleName = optional($viewStudent->feeSchedule)->name;
+                } else {
+                    $feeScheduleName = '-';
                 }
 
                 // Applied discounts for this student
@@ -4932,6 +5028,51 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
 
         $studentsWithFees = $query->paginate(25)->withQueryString();
 
+        // Auto-heal duplicate/orphan unpaid fees from unassigned schedules of selected session for students on current page
+        if ($selectedSession) {
+            foreach ($studentsWithFees->items() as $st) {
+                // If student has a fee_schedule_id pointing to a different session, clear it
+                if ($st->fee_schedule_id) {
+                    $sch = $st->feeSchedule ?? \App\Models\FeeSchedule::where('school_id', $schoolId)->find($st->fee_schedule_id);
+                    if ($sch && $sch->academic_session_id != $selectedSession->id) {
+                        $st->fee_schedule_id = null;
+                        $st->saveQuietly();
+                    }
+                }
+
+                // Check if student was enrolled in previous sessions
+                $wasEnrolledInPrev = !empty($previousSessionIds) && \App\Services\FeeHelper::isStudentEnrolledInPreviousSessions($st, $previousSessionIds, $selectedSession);
+                if (!$wasEnrolledInPrev && !empty($previousSessionIds)) {
+                    // Purge any unpaid orphan fees from previous sessions that were mistakenly created for new students
+                    \App\Models\StudentFee::withoutGlobalScope('active')
+                        ->where('school_id', $schoolId)
+                        ->where('student_id', $st->id)
+                        ->where('paid_amount', '<=', 0)
+                        ->where('instant_discount_amount', '<=', 0)
+                        ->where('status', '!=', 'refunded')
+                        ->where(function($q) use ($previousSessionIds) {
+                            $q->whereHas('feeSchedule', fn($sq) => $sq->whereIn('academic_session_id', $previousSessionIds))
+                              ->orWhereHas('transportFeeSchedule', fn($sq) => $sq->whereIn('academic_session_id', $previousSessionIds))
+                              ->orWhereHas('miscFee', fn($sq) => $sq->whereIn('academic_session_id', $previousSessionIds));
+                        })
+                        ->delete();
+                }
+
+                if ($st->fee_schedule_id) {
+                    $hasOrphanSessionFees = $st->studentFees->contains(function($f) use ($st, $selectedSession) {
+                        return !empty($f->fee_schedule_id)
+                            && $f->fee_schedule_id != $st->fee_schedule_id
+                            && optional($f->feeSchedule)->academic_session_id == $selectedSession->id
+                            && ($f->paid_amount ?? 0) <= 0
+                            && ($f->instant_discount_amount ?? 0) <= 0;
+                    });
+                    if ($hasOrphanSessionFees) {
+                        self::syncStudentFees($st, $selectedSession->id);
+                    }
+                }
+            }
+        }
+
         // Load/reload all studentFees and studentSessions
         $studentsWithFees->load([
             'class',
@@ -4951,36 +5092,45 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
         if (!empty($pageAdmissionNumbers) && !empty($previousSessionIds)) {
             $matchedStudents = Student::where('school_id', $schoolId)
                 ->whereIn('admission_number', $pageAdmissionNumbers)
-                ->get(['id', 'admission_number', 'academic_session_id']);
-            $matchedStudentIds = $matchedStudents->pluck('id')->toArray();
-            
-            $historicalFees = \App\Models\StudentFee::withoutGlobalScope('active')
-                ->where('school_id', $schoolId)
-                ->whereIn('student_id', $matchedStudentIds)
-                ->where(function($query) use ($previousSessionIds, $selectedSession) {
-                    $query->whereHas('feeSchedule', function($q) use ($previousSessionIds) {
-                        $q->whereIn('academic_session_id', $previousSessionIds);
-                    })->orWhereHas('transportFeeSchedule', function($q) use ($previousSessionIds) {
-                        $q->whereIn('academic_session_id', $previousSessionIds);
-                    })->orWhereHas('miscFee', function($q) use ($previousSessionIds) {
-                        $q->whereIn('academic_session_id', $previousSessionIds);
-                    })->orWhere(function($q) use ($selectedSession) {
-                        if ($selectedSession && $selectedSession->start_date) {
-                            $q->where('due_date', '<', $selectedSession->start_date);
-                        }
-                    })->orWhereHas('student', function($q) use ($previousSessionIds) {
-                        $q->whereIn('academic_session_id', $previousSessionIds);
-                    });
-                })
-                ->where('status', '!=', 'refunded')
-                ->whereNotIn('invoice_status', ['refunded'])
-                ->with(['feeSchedule.academicSession', 'transportFeeSchedule.academicSession', 'miscFee.academicSession', 'student.academicSession'])
-                ->get();
-            
-            $studentIdToAdm = $matchedStudents->pluck('admission_number', 'id');
-            $historicalFeesByAdmission = $historicalFees->groupBy(function($fee) use ($studentIdToAdm) {
-                return $studentIdToAdm[$fee->student_id] ?? '';
+                ->with(['studentSessions'])
+                ->get(['id', 'school_id', 'admission_number', 'admission_date', 'academic_session_id']);
+
+            // Filter to ONLY students who were actually enrolled in previous academic sessions!
+            $eligibleStudents = $matchedStudents->filter(function($mst) use ($previousSessionIds, $selectedSession) {
+                return \App\Services\FeeHelper::isStudentEnrolledInPreviousSessions($mst, $previousSessionIds, $selectedSession);
             });
+
+            $matchedStudentIds = $eligibleStudents->pluck('id')->toArray();
+            
+            if (!empty($matchedStudentIds)) {
+                $historicalFees = \App\Models\StudentFee::withoutGlobalScope('active')
+                    ->where('school_id', $schoolId)
+                    ->whereIn('student_id', $matchedStudentIds)
+                    ->where(function($query) use ($previousSessionIds, $selectedSession) {
+                        $query->whereHas('feeSchedule', function($q) use ($previousSessionIds) {
+                            $q->whereIn('academic_session_id', $previousSessionIds);
+                        })->orWhereHas('transportFeeSchedule', function($q) use ($previousSessionIds) {
+                            $q->whereIn('academic_session_id', $previousSessionIds);
+                        })->orWhereHas('miscFee', function($q) use ($previousSessionIds) {
+                            $q->whereIn('academic_session_id', $previousSessionIds);
+                        })->orWhere(function($q) use ($selectedSession) {
+                            if ($selectedSession && $selectedSession->start_date) {
+                                $q->where('due_date', '<', $selectedSession->start_date);
+                            }
+                        })->orWhereHas('student', function($q) use ($previousSessionIds) {
+                            $q->whereIn('academic_session_id', $previousSessionIds);
+                        });
+                    })
+                    ->where('status', '!=', 'refunded')
+                    ->whereNotIn('invoice_status', ['refunded'])
+                    ->with(['feeSchedule.academicSession', 'transportFeeSchedule.academicSession', 'miscFee.academicSession', 'student.academicSession'])
+                    ->get();
+                
+                $studentIdToAdm = $eligibleStudents->pluck('admission_number', 'id');
+                $historicalFeesByAdmission = $historicalFees->groupBy(function($fee) use ($studentIdToAdm) {
+                    return $studentIdToAdm[$fee->student_id] ?? '';
+                });
+            }
         }
 
         // Build fee schedule map for each student
@@ -5207,6 +5357,20 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
             if ($request->has('student_schedules')) {
                 $errorMsg = null;
                 \Illuminate\Support\Facades\DB::transaction(function() use ($request, $schoolId, &$errorMsg) {
+                    $formAcademicYear = $request->input('academic_year');
+                    $formMatchedSession = null;
+                    if ($formAcademicYear) {
+                        $formMatchedSession = \App\Models\AcademicSession::where('school_id', $schoolId)
+                            ->where(function($q) use ($formAcademicYear) {
+                                if (is_numeric($formAcademicYear)) {
+                                    $q->where('id', $formAcademicYear);
+                                }
+                                $q->orWhere('name', $formAcademicYear)
+                                  ->orWhere('name', 'like', "%{$formAcademicYear}%");
+                            })
+                            ->first();
+                    }
+
                     foreach ($request->student_schedules as $studentId => $scheduleId) {
                         $student = Student::with(['class', 'section', 'studentSessions.schoolClass', 'studentSessions.section'])
                             ->where('school_id', $schoolId)
@@ -5227,7 +5391,7 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
                         }
 
                         // Determine target academic session for this schedule assignment
-                        $targetSessionId = $sched ? $sched->academic_session_id : ($student->academic_session_id ?: null);
+                        $targetSessionId = $sched ? $sched->academic_session_id : ($formMatchedSession ? $formMatchedSession->id : ($student->academic_session_id ?: null));
 
                         // Find student's enrollment/session record in this target session
                         $sessionRec = $targetSessionId ? $student->studentSessions->firstWhere('academic_session_id', $targetSessionId) : null;
@@ -5278,7 +5442,7 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
 
                         $student->fee_schedule_id = $scheduleId;
                         $student->saveQuietly();
-                        self::syncStudentFees($student);
+                        self::syncStudentFees($student, $targetSessionId);
                     }
                 });
 
@@ -5500,38 +5664,44 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
         $schoolId = $this->resolveSchoolId();
         $this->ensureFeesSeeded($schoolId);
 
-        $currentSession = \App\Models\AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
-            ?? \App\Models\AcademicSession::where('school_id', $schoolId)->first();
-        $selectedSession = $currentSession;
+        $selectedSessionId = $request->get('academic_session_id');
+        $academicSessions  = \App\Models\AcademicSession::where('school_id', $schoolId)->get();
+        $currentSession    = \App\Models\AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+            ?? $academicSessions->first();
 
-        $totalCollected = FeeReceipt::where('school_id', $schoolId)
-            ->whereHas('student', function($q) use ($selectedSession) {
-                $q->where('academic_session_id', $selectedSession->id);
-            })
-            ->sum('amount_paid');
+        if (!$selectedSessionId) {
+            $selectedSessionId = $currentSession?->id;
+        }
+
+        $selectedSession = $academicSessions->firstWhere('id', $selectedSessionId) ?? $currentSession;
+
+        // Auto-purge any rogue previous session fees for new admissions
+        \App\Services\FeeHelper::purgeRoguePreviousSessionFees($schoolId, $selectedSession);
+
+        $metrics = \App\Services\FeeHelper::calculateSessionFeeMetrics($schoolId, $selectedSession);
+
+        $totalCollected = $metrics['annualCollected'];
+        $totalDues      = $metrics['annualDue'];
 
         $totalRefunded = FeeRefund::where('school_id', $schoolId)
-            ->whereHas('student', function($q) use ($selectedSession) {
-                $q->where('academic_session_id', $selectedSession->id);
+            ->whereHas('student', function($q) use ($selectedSessionId) {
+                if ($selectedSessionId) {
+                    $q->where(function($sq) use ($selectedSessionId) {
+                        $sq->where('academic_session_id', $selectedSessionId)
+                           ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $selectedSessionId));
+                    });
+                }
             })
             ->sum('amount');
 
-        $totalDues = StudentFee::where('school_id', $schoolId)
-            ->where('status', '!=', 'paid')
-            ->whereHas('student', function($q) use ($selectedSession) {
-                $q->where('academic_session_id', $selectedSession->id);
-            })
-            ->sum('amount') 
-            - StudentFee::where('school_id', $schoolId)
-            ->where('status', 'partially_paid')
-            ->whereHas('student', function($q) use ($selectedSession) {
-                $q->where('academic_session_id', $selectedSession->id);
-            })
-            ->sum('paid_amount');
-
         $receiptsByMode = FeeReceipt::where('school_id', $schoolId)
-            ->whereHas('student', function($q) use ($selectedSession) {
-                $q->where('academic_session_id', $selectedSession->id);
+            ->whereHas('student', function($q) use ($selectedSessionId) {
+                if ($selectedSessionId) {
+                    $q->where(function($sq) use ($selectedSessionId) {
+                        $sq->where('academic_session_id', $selectedSessionId)
+                           ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $selectedSessionId));
+                    });
+                }
             })
             ->selectRaw('payment_mode, SUM(amount_paid) as total')
             ->groupBy('payment_mode')
@@ -5539,7 +5709,11 @@ $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)->
 
         $collectionByClass = FeeReceipt::where('fee_receipts.school_id', $schoolId)
             ->join('students', 'fee_receipts.student_id', '=', 'students.id')
-            ->where('students.academic_session_id', $selectedSession->id)
+            ->where(function($sq) use ($selectedSessionId) {
+                if ($selectedSessionId) {
+                    $sq->where('students.academic_session_id', $selectedSessionId);
+                }
+            })
             ->join('school_classes', 'students.class_id', '=', 'school_classes.id')
             ->selectRaw('school_classes.name as class_name, SUM(amount_paid) as total')
             ->groupBy('school_classes.name')

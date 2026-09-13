@@ -19,6 +19,7 @@ use App\Models\StudentHouse;
 use App\Models\StudentSession;
 use App\Models\User;
 use App\Services\StudentNumberService;
+use App\Support\SearchHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -36,66 +37,189 @@ class StudentController extends Controller
     public function index(Request $request)
     {
         $schoolId = auth()->user()->school_id;
+        $user = auth()->user();
+        $isTeacher = $user && ($user->hasRole('teacher') || $user->role === 'teacher' || $user->hasRole('staff'));
+        $staff = $isTeacher ? $user->staff : null;
+
+        $assignedSectionIds = [];
+        $assignedClassIds = [];
+        if ($staff) {
+            $secIdsFromCt = Section::where('school_id', $schoolId)
+                ->where(function($q) use ($staff) {
+                    $q->where('class_teacher_id', $staff->id)
+                      ->orWhere('assistant_class_teacher_id', $staff->id);
+                })
+                ->pluck('id')->toArray();
+            $secIdsFromSss = \App\Models\SectionSubjectStaff::where('school_id', $schoolId)->where('staff_id', $staff->id)->pluck('section_id')->toArray();
+            $secIdsFromCells = \App\Models\ClassTimetableCell::where('school_id', $schoolId)->where('teacher_id', $staff->id)->pluck('section_id')->toArray();
+            $assignedSectionIds = array_unique(array_filter(array_merge($secIdsFromCt, $secIdsFromSss, $secIdsFromCells)));
+            $assignedClassIds = Section::whereIn('id', $assignedSectionIds)->pluck('class_id')->unique()->filter()->toArray();
+        }
+
         $page = $request->get('page', 1);
+
+        $selectedSessionId = $request->get('academic_session_id');
+        if (!$selectedSessionId || $selectedSessionId === '') {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $selectedSessionId = $currentSession?->id;
+        }
 
         $filters = [
             'class_id' => $request->get('class_id'),
             'section_id' => $request->get('section_id'),
-            'academic_session_id' => $request->get('academic_session_id'),
+            'academic_session_id' => $selectedSessionId === 'all' ? null : $selectedSessionId,
             'is_active' => $request->get('is_active'),
             'search' => $request->get('search'),
+            'status' => $request->get('status', 'active'),
+            'sort' => $request->get('sort', 'asc'),
+            'per_page' => $request->get('per_page'),
+            'all' => $request->get('all'),
         ];
 
         $version = Cache::get('students_list_version_' . $schoolId, 'v1');
-        $cacheKey = 'students_list_' . $schoolId . '_' . md5(json_encode($filters) . '_' . $page) . '_' . $version;
+        $teacherCacheSuffix = $staff ? '_staff_' . $staff->id : '';
+        $cacheKey = 'students_list_' . $schoolId . '_' . md5(json_encode($filters) . '_' . $page) . '_' . $version . $teacherCacheSuffix;
 
-        $students = Cache::remember($cacheKey, 120, function () use ($schoolId, $filters) {
-            $query = Student::with(['class', 'section', 'academicSession'])
-                            ->where('school_id', $schoolId);
+        $isFiltered = !empty($filters['class_id']) || !empty($filters['section_id']) || !empty($filters['search']) || $request->has('class_id') || $request->has('section_id') || $request->has('search');
 
-            if ($filters['class_id']) {
-                $query->where('class_id', $filters['class_id']);
+        $students = Cache::remember($cacheKey, 120, function () use ($schoolId, $filters, $staff, $assignedSectionIds, $isFiltered) {
+            if (!$isFiltered) {
+                return new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20, 1, [
+                    'path' => \Illuminate\Pagination\Paginator::resolveCurrentPath()
+                ]);
             }
-            if ($filters['section_id']) {
-                if (is_numeric($filters['section_id'])) {
-                    $query->where('section_id', $filters['section_id']);
+
+            if ($filters['status'] === 'deleted') {
+                $query = Student::onlyTrashed()->with(['class', 'section', 'academicSession', 'pendingDeletionRequest', 'studentSessions.schoolClass', 'studentSessions.section'])
+                                ->where('school_id', $schoolId);
+            } else {
+                $query = Student::with(['class', 'section', 'academicSession', 'pendingDeletionRequest', 'studentSessions.schoolClass', 'studentSessions.section'])
+                                ->where('school_id', $schoolId);
+            }
+
+            if ($staff) {
+                if (count($assignedSectionIds) > 0) {
+                    $query->whereIn('section_id', $assignedSectionIds);
                 } else {
-                    $query->whereHas('section', function ($q) use ($filters) {
-                        $q->where('name', $filters['section_id']);
-                    });
+                    $query->whereRaw('1 = 0');
                 }
             }
+
+            if ($filters['status'] === 'active') {
+                $query->where('is_active', 1)
+                      ->where('is_alumni', 0)
+                      ->where(function($q) {
+                          $q->where('is_transfer', 0)->orWhereNull('is_transfer');
+                      })
+                      ->where(function($q) {
+                          $q->whereNull('tc_number')->orWhere('tc_number', '');
+                      });
+            } elseif ($filters['status'] === 'deactivated') {
+                $query->where('is_active', 0)
+                      ->where('is_alumni', 0)
+                      ->where(function($q) {
+                          $q->where('is_transfer', 0)->orWhereNull('is_transfer');
+                      })
+                      ->where(function($q) {
+                          $q->whereNull('tc_number')->orWhere('tc_number', '');
+                      });
+            } elseif ($filters['status'] === 'transfer') {
+                $query->where(function($q) {
+                    $q->where('is_transfer', 1)
+                      ->orWhereNotNull('tc_number')
+                      ->orWhere('tc_number', '!=', '');
+                });
+            } elseif ($filters['status'] === 'alumni') {
+                $query->where('is_alumni', 1);
+            }
+
             if ($filters['academic_session_id']) {
-                $query->where('academic_session_id', $filters['academic_session_id']);
+                $sessionId = $filters['academic_session_id'];
+                $classId = $filters['class_id'] ?? null;
+                $sectionId = $filters['section_id'] ?? null;
+
+                $query->whereHas('studentSessions', function ($sq) use ($sessionId, $classId, $sectionId) {
+                    $sq->where('academic_session_id', $sessionId);
+                    if ($classId) {
+                        $sq->where('class_id', $classId);
+                    }
+                    if ($sectionId) {
+                        if (is_numeric($sectionId)) {
+                            $sq->where('section_id', $sectionId);
+                        } else {
+                            $sq->whereHas('section', function ($secQ) use ($sectionId) {
+                                $secQ->where('name', $sectionId);
+                            });
+                        }
+                    }
+                });
+            } else {
+                if ($filters['class_id']) {
+                    $query->where('class_id', $filters['class_id']);
+                }
+                if ($filters['section_id']) {
+                    if (is_numeric($filters['section_id'])) {
+                        $query->where('section_id', $filters['section_id']);
+                    } else {
+                        $query->whereHas('section', function ($q) use ($filters) {
+                            $q->where('name', $filters['section_id']);
+                        });
+                    }
+                }
             }
             if ($filters['is_active'] !== null && $filters['is_active'] !== '') {
                 $query->where('is_active', $filters['is_active']);
             }
             if ($filters['search']) {
-                $search = $filters['search'];
-                $query->where(function ($q) use ($search) {
-                    $q->where('first_name', 'like', "%{$search}%")
-                      ->orWhere('last_name', 'like', "%{$search}%")
-                      ->orWhere('admission_number', 'like', "%{$search}%")
-                      ->orWhere('roll_number', 'like', "%{$search}%");
-                });
+                SearchHelper::applyStudentSearch($query, $filters['search']);
             }
 
-            return $query->paginate(20);
+            if (($filters['sort'] ?? 'asc') === 'desc') {
+                $query->orderBy('first_name', 'desc')->orderBy('last_name', 'desc');
+            } else {
+                $query->orderBy('first_name', 'asc')->orderBy('last_name', 'asc');
+            }
+
+            $perPage = 20;
+            if (isset($filters['per_page']) && is_numeric($filters['per_page']) && $filters['per_page'] > 0) {
+                $perPage = min((int) $filters['per_page'], 10000);
+            } elseif (!empty($filters['all']) || (isset($filters['per_page']) && $filters['per_page'] === 'all')) {
+                $perPage = 10000;
+            }
+
+            return $query->paginate($perPage);
         });
 
-        $classes = SchoolClass::all();
-        $sections = Section::all();
+        if ($staff) {
+            $classes = count($assignedClassIds) > 0 ? SchoolClass::whereIn('id', $assignedClassIds)->get() : collect();
+            $sections = count($assignedSectionIds) > 0 ? Section::whereIn('id', $assignedSectionIds)->get() : collect();
+        } else {
+            $classes = SchoolClass::all();
+            $sections = Section::all();
+        }
         $academicSessions = AcademicSession::all();
+
+        $suggestion = null;
+        if ($students->total() === 0 && !empty($filters['search'])) {
+            $suggestion = SearchHelper::getStudentSuggestion(
+                $schoolId,
+                $filters['search'],
+                $filters['class_id'] ? (int) $filters['class_id'] : null,
+                $filters['section_id'] && is_numeric($filters['section_id']) ? (int) $filters['section_id'] : null
+            );
+        }
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
                 'data' => $students->items(),
+                'suggestion' => $suggestion,
+                'isFiltered' => $isFiltered,
             ]);
         }
 
-        return view('school.student.index', compact('students', 'classes', 'sections', 'academicSessions', 'filters'));
+        return view('school.student.index', compact('students', 'classes', 'sections', 'academicSessions', 'filters', 'suggestion', 'isFiltered'));
     }
 
     public function create()
@@ -120,13 +244,92 @@ class StudentController extends Controller
         $vehicles = \App\Models\Vehicle::where('school_id', $schoolId)->where('status', true)->get();
         $stops = \App\Models\Stop::where('school_id', $schoolId)->get();
 
-        return view('school.student.create', compact('classes', 'sections', 'academicSessions', 'categories', 'houses', 'routes', 'vehicles', 'stops'));
+        $admData = $this->studentNumberService->getStudentPrefixAndNextSequence($schoolId);
+
+        return view('school.student.create', compact('classes', 'sections', 'academicSessions', 'categories', 'houses', 'routes', 'vehicles', 'stops', 'admData'));
     }
 
     public function store(StudentStoreRequest $request)
     {
         $schoolId = auth()->user()->school_id;
         $data = $request->validated();
+
+        $cleanFullName = trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? ''));
+        $cleanFatherName = trim((string)($data['father_name'] ?? $data['guardian_name'] ?? ''));
+        $dob = $data['date_of_birth'] ?? null;
+
+        $existingStudentByIdentity = null;
+        if (!empty($cleanFullName) && !empty($dob)) {
+            $normFullName = strtolower(preg_replace('/\s+/', ' ', $cleanFullName));
+            $normFather   = strtolower(preg_replace('/\s+/', ' ', $cleanFatherName));
+            $cleanAlphaFullName = strtolower(preg_replace('/[^a-z0-9]/', '', $cleanFullName));
+            $cleanAlphaFather   = strtolower(preg_replace('/[^a-z0-9]/', '', $cleanFatherName));
+
+            $identityQuery = Student::withTrashed()
+                ->where('school_id', $schoolId)
+                ->whereDate('date_of_birth', $dob);
+
+            if ($cleanAlphaFather !== '') {
+                $identityQuery->where(function ($q) use ($normFather, $cleanAlphaFather) {
+                    $q->whereRaw("LOWER(TRIM(father_name)) = ?", [$normFather])
+                      ->orWhereRaw("LOWER(TRIM(guardian_name)) = ?", [$normFather])
+                      ->orWhereRaw("LOWER(REPLACE(REPLACE(REPLACE(father_name, ' ', ''), '.', ''), '-', '')) = ?", [$cleanAlphaFather])
+                      ->orWhereRaw("LOWER(REPLACE(REPLACE(REPLACE(guardian_name, ' ', ''), '.', ''), '-', '')) = ?", [$cleanAlphaFather]);
+                });
+            }
+
+            $identityQuery->where(function ($q) use ($normFullName, $cleanAlphaFullName) {
+                $q->whereRaw("LOWER(TRIM(CONCAT(first_name, ' ', COALESCE(last_name, '')))) = ?", [$normFullName])
+                  ->orWhereRaw("LOWER(REPLACE(REPLACE(REPLACE(CONCAT(first_name, ' ', COALESCE(last_name, '')), ' ', ''), '.', ''), '-', '')) = ?", [$cleanAlphaFullName]);
+            });
+
+            $existingStudentByIdentity = $identityQuery->first();
+        }
+
+        $submittedAdmNumber = trim((string)($request->input('admission_number') ?? ''));
+        $prefix = $request->input('admission_number_prefix');
+        $seqInput = trim((string) $request->input('admission_number_seq', ''));
+        if ($seqInput !== '') {
+            $submittedAdmNumber = ($prefix ?? '') . $seqInput;
+        }
+
+        if ($existingStudentByIdentity) {
+            // If existing student found by identity, preserve permanent admission number
+            if ($submittedAdmNumber !== '' && strcasecmp($submittedAdmNumber, (string)$existingStudentByIdentity->admission_number) !== 0) {
+                return redirect()->back()
+                    ->withInput()
+                    ->withErrors(['admission_number' => "Admission Number mismatch for existing student {$existingStudentByIdentity->full_name}. The correct Admission Number is {$existingStudentByIdentity->admission_number}. Admission Number cannot be changed."]);
+            }
+            $data['admission_number'] = $existingStudentByIdentity->admission_number;
+            $data['admission_sequence'] = $existingStudentByIdentity->admission_sequence;
+            $data['admission_year'] = $existingStudentByIdentity->admission_year;
+        } else {
+            if ($submittedAdmNumber !== '') {
+                $data['admission_number'] = $submittedAdmNumber;
+            } else {
+                $data['admission_number'] = $this->studentNumberService->generateAdmissionNumber($schoolId);
+            }
+            $admParsed = $this->studentNumberService->parseStudentAdmissionNumber($data['admission_number'], $schoolId);
+            $seq = (int) ($admParsed['sequence'] ?? 1);
+            if ($seq <= 0) {
+                $seq = 1;
+            }
+            $admissionYear = (int) date('Y', strtotime($data['admission_date'] ?? 'now'));
+
+            // Ensure sequence is unique for (school_id, admission_year) to respect DB unique constraint 'students_school_sequence_year_unique'
+            while (Student::withTrashed()
+                ->where('school_id', $schoolId)
+                ->where('admission_year', $admissionYear)
+                ->where('admission_sequence', $seq)
+                ->exists()) {
+                $seq++;
+            }
+
+            $data['admission_sequence'] = $seq;
+            $data['admission_year'] = $admissionYear;
+        }
+
+        // Handle uploaded photo
         $data['opening_due_balance'] = $data['opening_due_balance'] ?? 0.00;
         $data['admission_type'] = $request->has('is_new_admission') ? 'New Admission' : 'Old Admission';
 
@@ -145,55 +348,126 @@ class StudentController extends Controller
             $data['guardian_photo'] = $request->file('guardian_photo')->store('students/photos', 'public');
         }
 
-        // Generate admission details atomically
-        $data['admission_number'] = $this->studentNumberService->generateAdmissionNumber($schoolId);
-        $data['admission_sequence'] = (int) explode('/', $data['admission_number'])[2];
-        $data['admission_year'] = (int) date('Y');
+        $data['is_alumni'] = $request->has('is_alumni') ? 1 : 0;
+        $data['is_transfer'] = $request->has('is_transfer') ? 1 : 0;
         $data['school_id'] = $schoolId;
 
-        $student = DB::transaction(function () use ($schoolId, $data) {
-            // 1. Create student user account
-            $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
-            $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
-            $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['admission_number']));
-            
-            $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
-            if (!empty($data['email'])) {
-                $studentEmail = $data['email'];
-            }
+        // Ensure non-null defaults for required database fields
+        if (empty($data['guardian_name'])) {
+            $data['guardian_name'] = !empty($data['father_name']) ? $data['father_name'] : (!empty($data['mother_name']) ? $data['mother_name'] : 'Guardian');
+        }
+        if (empty($data['guardian_phone'])) {
+            $data['guardian_phone'] = !empty($data['father_phone']) ? $data['father_phone'] : (!empty($data['mother_phone']) ? $data['mother_phone'] : ($data['phone'] ?? '0000000000'));
+        }
+        if (empty($data['guardian_relationship'])) {
+            $data['guardian_relationship'] = !empty($data['father_name']) ? 'father' : (!empty($data['mother_name']) ? 'mother' : 'guardian');
+        }
+        if (empty($data['address'])) {
+            $data['address'] = !empty($data['permanent_address']) ? $data['permanent_address'] : 'N/A';
+        }
+        if (empty($data['city'])) {
+            $data['city'] = !empty($data['permanent_city']) ? $data['permanent_city'] : 'N/A';
+        }
+        if (empty($data['state'])) {
+            $data['state'] = !empty($data['permanent_state']) ? $data['permanent_state'] : 'N/A';
+        }
+        if (empty($data['pincode'])) {
+            $data['pincode'] = !empty($data['permanent_pincode']) ? $data['permanent_pincode'] : '000000';
+        }
+        if (empty($data['admission_date'])) {
+            $data['admission_date'] = date('Y-m-d');
+        }
+        if (!isset($data['last_name']) || $data['last_name'] === null) {
+            $data['last_name'] = '';
+        }
 
-            $studentUser = User::where('email', $studentEmail)->first();
-            if ($studentUser) {
+        $student = DB::transaction(function () use ($schoolId, &$data) {
+            // 1. Create / find student user account
+            $cleanFirstName   = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name'] ?? ''));
+            $cleanLastName    = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name'] ?? ''));
+            $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['admission_number'] ?? ''));
+
+            $currentSchool    = \App\Models\School::find($schoolId);
+            $schoolCode       = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $currentSchool?->code ?? ('sch' . $schoolId)));
+
+            $emailPrefixParts = array_filter([$cleanFirstName, $cleanLastName, $cleanAdmissionId]);
+            $defaultStudentEmail = implode('.', $emailPrefixParts) . '@student.' . $schoolCode . '.com';
+            $studentEmail = (!empty($data['email'])) ? $data['email'] : $defaultStudentEmail;
+
+            // Search by email globally across the users table
+            $existingUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                ->where('email', $studentEmail)
+                ->first();
+
+            // Check if existing user is an Admin/Staff/Teacher account
+            $isAdminOrStaff = $existingUser && (
+                $existingUser->hasRole('superadmin') ||
+                $existingUser->hasRole('school_admin') ||
+                $existingUser->hasRole('admin') ||
+                $existingUser->hasRole('staff') ||
+                $existingUser->hasRole('teacher') ||
+                $existingUser->hasRole('accountant') ||
+                in_array($existingUser->role, ['superadmin', 'school_admin', 'admin', 'school', 'staff', 'teacher'])
+            );
+
+            if ($existingUser && !$isAdminOrStaff) {
+                $studentUser = $existingUser;
                 $studentUser->update([
-                    'name' => trim($data['first_name'] . ' ' . $data['last_name']),
-                    'phone' => $data['guardian_phone'] ?? $studentUser->phone,
-                    'is_active' => true,
-                ]);
-            } else {
-                $studentUser = User::create([
                     'school_id' => $schoolId,
-                    'name' => trim($data['first_name'] . ' ' . $data['last_name']),
-                    'email' => $studentEmail,
-                    'phone' => $data['guardian_phone'] ?? null,
-                    'password' => Hash::make('Student@2026!'), // Default password
+                    'name'      => trim($data['first_name'] . ' ' . $data['last_name']),
+                    'phone'     => $data['guardian_phone'] ?? $studentUser->phone,
                     'is_active' => true,
                 ]);
-                $studentUser->assignRole('student');
+                if (!$studentUser->hasRole('student')) {
+                    $studentUser->assignRole('student');
+                }
+            } else {
+                if ($isAdminOrStaff) {
+                    $studentEmail = $defaultStudentEmail;
+                    $studentUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                        ->where('email', $studentEmail)
+                        ->first();
+                } else {
+                    $studentUser = null;
+                }
+
+                if (!$studentUser) {
+                    $studentUser = User::create([
+                        'school_id' => $schoolId,
+                        'name'      => trim($data['first_name'] . ' ' . $data['last_name']),
+                        'email'     => $studentEmail,
+                        'phone'     => $data['guardian_phone'] ?? null,
+                        'password'  => Hash::make('Student@2026!'),
+                        'is_active' => true,
+                    ]);
+                    $studentUser->assignRole('student');
+                }
             }
 
-            // 2. Create parent user account if guardian email is provided
+            // 2. Create / find parent user account if guardian email is provided
             if (!empty($data['guardian_email'])) {
-                $parentUser = User::where('email', $data['guardian_email'])
-                    ->where('school_id', $schoolId)
+                $parentUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                    ->where('email', $data['guardian_email'])
                     ->first();
 
-                if (!$parentUser) {
+                if ($parentUser) {
+                    // Existing user found — update their name/phone and ensure they have the parent role
+                    $parentUser->update([
+                        'school_id' => $parentUser->school_id ?? $schoolId,
+                        'name'      => $data['guardian_name'] ?? $parentUser->name,
+                        'phone'     => $data['guardian_phone'] ?? $parentUser->phone,
+                        'is_active' => true,
+                    ]);
+                    if (!$parentUser->hasRole('parent')) {
+                        $parentUser->assignRole('parent');
+                    }
+                } else {
                     $parentUser = User::create([
                         'school_id' => $schoolId,
-                        'name' => $data['guardian_name'],
-                        'email' => $data['guardian_email'],
-                        'phone' => $data['guardian_phone'],
-                        'password' => Hash::make('schoolcloud123'),
+                        'name'      => $data['guardian_name'],
+                        'email'     => $data['guardian_email'],
+                        'phone'     => $data['guardian_phone'],
+                        'password'  => Hash::make('schoolcloud123'),
                         'is_active' => true,
                     ]);
                     $parentUser->assignRole('parent');
@@ -201,20 +475,76 @@ class StudentController extends Controller
             }
 
             $data['user_id'] = $studentUser->id;
-            $student = Student::create($data);
 
-            StudentSession::create([
-                'school_id' => $schoolId,
-                'student_id' => $student->id,
-                'class_id' => $data['class_id'],
-                'section_id' => $data['section_id'],
-                'academic_session_id' => $data['academic_session_id'],
-                'roll_number' => $data['roll_number'] ?? $this->studentNumberService->generateRollNumber($data['section_id'], $data['academic_session_id']),
-                'is_promoted' => false,
-            ]);
+            // Strip any keys not in actual DB table schema to avoid "Unknown column" errors
+            // on live servers where some migrations may not have been run yet
+            $dbColumns = \Illuminate\Support\Facades\Schema::getColumnListing('students');
+            $safeData = array_intersect_key($data, array_flip($dbColumns));
+
+            $existingStudent = Student::withTrashed()
+                ->where('school_id', $schoolId)
+                ->where('admission_number', $data['admission_number'])
+                ->first();
+
+            if ($existingStudent) {
+                if ($existingStudent->trashed()) {
+                    $existingStudent->restore();
+                }
+                $student = $existingStudent;
+                // Only update active pointers if this session is the active session
+                $student->update($safeData);
+            } else {
+                $student = Student::create($safeData);
+            }
+
+            // Build session profile snapshot
+            $sessionProfileKeys = $this->getStudentProfileKeys();
+            $sessionData = [];
+            foreach ($sessionProfileKeys as $key) {
+                if (array_key_exists($key, $data) && $data[$key] !== null) {
+                    $sessionData[$key] = $data[$key];
+                }
+            }
+            if (!empty($student->photo) && empty($sessionData['photo'])) {
+                $sessionData['photo'] = $student->photo;
+            }
+
+            StudentSession::updateOrCreate(
+                [
+                    'school_id'           => $schoolId,
+                    'student_id'          => $student->id,
+                    'academic_session_id' => $data['academic_session_id'],
+                ],
+                [
+                    'class_id'     => $data['class_id'],
+                    'section_id'   => $data['section_id'],
+                    'roll_number'  => $data['roll_number'] ?? $this->studentNumberService->generateRollNumber($data['section_id'], $data['academic_session_id']),
+                    'is_promoted'  => false,
+                    'session_data' => $sessionData,
+                ]
+            );
 
             return $student;
         });
+
+        // Store Student Documents if provided
+        if ($request->hasFile('documents')) {
+            $docFiles = $request->file('documents');
+            $docTypes = $request->input('document_types', []);
+            foreach ($docFiles as $index => $file) {
+                if ($file && $file->isValid()) {
+                    $docType = !empty($docTypes[$index]) ? $docTypes[$index] : 'Other Document';
+                    $path = $file->store('students/documents', 'public');
+                    \App\Models\StudentDocument::create([
+                        'school_id'     => $schoolId,
+                        'student_id'    => $student->id,
+                        'document_type' => $docType,
+                        'file_path'     => $path,
+                        'original_name' => $file->getClientOriginalName(),
+                    ]);
+                }
+            }
+        }
 
         // Flush student list cache keys for this school
         Cache::forget('students_list_version_' . $schoolId);
@@ -223,7 +553,24 @@ class StudentController extends Controller
         // Sync transport and other fees
         \App\Http\Controllers\School\FeeManagementController::syncStudentFees($student);
 
+        // Send Central Notification
+        $studentFullName = trim($student->first_name . ' ' . ($student->last_name ?? ''));
+        \App\Services\NotificationService::send([
+            'school_id'      => $schoolId,
+            'recipient_role' => 'school_admin',
+            'title'          => 'New Student Admission',
+            'message'        => "Student {$studentFullName} (Adm No: {$student->admission_number}) admitted successfully.",
+            'module'         => 'admission',
+            'type'           => 'student_admission',
+            'related_id'     => $student->id,
+            'priority'       => 'normal',
+            'action_url'     => route('school.students.show', $student->id),
+            'icon'           => 'fa-user-plus',
+            'color'          => '#10b981',
+        ]);
+
         event(new StudentAdmitted($student));
+
 
         return redirect()->route('school.students.index')->with('success', 'Student admitted successfully.');
     }
@@ -261,6 +608,24 @@ class StudentController extends Controller
         $schoolId = auth()->user()->school_id;
         if ($student->school_id !== $schoolId) {
             abort(403, 'Unauthorized.');
+        }
+
+        $user = auth()->user();
+        $isTeacher = $user && ($user->hasRole('teacher') || $user->role === 'teacher' || $user->hasRole('staff'));
+        $staff = $isTeacher ? $user->staff : null;
+        if ($staff) {
+            $secIdsFromCt = Section::where('school_id', $schoolId)
+                ->where(function($q) use ($staff) {
+                    $q->where('class_teacher_id', $staff->id)
+                      ->orWhere('assistant_class_teacher_id', $staff->id);
+                })
+                ->pluck('id')->toArray();
+            $secIdsFromSss = \App\Models\SectionSubjectStaff::where('school_id', $schoolId)->where('staff_id', $staff->id)->pluck('section_id')->toArray();
+            $secIdsFromCells = \App\Models\ClassTimetableCell::where('school_id', $schoolId)->where('teacher_id', $staff->id)->pluck('section_id')->toArray();
+            $assignedSectionIds = array_unique(array_filter(array_merge($secIdsFromCt, $secIdsFromSss, $secIdsFromCells)));
+            if (!in_array($student->section_id, $assignedSectionIds)) {
+                abort(403, 'Unauthorized: You are not assigned to this student\'s section.');
+            }
         }
 
         // 1. Attendance
@@ -337,12 +702,23 @@ class StudentController extends Controller
             ->get();
 
         // 9. Leaves
-        $leaves = $student->user_id 
-            ? \App\Models\LeaveApplication::where('school_id', $schoolId)
-                ->where('user_id', $student->user_id)
-                ->orderBy('start_date', 'desc')
+        $leaves = ($student && \Illuminate\Support\Facades\Schema::hasTable('student_leave_applications')) 
+            ? \App\Models\StudentLeaveApplication::where('school_id', $schoolId)
+                ->where('student_id', $student->id)
+                ->orderBy('from_date', 'desc')
                 ->get()
             : collect();
+
+        // 10. Documents
+        $documents = \App\Models\StudentDocument::where('student_id', $student->id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // 11. Gate Passes
+        $gatePasses = \App\Models\StudentGatePass::where('student_id', $student->id)
+            ->orderBy('pass_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
 
         return view('school.student.show', compact(
             'student',
@@ -359,11 +735,13 @@ class StudentController extends Controller
             'receipts',
             'busAttendances',
             'offlineTests',
-            'leaves'
+            'leaves',
+            'documents',
+            'gatePasses'
         ));
     }
 
-    public function edit(Student $student)
+    public function edit(Request $request, Student $student)
     {
         $classes = SchoolClass::all();
         $sections = Section::all();
@@ -384,25 +762,91 @@ class StudentController extends Controller
         $routes = \App\Models\TransportRoute::where('school_id', $schoolId)->get();
         $vehicles = \App\Models\Vehicle::where('school_id', $schoolId)->where('status', true)->get();
         $stops = \App\Models\Stop::where('school_id', $schoolId)->get();
+        $admData = $this->studentNumberService->parseStudentAdmissionNumber($student->admission_number, $schoolId);
 
-        return view('school.student.edit', compact('student', 'classes', 'sections', 'academicSessions', 'categories', 'houses', 'routes', 'vehicles', 'stops'));
+        $selectedSessionId = $request->get('academic_session_id');
+        if (!$selectedSessionId || $selectedSessionId === 'all') {
+            $selectedSessionId = $student->academic_session_id;
+        }
+
+        // Find session-specific enrollment record
+        $studentSession = StudentSession::where('school_id', $schoolId)
+            ->where('student_id', $student->id)
+            ->where('academic_session_id', $selectedSessionId)
+            ->first();
+
+        $sessionClassId = $studentSession?->class_id ?? $student->class_id;
+        $sessionSectionId = $studentSession?->section_id ?? $student->section_id;
+        $sessionRollNumber = $studentSession?->roll_number ?? $student->roll_number;
+        $sessionAcademicSessionId = $studentSession?->academic_session_id ?? $selectedSessionId;
+
+        $sessionPhoto = $studentSession?->getProfileAttribute('photo') ?? $student->photo;
+        $sessionPhotoUrl = $student->resolvePhotoUrl($selectedSessionId) ?? asset('images/avatar-student.png');
+
+        return view('school.student.edit', compact(
+            'student',
+            'classes',
+            'sections',
+            'academicSessions',
+            'categories',
+            'houses',
+            'routes',
+            'vehicles',
+            'stops',
+            'admData',
+            'studentSession',
+            'selectedSessionId',
+            'sessionClassId',
+            'sessionSectionId',
+            'sessionRollNumber',
+            'sessionAcademicSessionId',
+            'sessionPhoto',
+            'sessionPhotoUrl'
+        ));
     }
 
     public function update(StudentUpdateRequest $request, Student $student)
     {
         $schoolId = auth()->user()->school_id;
         $data = $request->validated();
+        
+        // Enforce Admission Number immutability for existing students
+        if (!empty($student->admission_number)) {
+            $data['admission_number']   = $student->admission_number;
+            $data['admission_sequence'] = $student->admission_sequence;
+            $data['admission_year']     = $student->admission_year;
+        } else {
+            if (!empty($data['admission_number'])) {
+                $admParsed = $this->studentNumberService->parseStudentAdmissionNumber($data['admission_number'], $schoolId);
+                $seq = (int) ($admParsed['sequence'] ?? 1);
+                if ($seq <= 0) {
+                    $seq = 1;
+                }
+                $admissionYear = (int) date('Y');
+
+                while (Student::withTrashed()
+                    ->where('school_id', $schoolId)
+                    ->where('admission_year', $admissionYear)
+                    ->where('admission_sequence', $seq)
+                    ->where('id', '!=', $student->id)
+                    ->exists()) {
+                    $seq++;
+                }
+
+                $data['admission_sequence'] = $seq;
+                $data['admission_year'] = $admissionYear;
+            }
+        }
         $data['admission_type'] = $request->has('is_new_admission') ? 'New Admission' : 'Old Admission';
+        $data['is_alumni'] = $request->has('is_alumni') ? 1 : 0;
+        $data['is_transfer'] = $request->has('is_transfer') ? 1 : 0;
         if (array_key_exists('opening_due_balance', $data)) {
             $data['opening_due_balance'] = $data['opening_due_balance'] ?? 0.00;
         }
 
         if ($request->filled('captured_photo')) {
-            $data['photo'] = $this->saveBase64Photo($request->input('captured_photo'), 'students/photos', $student->photo);
+            $data['photo'] = $this->saveBase64Photo($request->input('captured_photo'), 'students/photos');
         } elseif ($request->hasFile('photo')) {
-            if ($student->photo) {
-                Storage::disk('public')->delete($student->photo);
-            }
             $data['photo'] = $request->file('photo')->store('students/photos', 'public');
         }
         if ($request->hasFile('father_photo')) {
@@ -417,106 +861,210 @@ class StudentController extends Controller
             }
             $data['mother_photo'] = $request->file('mother_photo')->store('students/photos', 'public');
         }
-        if ($request->hasFile('guardian_photo')) {
-            if ($student->guardian_photo) {
-                Storage::disk('public')->delete($student->guardian_photo);
-            }
-            $data['guardian_photo'] = $request->file('guardian_photo')->store('students/photos', 'public');
+        // Ensure non-null defaults for required database fields
+        if (empty($data['guardian_name'])) {
+            $data['guardian_name'] = !empty($data['father_name']) ? $data['father_name'] : (!empty($data['mother_name']) ? $data['mother_name'] : ($student->guardian_name ?? 'Guardian'));
+        }
+        if (empty($data['guardian_phone'])) {
+            $data['guardian_phone'] = !empty($data['father_phone']) ? $data['father_phone'] : (!empty($data['mother_phone']) ? $data['mother_phone'] : ($student->guardian_phone ?? ($data['phone'] ?? '0000000000')));
+        }
+        if (empty($data['guardian_relationship'])) {
+            $data['guardian_relationship'] = $student->guardian_relationship ?? (!empty($data['father_name']) ? 'father' : (!empty($data['mother_name']) ? 'mother' : 'guardian'));
+        }
+        if (empty($data['address'])) {
+            $data['address'] = $student->address ?? (!empty($data['permanent_address']) ? $data['permanent_address'] : 'N/A');
+        }
+        if (empty($data['city'])) {
+            $data['city'] = $student->city ?? (!empty($data['permanent_city']) ? $data['permanent_city'] : 'N/A');
+        }
+        if (empty($data['state'])) {
+            $data['state'] = $student->state ?? (!empty($data['permanent_state']) ? $data['permanent_state'] : 'N/A');
+        }
+        if (empty($data['pincode'])) {
+            $data['pincode'] = $student->pincode ?? (!empty($data['permanent_pincode']) ? $data['permanent_pincode'] : '000000');
+        }
+        if (!isset($data['last_name']) || $data['last_name'] === null) {
+            $data['last_name'] = '';
         }
 
         DB::transaction(function () use ($schoolId, $student, &$data) {
-            $studentUser = $student->user;
-            if (!$studentUser) {
-                $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
-                $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
-                $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->admission_number));
-                
-                $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
-                if (!empty($data['email'])) {
-                    $studentEmail = $data['email'];
-                }
-                
-                $studentUser = User::where('email', $studentEmail)->first();
-                if ($studentUser) {
-                    $data['user_id'] = $studentUser->id;
+            $cleanFirstName   = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name'] ?? ''));
+            $cleanLastName    = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name'] ?? ''));
+            $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->admission_number ?? ''));
+            
+            $currentSchool    = \App\Models\School::find($schoolId);
+            $schoolCode       = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $currentSchool?->code ?? ('sch' . $schoolId)));
+
+            $emailPrefixParts = array_filter([$cleanFirstName, $cleanLastName, $cleanAdmissionId]);
+            $defaultStudentEmail = implode('.', $emailPrefixParts) . '@student.' . $schoolCode . '.com';
+            $targetStudentEmail = !empty($data['email']) ? trim($data['email']) : ($student->email ? trim($student->email) : $defaultStudentEmail);
+
+            $studentUser = $student->user_id
+                ? User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)->find($student->user_id)
+                : null;
+
+            if ($studentUser) {
+                $isAdminOrStaff = (
+                    $studentUser->hasRole('superadmin') ||
+                    $studentUser->hasRole('school_admin') ||
+                    $studentUser->hasRole('admin') ||
+                    $studentUser->hasRole('staff') ||
+                    $studentUser->hasRole('teacher') ||
+                    in_array($studentUser->role, ['superadmin', 'school_admin', 'admin', 'school', 'staff', 'teacher'])
+                );
+                if ($isAdminOrStaff || $studentUser->school_id != $schoolId) {
+                    $studentUser = null;
                 }
             }
 
-            if (!$studentUser || !$studentUser->hasRole('student')) {
-                $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
-                $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
-                $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->admission_number));
-                
-                $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
-                if (!empty($data['email'])) {
-                    $studentEmail = $data['email'];
-                }
+            if (!$studentUser) {
+                $studentUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                    ->where('email', $targetStudentEmail)
+                    ->first();
+            }
 
+            if (!$studentUser) {
                 $studentUser = User::create([
                     'school_id' => $schoolId,
-                    'name' => trim($data['first_name'] . ' ' . $data['last_name']),
-                    'email' => $studentEmail,
-                    'phone' => $data['guardian_phone'] ?? null,
-                    'password' => Hash::make('Student@2026!'),
+                    'name'      => trim($data['first_name'] . ' ' . $data['last_name']),
+                    'email'     => $targetStudentEmail,
+                    'phone'     => $data['guardian_phone'] ?? null,
+                    'password'  => Hash::make('Student@2026!'),
                     'is_active' => true,
                 ]);
                 $studentUser->assignRole('student');
-                $data['user_id'] = $studentUser->id;
             } else {
-                $studentEmail = $studentUser->email;
-                if (!empty($data['email'])) {
-                    $studentEmail = $data['email'];
-                } elseif ($student->first_name !== $data['first_name'] || $student->last_name !== $data['last_name']) {
-                    if (str_contains($studentUser->email, '@student.yis.com')) {
-                        $cleanFirstName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['first_name']));
-                        $cleanLastName = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $data['last_name']));
-                        $cleanAdmissionId = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $student->admission_number));
-                        $studentEmail = $cleanFirstName . '.' . $cleanLastName . '.' . $cleanAdmissionId . '@student.yis.com';
-                    }
-                }
-
                 $studentUser->update([
-                    'name' => trim($data['first_name'] . ' ' . $data['last_name']),
-                    'email' => $studentEmail,
-                    'phone' => $data['guardian_phone'] ?? null,
+                    'name'      => trim($data['first_name'] . ' ' . $data['last_name']),
+                    'email'     => $targetStudentEmail,
+                    'phone'     => $data['guardian_phone'] ?? $studentUser->phone,
+                    'is_active' => true,
                 ]);
+                if (!$studentUser->hasRole('student')) {
+                    $studentUser->assignRole('student');
+                }
             }
+            $data['user_id'] = $studentUser->id;
 
             // 2. Manage parent user account
-            if (!empty($data['guardian_email'])) {
-                $parentUser = User::where('email', $data['guardian_email'])
-                    ->where('school_id', $schoolId)
+            $parentEmail = !empty($data['guardian_email']) ? trim($data['guardian_email']) : (!empty($data['father_email']) ? trim($data['father_email']) : null);
+            if (!empty($parentEmail)) {
+                $parentUser = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
+                    ->where('email', $parentEmail)
                     ->first();
 
                 if (!$parentUser) {
                     $parentUser = User::create([
                         'school_id' => $schoolId,
-                        'name' => $data['guardian_name'],
-                        'email' => $data['guardian_email'],
-                        'phone' => $data['guardian_phone'],
-                        'password' => Hash::make('schoolcloud123'),
+                        'name'      => $data['father_name'] ?? ($data['guardian_name'] ?? 'Parent'),
+                        'email'     => $parentEmail,
+                        'phone'     => $data['father_phone'] ?? ($data['guardian_phone'] ?? null),
+                        'password'  => Hash::make('Student@2026!'),
                         'is_active' => true,
                     ]);
                     $parentUser->assignRole('parent');
+                } else {
+                    $parentUser->update([
+                        'name'      => $data['father_name'] ?? ($data['guardian_name'] ?? $parentUser->name),
+                        'phone'     => $data['father_phone'] ?? ($data['guardian_phone'] ?? $parentUser->phone),
+                        'is_active' => true,
+                    ]);
+                    if (!$parentUser->hasRole('parent')) {
+                        $parentUser->assignRole('parent');
+                    }
                 }
             }
 
-            $student->update($data);
+            // 3. Freeze any other existing sessions of this student that don't have session_data yet
+            $academicSessionId = (int) $data['academic_session_id'];
+            $classId = $data['class_id'];
+            $sectionId = $data['section_id'];
+            $rollNumber = $data['roll_number'] ?? $student->roll_number;
+            $sessionProfileKeys = $this->getStudentProfileKeys();
 
-            // Update or create student session for current academic year
-            StudentSession::updateOrCreate(
-                [
-                    'school_id' => $student->school_id,
-                    'student_id' => $student->id,
-                    'academic_session_id' => $data['academic_session_id'],
-                ],
-                [
-                    'class_id' => $data['class_id'],
-                    'section_id' => $data['section_id'],
-                    'roll_number' => $data['roll_number'] ?? $student->roll_number,
-                ]
-            );
+            $otherSessions = StudentSession::where('school_id', $student->school_id)
+                ->where('student_id', $student->id)
+                ->where('academic_session_id', '!=', $academicSessionId)
+                ->get();
+
+            foreach ($otherSessions as $otherSession) {
+                if (empty($otherSession->session_data)) {
+                    $freezeData = [];
+                    foreach ($sessionProfileKeys as $key) {
+                        $freezeData[$key] = $student->getAttribute($key);
+                    }
+                    $otherSession->update(['session_data' => $freezeData]);
+                }
+            }
+
+            // 4. Update or create student session for the specific academic year being edited
+            $targetSession = StudentSession::firstOrNew([
+                'school_id'           => $student->school_id,
+                'student_id'          => $student->id,
+                'academic_session_id' => $academicSessionId,
+            ]);
+
+            $currentSessionData = $targetSession->session_data ?? [];
+            foreach ($sessionProfileKeys as $key) {
+                if (array_key_exists($key, $data)) {
+                    $currentSessionData[$key] = $data[$key];
+                } elseif (!array_key_exists($key, $currentSessionData)) {
+                    $currentSessionData[$key] = $student->getAttribute($key);
+                }
+            }
+
+            $targetSession->class_id     = $classId;
+            $targetSession->section_id   = $sectionId;
+            $targetSession->roll_number  = $rollNumber;
+            $targetSession->session_data = $currentSessionData;
+            $targetSession->save();
+
+            // 5. Update permanent master student identity attributes
+            $dbColumns = \Illuminate\Support\Facades\Schema::getColumnListing('students');
+            $safeData = array_intersect_key($data, array_flip($dbColumns));
+
+            // Check if this edited session is the latest session or current session
+            $latestSessionId = StudentSession::where('school_id', $student->school_id)
+                ->where('student_id', $student->id)
+                ->max('academic_session_id');
+
+            if (!$latestSessionId || $latestSessionId == $academicSessionId || $student->academic_session_id == $academicSessionId) {
+                $safeData['class_id']            = $classId;
+                $safeData['section_id']          = $sectionId;
+                $safeData['roll_number']         = $rollNumber;
+                $safeData['academic_session_id'] = $academicSessionId;
+            } else {
+                // When editing a historical session, keep master pointer to the student's latest active session
+                unset($safeData['class_id'], $safeData['section_id'], $safeData['roll_number'], $safeData['academic_session_id']);
+                // Do not overwrite active profile master fields when editing a historical session
+                foreach ($sessionProfileKeys as $key) {
+                    unset($safeData[$key]);
+                }
+            }
+
+            if (!empty($safeData)) {
+                $student->update($safeData);
+            }
         });
+
+        // Store Student Documents if provided
+        if ($request->hasFile('documents')) {
+            $docFiles = $request->file('documents');
+            $docTypes = $request->input('document_types', []);
+            foreach ($docFiles as $index => $file) {
+                if ($file && $file->isValid()) {
+                    $docType = !empty($docTypes[$index]) ? $docTypes[$index] : 'Other Document';
+                    $path = $file->store('students/documents', 'public');
+                    \App\Models\StudentDocument::create([
+                        'school_id'     => $schoolId,
+                        'student_id'    => $student->id,
+                        'document_type' => $docType,
+                        'file_path'     => $path,
+                        'original_name' => $file->getClientOriginalName(),
+                    ]);
+                }
+            }
+        }
 
         Cache::forget('students_list_version_' . $schoolId);
         Cache::put('students_list_version_' . $schoolId, time(), 86400);
@@ -527,54 +1075,87 @@ class StudentController extends Controller
         return redirect()->route('school.students.index')->with('success', 'Student updated successfully.');
     }
 
-    public function destroy(Student $student)
+    public function destroy(Request $request, Student $student)
     {
         $schoolId = auth()->user()->school_id;
-        $student->update(['is_active' => 0]);
+        $sessionId = $request->input('academic_session_id') ?: $request->get('academic_session_id');
+        if (!$sessionId || $sessionId === 'all') {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $sessionId = $currentSession?->id ?? $student->academic_session_id;
+        }
 
-        // Trigger notification to parent
-        \Illuminate\Support\Facades\Log::info("Parent Notification: Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
-
-        Cache::forget('students_list_version_' . $schoolId);
-        Cache::put('students_list_version_' . $schoolId, time(), 86400);
-
-        return redirect()->route('school.students.index')->with('success', 'Student deactivated successfully. Parent notified.');
+        // Delegate to StudentDeletionRequestController store to enforce approval workflow
+        $controller = app(\App\Http\Controllers\School\Student\StudentDeletionRequestController::class);
+        $request->merge([
+            'student_id'          => $student->id,
+            'academic_session_id' => $sessionId,
+        ]);
+        return $controller->store($request);
     }
 
     public function bulkDestroy(Request $request)
     {
         $schoolId = auth()->user()->school_id;
+        $bulkSessionId = $request->input('academic_session_id');
+        if (!$bulkSessionId || $bulkSessionId === '') {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $bulkSessionId = $currentSession?->id;
+        }
 
         if ($request->boolean('delete_all')) {
             $query = Student::where('school_id', $schoolId);
+            $classId = $request->input('class_id');
+            $sectionId = $request->input('section_id');
 
-            if ($request->filled('class_id')) {
-                $query->where('class_id', $request->input('class_id'));
-            }
-            if ($request->filled('section_id')) {
-                $sectionId = $request->input('section_id');
-                if (is_numeric($sectionId)) {
-                    $query->where('section_id', $sectionId);
-                } else {
-                    $query->whereHas('section', function ($q) use ($sectionId) {
-                        $q->where('name', $sectionId);
-                    });
+            if ($bulkSessionId && $bulkSessionId !== 'all') {
+                $query->whereHas('studentSessions', function ($sq) use ($bulkSessionId, $classId, $sectionId) {
+                    $sq->where('academic_session_id', $bulkSessionId);
+                    if ($classId) {
+                        $sq->where('class_id', $classId);
+                    }
+                    if ($sectionId) {
+                        if (is_numeric($sectionId)) {
+                            $sq->where('section_id', $sectionId);
+                        } else {
+                            $sq->whereHas('section', function ($secQ) use ($sectionId) {
+                                $secQ->where('name', $sectionId);
+                            });
+                        }
+                    }
+                });
+            } else {
+                if ($classId) {
+                    $query->where('class_id', $classId);
+                }
+                if ($sectionId) {
+                    if (is_numeric($sectionId)) {
+                        $query->where('section_id', $sectionId);
+                    } else {
+                        $query->whereHas('section', function ($q) use ($sectionId) {
+                            $query->where('name', $sectionId);
+                        });
+                    }
                 }
             }
-            if ($request->filled('academic_session_id')) {
-                $query->where('academic_session_id', $request->input('academic_session_id'));
-            }
-            if ($request->input('is_active') !== null && $request->input('is_active') !== '') {
+
+            $status = $request->input('status', 'active');
+            if ($status === 'active') {
+                $query->where('is_active', 1)
+                      ->where('is_alumni', 0)
+                      ->where(function($q) {
+                          $q->where('is_transfer', 0)->orWhereNull('is_transfer');
+                      })
+                      ->where(function($q) {
+                          $q->whereNull('tc_number')->orWhere('tc_number', '');
+                      });
+            } elseif ($request->input('is_active') !== null && $request->input('is_active') !== '') {
                 $query->where('is_active', $request->input('is_active'));
             }
+
             if ($request->filled('search')) {
-                $search = $request->input('search');
-                $query->where(function ($q) use ($search) {
-                    $q->where('first_name', 'like', "%{$search}%")
-                      ->orWhere('last_name', 'like', "%{$search}%")
-                      ->orWhere('admission_number', 'like', "%{$search}%")
-                      ->orWhere('roll_number', 'like', "%{$search}%");
-                });
+                SearchHelper::applyStudentSearch($query, $request->input('search'));
             }
 
             $students = $query->get();
@@ -582,8 +1163,8 @@ class StudentController extends Controller
             foreach ($students as $student) {
                 if ($student->is_active) {
                     $student->update(['is_active' => 0]);
+                    \Illuminate\Support\Facades\Log::info("Parent Notification: Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
                     $deactivatedCount++;
-                    \Illuminate\Support\Facades\Log::info("Parent Notification (Bulk - Delete All): Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
                 }
             }
 
@@ -592,7 +1173,7 @@ class StudentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Successfully deactivated {$deactivatedCount} student(s) and notified parent(s)."
+                'message' => "Successfully deactivated {$deactivatedCount} student(s)."
             ]);
         }
 
@@ -610,8 +1191,8 @@ class StudentController extends Controller
         foreach ($students as $student) {
             if ($student->is_active) {
                 $student->update(['is_active' => 0]);
+                \Illuminate\Support\Facades\Log::info("Parent Notification: Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
                 $deactivatedCount++;
-                \Illuminate\Support\Facades\Log::info("Parent Notification (Bulk - Selected): Student {$student->full_name} has been deactivated. Guardian email: {$student->guardian_email}, Phone: {$student->guardian_phone}.");
             }
         }
 
@@ -620,7 +1201,7 @@ class StudentController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Successfully deactivated {$deactivatedCount} student(s) and notified parent(s)."
+            'message' => "Successfully deactivated {$deactivatedCount} student(s)."
         ]);
     }
 
@@ -800,11 +1381,11 @@ class StudentController extends Controller
         $sheet = $spreadsheet->getActiveSheet();
         
         $headers = [
-            'Admission Id', 'Date Of Admission (dd/mm/yyyy)', 'First Name', 'Last Name', 'Class', 'Section', 'Roll Number',
+            'Admission Id', 'Date Of Admission (dd/mm/yyyy)', 'First Name', 'Last Name', 'Class', 'Section', 'Roll Number', 'Academic Year',
             'DOB (dd/mm/yyyy)', 'Gender (M/F)', 'Religion', 'Caste', 'Sub Caste', 'Category (General / OBC / SC / ST)',
             'Sub Category (EWS / Others)', 'Blood Group', 'Any Allergy (Yes/No)', 'Allergy/Medical Condition Description',
             'Birthmark (if any)', 'Adhar Number', 'Father Name', 'Father Mobile Number', 'Father ID', 'Mother Name',
-            'Mother Mobile Number', 'Mother ID', 'House Number', 'Location', 'City', 'State', 'Country', 'Zip',
+            'Mother Mobile Number', 'Mother ID', 'Address', 'City', 'State', 'Country', 'Zip',
             'Emergency Name', 'Emergency Number', 'Emergency Doctor Number', 'Emergency Doctor Detail', 'Email',
             'Admission Type', 'Boarding Type', 'Defence Personal (Yes/No)', 'transport'
         ];
@@ -820,51 +1401,288 @@ class StudentController extends Controller
         ]);
     }
 
-    public function export(Request $request)
+    private function getExportQuery(Request $request)
     {
         $schoolId = auth()->user()->school_id;
-        $query = Student::with(['class', 'section']);
+        $user = auth()->user();
+        $isTeacher = $user && ($user->hasRole('teacher') || $user->role === 'teacher' || $user->hasRole('staff'));
+        $staff = $isTeacher ? $user->staff : null;
 
-        if ($request->get('class_id')) {
-            $query->where('class_id', $request->get('class_id'));
-        }
-        if ($request->get('section_id')) {
-            $query->where('section_id', $request->get('section_id'));
-        }
-        if ($request->get('academic_session_id')) {
-            $query->where('academic_session_id', $request->get('academic_session_id'));
+        $assignedSectionIds = [];
+        if ($staff) {
+            $secIdsFromCt = Section::where('school_id', $schoolId)
+                ->where(function($q) use ($staff) {
+                    $q->where('class_teacher_id', $staff->id)
+                      ->orWhere('assistant_class_teacher_id', $staff->id);
+                })
+                ->pluck('id')->toArray();
+            $secIdsFromSss = \App\Models\SectionSubjectStaff::where('school_id', $schoolId)->where('staff_id', $staff->id)->pluck('section_id')->toArray();
+            $secIdsFromCells = \App\Models\ClassTimetableCell::where('school_id', $schoolId)->where('teacher_id', $staff->id)->pluck('section_id')->toArray();
+            $assignedSectionIds = array_unique(array_filter(array_merge($secIdsFromCt, $secIdsFromSss, $secIdsFromCells)));
         }
 
-        $students = $query->get();
+        $query = Student::where('school_id', $schoolId)->with(['class', 'section', 'academicSession', 'category']);
+
+        if ($staff) {
+            if (count($assignedSectionIds) > 0) {
+                $query->whereIn('section_id', $assignedSectionIds);
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+        }
+
+        $status = $request->get('status', 'active');
+        if ($status === 'deleted') {
+            $query->onlyTrashed();
+        } elseif ($status === 'active') {
+            $query->where('is_active', 1)
+                  ->where('is_alumni', 0)
+                  ->where(function($q) {
+                      $q->where('is_transfer', 0)->orWhereNull('is_transfer');
+                  })
+                  ->where(function($q) {
+                      $q->whereNull('tc_number')->orWhere('tc_number', '');
+                  });
+        } elseif ($status === 'deactivated') {
+            $query->where('is_active', 0)
+                  ->where('is_alumni', 0)
+                  ->where(function($q) {
+                      $q->where('is_transfer', 0)->orWhereNull('is_transfer');
+                  })
+                  ->where(function($q) {
+                      $q->whereNull('tc_number')->orWhere('tc_number', '');
+                  });
+        } elseif ($status === 'transfer') {
+            $query->where(function($q) {
+                $q->where('is_transfer', 1)
+                  ->orWhereNotNull('tc_number')
+                  ->orWhere('tc_number', '!=', '');
+            });
+        } elseif ($status === 'alumni') {
+            $query->where('is_alumni', 1);
+        }
+
+        $exportSessionId = $request->get('academic_session_id');
+        if (!$exportSessionId || $exportSessionId === '') {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $exportSessionId = $currentSession?->id;
+        }
+        $classId = $request->get('class_id');
+        $sectionId = $request->get('section_id');
+
+        if ($exportSessionId && $exportSessionId !== 'all') {
+            $query->whereHas('studentSessions', function ($sq) use ($exportSessionId, $classId, $sectionId) {
+                $sq->where('academic_session_id', $exportSessionId);
+                if ($classId) {
+                    $sq->where('class_id', $classId);
+                }
+                if ($sectionId) {
+                    if (is_numeric($sectionId)) {
+                        $sq->where('section_id', $sectionId);
+                    } else {
+                        $sq->whereHas('section', function ($secQ) use ($sectionId) {
+                            $secQ->where('name', $sectionId);
+                        });
+                    }
+                }
+            });
+        } else {
+            if ($classId) {
+                $query->where('class_id', $classId);
+            }
+            if ($sectionId) {
+                if (is_numeric($sectionId)) {
+                    $query->where('section_id', $sectionId);
+                } else {
+                    $query->whereHas('section', function ($q) use ($sectionId) {
+                        $query->where('name', $sectionId);
+                    });
+                }
+            }
+        }
+        if ($request->get('search')) {
+            SearchHelper::applyStudentSearch($query, $request->get('search'));
+        }
+
+        return $query;
+    }
+
+    public function export(Request $request)
+    {
+        $students = $this->getExportQuery($request)->get();
+        $schoolId = auth()->user()->school_id;
+        $school = \App\Models\School::find($schoolId);
 
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Students Data');
 
-        $headers = ['Admission Number', 'Roll Number', 'Full Name', 'Class', 'Section', 'Guardian Name', 'Guardian Phone', 'Guardian Email', 'Is Active'];
-        $sheet->fromArray($headers, null, 'A1');
+        // Row 1: Header Banner (Navy blue background, white text)
+        $sheet->mergeCells('A1:AQ1');
+        $sheet->setCellValue('A1', strtoupper($school->name ?? 'SCHOOL ERP') . ' - STUDENT MASTER DATA EXPORT');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFFFFF'));
+        $sheet->getStyle('A1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('1E3A8A');
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+        $sheet->getRowDimension(1)->setRowHeight(40);
 
-        $rowIdx = 2;
+        // Row 2: Subtitle Row (Generated date, total records count)
+        $sheet->mergeCells('A2:AQ2');
+        $sheet->setCellValue('A2', 'Generated On: ' . date('d M Y, h:i A') . ' | Total Records: ' . count($students));
+        $sheet->getStyle('A2')->getFont()->setItalic(true)->setSize(10)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('475569'));
+        $sheet->getStyle('A2')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('F1F5F9');
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+        $sheet->getRowDimension(2)->setRowHeight(22);
+
+        // Row 3: Blank gap row
+        $sheet->getRowDimension(3)->setRowHeight(10);
+
+        // Row 4: Column Headers (Blue background, white text, bold)
+        $headers = [
+            'Admission No', 'Date Of Admission', 'First Name', 'Last Name', 'Full Name', 'Class', 'Section', 'Roll Number', 'Academic Year',
+            'DOB', 'Gender', 'Religion', 'Caste', 'Sub Caste', 'Category',
+            'Sub Category', 'Blood Group', 'Any Allergy', 'Medical/Allergy Description',
+            'Birthmark', 'Adhar Number', 'Father Name', 'Father Mobile Number', 'Father ID', 'Mother Name',
+            'Mother Mobile Number', 'Mother ID', 'Address', 'City', 'State', 'Country', 'Zip',
+            'Emergency Name', 'Emergency Number', 'Emergency Doctor Number', 'Emergency Doctor Detail', 'Email',
+            'Admission Type', 'Boarding Type', 'Defence Personal', 'Transport', 'Status'
+        ];
+
+        $sheet->fromArray($headers, null, 'A4');
+        $sheet->getStyle('A4:AQ4')->getFont()->setBold(true)->setSize(11)->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('FFFFFF'));
+        $sheet->getStyle('A4:AQ4')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('1D4ED8');
+        $sheet->getStyle('A4:AQ4')->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER)->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+        $sheet->getStyle('A4:AQ4')->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN)->getColor()->setARGB('1E40AF');
+        $sheet->getRowDimension(4)->setRowHeight(28);
+
+        $exportSessionId = $request->get('academic_session_id');
+        if (!$exportSessionId || $exportSessionId === '') {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $exportSessionId = $currentSession?->id;
+        }
+
+        // Data Rows starting from row 5
+        $rowIdx = 5;
         foreach ($students as $student) {
-            $sheet->fromArray([
-                $student->admission_number,
-                $student->roll_number,
-                $student->full_name,
-                $student->class?->name,
-                $student->section?->name,
-                $student->guardian_name,
-                $student->guardian_phone,
-                $student->guardian_email,
-                $student->is_active ? 'Yes' : 'No'
-            ], null, 'A' . $rowIdx++);
+            $sessionRec = ($exportSessionId && $exportSessionId !== 'all')
+                ? $student->studentSessions->firstWhere('academic_session_id', $exportSessionId)
+                : $student->studentSessions->sortByDesc('academic_session_id')->first();
+
+            $expClass = $sessionRec?->schoolClass?->name ?? ($student->class?->name ?? '—');
+            $expSection = $sessionRec?->section?->name ?? ($student->section?->name ?? '—');
+            $expRoll = $sessionRec?->roll_number ?? ($student->roll_number ?? '—');
+            $expSession = $sessionRec?->academicSession?->name ?? ($student->academicSession?->name ?? ($student->admission_year ?? '—'));
+
+            $rowData = [
+                $student->admission_number ?? '—',
+                $student->admission_date ? \Carbon\Carbon::parse($student->admission_date)->format('d/m/Y') : '—',
+                $sessionRec?->first_name ?? ($student->first_name ?? '—'),
+                $sessionRec?->last_name ?? ($student->last_name ?? '—'),
+                $sessionRec?->full_name ?? ($student->full_name ?? '—'),
+                $expClass,
+                $expSection,
+                $expRoll,
+                $expSession,
+                ($sessionRec?->date_of_birth ?? $student->date_of_birth) ? \Carbon\Carbon::parse($sessionRec?->date_of_birth ?? $student->date_of_birth)->format('d/m/Y') : '—',
+                ucfirst($sessionRec?->gender ?? ($student->gender ?? '—')),
+                $sessionRec?->religion ?? ($student->religion ?? '—'),
+                $sessionRec?->caste ?? ($student->caste ?? '—'),
+                $sessionRec?->sub_caste ?? ($student->sub_caste ?? '—'),
+                $sessionRec?->category_name ?? ($student->category_name ?? ($student->category?->name ?? '—')),
+                $sessionRec?->sub_category ?? ($student->sub_category ?? '—'),
+                $sessionRec?->blood_group ?? ($student->blood_group ?? '—'),
+                $sessionRec?->any_allergy ?? ($student->any_allergy ?? '—'),
+                $sessionRec?->medical_allergies ?? ($student->medical_allergies ?? '—'),
+                $sessionRec?->birthmark ?? ($student->birthmark ?? '—'),
+                $sessionRec?->national_id ?? ($student->national_id ?? '—'),
+                $sessionRec?->father_name ?? ($student->father_name ?? '—'),
+                $sessionRec?->father_phone ?? ($student->father_phone ?? '—'),
+                $sessionRec?->father_id ?? ($student->father_id ?? '—'),
+                $sessionRec?->mother_name ?? ($student->mother_name ?? '—'),
+                $sessionRec?->mother_phone ?? ($student->mother_phone ?? '—'),
+                $sessionRec?->mother_id ?? ($student->mother_id ?? '—'),
+                $sessionRec?->address ?? ($student->address ?? '—'),
+                $sessionRec?->city ?? ($student->city ?? '—'),
+                $sessionRec?->state ?? ($student->state ?? '—'),
+                $sessionRec?->country ?? ($student->country ?? '—'),
+                $sessionRec?->pincode ?? ($student->pincode ?? '—'),
+                $sessionRec?->emergency_name ?? ($student->emergency_name ?? '—'),
+                $sessionRec?->emergency_number ?? ($student->emergency_number ?? '—'),
+                $sessionRec?->medical_doctor_phone ?? ($student->medical_doctor_phone ?? '—'),
+                $sessionRec?->medical_doctor_name ?? ($student->medical_doctor_name ?? '—'),
+                $sessionRec?->email ?? ($student->email ?? '—'),
+                $sessionRec?->admission_type ?? ($student->admission_type ?? '—'),
+                $sessionRec?->boarding_type ?? ($student->boarding_type ?? '—'),
+                $sessionRec?->defence_personal ?? ($student->defence_personal ?? '—'),
+                $sessionRec?->transport_route ?? ($student->transport_route ?? ($student->transport_opted ? 'Yes' : 'No')),
+                ($sessionRec?->is_active ?? $student->is_active) ? 'Active' : 'Inactive'
+            ];
+            $sheet->fromArray($rowData, null, 'A' . $rowIdx);
+
+            // Zebra striping
+            $bgColor = ($rowIdx % 2 == 0) ? 'F8FAFC' : 'FFFFFF';
+            $sheet->getStyle('A' . $rowIdx . ':AQ' . $rowIdx)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB($bgColor);
+            $sheet->getStyle('A' . $rowIdx . ':AQ' . $rowIdx)->getBorders()->getAllBorders()->setBorderStyle(\PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN)->getColor()->setARGB('E2E8F0');
+            $sheet->getStyle('A' . $rowIdx . ':AQ' . $rowIdx)->getFont()->setSize(10);
+            $sheet->getStyle('A' . $rowIdx . ':AQ' . $rowIdx)->getAlignment()->setVertical(\PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER);
+
+            // Colored Status Pill in Column AQ
+            if ($student->is_active) {
+                $sheet->getStyle('AQ' . $rowIdx)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('DCFCE7');
+                $sheet->getStyle('AQ' . $rowIdx)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('15803D'))->setBold(true);
+            } else {
+                $sheet->getStyle('AQ' . $rowIdx)->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FEE2E2');
+                $sheet->getStyle('AQ' . $rowIdx)->getFont()->setColor(new \PhpOffice\PhpSpreadsheet\Style\Color('B91C1C'))->setBold(true);
+            }
+
+            $sheet->getRowDimension($rowIdx)->setRowHeight(22);
+            $rowIdx++;
+        }
+
+        // Auto-size columns up to AQ
+        $highestColumn = $sheet->getHighestColumn();
+        $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
+        for ($col = 1; $col <= $highestColumnIndex; $col++) {
+            $colString = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+            $sheet->getColumnDimension($colString)->setAutoSize(true);
         }
 
         $writer = new Xlsx($spreadsheet);
 
         return response()->streamDownload(function () use ($writer) {
             $writer->save('php://output');
-        }, 'students_export.xlsx', [
+        }, 'students_export_' . date('Y_m_d_His') . '.xlsx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    public function exportPdf(Request $request)
+    {
+        $students = $this->getExportQuery($request)->get();
+        $schoolId = auth()->user()->school_id;
+        $school = \App\Models\School::find($schoolId);
+
+        $exportSessionId = $request->get('academic_session_id');
+        if (!$exportSessionId || $exportSessionId === '') {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $exportSessionId = $currentSession?->id;
+        }
+
+        $sessionObj = ($exportSessionId && $exportSessionId !== 'all') ? AcademicSession::find($exportSessionId) : null;
+        $filters = [
+            'session' => $sessionObj?->name ?? 'All Sessions',
+            'class' => $request->get('class_id') ? SchoolClass::find($request->get('class_id'))?->name : 'All Classes',
+            'section' => $request->get('section_id') ? (is_numeric($request->get('section_id')) ? Section::find($request->get('section_id'))?->name : $request->get('section_id')) : 'All Sections',
+            'status' => ucfirst($request->get('status', 'active')),
+            'search' => $request->get('search') ?? 'None',
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.student.export-pdf', compact('students', 'school', 'filters', 'exportSessionId'))
+                ->setPaper('a3', 'landscape');
+
+        return $pdf->download('students_export_' . date('Y_m_d_His') . '.pdf');
     }
 
     public function promoteForm()
@@ -880,33 +1698,59 @@ class StudentController extends Controller
     {
         $schoolId = auth()->user()->school_id;
         $data = $request->validated();
+        $sessionProfileKeys = $this->getStudentProfileKeys();
 
-        DB::transaction(function () use ($schoolId, $data) {
+        DB::transaction(function () use ($schoolId, $data, $sessionProfileKeys) {
             foreach ($data['student_ids'] as $studentId) {
-                $student = Student::findOrFail($studentId);
+                $student = Student::with('studentSessions')->findOrFail($studentId);
 
-                // Promote student by updating current session records
+                // Build profile snapshot
+                $existingFromSession = $student->studentSessions->firstWhere('academic_session_id', $data['from_session_id']);
+                $profileSnapshot = $existingFromSession?->session_data ?? [];
+                if (empty($profileSnapshot)) {
+                    foreach ($sessionProfileKeys as $key) {
+                        $profileSnapshot[$key] = $student->getAttribute($key);
+                    }
+                }
+
+                // Ensure previous session record exists in student_sessions with snapshot
+                StudentSession::updateOrCreate(
+                    [
+                        'school_id' => $schoolId,
+                        'student_id' => $studentId,
+                        'academic_session_id' => $data['from_session_id'],
+                    ],
+                    [
+                        'class_id' => $existingFromSession?->class_id ?? $student->class_id,
+                        'section_id' => $existingFromSession?->section_id ?? $student->section_id,
+                        'roll_number' => $existingFromSession?->roll_number ?? $student->roll_number,
+                        'is_promoted' => true,
+                        'session_data' => $profileSnapshot,
+                    ]
+                );
+
+                // Promote student by updating main record
                 $student->update([
                     'class_id' => $data['to_class_id'],
                     'section_id' => $data['to_section_id'],
                     'academic_session_id' => $data['to_session_id'],
                 ]);
 
-                // Mark previous session as promoted
-                StudentSession::where('student_id', $studentId)
-                    ->where('academic_session_id', $data['from_session_id'])
-                    ->update(['is_promoted' => true]);
-
                 // Create student session record for new year
-                StudentSession::create([
-                    'school_id' => $schoolId,
-                    'student_id' => $studentId,
-                    'class_id' => $data['to_class_id'],
-                    'section_id' => $data['to_section_id'],
-                    'academic_session_id' => $data['to_session_id'],
-                    'roll_number' => $this->studentNumberService->generateRollNumber($data['to_section_id'], $data['to_session_id']),
-                    'is_promoted' => false,
-                ]);
+                StudentSession::updateOrCreate(
+                    [
+                        'school_id' => $schoolId,
+                        'student_id' => $studentId,
+                        'academic_session_id' => $data['to_session_id'],
+                    ],
+                    [
+                        'class_id' => $data['to_class_id'],
+                        'section_id' => $data['to_section_id'],
+                        'roll_number' => $this->studentNumberService->generateRollNumber($data['to_section_id'], $data['to_session_id']),
+                        'is_promoted' => false,
+                        'session_data' => $profileSnapshot,
+                    ]
+                );
             }
         });
 
@@ -1175,6 +2019,564 @@ class StudentController extends Controller
             'formOnly'
         ));
         $filename = str_replace(['/', '\\'], '_', "admission_form_{$student->admission_number}.pdf");
-        return $pdf->stream($filename);
+        return $pdf->download($filename);
+    }
+
+    public function restore(int $id)
+    {
+        $schoolId = auth()->user()->school_id;
+        $student = Student::onlyTrashed()->where('school_id', $schoolId)->findOrFail($id);
+        
+        // Restore associated student user record if deactivated
+        if ($student->user_id) {
+            $user = \App\Models\User::withTrashed()->find($student->user_id);
+            if ($user) {
+                $user->restore();
+                $user->update(['is_active' => true]);
+            }
+        }
+
+        $student->restore();
+        $student->update(['is_active' => 1]); // Set back to active
+
+        return redirect()->route('school.students.index', ['status' => 'active'])->with('success', 'Student restored successfully.');
+    }
+
+    public function viewDocument(Request $request, $id)
+    {
+        $schoolId = auth()->user()->school_id;
+        $doc = \App\Models\StudentDocument::where('school_id', $schoolId)->findOrFail($id);
+
+        $filePath = $this->resolveDocumentFilePath($doc->file_path);
+        if (!$filePath) {
+            abort(404, 'Document file not found on disk.');
+        }
+
+        $mimeType = @mime_content_type($filePath) ?: 'application/octet-stream';
+        $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        if ($ext === 'pdf') {
+            $mimeType = 'application/pdf';
+        } elseif (in_array($ext, ['jpg', 'jpeg'])) {
+            $mimeType = 'image/jpeg';
+        } elseif ($ext === 'png') {
+            $mimeType = 'image/png';
+        } elseif ($ext === 'webp') {
+            $mimeType = 'image/webp';
+        }
+
+        $filename = $doc->original_name ?: basename($filePath);
+
+        return response()->file($filePath, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
+        ]);
+    }
+
+    public function downloadDocument(Request $request, $id)
+    {
+        $schoolId = auth()->user()->school_id;
+        $doc = \App\Models\StudentDocument::where('school_id', $schoolId)->findOrFail($id);
+
+        $filePath = $this->resolveDocumentFilePath($doc->file_path);
+        if (!$filePath) {
+            abort(404, 'Document file not found on disk.');
+        }
+
+        $filename = $doc->original_name ?: basename($filePath);
+        return response()->download($filePath, $filename);
+    }
+
+    private function resolveDocumentFilePath(?string $path): ?string
+    {
+        if (empty($path)) {
+            return null;
+        }
+
+        $cleanPath = ltrim(str_replace(['public/', 'storage/', 'uploads/'], '', $path), '/\\');
+
+        $candidates = [
+            storage_path('app/public/' . $cleanPath),
+            storage_path('app/' . $cleanPath),
+            public_path('storage/' . $cleanPath),
+            public_path('uploads/' . $cleanPath),
+            storage_path('app/public/' . $path),
+            storage_path('app/' . $path),
+            public_path('storage/' . $path),
+            public_path('uploads/' . $path),
+            public_path($cleanPath),
+            public_path($path),
+        ];
+
+        foreach ($candidates as $cand) {
+            if (file_exists($cand) && is_file($cand)) {
+                return $cand;
+            }
+        }
+
+        $defaultDisk = config('filesystems.default', 'public');
+        if (Storage::disk($defaultDisk)->exists($path)) {
+            return Storage::disk($defaultDisk)->path($path);
+        }
+        if (Storage::disk('public')->exists($path)) {
+            return Storage::disk('public')->path($path);
+        }
+        if (Storage::disk('local')->exists($path)) {
+            return Storage::disk('local')->path($path);
+        }
+
+        return null;
+    }
+
+    /**
+     * Helper to resolve active school ID considering impersonation / multi-tenancy session
+     */
+    protected function getResolvedSchoolId(): ?int
+    {
+        if (app()->bound('currentSchool') && app('currentSchool')) {
+            return (int) app('currentSchool')->id;
+        }
+
+        if (session()->has('school_id') && session('school_id')) {
+            return (int) session('school_id');
+        }
+
+        if (session()->has('school_code') && session('school_code')) {
+            $s = \App\Models\School::where('code', session('school_code'))->first();
+            if ($s) {
+                return (int) $s->id;
+            }
+        }
+
+        return auth()->user()?->school_id ? (int) auth()->user()->school_id : null;
+    }
+
+    public function bulkEdit(Request $request)
+    {
+        $schoolId = $this->getResolvedSchoolId();
+        
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+            ?? AcademicSession::where('school_id', $schoolId)->first();
+
+        $reqSessionId = $request->get('academic_session_id');
+        if ($reqSessionId && is_numeric($reqSessionId) && AcademicSession::where('school_id', $schoolId)->where('id', $reqSessionId)->exists()) {
+            $selectedSessionId = (int) $reqSessionId;
+        } else {
+            $selectedSessionId = $currentSession?->id;
+        }
+
+        $classId = $request->get('class_id');
+        $sectionId = $request->get('section_id');
+        $search = $request->get('search');
+        $status = $request->get('status', 'active');
+
+        $query = Student::where('school_id', $schoolId)
+            ->with([
+                'studentSessions' => function ($sq) use ($selectedSessionId) {
+                    if ($selectedSessionId) {
+                        $sq->where('academic_session_id', $selectedSessionId);
+                    }
+                }
+            ]);
+
+        if ($status === 'active') {
+            $query->where('is_active', true)->where('is_alumni', 0);
+        } elseif ($status === 'inactive') {
+            $query->where('is_active', false)->where('is_alumni', 0);
+        }
+
+        if ($selectedSessionId && $selectedSessionId !== 'all') {
+            $query->where(function ($q) use ($selectedSessionId, $classId, $sectionId, $schoolId) {
+                $q->whereHas('studentSessions', function ($sq) use ($selectedSessionId, $classId, $sectionId, $schoolId) {
+                    $sq->where('academic_session_id', $selectedSessionId)
+                       ->where('school_id', $schoolId);
+                    if ($classId) {
+                        $sq->where('class_id', $classId);
+                    }
+                    if ($sectionId) {
+                        if (is_numeric($sectionId)) {
+                            $sq->where('section_id', $sectionId);
+                        } else {
+                            $sq->whereHas('section', function ($secQ) use ($sectionId) {
+                                $secQ->where('name', $sectionId);
+                            });
+                        }
+                    }
+                })->orWhere(function ($sq) use ($selectedSessionId, $classId, $sectionId, $schoolId) {
+                    $sq->where('school_id', $schoolId)
+                       ->where('academic_session_id', $selectedSessionId)
+                       ->doesntHave('studentSessions');
+                    if ($classId) {
+                        $sq->where('class_id', $classId);
+                    }
+                    if ($sectionId) {
+                        if (is_numeric($sectionId)) {
+                            $sq->where('section_id', $sectionId);
+                        } else {
+                            $sq->whereHas('section', function ($secQ) use ($sectionId) {
+                                $secQ->where('name', $sectionId);
+                            });
+                        }
+                    }
+                });
+            });
+        } else {
+            if ($classId) {
+                $query->where('class_id', $classId);
+            }
+            if ($sectionId) {
+                if (is_numeric($sectionId)) {
+                    $query->where('section_id', $sectionId);
+                } else {
+                    $query->whereHas('section', function ($secQ) use ($sectionId) {
+                        $secQ->where('name', $sectionId);
+                    });
+                }
+            }
+        }
+
+        if ($search) {
+            SearchHelper::applyStudentSearch($query, $search, '', $selectedSessionId);
+        }
+
+        // Limit to max 500 records per view for maximum DOM rendering speed
+        $students = $query->orderBy('class_id', 'asc')
+            ->orderBy('section_id', 'asc')
+            ->orderBy('roll_number', 'asc')
+            ->orderBy('first_name', 'asc')
+            ->limit(500)
+            ->get();
+
+        // Sort collection class-wise and section-wise taking session records into account
+        if ($selectedSessionId && $selectedSessionId !== 'all') {
+            $students = $students->sort(function ($a, $b) use ($selectedSessionId) {
+                $aSession = $a->studentSessions->firstWhere('academic_session_id', $selectedSessionId);
+                $bSession = $b->studentSessions->firstWhere('academic_session_id', $selectedSessionId);
+
+                $aClass = $aSession?->class_id ?? $a->class_id ?? 0;
+                $bClass = $bSession?->class_id ?? $b->class_id ?? 0;
+                if ($aClass != $bClass) {
+                    return $aClass <=> $bClass;
+                }
+
+                $aSec = $aSession?->section_id ?? $a->section_id ?? 0;
+                $bSec = $bSession?->section_id ?? $b->section_id ?? 0;
+                if ($aSec != $bSec) {
+                    return $aSec <=> $bSec;
+                }
+
+                $aRoll = (int) ($aSession?->roll_number ?? $a->roll_number ?? 0);
+                $bRoll = (int) ($bSession?->roll_number ?? $b->roll_number ?? 0);
+                if ($aRoll != $bRoll) {
+                    return $aRoll <=> $bRoll;
+                }
+
+                return strcasecmp($a->first_name ?? '', $b->first_name ?? '');
+            })->values();
+        }
+
+        $classes = Cache::remember("school_{$schoolId}_classes", 60, function () use ($schoolId) {
+            return SchoolClass::where('school_id', $schoolId)->orderBy('id')->get();
+        });
+
+        $allSections = Cache::remember("school_{$schoolId}_sections", 60, function () use ($schoolId) {
+            return Section::where('school_id', $schoolId)->orderBy('name')->get();
+        });
+
+        $sections = $classId
+            ? $allSections->where('class_id', $classId)
+            : $allSections;
+
+        $categories = Cache::remember("school_{$schoolId}_categories", 60, function () use ($schoolId) {
+            return StudentCategory::where('school_id', $schoolId)->get();
+        });
+
+        $academicSessions = Cache::remember("school_{$schoolId}_sessions", 60, function () use ($schoolId) {
+            return AcademicSession::where('school_id', $schoolId)->orderBy('id', 'desc')->get();
+        });
+
+        return view('school.student.bulk-edit', compact(
+            'students',
+            'classes',
+            'sections',
+            'allSections',
+            'categories',
+            'academicSessions',
+            'selectedSessionId',
+            'classId',
+            'sectionId',
+            'search',
+            'status'
+        ));
+    }
+
+    public function bulkUpdate(Request $request)
+    {
+        $schoolId = $this->getResolvedSchoolId();
+        $studentDataArray = $request->input('students', []);
+        $selectedSessionId = $request->input('academic_session_id');
+
+        if (!$selectedSessionId || $selectedSessionId === '') {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $selectedSessionId = $currentSession?->id;
+        } else {
+            $selectedSessionId = (int) $selectedSessionId;
+        }
+
+        if (empty($studentDataArray) || !is_array($studentDataArray)) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'No student records were modified or submitted.'], 400);
+            }
+            return redirect()->back()->with('error', 'No student records were modified or submitted.');
+        }
+
+        $studentIds = array_keys($studentDataArray);
+        $sessionProfileKeys = $this->getStudentProfileKeys();
+
+        DB::beginTransaction();
+        try {
+            // Eager load all requested students with their sessions in 1 query
+            $studentsMap = Student::where('school_id', $schoolId)
+                ->whereIn('id', $studentIds)
+                ->with(['studentSessions'])
+                ->get()
+                ->keyBy('id');
+
+            $updatedCount = 0;
+
+            foreach ($studentDataArray as $id => $data) {
+                $student = $studentsMap->get($id);
+                if (!$student) {
+                    continue;
+                }
+
+                // 1. Freeze other sessions of this student that don't have session_data yet
+                if ($selectedSessionId) {
+                    foreach ($student->studentSessions as $existingSession) {
+                        if ((int)$existingSession->academic_session_id !== (int)$selectedSessionId && empty($existingSession->session_data)) {
+                            $freezeData = [];
+                            foreach ($sessionProfileKeys as $key) {
+                                $freezeData[$key] = $student->getAttribute($key);
+                            }
+                            $existingSession->update(['session_data' => $freezeData]);
+                        }
+                    }
+                }
+
+                // Clean and normalize incoming data
+                $normalized = [];
+                foreach ($data as $k => $v) {
+                    if ($v === '' || $v === null) {
+                        $normalized[$k] = null;
+                    } else {
+                        $normalized[$k] = $v;
+                    }
+                }
+
+                // Handle Photo Action (remove or update base64)
+                $photoAction = $normalized['photo_action'] ?? null;
+                $photoData = $normalized['photo'] ?? null;
+
+                if ($photoAction === 'remove') {
+                    $student->photo = null;
+                    $normalized['photo'] = null;
+                } elseif ($photoAction === 'update' && !empty($photoData) && str_starts_with($photoData, 'data:image')) {
+                    $savedPath = $this->saveBase64Photo($photoData, 'students/photos');
+                    if ($savedPath) {
+                        $student->photo = $savedPath;
+                        $normalized['photo'] = $savedPath;
+                    }
+                }
+
+                // Non-nullable string fields in students table should default to empty string instead of NULL
+                $nonNullableStringFields = [
+                    'last_name', 'address', 'father_name', 'mother_name',
+                    'guardian_name', 'guardian_phone', 'city', 'state', 'pincode'
+                ];
+                foreach ($nonNullableStringFields as $field) {
+                    if (array_key_exists($field, $normalized) && $normalized[$field] === null) {
+                        $normalized[$field] = '';
+                    }
+                }
+
+                // Foreign key columns must be valid integers or null
+                $foreignKeyFields = ['category_id', 'class_id', 'section_id', 'house_id'];
+                foreach ($foreignKeyFields as $fk) {
+                    if (array_key_exists($fk, $normalized)) {
+                        $normalized[$fk] = (!empty($normalized[$fk])) ? (int) $normalized[$fk] : null;
+                    }
+                }
+
+                // Enum normalization
+                if (array_key_exists('gender', $normalized) && $normalized['gender']) {
+                    $normalized['gender'] = strtolower($normalized['gender']);
+                }
+
+                // 2. Load or create target session record
+                $targetSession = $selectedSessionId
+                    ? $student->studentSessions->firstWhere('academic_session_id', $selectedSessionId)
+                    : null;
+
+                if (!$targetSession && $selectedSessionId) {
+                    $targetSession = new StudentSession([
+                        'school_id'           => $schoolId,
+                        'student_id'          => $student->id,
+                        'academic_session_id' => $selectedSessionId,
+                        'class_id'            => $normalized['class_id'] ?? $student->class_id,
+                        'section_id'          => $normalized['section_id'] ?? $student->section_id,
+                        'roll_number'         => $normalized['roll_number'] ?? $student->roll_number,
+                    ]);
+                }
+
+                $currentSessionData = $targetSession ? ($targetSession->session_data ?? []) : [];
+
+                foreach ($normalized as $key => $val) {
+                    if (in_array($key, $sessionProfileKeys)) {
+                        $currentSessionData[$key] = $val;
+                    }
+                }
+
+                if ($targetSession) {
+                    if (array_key_exists('class_id', $normalized) && $normalized['class_id']) {
+                        $targetSession->class_id = $normalized['class_id'];
+                    }
+                    if (array_key_exists('section_id', $normalized) && $normalized['section_id']) {
+                        $targetSession->section_id = $normalized['section_id'];
+                    }
+                    if (array_key_exists('roll_number', $normalized)) {
+                        $targetSession->roll_number = $normalized['roll_number'];
+                    }
+                    // Ensure class_id and section_id are never null on StudentSession
+                    if (!$targetSession->class_id) {
+                        $targetSession->class_id = $student->class_id;
+                    }
+                    if (!$targetSession->section_id) {
+                        $targetSession->section_id = $student->section_id;
+                    }
+
+                    $targetSession->session_data = $currentSessionData;
+                    $targetSession->save();
+                }
+
+                // 3. Update master student record
+                $dbColumns = \Illuminate\Support\Facades\Schema::getColumnListing('students');
+                $safeData = array_intersect_key($normalized, array_flip($dbColumns));
+
+                // Avoid overwriting critical required columns with empty values if existing
+                // and guarantee admission numbers cannot be changed via bulk update
+                unset($safeData['admission_number']);
+                unset($safeData['admission_sequence']);
+                unset($safeData['admission_year']);
+                if (empty($safeData['first_name'])) {
+                    unset($safeData['first_name']);
+                }
+                if (empty($safeData['date_of_birth'])) {
+                    unset($safeData['date_of_birth']);
+                }
+                if (empty($safeData['class_id'])) {
+                    unset($safeData['class_id']);
+                }
+                if (empty($safeData['section_id'])) {
+                    unset($safeData['section_id']);
+                }
+                if (array_key_exists('is_active', $safeData) && $safeData['is_active'] !== null) {
+                    $safeData['is_active'] = (bool) $safeData['is_active'];
+                }
+
+                // Determine if this session is the active/latest session
+                $latestSessionId = StudentSession::where('school_id', $schoolId)
+                    ->where('student_id', $student->id)
+                    ->max('academic_session_id');
+
+                $isCurrentOrLatest = (!$selectedSessionId || !$latestSessionId || (int)$latestSessionId === (int)$selectedSessionId || (int)$student->academic_session_id === (int)$selectedSessionId);
+
+                if ($isCurrentOrLatest) {
+                    if (!empty($normalized['class_id'])) {
+                        $safeData['class_id'] = $normalized['class_id'];
+                    }
+                    if (!empty($normalized['section_id'])) {
+                        $safeData['section_id'] = $normalized['section_id'];
+                    }
+                    if (array_key_exists('roll_number', $normalized)) {
+                        $safeData['roll_number'] = $normalized['roll_number'];
+                    }
+                    if ($selectedSessionId) {
+                        $safeData['academic_session_id'] = $selectedSessionId;
+                    }
+                } else {
+                    // For historical session, keep master enrollment pointers intact
+                    unset($safeData['class_id'], $safeData['section_id'], $safeData['roll_number'], $safeData['academic_session_id']);
+                }
+
+                if (!empty($safeData)) {
+                    $student->update($safeData);
+                }
+
+                $updatedCount++;
+            }
+
+            DB::commit();
+
+            Cache::forget('students_list_version_' . $schoolId);
+            Cache::put('students_list_version_' . $schoolId, time(), 86400);
+
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "{$updatedCount} student record(s) updated successfully!"
+                ]);
+            }
+
+            return redirect()->route('school.students.bulk-edit', $request->only(['class_id', 'section_id', 'search', 'status', 'academic_session_id']))
+                ->with('success', "Successfully updated {$updatedCount} student record(s)!");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('error', 'Failed to update student records: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get list of profile field keys to store and isolate per academic session.
+     */
+    protected function getStudentProfileKeys(): array
+    {
+        return [
+            'first_name', 'last_name', 'first_name_local', 'last_name_local', 'email', 'phone',
+            'date_of_birth', 'gender', 'place_of_birth', 'birth_certificate_no', 'usn_srn_number',
+            'blood_group', 'religion', 'nationality', 'caste', 'sub_caste', 'family_id', 'category_id',
+            'group', 'house_id', 'house_role', 'photo', 'biometric_id', 'pen_number', 'apaar_id',
+            'samagra_id', 'class_at_admission', 'enrollment_number', 'tc_number', 'transport_month',
+            'transport_route', 'transport_vehicle_code', 'transport_stop', 'transport_drop_vehicle_code',
+            'prev_school', 'prev_city_country', 'prev_year_attended', 'prev_board', 'prev_reg_no',
+            'prev_pcm_marks', 'prev_pcm_percentage', 'prev_total_marks', 'prev_average',
+            'entrance_exam_name', 'entrance_exam_rank', 'entrance_exam_remarks', 'disciplinary_action',
+            'disciplinary_action_reason', 'asked_to_leave', 'asked_to_leave_reason', 'special_needs',
+            'special_needs_reason', 'interests_talents', 'interests_talents_reason', 'represented_school',
+            'represented_school_reason', 'other_info', 'other_info_reason',
+            'father_name', 'father_phone', 'father_alternate_phone', 'father_email', 'father_occupation',
+            'father_id', 'father_aadhar', 'father_income', 'father_qualification', 'father_passport',
+            'father_address', 'father_photo',
+            'mother_name', 'mother_phone', 'mother_alternate_phone', 'mother_email', 'mother_occupation',
+            'mother_id', 'mother_aadhar', 'mother_income', 'mother_qualification', 'mother_passport',
+            'mother_address', 'mother_office_address', 'mother_photo',
+            'guardian_name', 'guardian_phone', 'guardian_email', 'guardian_relationship', 'guardian_occupation',
+            'guardian_photo', 'guardian_passport', 'guardian_name_local', 'guardian_address',
+            'whatsapp_number', 'address', 'address_line_2', 'city', 'state', 'country', 'pincode', 'region',
+            'permanent_address', 'permanent_address_line_2', 'permanent_house_number', 'permanent_location',
+            'permanent_city', 'permanent_state', 'permanent_country', 'permanent_pincode', 'permanent_region',
+            'is_active', 'fee_visible', 'opening_due_balance', 'custom_fields', 'sub_category',
+            'any_allergy', 'birthmark', 'house_number', 'location', 'emergency_name', 'emergency_number',
+            'admission_type', 'boarding_type', 'defence_personal', 'is_rte', 'fee_schedule_id',
+            'transport_opted', 'transport_route_id', 'transport_pick_fare', 'transport_drop_fare',
+            'transport_pickup_location', 'transport_drop_location', 'transport_pickup_time', 'transport_drop_time',
+            'transport_calendar_start', 'is_alumni', 'is_transfer', 'note', 'medical_height', 'medical_weight',
+            'medical_vision_left', 'medical_vision_right', 'medical_dental', 'medical_illness', 'medical_history',
+            'medical_allergies', 'medical_disabilities', 'medical_doctor_name', 'medical_doctor_phone', 'medical_doctor_address'
+        ];
     }
 }
+
+

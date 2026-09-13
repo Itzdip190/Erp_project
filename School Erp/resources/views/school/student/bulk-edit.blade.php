@@ -423,6 +423,98 @@
     body.dark-mode .cell-input, body.dark-mode .cell-select {
         color: #f8fafc;
     }
+
+    /* Photo Column Styles */
+    .photo-col-cell {
+        text-align: center;
+        vertical-align: middle !important;
+        padding: 4px 6px !important;
+        width: 65px;
+        min-width: 65px;
+    }
+    .student-photo-cell {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+    }
+    .student-photo-cell input[type="file"] {
+        display: none !important;
+    }
+    .photo-preview-wrap {
+        position: relative;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: #f1f5f9;
+        border: 1.5px solid #cbd5e1;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .photo-preview-wrap:hover {
+        border-color: #107c41;
+        box-shadow: 0 2px 8px rgba(16, 124, 65, 0.28);
+    }
+    .student-thumb-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .photo-actions-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.75);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+        border-radius: 50%;
+    }
+    .photo-preview-wrap:hover .photo-actions-overlay,
+    .student-photo-cell.is-active .photo-actions-overlay {
+        opacity: 1;
+    }
+    .photo-btn-upload, .photo-btn-remove {
+        width: 22px;
+        height: 22px;
+        border-radius: 4px;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        color: #ffffff;
+        cursor: pointer;
+        transition: transform 0.15s ease, background-color 0.15s ease;
+        margin: 0;
+        padding: 0;
+    }
+    .photo-btn-upload {
+        background: #107c41;
+    }
+    .photo-btn-upload:hover {
+        background: #0d6535;
+        transform: scale(1.15);
+    }
+    .photo-btn-remove {
+        background: #ef4444;
+    }
+    .photo-btn-remove:hover {
+        background: #dc2626;
+        transform: scale(1.15);
+    }
+    body.dark-mode .photo-preview-wrap {
+        background: #0f172a;
+        border-color: #334155;
+    }
 </style>
 @endsection
 
@@ -528,6 +620,7 @@
                     <thead>
                         <tr>
                             <th class="col-num">#</th>
+                            <th style="min-width: 80px; text-align: center;">Photo</th>
                             
                             <th style="min-width: 130px;">
                                 <div class="th-content">
@@ -706,48 +799,79 @@
                                 $sessionRec = $selectedSessionId
                                     ? $student->studentSessions->firstWhere('academic_session_id', $selectedSessionId)
                                     : $student->studentSessions->sortByDesc('academic_session_id')->first();
+                                $sData = is_array($sessionRec?->session_data) ? $sessionRec->session_data : [];
+
                                 $bRoll = $sessionRec?->roll_number ?? $student->roll_number;
-                                $bFirstName = $sessionRec?->first_name ?? $student->first_name;
-                                $bLastName = $sessionRec?->last_name ?? $student->last_name;
                                 $bClassId = $sessionRec?->class_id ?? $student->class_id;
                                 $bSectionId = $sessionRec?->section_id ?? $student->section_id;
-                                $bGender = $sessionRec?->gender ?? $student->gender;
-                                $bDob = $sessionRec?->date_of_birth ?? $student->date_of_birth;
-                                $bPhone = $sessionRec?->phone ?? $student->phone;
-                                $bFatherName = $sessionRec?->father_name ?? $student->father_name;
-                                $bFatherPhone = $sessionRec?->father_phone ?? $student->father_phone;
-                                $bMotherName = $sessionRec?->mother_name ?? $student->mother_name;
-                                $bCategoryId = $sessionRec?->category_id ?? $student->category_id;
-                                $bBloodGroup = $sessionRec?->blood_group ?? $student->blood_group;
-                                $bNationalId = $sessionRec?->national_id ?? $student->national_id;
-                                $bAddress = $sessionRec?->address ?? $student->address;
+                                $bFirstName = (array_key_exists('first_name', $sData) && $sData['first_name'] !== null) ? $sData['first_name'] : $student->first_name;
+                                $bLastName = (array_key_exists('last_name', $sData) && $sData['last_name'] !== null) ? $sData['last_name'] : $student->last_name;
+                                $bGender = (array_key_exists('gender', $sData) && $sData['gender'] !== null) ? $sData['gender'] : $student->gender;
+                                $bDob = (array_key_exists('date_of_birth', $sData) && $sData['date_of_birth'] !== null) ? $sData['date_of_birth'] : $student->date_of_birth;
+                                $bPhone = (array_key_exists('phone', $sData) && $sData['phone'] !== null) ? $sData['phone'] : $student->phone;
+                                $bFatherName = (array_key_exists('father_name', $sData) && $sData['father_name'] !== null) ? $sData['father_name'] : $student->father_name;
+                                $bFatherPhone = (array_key_exists('father_phone', $sData) && $sData['father_phone'] !== null) ? $sData['father_phone'] : $student->father_phone;
+                                $bMotherName = (array_key_exists('mother_name', $sData) && $sData['mother_name'] !== null) ? $sData['mother_name'] : $student->mother_name;
+                                $bCategoryId = (array_key_exists('category_id', $sData) && $sData['category_id'] !== null) ? $sData['category_id'] : $student->category_id;
+                                $bBloodGroup = (array_key_exists('blood_group', $sData) && $sData['blood_group'] !== null) ? $sData['blood_group'] : $student->blood_group;
+                                $bNationalId = (array_key_exists('national_id', $sData) && $sData['national_id'] !== null) ? $sData['national_id'] : $student->national_id;
+                                $bAddress = (array_key_exists('address', $sData) && $sData['address'] !== null) ? $sData['address'] : $student->address;
                                 $bIsActive = ($sessionRec && $sessionRec->is_active !== null) ? $sessionRec->is_active : $student->is_active;
+
+                                $photoPath = (array_key_exists('photo', $sData) && $sData['photo']) ? $sData['photo'] : $student->photo;
+                                $defaultAvatarSvg = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+                                if ($photoPath) {
+                                    $photoUrl = (str_starts_with($photoPath, 'http') || str_starts_with($photoPath, 'data:image'))
+                                        ? $photoPath
+                                        : \Illuminate\Support\Facades\Storage::disk('public')->url($photoPath);
+                                } else {
+                                    $photoUrl = $defaultAvatarSvg;
+                                }
                             @endphp
                             <tr data-student-id="{{ $student->id }}">
                                 <td class="col-num">{{ $index + 1 }}</td>
 
-                                <td>
-                                    <input type="text" data-field="admission_number" class="cell-input" value="{{ $student->admission_number }}" required oninput="markCellModified(this)">
+                                <td class="photo-col-cell">
+                                    <div class="student-photo-cell" id="photo_cell_{{ $student->id }}">
+                                        <div class="photo-preview-wrap" title="Click to upload / change photo" onclick="triggerPhotoUpload({{ $student->id }})">
+                                            <img src="{{ $photoUrl }}" class="student-thumb-img" id="photo_preview_{{ $student->id }}" alt="Photo" onerror="this.onerror=null; this.src='{{ $defaultAvatarSvg }}';">
+                                            <div class="photo-actions-overlay" onclick="event.stopPropagation()">
+                                                <button type="button" class="photo-btn-upload" title="Upload / Change Photo" onclick="triggerPhotoUpload({{ $student->id }})">
+                                                    <i class="fas fa-camera"></i>
+                                                </button>
+                                                <button type="button" class="photo-btn-remove {{ empty($photoPath) ? 'd-none' : '' }}" id="photo_remove_btn_{{ $student->id }}" title="Remove Photo" onclick="onPhotoRemove({{ $student->id }})">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <input type="file" accept="image/jpeg,image/png,image/webp,image/jpg" style="display: none !important;" id="photo_file_{{ $student->id }}" onchange="onPhotoSelected(this, {{ $student->id }})">
+                                        <input type="hidden" data-field="photo" id="photo_input_{{ $student->id }}" value="">
+                                        <input type="hidden" data-field="photo_action" id="photo_action_{{ $student->id }}" value="">
+                                    </div>
                                 </td>
-                                <td>
-                                    <input type="text" data-field="roll_number" class="cell-input" value="{{ $bRoll }}" oninput="markCellModified(this)">
+
+                                <td class="col-locked">
+                                    <input type="text" data-field="admission_number" class="cell-input" value="{{ $student->admission_number }}" required readonly oninput="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <input type="text" data-field="first_name" class="cell-input" value="{{ $bFirstName }}" required oninput="markCellModified(this)">
+                                <td class="col-locked">
+                                    <input type="text" data-field="roll_number" class="cell-input" value="{{ $bRoll }}" readonly oninput="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <input type="text" data-field="last_name" class="cell-input" value="{{ $bLastName }}" oninput="markCellModified(this)">
+                                <td class="col-locked">
+                                    <input type="text" data-field="first_name" class="cell-input" value="{{ $bFirstName }}" required readonly oninput="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <select data-field="class_id" class="cell-select row-class-select" onchange="onRowClassChange(this)">
+                                <td class="col-locked">
+                                    <input type="text" data-field="last_name" class="cell-input" value="{{ $bLastName }}" readonly oninput="markCellModified(this)">
+                                </td>
+                                <td class="col-locked">
+                                    <select data-field="class_id" class="cell-select row-class-select" disabled onchange="onRowClassChange(this)">
                                         <option value="">-- None --</option>
                                         @foreach($classes as $cls)
                                             <option value="{{ $cls->id }}" {{ $bClassId == $cls->id ? 'selected' : '' }}>{{ $cls->name }}</option>
                                         @endforeach
                                     </select>
                                 </td>
-                                <td>
-                                    <select data-field="section_id" class="cell-select row-section-select" onchange="markCellModified(this)">
+                                <td class="col-locked">
+                                    <select data-field="section_id" class="cell-select row-section-select" disabled onchange="markCellModified(this)">
                                         <option value="">-- None --</option>
                                         @if($bClassId)
                                             @foreach($allSections->where('class_id', $bClassId) as $sec)
@@ -760,53 +884,53 @@
                                         @endif
                                     </select>
                                 </td>
-                                <td>
-                                    <select data-field="gender" class="cell-select" onchange="markCellModified(this)">
+                                <td class="col-locked">
+                                    <select data-field="gender" class="cell-select" disabled onchange="markCellModified(this)">
                                         <option value="">-- Select --</option>
                                         <option value="Male" {{ strtolower($bGender ?? '') === 'male' ? 'selected' : '' }}>Male</option>
                                         <option value="Female" {{ strtolower($bGender ?? '') === 'female' ? 'selected' : '' }}>Female</option>
                                         <option value="Other" {{ strtolower($bGender ?? '') === 'other' ? 'selected' : '' }}>Other</option>
                                     </select>
                                 </td>
-                                <td>
-                                    <input type="date" data-field="date_of_birth" class="cell-input" value="{{ $bDob ? \Carbon\Carbon::parse($bDob)->format('Y-m-d') : '' }}" onchange="markCellModified(this)">
+                                <td class="col-locked">
+                                    <input type="date" data-field="date_of_birth" class="cell-input" value="{{ $bDob ? \Carbon\Carbon::parse($bDob)->format('Y-m-d') : '' }}" readonly onchange="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <input type="text" data-field="phone" class="cell-input" value="{{ $bPhone }}" oninput="markCellModified(this)">
+                                <td class="col-locked">
+                                    <input type="text" data-field="phone" class="cell-input" value="{{ $bPhone }}" readonly oninput="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <input type="text" data-field="father_name" class="cell-input" value="{{ $bFatherName }}" oninput="markCellModified(this)">
+                                <td class="col-locked">
+                                    <input type="text" data-field="father_name" class="cell-input" value="{{ $bFatherName }}" readonly oninput="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <input type="text" data-field="father_phone" class="cell-input" value="{{ $bFatherPhone }}" oninput="markCellModified(this)">
+                                <td class="col-locked">
+                                    <input type="text" data-field="father_phone" class="cell-input" value="{{ $bFatherPhone }}" readonly oninput="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <input type="text" data-field="mother_name" class="cell-input" value="{{ $bMotherName }}" oninput="markCellModified(this)">
+                                <td class="col-locked">
+                                    <input type="text" data-field="mother_name" class="cell-input" value="{{ $bMotherName }}" readonly oninput="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <select data-field="category_id" class="cell-select" onchange="markCellModified(this)">
+                                <td class="col-locked">
+                                    <select data-field="category_id" class="cell-select" disabled onchange="markCellModified(this)">
                                         <option value="">-- None --</option>
                                         @foreach($categories as $cat)
                                             <option value="{{ $cat->id }}" {{ $bCategoryId == $cat->id ? 'selected' : '' }}>{{ $cat->name }}</option>
                                         @endforeach
                                     </select>
                                 </td>
-                                <td>
-                                    <select data-field="blood_group" class="cell-select" onchange="markCellModified(this)">
+                                <td class="col-locked">
+                                    <select data-field="blood_group" class="cell-select" disabled onchange="markCellModified(this)">
                                         <option value="">-- None --</option>
                                         @foreach(['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'] as $bg)
                                             <option value="{{ $bg }}" {{ $bBloodGroup === $bg ? 'selected' : '' }}>{{ $bg }}</option>
                                         @endforeach
                                     </select>
                                 </td>
-                                <td>
-                                    <input type="text" data-field="national_id" class="cell-input" value="{{ $bNationalId }}" oninput="markCellModified(this)">
+                                <td class="col-locked">
+                                    <input type="text" data-field="national_id" class="cell-input" value="{{ $bNationalId }}" readonly oninput="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <input type="text" data-field="address" class="cell-input" value="{{ $bAddress }}" oninput="markCellModified(this)">
+                                <td class="col-locked">
+                                    <input type="text" data-field="address" class="cell-input" value="{{ $bAddress }}" readonly oninput="markCellModified(this)">
                                 </td>
-                                <td>
-                                    <select data-field="is_active" class="cell-select" onchange="markCellModified(this)">
+                                <td class="col-locked">
+                                    <select data-field="is_active" class="cell-select" disabled onchange="markCellModified(this)">
                                         <option value="1" {{ $bIsActive ? 'selected' : '' }}>Active</option>
                                         <option value="0" {{ !$bIsActive ? 'selected' : '' }}>Inactive</option>
                                     </select>
@@ -814,7 +938,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="18" class="text-center py-5 text-muted">
+                                <td colspan="19" class="text-center py-5 text-muted">
                                     <i class="fas fa-inbox fs-2 mb-2 d-block text-secondary"></i>
                                     No student records found matching your filters.
                                 </td>
@@ -1026,7 +1150,9 @@
             if (response.ok && result.success) {
                 showToast(result.message || 'Saved successfully!');
                 
-                // Clear modified indicators
+                // Clear modified indicators & photo action states
+                document.querySelectorAll('[data-field="photo_action"]').forEach(inp => inp.value = '');
+                document.querySelectorAll('[data-field="photo"]').forEach(inp => inp.value = '');
                 document.querySelectorAll('.is-modified').forEach(td => td.classList.remove('is-modified'));
                 modifiedRows.clear();
                 modifiedFieldsCount = 0;
@@ -1044,12 +1170,80 @@
         }
     }
 
-    // Initialize all columns in locked state by default
-    document.addEventListener('DOMContentLoaded', () => {
-        document.querySelectorAll('.col-lock-toggle').forEach(chk => {
-            toggleColumnEditable(chk);
-        });
-    });
+    function triggerPhotoUpload(studentId) {
+        const fileInput = document.getElementById(`photo_file_${studentId}`);
+        if (fileInput) {
+            fileInput.click();
+        }
+    }
+
+    function onPhotoSelected(fileInput, studentId) {
+        if (!fileInput.files || !fileInput.files[0]) return;
+        const file = fileInput.files[0];
+
+        // Max 5MB check
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Image file size cannot exceed 5MB.', true);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const base64Data = e.target.result;
+            const previewImg = document.getElementById(`photo_preview_${studentId}`);
+            const photoInput = document.getElementById(`photo_input_${studentId}`);
+            const actionInput = document.getElementById(`photo_action_${studentId}`);
+            const removeBtn = document.getElementById(`photo_remove_btn_${studentId}`);
+
+            if (previewImg) {
+                previewImg.src = base64Data;
+            }
+            if (photoInput) {
+                photoInput.value = base64Data;
+            }
+            if (actionInput) {
+                actionInput.value = 'update';
+            }
+            if (removeBtn) {
+                removeBtn.classList.remove('d-none');
+            }
+
+            if (photoInput) {
+                markCellModified(photoInput);
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    const DEFAULT_AVATAR_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+
+    function onPhotoRemove(studentId) {
+        const previewImg = document.getElementById(`photo_preview_${studentId}`);
+        const photoInput = document.getElementById(`photo_input_${studentId}`);
+        const actionInput = document.getElementById(`photo_action_${studentId}`);
+        const removeBtn = document.getElementById(`photo_remove_btn_${studentId}`);
+        const fileInput = document.getElementById(`photo_file_${studentId}`);
+
+        if (previewImg) {
+            previewImg.src = DEFAULT_AVATAR_SVG;
+        }
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        if (photoInput) {
+            photoInput.value = '';
+        }
+        if (actionInput) {
+            actionInput.value = 'remove';
+        }
+        if (removeBtn) {
+            removeBtn.classList.add('d-none');
+        }
+
+        if (photoInput) {
+            markCellModified(photoInput);
+        }
+    }
 </script>
 @endsection
 

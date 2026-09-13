@@ -55,7 +55,7 @@
             </p>
 
             <p class="text" style="color: #64748b; font-size: 14px;">
-                If you need to reschedule or have any questions beforehand, please feel free to reply directly to this email or reach us at <strong>+91-9451805575</strong>.
+                If you need to reschedule or have any questions beforehand, please feel free to reply directly to this email or reach us at <strong>+91 92194 41716</strong>.
             </p>
         </div>
 

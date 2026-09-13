@@ -298,17 +298,16 @@ class HRPayrollWorkflowTest extends TestCase
         // 1. Visit listing page
         $response = $this->actingAs($user)->get(route('school.payroll.salary-structure'));
         $response->assertStatus(200);
-        $response->assertSee('Configure Payroll Settings');
-        $response->assertSee('Salary List');
+        $response->assertSee('Salary Structure');
 
         // 2. Visit configure page
         $configureResponse = $this->actingAs($user)->get(route('school.payroll.salary-structure.configure'));
         $configureResponse->assertStatus(200);
-        $configureResponse->assertSee('Saurabh Kumar');
+        $configureResponse->assertSee('Salary Structure');
 
-        // 3. Store new salary structure
+        // 3. Store new salary structure master
         $storeResponse = $this->actingAs($user)->post(route('school.payroll.salary-structure.store'), [
-            'staff_id' => $staff->id,
+            'name' => 'Senior Teacher Grade A',
             'basic_salary' => 20000.00,
             'salary_type' => 'Monthly',
             'hra' => 2000.00,
@@ -325,9 +324,9 @@ class HRPayrollWorkflowTest extends TestCase
 
         $storeResponse->assertRedirect(route('school.payroll.salary-structure'));
 
-        $this->assertDatabaseHas('staff_salary_structures', [
+        $this->assertDatabaseHas('salary_structures', [
             'school_id' => $school->id,
-            'staff_id' => $staff->id,
+            'name' => 'Senior Teacher Grade A',
             'basic_salary' => 20000.00,
             'salary_type' => 'Monthly',
             'hra' => 2000.00,
@@ -341,13 +340,38 @@ class HRPayrollWorkflowTest extends TestCase
             'is_active' => 1,
         ]);
 
-        // Check staff basic salary synced
+        $structure = \App\Models\SalaryStructure::where('school_id', $school->id)->first();
+        $this->assertNotNull($structure);
+
+        // 4. Test Slider Staff List AJAX endpoint
+        $staffListResponse = $this->actingAs($user)->get(route('school.payroll.salary-structure.staff', ['id' => $structure->id]));
+        $staffListResponse->assertStatus(200);
+        $staffListResponse->assertJsonFragment(['name' => 'Saurabh Kumar']);
+
+        // 5. Test Assign Staff to Structure via Slider AJAX endpoint
+        $assignResponse = $this->actingAs($user)->postJson(route('school.payroll.salary-structure.assign-staff', ['id' => $structure->id]), [
+            'staff_ids' => [$staff->id],
+        ]);
+        $assignResponse->assertStatus(200);
+        $assignResponse->assertJson(['success' => true, 'assigned_count' => 1]);
+
+        // Check staff assigned & synced
         $staff->refresh();
+        $this->assertEquals($structure->id, $staff->salary_structure_id);
         $this->assertEquals(20000.00, $staff->basic_salary);
 
-        // 4. Edit existing salary structure (should update without duplicate)
-        $updateResponse = $this->actingAs($user)->post(route('school.payroll.salary-structure.store'), [
+        $this->assertDatabaseHas('staff_salary_structures', [
+            'school_id' => $school->id,
             'staff_id' => $staff->id,
+            'salary_structure_id' => $structure->id,
+            'basic_salary' => 20000.00,
+            'hra' => 2000.00,
+        ]);
+
+        // 6. Edit existing salary structure (should update master and auto-sync assigned staff)
+        $updateResponse = $this->actingAs($user)->post(route('school.payroll.salary-structure.store'), [
+            'id' => $structure->id,
+            'name' => 'Senior Teacher Grade A (Revised)',
             'basic_salary' => 25000.00,
             'salary_type' => 'Monthly',
             'hra' => 2500.00,
@@ -364,7 +388,14 @@ class HRPayrollWorkflowTest extends TestCase
 
         $updateResponse->assertRedirect(route('school.payroll.salary-structure'));
 
-        $this->assertEquals(1, \App\Models\StaffSalaryStructure::where('school_id', $school->id)->where('staff_id', $staff->id)->count());
+        $this->assertDatabaseHas('salary_structures', [
+            'id' => $structure->id,
+            'name' => 'Senior Teacher Grade A (Revised)',
+            'basic_salary' => 25000.00,
+        ]);
+
+        $staff->refresh();
+        $this->assertEquals(25000.00, $staff->basic_salary);
 
         $this->assertDatabaseHas('staff_salary_structures', [
             'school_id' => $school->id,
@@ -372,6 +403,97 @@ class HRPayrollWorkflowTest extends TestCase
             'basic_salary' => 25000.00,
             'hra' => 2500.00,
         ]);
+    }
+
+    public function test_staff_salary_assignment_spreadsheet_workflow(): void
+    {
+        [$school, $user, $dept, $desig] = $this->createSchoolUserDeptAndDesig();
+
+        $staff = Staff::create([
+            'school_id' => $school->id,
+            'department_id' => $dept->id,
+            'designation_id' => $desig->id,
+            'joining_date' => '2025-01-01',
+            'employee_id' => 'EDUZENEMP010',
+            'first_name' => 'Amit',
+            'last_name' => 'Sharma',
+            'basic_salary' => 0.00,
+            'is_active' => true,
+        ]);
+
+        $structure = \App\Models\SalaryStructure::create([
+            'school_id' => $school->id,
+            'name' => 'Junior Teacher Grade B',
+            'basic_salary' => 15000.00,
+            'salary_type' => 'Monthly',
+            'hra' => 1500.00,
+            'da' => 800.00,
+            'ta' => 500.00,
+            'allowance' => 200.00,
+            'pf' => 400.00,
+            'esi' => 150.00,
+            'tds' => 0.00,
+            'prof_tax' => 100.00,
+            'effective_from' => '2026-04-01',
+            'is_active' => true,
+        ]);
+
+        // 1. Visit staff salary assign spreadsheet page
+        $response = $this->actingAs($user)->get(route('school.payroll.staff-assign'));
+        $response->assertStatus(200);
+        $response->assertSee('Staff Salary Assignment');
+        $response->assertSee('Amit Sharma');
+        $response->assertSee('EDUZENEMP010');
+
+        // 2. Save individual / custom salary assignment via POST JSON
+        $saveResponse = $this->actingAs($user)->postJson(route('school.payroll.staff-assign.save'), [
+            'assignments' => [
+                [
+                    'staff_id' => $staff->id,
+                    'salary_structure_id' => $structure->id,
+                    'salary_type' => 'Monthly',
+                    'basic_salary' => 18000.00,
+                    'hra' => 2000.00,
+                    'da' => 1000.00,
+                    'ta' => 600.00,
+                    'allowance' => 300.00,
+                    'pf' => 500.00,
+                    'esi' => 200.00,
+                    'tds' => 100.00,
+                    'prof_tax' => 150.00,
+                    'effective_from' => '2026-05-01',
+                    'is_active' => 1,
+                ]
+            ]
+        ]);
+
+        $saveResponse->assertStatus(200);
+        $saveResponse->assertJson(['success' => true, 'updated_count' => 1]);
+
+        $staff->refresh();
+        $this->assertEquals($structure->id, $staff->salary_structure_id);
+        $this->assertEquals(18000.00, $staff->basic_salary);
+
+        $this->assertDatabaseHas('staff_salary_structures', [
+            'school_id' => $school->id,
+            'staff_id' => $staff->id,
+            'salary_structure_id' => $structure->id,
+            'basic_salary' => 18000.00,
+            'hra' => 2000.00,
+            'pf' => 500.00,
+        ]);
+
+        // 3. Quick Apply Salary Structure
+        $quickApplyResponse = $this->actingAs($user)->postJson(route('school.payroll.staff-assign.quick-apply'), [
+            'salary_structure_id' => $structure->id,
+            'staff_ids' => [$staff->id],
+        ]);
+
+        $quickApplyResponse->assertStatus(200);
+        $quickApplyResponse->assertJson(['success' => true, 'applied_count' => 1]);
+
+        $staff->refresh();
+        $this->assertEquals(15000.00, $staff->basic_salary);
     }
 
     public function test_deposit_amount_search_and_transaction_workflow(): void

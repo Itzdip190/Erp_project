@@ -6,6 +6,7 @@ School Erp/downloaded_log*.txt
 
 # Ignore backup/scratch directories and files
 School Erp/scratch/
+scratch/
 **/*.bak
 scratch_*
 

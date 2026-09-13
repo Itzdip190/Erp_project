@@ -3298,10 +3298,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 $fees        = $student->studentFees ?? collect();
                 
                 // Session fees filter (includes Tuition, Transport, and Misc fees for the selected session)
-                $sessionFees = $fees->filter(function($fee) use ($selectedSession) {
+                $sessionFees = $fees->filter(function($fee) use ($selectedSession, $student) {
                     if ($fee->fee_schedule_id) {
                         $sch = $fee->feeSchedule ?? \App\Models\FeeSchedule::find($fee->fee_schedule_id);
-                        return $sch && $sch->academic_session_id == $selectedSession->id;
+                        if (!$sch || $sch->academic_session_id != $selectedSession->id) {
+                            return false;
+                        }
+                        // If student is assigned to a schedule for this session, exclude unpaid fees belonging to other schedules of this session
+                        if ($student->fee_schedule_id && $fee->fee_schedule_id != $student->fee_schedule_id && ($fee->paid_amount ?? 0) <= 0 && ($fee->instant_discount_amount ?? 0) <= 0) {
+                            return false;
+                        }
+                        return true;
                     }
                     if ($fee->transport_fee_schedule_id) {
                         $sch = $fee->transportFeeSchedule ?? \App\Models\TransportFeeSchedule::find($fee->transport_fee_schedule_id);
@@ -3323,26 +3330,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     return $carry + max(0, $f->amount - $f->instant_discount_amount - $f->paid_amount);
                 }, 0);
 
-                // Previous years / historical dues for this student (matched strictly by admission_number or cross-session studentFees)
+                // Previous years / historical dues for this student (only if student was enrolled in previous sessions)
+                $wasEnrolledInPrev = !empty($previousSessionIds) && \App\Services\FeeHelper::isStudentEnrolledInPreviousSessions($student, $previousSessionIds, $selectedSession);
                 $prevFees = collect();
-                if (!empty($student->admission_number) && isset($historicalFeesByAdmission)) {
-                    $prevFees = $historicalFeesByAdmission->get($student->admission_number, collect());
-                } else {
-                    $prevFees = $fees->filter(function($fee) use ($selectedSession) {
-                        if ($fee->feeSchedule && $fee->feeSchedule->academic_session_id && $fee->feeSchedule->academic_session_id != $selectedSession->id) {
-                            return true;
-                        }
-                        if ($fee->transportFeeSchedule && $fee->transportFeeSchedule->academic_session_id && $fee->transportFeeSchedule->academic_session_id != $selectedSession->id) {
-                            return true;
-                        }
-                        if ($fee->miscFee && $fee->miscFee->academic_session_id && $fee->miscFee->academic_session_id != $selectedSession->id) {
-                            return true;
-                        }
-                        if ($fee->due_date && $selectedSession->start_date && $fee->due_date < $selectedSession->start_date) {
-                            return true;
-                        }
-                        return false;
-                    });
+                if ($wasEnrolledInPrev) {
+                    if (!empty($student->admission_number) && isset($historicalFeesByAdmission)) {
+                        $prevFees = $historicalFeesByAdmission->get($student->admission_number, collect());
+                    } else {
+                        $prevFees = $fees->filter(function($fee) use ($selectedSession) {
+                            if ($fee->feeSchedule && $fee->feeSchedule->academic_session_id && $fee->feeSchedule->academic_session_id != $selectedSession->id) {
+                                return true;
+                            }
+                            if ($fee->transportFeeSchedule && $fee->transportFeeSchedule->academic_session_id && $fee->transportFeeSchedule->academic_session_id != $selectedSession->id) {
+                                return true;
+                            }
+                            if ($fee->miscFee && $fee->miscFee->academic_session_id && $fee->miscFee->academic_session_id != $selectedSession->id) {
+                                return true;
+                            }
+                            if ($fee->due_date && $selectedSession->start_date && $fee->due_date < $selectedSession->start_date) {
+                                return true;
+                            }
+                            return false;
+                        });
+                    }
                 }
                 $previousYearDue = $prevFees->reduce(function($carry, $f) {
                     if ($f->status === 'refunded') return $carry;
@@ -3355,12 +3365,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 $initials    = strtoupper(substr($student->first_name, 0, 1));
 
                 // Fee schedule: Show only if explicitly assigned for this session or student
-                $schedFee = $sessionFees->first(fn($f) => !empty($f->fee_schedule_id) && $f->feeSchedule);
-                $schedName = $schedFee ? $schedFee->feeSchedule->name : (
-                    ($student->feeSchedule && $student->feeSchedule->academic_session_id == $selectedSession->id)
-                        ? $student->feeSchedule->name
-                        : optional($student->feeSchedule)->name
-                );
+                $assignedSched = ($student->feeSchedule && $student->feeSchedule->academic_session_id == $selectedSession->id)
+                    ? $student->feeSchedule
+                    : null;
+                if (!$assignedSched && $student->fee_schedule_id) {
+                    $sch = $schedules->firstWhere('id', $student->fee_schedule_id);
+                    if ($sch && $sch->academic_session_id == $selectedSession->id) {
+                        $assignedSched = $sch;
+                    }
+                }
+                $schedName = $assignedSched ? $assignedSched->name : null;
+                if (!$schedName) {
+                    $schedFee = $sessionFees->first(fn($f) => !empty($f->fee_schedule_id) && $f->feeSchedule && optional($f->feeSchedule)->academic_session_id == $selectedSession->id);
+                    $schedName = $schedFee ? $schedFee->feeSchedule->name : ($student->feeSchedule && optional($student->feeSchedule)->academic_session_id == $selectedSession->id ? $student->feeSchedule->name : null);
+                }
 
                 $sessionRec = $student->studentSessionFor($selectedSession->id);
                 $displayClass = $sessionRec?->schoolClass ?? $student->class;

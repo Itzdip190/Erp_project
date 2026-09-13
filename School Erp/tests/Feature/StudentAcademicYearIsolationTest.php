@@ -605,4 +605,57 @@ class StudentAcademicYearIsolationTest extends TestCase
         $response2->assertSee('Kavita UKG');
         $response2->assertSee('Dipak Sen');
     }
+
+    public function test_student_photo_is_isolated_per_academic_session(): void
+    {
+        $student = $this->createStudent([
+            'admission_number'    => 'ADM7007',
+            'first_name'          => 'Rahul',
+            'last_name'           => 'Verma',
+            'academic_session_id' => $this->session2026->id,
+            'class_id'            => $this->class1->id,
+            'section_id'          => $this->sectionA->id,
+            'photo'               => 'students/photos/photo_2026.jpg',
+        ]);
+
+        $session2025Record = StudentSession::create([
+            'school_id'           => $this->school->id,
+            'student_id'          => $student->id,
+            'academic_session_id' => $this->session2025->id,
+            'class_id'            => $this->classUKG->id,
+            'section_id'          => $this->sectionB->id,
+            'roll_number'         => '01',
+            'session_data'        => [
+                'first_name' => 'Rahul',
+                'last_name'  => 'Verma',
+                'photo'      => 'students/photos/photo_2025.jpg',
+            ],
+        ]);
+
+        $session2026Record = StudentSession::create([
+            'school_id'           => $this->school->id,
+            'student_id'          => $student->id,
+            'academic_session_id' => $this->session2026->id,
+            'class_id'            => $this->class1->id,
+            'section_id'          => $this->sectionA->id,
+            'roll_number'         => '01',
+            'session_data'        => [
+                'first_name' => 'Rahul',
+                'last_name'  => 'Verma',
+                'photo'      => 'students/photos/photo_2026.jpg',
+            ],
+        ]);
+
+        // Verify session-specific photo retrieval via StudentSession
+        $this->assertEquals('students/photos/photo_2025.jpg', $session2025Record->photo);
+        $this->assertEquals('students/photos/photo_2026.jpg', $session2026Record->photo);
+
+        // Verify session-specific photo retrieval via Student model
+        $this->assertEquals('students/photos/photo_2025.jpg', $student->getPhotoInSession($this->session2025->id));
+        $this->assertEquals('students/photos/photo_2026.jpg', $student->getPhotoInSession($this->session2026->id));
+
+        // Verify resolvePhotoUrl picks correct photo per session
+        $this->assertStringContainsString('photo_2025.jpg', $student->resolvePhotoUrl($this->session2025->id));
+        $this->assertStringContainsString('photo_2026.jpg', $student->resolvePhotoUrl($this->session2026->id));
+    }
 }

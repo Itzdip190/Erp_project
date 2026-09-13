@@ -803,8 +803,14 @@
 
         <!-- Profile Badge Box -->
         <div class="sb-profile">
-            <div class="sb-avatar">
-                {{ strtoupper(substr($user->name, 0, 1)) }}
+            <div class="sb-avatar" style="overflow:hidden;padding:0;">
+                @php $tAvatar = $teacherAvatarUrl ?? $user->photo_url ?? $staff?->photo_url ?? null; @endphp
+                @if(!empty($tAvatar))
+                    <img src="{{ $tAvatar }}" alt="{{ $user->name }}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
+                    <span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
+                @else
+                    <span>{{ strtoupper(substr($user->name, 0, 1)) }}</span>
+                @endif
             </div>
             <div class="sb-prof-info">
                 <h4>{{ $user->name }}</h4>
@@ -900,9 +906,10 @@
 
                 <!-- User Profile Pill -->
                 <a href="{{ route('teacher.dashboard') }}" class="th-user-pill" style="text-decoration:none;">
-                    <div class="th-user-img">
-                        @if(!empty($user->photo))
-                            <img src="{{ asset($user->photo) }}" alt="{{ $user->name }}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
+                    <div class="th-user-img" style="overflow:hidden;">
+                        @if(!empty($tAvatar))
+                            <img src="{{ $tAvatar }}" alt="{{ $user->name }}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';">
+                            <span style="display:none;width:100%;height:100%;align-items:center;justify-content:center;">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
                         @else
                             {{ strtoupper(substr($user->name, 0, 1)) }}
                         @endif

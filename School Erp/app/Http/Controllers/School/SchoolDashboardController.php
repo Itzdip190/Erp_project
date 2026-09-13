@@ -76,66 +76,64 @@ class SchoolDashboardController extends Controller
         $totalExpense         = (float) $totalExpenseQuery->sum('amount');
 
         // Fee counts (Filtered by Active Academic Session)
-        $sessionFeeQuery = StudentFee::where('school_id', $schoolId);
-        if ($currentSession) {
-            $sessId = $currentSession->id;
-            $sessionFeeQuery->whereHas('student', function($sq) use ($sessId) {
-                $sq->where('academic_session_id', $sessId)
-                  ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
-            });
-        }
+        $feeMetrics = \App\Services\FeeHelper::calculateSessionFeeMetrics($schoolId, $currentSession);
 
-        $totalFeeCollectionQuery = (clone $sessionFeeQuery)->where('paid_amount', '>', 0);
-        if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
-            $totalFeeCollectionQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
-        }
-        $totalFeeCollection = (float) $totalFeeCollectionQuery->sum('paid_amount');
+        $totalFeeCollection    = $feeMetrics['annualCollected'];
+        $todayFeeCollection    = $feeMetrics['todayFeeCollection'];
+        $todayFeeDue           = $feeMetrics['todayFeeDue'];
+        $todayFeeCollectionPct = $feeMetrics['todayFeeCollectionPct'];
 
-        $todayFeeCollection = (float) (clone $sessionFeeQuery)
-            ->whereDate('updated_at', today())
-            ->sum('paid_amount');
+        // Today's Attendance rates (Strictly scoped to active academic session)
+        $isTodayInSession = $this->isDateInSession($currentSession, today());
 
-        $todayFeeDue = (float) (clone $sessionFeeQuery)
-            ->whereDate('due_date', today())
-            ->sum('amount');
+        $markedStudentsToday = 0;
+        $presentStudentsToday = 0;
+        $studentAttendancePct = 0;
+        $markedStaffToday = 0;
+        $presentStaffToday = 0;
+        $staffAttendancePct = 0;
 
-        $todayFeeCollectionPct = 0;
-        if ($todayFeeCollection > 0) {
-            if ($todayFeeDue > 0) {
-                $todayFeeCollectionPct = min(100, round(($todayFeeCollection / $todayFeeDue) * 100));
-            } else {
-                $todayFeeCollectionPct = 100;
-            }
-        }
-
-        // Today's Attendance rates
-        $markedStudentsToday = StudentAttendance::where('school_id', $schoolId)
-            ->whereDate('date', today())
-            ->count();
-        $presentStudentsToday = StudentAttendance::where('school_id', $schoolId)
-            ->whereDate('date', today())
-            ->whereIn('status', ['present', 'late', 'duty_leave'])
-            ->count() + (StudentAttendance::where('school_id', $schoolId)
+        if ($isTodayInSession) {
+            $sessId = $currentSession?->id;
+            $studentAttBaseQuery = StudentAttendance::where('school_id', $schoolId)
                 ->whereDate('date', today())
-                ->where('status', 'half_day')
-                ->count() * 0.5);
-        $studentAttendancePct = $totalStudents > 0 
-            ? round(($presentStudentsToday / $totalStudents) * 100) 
-            : 0;
+                ->when($sessId, function($q) use ($sessId) {
+                    $q->where(function($sub) use ($sessId) {
+                        $sub->where('academic_session_id', $sessId)
+                            ->orWhere(function($sq) use ($sessId) {
+                                $sq->whereNull('academic_session_id')
+                                   ->whereHas('student', function($stq) use ($sessId) {
+                                       $stq->where('academic_session_id', $sessId)
+                                           ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                                   });
+                            });
+                    });
+                });
 
-        $markedStaffToday = StaffAttendance::where('school_id', $schoolId)
-            ->whereDate('date', today())
-            ->count();
-        $presentStaffToday = StaffAttendance::where('school_id', $schoolId)
-            ->whereDate('date', today())
-            ->whereIn('status', ['present', 'late'])
-            ->count() + (StaffAttendance::where('school_id', $schoolId)
+            $markedStudentsToday = (clone $studentAttBaseQuery)->count();
+            $presentStudentsToday = (clone $studentAttBaseQuery)
+                ->whereIn('status', ['present', 'late', 'duty_leave'])
+                ->count() + ((clone $studentAttBaseQuery)
+                    ->where('status', 'half_day')
+                    ->count() * 0.5);
+            $studentAttendancePct = $totalStudents > 0 
+                ? round(($presentStudentsToday / $totalStudents) * 100) 
+                : 0;
+
+            $markedStaffToday = StaffAttendance::where('school_id', $schoolId)
                 ->whereDate('date', today())
-                ->where('status', 'half_day')
-                ->count() * 0.5);
-        $staffAttendancePct = $totalStaffs > 0 
-            ? round(($presentStaffToday / $totalStaffs) * 100) 
-            : 0;
+                ->count();
+            $presentStaffToday = StaffAttendance::where('school_id', $schoolId)
+                ->whereDate('date', today())
+                ->whereIn('status', ['present', 'late'])
+                ->count() + (StaffAttendance::where('school_id', $schoolId)
+                    ->whereDate('date', today())
+                    ->where('status', 'half_day')
+                    ->count() * 0.5);
+            $staffAttendancePct = $totalStaffs > 0 
+                ? round(($presentStaffToday / $totalStaffs) * 100) 
+                : 0;
+        }
 
         // ── 2. ENROLLMENT OVERVIEW (GENDER, ATTRITION, ADMISSIONS) ───────────
         $studentMaleCount = Student::where('school_id', $schoolId)->where('is_active', true)
@@ -269,30 +267,27 @@ class SchoolDashboardController extends Controller
             }
         }
 
-        // Till Date (due_date <= today) Collected vs Due (Filtered by Active Session)
-        $schoolPendingChequesTotal = (float) \App\Models\PendingCheque::where('school_id', $schoolId)->where('status', 'pending')->sum('amount');
+        // Till Date Collected vs Due (Filtered strictly by Active Session & legitimate carry-forwards)
+        $schoolPendingChequesTotal = $feeMetrics['schoolPendingChequesTotal'];
 
-        $feeCollectedQuery = (clone $sessionFeeQuery)->where('due_date', '<=', today());
-        if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
-            $feeCollectedQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
-        }
-        $feeCollectedAmount = (float) $feeCollectedQuery->sum('paid_amount');
+        $feeCollectedAmount     = $feeMetrics['tillDateCollected'];
+        $feeDueAmount           = $feeMetrics['tillDateDue'];
+        $feeTotalSum            = $feeMetrics['tillDateTotal'];
+        $feeCollectedPct        = $feeMetrics['tillDateCollectedPct'];
+        $feeDuePct              = $feeMetrics['tillDateDuePct'];
 
-        $feeDueAmount = max(0.00, (float) (clone $sessionFeeQuery)->where('due_date', '<=', today())->sum(\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
-        $feeTotalSum = $feeCollectedAmount + $feeDueAmount;
-        $feeCollectedPct = $feeTotalSum > 0 ? round(($feeCollectedAmount / $feeTotalSum) * 100, 2) : 0;
-        $feeDuePct = $feeTotalSum > 0 ? round(($feeDueAmount / $feeTotalSum) * 100, 2) : 0;
+        // Annual (all fees) Collected vs Due (Filtered strictly by Active Session)
+        $annualCollectedAmount  = $feeMetrics['annualCollected'];
+        $annualDueAmount        = $feeMetrics['annualDue'];
+        $annualTotalSum         = $feeMetrics['annualTotal'];
+        $annualCollectedPct     = $feeMetrics['annualCollectedPct'];
+        $annualDuePct           = $feeMetrics['annualDuePct'];
 
-        // Annual (all fees) Collected vs Due (Filtered by Active Session)
-        $annualCollectedAmount = $totalFeeCollection;
-        $annualDueAmount = max(0.00, (float) (clone $sessionFeeQuery)->sum(\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)')) - $schoolPendingChequesTotal);
-        $annualTotalSum = $annualCollectedAmount + $annualDueAmount;
-        $annualCollectedPct = $annualTotalSum > 0 ? round(($annualCollectedAmount / $annualTotalSum) * 100, 2) : 0;
-        $annualDuePct = $annualTotalSum > 0 ? round(($annualDueAmount / $annualTotalSum) * 100, 2) : 0;
-
-        // Pending (till date)
-        $feePendingStudentsCount = (clone $sessionFeeQuery)->where('due_date', '<=', today())->whereColumn('amount', '>', 'paid_amount')->distinct('student_id')->count();
-        $feePendingDueAmount = $feeDueAmount;
+        // Pending (till date & annual)
+        $feePendingStudentsCount     = $feeMetrics['tillDatePendingStudentsCount'];
+        $annualPendingStudentsCount  = $feeMetrics['annualPendingStudentsCount'] ?? $feePendingStudentsCount;
+        $annualAssignedStudentsCount = $feeMetrics['annualAssignedStudentsCount'] ?? $totalStudents;
+        $feePendingDueAmount         = $feeDueAmount;
 
         // ── 4. ADMINISTRATIVE OPERATIONS OVERVIEW ────────────────────────────
         // Recent Updates tabs (Notices)
@@ -345,31 +340,63 @@ class SchoolDashboardController extends Controller
             ];
         });
 
-        // Staff attendance statuses today
-        $staffAttendanceToday = StaffAttendance::where('school_id', $schoolId)
-            ->whereDate('date', today())
-            ->get();
-        
-        $staffPresentToday = $staffAttendanceToday->where('status', 'present')->count();
-        $staffAbsentToday = $staffAttendanceToday->where('status', 'absent')->count();
-        $staffHalfdayToday = $staffAttendanceToday->where('status', 'half_day')->count();
-        $staffLeaveToday = $staffAttendanceToday->where('status', 'leave')->count();
-        $staffCustomToday = $staffAttendanceToday->where('status', 'custom')->count();
-        
-        $staffNotMarkedToday = max(0, $totalStaffs - $staffAttendanceToday->count());
-        $staffNotMarkedPct = $totalStaffs > 0 ? round(($staffNotMarkedToday / $totalStaffs) * 100, 1) : 0.0;
+        if ($isTodayInSession) {
+            $sessId = $currentSession?->id;
 
-        // Student attendance breakdown for today
-        $studentAttendanceToday = StudentAttendance::where('school_id', $schoolId)
-            ->whereDate('date', today())
-            ->get();
-        $studentPresentToday  = $studentAttendanceToday->where('status', 'present')->count();
-        $studentAbsentToday   = $studentAttendanceToday->where('status', 'absent')->count();
-        $studentHalfDayToday  = $studentAttendanceToday->where('status', 'half_day')->count();
-        $studentLeaveToday    = $studentAttendanceToday->where('status', 'leave')->count();
-        $studentCustomToday   = $studentAttendanceToday->where('status', 'custom')->count();
-        $studentNotMarkedToday = max(0, $totalStudents - $studentAttendanceToday->count());
-        $studentNotMarkedPct   = $totalStudents > 0 ? round(($studentNotMarkedToday / $totalStudents) * 100, 1) : 0.0;
+            // Staff attendance statuses today
+            $staffAttendanceToday = StaffAttendance::where('school_id', $schoolId)
+                ->whereDate('date', today())
+                ->get();
+            
+            $staffPresentToday = $staffAttendanceToday->where('status', 'present')->count();
+            $staffAbsentToday = $staffAttendanceToday->where('status', 'absent')->count();
+            $staffHalfdayToday = $staffAttendanceToday->where('status', 'half_day')->count();
+            $staffLeaveToday = $staffAttendanceToday->where('status', 'leave')->count();
+            $staffCustomToday = $staffAttendanceToday->where('status', 'custom')->count();
+            
+            $staffNotMarkedToday = max(0, $totalStaffs - $staffAttendanceToday->count());
+            $staffNotMarkedPct = $totalStaffs > 0 ? round(($staffNotMarkedToday / $totalStaffs) * 100, 1) : 0.0;
+
+            // Student attendance breakdown for today
+            $studentAttendanceToday = StudentAttendance::where('school_id', $schoolId)
+                ->whereDate('date', today())
+                ->when($sessId, function($q) use ($sessId) {
+                    $q->where(function($sub) use ($sessId) {
+                        $sub->where('academic_session_id', $sessId)
+                            ->orWhere(function($sq) use ($sessId) {
+                                $sq->whereNull('academic_session_id')
+                                   ->whereHas('student', function($stq) use ($sessId) {
+                                       $stq->where('academic_session_id', $sessId)
+                                           ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                                   });
+                            });
+                    });
+                })
+                ->get();
+            $studentPresentToday  = $studentAttendanceToday->where('status', 'present')->count();
+            $studentAbsentToday   = $studentAttendanceToday->where('status', 'absent')->count();
+            $studentHalfDayToday  = $studentAttendanceToday->where('status', 'half_day')->count();
+            $studentLeaveToday    = $studentAttendanceToday->where('status', 'leave')->count();
+            $studentCustomToday   = $studentAttendanceToday->where('status', 'custom')->count();
+            $studentNotMarkedToday = max(0, $totalStudents - $studentAttendanceToday->count());
+            $studentNotMarkedPct   = $totalStudents > 0 ? round(($studentNotMarkedToday / $totalStudents) * 100, 1) : 0.0;
+        } else {
+            $staffPresentToday = 0;
+            $staffAbsentToday = 0;
+            $staffHalfdayToday = 0;
+            $staffLeaveToday = 0;
+            $staffCustomToday = 0;
+            $staffNotMarkedToday = 0;
+            $staffNotMarkedPct = 0.0;
+
+            $studentPresentToday = 0;
+            $studentAbsentToday = 0;
+            $studentHalfDayToday = 0;
+            $studentLeaveToday = 0;
+            $studentCustomToday = 0;
+            $studentNotMarkedToday = 0;
+            $studentNotMarkedPct = 0.0;
+        }
 
         // Birthday calendar counts & events
         $birthdaysToday = 0;
@@ -433,6 +460,8 @@ class SchoolDashboardController extends Controller
             'annualCollectedPct',
             'annualDuePct',
             'feePendingStudentsCount',
+            'annualPendingStudentsCount',
+            'annualAssignedStudentsCount',
             'feePendingDueAmount',
             'notices',
             'diaries',
@@ -534,6 +563,9 @@ class SchoolDashboardController extends Controller
         $month    = (int) $request->get('month', now()->month);
         $year     = (int) $request->get('year', now()->year);
 
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        $sessId = $currentSession?->id;
+
         $labels  = [];
         $data    = [];
         $average = 0;
@@ -545,8 +577,30 @@ class SchoolDashboardController extends Controller
         for ($d = 1; $d <= $daysInMonth; $d++) {
             $date    = Carbon::create($year, $month, $d)->toDateString();
             $labels[] = (string) $d;
-            $total   = StudentAttendance::where('school_id', $schoolId)->whereDate('date', $date)->count();
-            $present = StudentAttendance::where('school_id', $schoolId)->whereDate('date', $date)->where('status', 'present')->count();
+
+            $total = 0;
+            $present = 0;
+
+            if ($this->isDateInSession($currentSession, Carbon::parse($date))) {
+                $attQuery = StudentAttendance::where('school_id', $schoolId)
+                    ->whereDate('date', $date)
+                    ->when($sessId, function($q) use ($sessId) {
+                        $q->where(function($sub) use ($sessId) {
+                            $sub->where('academic_session_id', $sessId)
+                                ->orWhere(function($sq) use ($sessId) {
+                                    $sq->whereNull('academic_session_id')
+                                       ->whereHas('student', function($stq) use ($sessId) {
+                                           $stq->where('academic_session_id', $sessId)
+                                               ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                                       });
+                                });
+                        });
+                    });
+
+                $total   = (clone $attQuery)->count();
+                $present = (clone $attQuery)->where('status', 'present')->count();
+            }
+
             $pct = $total > 0 ? round($present / $total * 100) : 0;
             $data[] = $pct;
             if ($total > 0) {
@@ -567,17 +621,40 @@ class SchoolDashboardController extends Controller
     public function snapshot(Request $request): JsonResponse
     {
         $schoolId = auth()->user()->school_id;
-
-        $presentToday = StudentAttendance::where('school_id', $schoolId)
-            ->whereDate('date', today())
-            ->where('status', 'present')
-            ->count();
-
-        $markedToday = StudentAttendance::where('school_id', $schoolId)
-            ->whereDate('date', today())
-            ->count();
-
         $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+
+        $isTodayInSession = $this->isDateInSession($currentSession, today());
+
+        $presentToday = 0;
+        $markedToday = 0;
+        $staffPresentToday = 0;
+
+        if ($isTodayInSession) {
+            $sessId = $currentSession?->id;
+            $studentAttQuery = StudentAttendance::where('school_id', $schoolId)
+                ->whereDate('date', today())
+                ->when($sessId, function($q) use ($sessId) {
+                    $q->where(function($sub) use ($sessId) {
+                        $sub->where('academic_session_id', $sessId)
+                            ->orWhere(function($sq) use ($sessId) {
+                                $sq->whereNull('academic_session_id')
+                                   ->whereHas('student', function($stq) use ($sessId) {
+                                       $stq->where('academic_session_id', $sessId)
+                                           ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                                   });
+                            });
+                    });
+                });
+
+            $presentToday = (clone $studentAttQuery)->where('status', 'present')->count();
+            $markedToday = (clone $studentAttQuery)->count();
+
+            $staffPresentToday = StaffAttendance::where('school_id', $schoolId)
+                ->whereDate('date', today())
+                ->where('status', 'present')
+                ->count();
+        }
+
         $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
         if ($currentSession) {
             $sessId = $currentSession->id;
@@ -587,11 +664,6 @@ class SchoolDashboardController extends Controller
             });
         }
         $totalStudents = $totalStudentsQuery->count();
-
-        $staffPresentToday = StaffAttendance::where('school_id', $schoolId)
-            ->whereDate('date', today())
-            ->where('status', 'present')
-            ->count();
 
         $totalStaff = Staff::where('school_id', $schoolId)
             ->where('is_active', true)
@@ -664,18 +736,49 @@ class SchoolDashboardController extends Controller
             });
         }
         $totalStudents = $totalStudentsQuery->count();
-        $studentAttendance = StudentAttendance::where('school_id', $schoolId)->whereDate('date', $date)->get();
-        $studentPresent = $studentAttendance->where('status', 'present')->count();
-        $studentMarked = $studentAttendance->count();
-        $studentAttendancePct = $totalStudents > 0 ? round(($studentPresent / $totalStudents) * 100) : 0;
-        $studentAttendanceRatio = "{$studentPresent}/{$totalStudents}";
+        $isDateInSession = $this->isDateInSession($currentSession, $date);
 
-        // 3. Staff Attendance
+        $studentPresent = 0;
+        $studentMarked = 0;
+        $studentAttendancePct = 0;
+        $studentAttendanceRatio = "0/{$totalStudents}";
+
         $totalStaff = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
-        $staffAttendance = StaffAttendance::where('school_id', $schoolId)->whereDate('date', $date)->get();
-        $staffPresent = $staffAttendance->where('status', 'present')->count();
-        $staffAttendancePct = $totalStaff > 0 ? round(($staffPresent / $totalStaff) * 100) : 0;
-        $staffAttendanceRatio = "{$staffPresent}/{$totalStaff}";
+        $staffPresent = 0;
+        $staffAttendancePct = 0;
+        $staffAttendanceRatio = "0/{$totalStaff}";
+
+        $studentAttendance = collect([]);
+        $staffAttendance = collect([]);
+
+        if ($isDateInSession) {
+            $sessId = $currentSession?->id;
+            $studentAttendance = StudentAttendance::where('school_id', $schoolId)
+                ->whereDate('date', $date)
+                ->when($sessId, function($q) use ($sessId) {
+                    $q->where(function($sub) use ($sessId) {
+                        $sub->where('academic_session_id', $sessId)
+                            ->orWhere(function($sq) use ($sessId) {
+                                $sq->whereNull('academic_session_id')
+                                   ->whereHas('student', function($stq) use ($sessId) {
+                                       $stq->where('academic_session_id', $sessId)
+                                           ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                                   });
+                            });
+                    });
+                })
+                ->get();
+            $studentPresent = $studentAttendance->where('status', 'present')->count();
+            $studentMarked = $studentAttendance->count();
+            $studentAttendancePct = $totalStudents > 0 ? round(($studentPresent / $totalStudents) * 100) : 0;
+            $studentAttendanceRatio = "{$studentPresent}/{$totalStudents}";
+
+            // 3. Staff Attendance
+            $staffAttendance = StaffAttendance::where('school_id', $schoolId)->whereDate('date', $date)->get();
+            $staffPresent = $staffAttendance->where('status', 'present')->count();
+            $staffAttendancePct = $totalStaff > 0 ? round(($staffPresent / $totalStaff) * 100) : 0;
+            $staffAttendanceRatio = "{$staffPresent}/{$totalStaff}";
+        }
 
         // 4. New Admissions
         $newAdmissionsCount = Student::where('school_id', $schoolId)
@@ -824,17 +927,17 @@ class SchoolDashboardController extends Controller
             ->count();
 
         // --- TODAY'S ATTENDANCE CARD ---
-        $studentPresentCount = $studentAttendance->where('status', 'present')->count();
-        $studentAbsentCount = $studentAttendance->where('status', 'absent')->count();
-        $studentHalfDayCount = $studentAttendance->where('status', 'half_day')->count();
-        $studentLeaveCount = $studentAttendance->where('status', 'leave')->count();
-        $studentNotMarkedCount = max(0, $totalStudents - $studentMarked);
+        $studentPresentCount = $studentPresent;
+        $studentAbsentCount = $isDateInSession ? $studentAttendance->where('status', 'absent')->count() : 0;
+        $studentHalfDayCount = $isDateInSession ? $studentAttendance->where('status', 'half_day')->count() : 0;
+        $studentLeaveCount = $isDateInSession ? $studentAttendance->where('status', 'leave')->count() : 0;
+        $studentNotMarkedCount = $isDateInSession ? max(0, $totalStudents - $studentMarked) : 0;
 
-        $staffPresentCount = $staffAttendance->where('status', 'present')->count();
-        $staffAbsentCount = $staffAttendance->where('status', 'absent')->count();
-        $staffHalfDayCount = $staffAttendance->where('status', 'half_day')->count();
-        $staffLeaveCount = $staffAttendance->where('status', 'leave')->count();
-        $staffNotMarkedCount = $attendanceNotMarkedTeachersCount;
+        $staffPresentCount = $staffPresent;
+        $staffAbsentCount = $isDateInSession ? $staffAttendance->where('status', 'absent')->count() : 0;
+        $staffHalfDayCount = $isDateInSession ? $staffAttendance->where('status', 'half_day')->count() : 0;
+        $staffLeaveCount = $isDateInSession ? $staffAttendance->where('status', 'leave')->count() : 0;
+        $staffNotMarkedCount = $isDateInSession ? $attendanceNotMarkedTeachersCount : 0;
 
         // Critical attendance issues
         $criticalAttendanceIssues = [];
@@ -902,17 +1005,22 @@ class SchoolDashboardController extends Controller
         $feeDefaulters90PlusList = StudentFee::where('school_id', $schoolId)
             ->whereColumn('amount', '>', 'paid_amount')
             ->whereDate('due_date', '<', $date->copy()->subDays(90))
+            ->whereHas('student', function($q) {
+                $q->where('is_active', true);
+            })
             ->with(['student.class', 'student.section'])
             ->get()
             ->map(function ($fee) use ($date) {
                 $dueDays = Carbon::parse($fee->due_date)->diffInDays($date);
+                $pendingAmt = max(0.00, (float)$fee->amount + (float)($fee->fine_amount_applied ?? 0) - (float)($fee->instant_discount_amount ?? 0) - (float)$fee->paid_amount);
                 return [
-                    'name' => $fee->student->full_name,
-                    'class_section' => ($fee->student->class->name ?? '') . '-' . ($fee->student->section->name ?? ''),
-                    'pending_amount' => $fee->amount - $fee->paid_amount,
+                    'name' => $fee->student?->full_name ?? '—',
+                    'class_section' => ($fee->student?->class?->name ?? '—') . ($fee->student?->section ? '-' . $fee->student->section->name : ''),
+                    'pending_amount' => $pendingAmt,
                     'due_days' => $dueDays
                 ];
             })
+            ->filter(fn($item) => $item['pending_amount'] > 0.001)
             ->sortByDesc('due_days');
         
         $feeDefaulters90PlusMoreCount = max(0, $feeDefaulters90PlusList->count() - 3);
@@ -1371,17 +1479,49 @@ class SchoolDashboardController extends Controller
 
             case 'student_attendance':
                 $title = "Today's Student Attendance Log";
-                $marked = StudentAttendance::where('school_id', $schoolId)->whereDate('date', today())->with('student')->get();
+                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+                $isTodayInSession = $this->isDateInSession($selectedSession, today());
+                $sessId = $selectedSession?->id;
+
+                $marked = collect([]);
+                if ($isTodayInSession) {
+                    $marked = StudentAttendance::where('school_id', $schoolId)
+                        ->whereDate('date', today())
+                        ->when($sessId, function($q) use ($sessId) {
+                            $q->where(function($sub) use ($sessId) {
+                                $sub->where('academic_session_id', $sessId)
+                                    ->orWhere(function($sq) use ($sessId) {
+                                        $sq->whereNull('academic_session_id')
+                                           ->whereHas('student', function($stq) use ($sessId) {
+                                               $stq->where('academic_session_id', $sessId)
+                                                   ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                                           });
+                                    });
+                            });
+                        })
+                        ->with('student')
+                        ->get();
+                }
+
                 if ($marked->isEmpty()) {
-                    $students = Student::where('school_id', $schoolId)->where('is_active', true)->get();
-                    foreach ($students as $stu) {
-                        $data[] = [
-                            'roll' => $stu->roll_number ?? '—',
-                            'name' => $stu->full_name,
-                            'class' => $stu->class?->name ?? '—',
-                            'status' => 'Not Marked',
-                            'remark' => '—'
-                        ];
+                    if ($isTodayInSession) {
+                        $studentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
+                        if ($selectedSession) {
+                            $studentsQuery->where(function($q) use ($sessId) {
+                                $q->where('academic_session_id', $sessId)
+                                  ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $sessId));
+                            });
+                        }
+                        $students = $studentsQuery->get();
+                        foreach ($students as $stu) {
+                            $data[] = [
+                                'roll' => $stu->roll_number ?? '—',
+                                'name' => $stu->full_name,
+                                'class' => $stu->class?->name ?? '—',
+                                'status' => 'Not Marked',
+                                'remark' => '—'
+                            ];
+                        }
                     }
                 } else {
                     foreach ($marked as $att) {
@@ -1398,51 +1538,78 @@ class SchoolDashboardController extends Controller
 
             case 'staff_attendance':
                 $title = "Today's Staff Attendance Statuses";
-                $marked = StaffAttendance::where('school_id', $schoolId)->whereDate('date', today())->with('staff')->get();
+                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+                $isTodayInSession = $this->isDateInSession($selectedSession, today());
+
+                $marked = collect([]);
+                if ($isTodayInSession) {
+                    $marked = StaffAttendance::where('school_id', $schoolId)->whereDate('date', today())->with('staff')->get();
+                }
+
                 if ($marked->isEmpty()) {
-                    $staff = Staff::where('school_id', $schoolId)->where('is_active', true)->get();
-                    foreach ($staff as $st) {
-                        $data[] = [
-                            'name' => $st->first_name . ' ' . $st->last_name,
-                            'role' => $st->designation?->name ?? 'Staff',
-                            'status' => 'Not Marked',
-                            'punch_in' => '—'
-                        ];
+                    if ($isTodayInSession) {
+                        $staff = Staff::where('school_id', $schoolId)->where('is_active', true)->get();
+                        foreach ($staff as $st) {
+                            $data[] = [
+                                'name' => $st->first_name . ' ' . $st->last_name,
+                                'role' => $st->designation?->name ?? 'Staff',
+                                'status' => 'Not Marked',
+                                'punch_in' => '—'
+                            ];
+                        }
                     }
                 } else {
                     foreach ($marked as $att) {
                         $data[] = [
-                            'name' => $att->staff?->first_name . ' ' . $att->staff?->last_name,
+                            'name' => ($att->staff?->first_name ?? 'Staff') . ' ' . ($att->staff?->last_name ?? ''),
                             'role' => $att->staff?->designation?->name ?? 'Staff',
                             'status' => ucfirst($att->status),
-                            'punch_in' => $att->punch_in_time ?? '—'
+                            'punch_in' => $att->clock_in_at ? Carbon::parse($att->clock_in_at)->format('h:i A') : '—'
                         ];
                     }
                 }
                 break;
 
             case 'fee_pending':
-                $title = "Students with Dues / Pending Fees";
-                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
-                $pendingQuery = StudentFee::where('school_id', $schoolId)->whereColumn('amount', '>', 'paid_amount')->with('student');
-                if ($selectedSession) {
-                    $sessId = $selectedSession->id;
-                    $pendingQuery->whereHas('student', function($sq) use ($sessId) {
-                        $sq->where('academic_session_id', $sessId)
-                          ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
-                    });
-                }
-                $pending = $pendingQuery->get();
-                foreach ($pending as $fee) {
-                    $due = $fee->amount - $fee->paid_amount;
-                    $data[] = [
-                        'name' => $fee->student?->full_name ?? '—',
-                        'class' => ($fee->student?->class?->name ?? '—') . ' (' . ($fee->student?->section?->name ?? '—') . ')',
-                        'total_fee' => '₹ ' . number_format($fee->amount, 2),
-                        'paid' => '₹ ' . number_format($fee->paid_amount, 2),
-                        'due' => '₹ ' . number_format($due, 2),
-                        'due_date' => $fee->due_date ?? '—'
-                    ];
+                $period = $request->get('period', 'tilldate');
+                $isTillDate = ($period === 'tilldate');
+                $title = $isTillDate ? "Students with Dues / Pending Fees (Till Date)" : "Students with Dues / Pending Fees (Annual)";
+                $sessionId = $request->get('session_id');
+                $selectedSession = $sessionId 
+                    ? AcademicSession::where('school_id', $schoolId)->find($sessionId)
+                    : AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+
+                $pendingFees = \App\Services\FeeHelper::buildSessionFeeQuery($schoolId, $selectedSession, $isTillDate)
+                    ->with(['student.class', 'student.section', 'student.studentSessions', 'feeSchedule'])
+                    ->get();
+
+                // Group by student so each student appears once with their total pending due till date/annual
+                $groupedByStudent = $pendingFees->groupBy('student_id');
+                foreach ($groupedByStudent as $studentId => $stFees) {
+                    $st = $stFees->first()->student;
+                    if (!$st) continue;
+
+                    $totalFee = (float) $stFees->sum('amount');
+                    $paid     = (float) $stFees->sum('paid_amount');
+                    $discount = (float) $stFees->sum('instant_discount_amount');
+                    $fine     = (float) $stFees->sum('fine_amount_applied');
+                    $due      = max(0.00, $totalFee + $fine - $discount - $paid);
+
+                    if ($due > 0.001) {
+                        $latestDueDate = $stFees->pluck('due_date')->filter()->sortDesc()->first() ?? '—';
+                        $sessRec = $selectedSession ? $st->studentSessions->firstWhere('academic_session_id', $selectedSession->id) : null;
+                        $className = ($sessRec?->schoolClass?->name ?? $st->class?->name ?? '—');
+                        $secName = ($sessRec?->section?->name ?? $st->section?->name);
+
+                        $data[] = [
+                            'name' => $st->full_name,
+                            'class' => $className . ($secName ? ' (' . $secName . ')' : ''),
+                            'total_fee' => '₹ ' . number_format($totalFee, 2),
+                            'paid' => '₹ ' . number_format($paid, 2),
+                            'due' => '₹ ' . number_format($due, 2),
+                            'due_date' => $latestDueDate
+                        ];
+                    }
                 }
                 break;
 
@@ -1507,33 +1674,81 @@ class SchoolDashboardController extends Controller
                 break;
 
             case 'class_fee_report':
-                $title = 'Class-Wise Fee Report';
-                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
-                $classes = \App\Models\SchoolClass::where('school_id', $schoolId)->get();
-                foreach ($classes as $c) {
-                    $studentQuery = Student::where('school_id', $schoolId)->where('class_id', $c->id);
-                    if ($selectedSession) {
-                        $sessId = $selectedSession->id;
-                        $studentQuery->where(function($q) use ($sessId) {
+                $period = $request->get('period', 'tilldate');
+                $isTillDate = ($period === 'tilldate');
+                $title = $isTillDate ? 'Class-Wise Fee Report (Till Date)' : 'Class-Wise Fee Report (Annual)';
+                $sessionId = $request->get('session_id');
+                $selectedSession = $sessionId 
+                    ? AcademicSession::where('school_id', $schoolId)->find($sessionId)
+                    : AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+
+                // Classes ordered naturally
+                $classes = \App\Models\SchoolClass::where('school_id', $schoolId)
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->get();
+
+                $classes = $classes->sort(function($a, $b) {
+                    $orderA = \App\Services\FeeHelper::getAcademicClassOrder($a->name, $a->sort_order);
+                    $orderB = \App\Services\FeeHelper::getAcademicClassOrder($b->name, $b->sort_order);
+                    return $orderA <=> $orderB;
+                })->values();
+
+                // Active students count per class for this session
+                $enrolledStudents = Student::where('school_id', $schoolId)
+                    ->where('is_active', true)
+                    ->where(function($q) use ($selectedSession) {
+                        if ($selectedSession) {
+                            $sessId = $selectedSession->id;
                             $q->where('academic_session_id', $sessId)
                               ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $sessId));
-                        });
+                        }
+                    })
+                    ->with(['studentSessions' => fn($q) => $selectedSession ? $q->where('academic_session_id', $selectedSession->id) : null])
+                    ->get();
+
+                $studentCountByClass = [];
+                foreach ($enrolledStudents as $st) {
+                    $cId = $selectedSession 
+                        ? ($st->studentSessions->firstWhere('academic_session_id', $selectedSession->id)?->class_id ?? $st->class_id)
+                        : $st->class_id;
+                    if ($cId) {
+                        $studentCountByClass[$cId] = ($studentCountByClass[$cId] ?? 0) + 1;
                     }
-                    $studentIds = $studentQuery->pluck('id');
-                    $feeQuery = StudentFee::where('school_id', $schoolId)->whereIn('student_id', $studentIds);
-                    $totalFee = (float) (clone $feeQuery)->sum('amount');
-                    $paidQuery = (clone $feeQuery);
-                    if ($selectedSession && $selectedSession->start_date && $selectedSession->end_date) {
-                        $paidQuery->whereBetween('updated_at', [$selectedSession->start_date->startOfDay(), $selectedSession->end_date->endOfDay()]);
+                }
+
+                $allSessionFees = \App\Services\FeeHelper::buildSessionFeeQuery($schoolId, $selectedSession, $isTillDate)
+                    ->with(['student.studentSessions' => fn($q) => $selectedSession ? $q->where('academic_session_id', $selectedSession->id) : null])
+                    ->get();
+
+                $feesByClass = [];
+                foreach ($allSessionFees as $f) {
+                    $cId = $selectedSession 
+                        ? ($f->student?->studentSessions?->firstWhere('academic_session_id', $selectedSession->id)?->class_id ?? $f->student?->class_id)
+                        : $f->student?->class_id;
+                    if ($cId) {
+                        $feesByClass[$cId][] = $f;
                     }
-                    $paid = (float) $paidQuery->sum('paid_amount');
-                    $due = max(0, $totalFee - $paid);
-                    
+                }
+
+                $totStudents = 0;
+                foreach ($classes as $c) {
+                    $classFees = collect($feesByClass[$c->id] ?? []);
+                    $totalFee = (float) $classFees->sum('amount');
+                    $discount = (float) $classFees->sum('instant_discount_amount');
+                    $fine     = (float) $classFees->sum('fine_amount_applied');
+                    $paid     = (float) $classFees->sum('paid_amount');
+                    $due      = max(0.00, $totalFee + $fine - $discount - $paid);
+                    $numStudents = $studentCountByClass[$c->id] ?? $classFees->pluck('student_id')->unique()->count();
+                    $totStudents += $numStudents;
+
                     $data[] = [
-                        'class_name' => $c->name,
-                        'total_fee' => $totalFee,
-                        'paid' => $paid,
-                        'due' => $due
+                        'class_id'       => $c->id,
+                        'class_name'     => $c->name,
+                        'total_students' => $numStudents,
+                        'total_fee'      => $totalFee,
+                        'paid'           => $paid,
+                        'due'            => $due
                     ];
                 }
                 break;
@@ -1542,8 +1757,10 @@ class SchoolDashboardController extends Controller
         return response()->json([
             'title' => $title,
             'data' => $data,
-            'type' => $type
+            'type' => $type,
+            'period' => $period ?? 'tilldate'
         ]);
+
     }
 
     public function sendFeeReminder(Request $request): JsonResponse
@@ -1606,51 +1823,13 @@ class SchoolDashboardController extends Controller
                 'totalExpense' => number_format($totalExpense),
             ];
         } elseif ($box === 'fee') {
-            $sessionFeeQuery = StudentFee::where('school_id', $schoolId);
-            if ($currentSession) {
-                $sessId = $currentSession->id;
-                $sessionFeeQuery->whereHas('student', function($sq) use ($sessId) {
-                    $sq->where('academic_session_id', $sessId)
-                      ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
-                });
-            }
-
-            $todayFeeCollection = (float) (clone $sessionFeeQuery)
-                ->whereDate('updated_at', today())
-                ->sum('paid_amount');
-
-            $totalFeeCollectionQuery = (clone $sessionFeeQuery)->where('paid_amount', '>', 0);
-            if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
-                $totalFeeCollectionQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
-            }
-            $totalFeeCollection = (float) $totalFeeCollectionQuery->sum('paid_amount');
-            
-            $todayFeeDue = (float) (clone $sessionFeeQuery)
-                ->whereDate('due_date', today())
-                ->sum('amount');
-            $todayFeeCollectionPct = 0;
-            if ($todayFeeCollection > 0) {
-                if ($todayFeeDue > 0) {
-                    $todayFeeCollectionPct = min(100, round(($todayFeeCollection / $todayFeeDue) * 100));
-                } else {
-                    $todayFeeCollectionPct = 100;
-                }
-            }
-
-            $feeCollectedQuery = (clone $sessionFeeQuery)->where('due_date', '<=', today());
-            if ($currentSession && $currentSession->start_date && $currentSession->end_date) {
-                $feeCollectedQuery->whereBetween('updated_at', [$currentSession->start_date->startOfDay(), $currentSession->end_date->endOfDay()]);
-            }
-            $feeCollectedAmount = (float) $feeCollectedQuery->sum('paid_amount');
-            $feeDueAmount = (float) (clone $sessionFeeQuery)->where('due_date', '<=', today())->whereColumn('amount', '>', 'paid_amount')->sum(\DB::raw('amount - paid_amount'));
-            $feeTotalSum = $feeCollectedAmount + $feeDueAmount;
-            $feeCollectedPct = $feeTotalSum > 0 ? round(($feeCollectedAmount / $feeTotalSum) * 100, 2) : 0;
+            $feeMetrics = \App\Services\FeeHelper::calculateSessionFeeMetrics($schoolId, $currentSession);
 
             $data = [
-                'todayFeeCollection' => number_format($todayFeeCollection),
-                'todayFeeCollectionPct' => $todayFeeCollectionPct,
-                'totalFeeCollection' => number_format($totalFeeCollection),
-                'feeCollectedPct' => $feeCollectedPct,
+                'todayFeeCollection' => number_format($feeMetrics['todayFeeCollection']),
+                'todayFeeCollectionPct' => $feeMetrics['todayFeeCollectionPct'],
+                'totalFeeCollection' => number_format($feeMetrics['annualCollected']),
+                'feeCollectedPct' => $feeMetrics['tillDateCollectedPct'],
             ];
         } elseif ($box === 'attendance') {
             $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
@@ -1664,33 +1843,52 @@ class SchoolDashboardController extends Controller
             $totalStudents = $totalStudentsQuery->count();
             $totalStaffs = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
 
-            $markedStudentsToday = StudentAttendance::where('school_id', $schoolId)
-                ->whereDate('date', today())
-                ->count();
-            $presentStudentsToday = StudentAttendance::where('school_id', $schoolId)
-                ->whereDate('date', today())
-                ->whereIn('status', ['present', 'late', 'duty_leave'])
-                ->count() + (StudentAttendance::where('school_id', $schoolId)
-                    ->whereDate('date', today())
-                    ->where('status', 'half_day')
-                    ->count() * 0.5);
-            $studentAttendancePct = $totalStudents > 0 
-                ? round(($presentStudentsToday / $totalStudents) * 100) 
-                : 0;
+            $isTodayInSession = $this->isDateInSession($currentSession, today());
 
-            $markedStaffToday = StaffAttendance::where('school_id', $schoolId)
-                ->whereDate('date', today())
-                ->count();
-            $presentStaffToday = StaffAttendance::where('school_id', $schoolId)
-                ->whereDate('date', today())
-                ->whereIn('status', ['present', 'late'])
-                ->count() + (StaffAttendance::where('school_id', $schoolId)
+            $studentAttendancePct = 0;
+            $staffAttendancePct = 0;
+            $presentStudentsToday = 0;
+            $presentStaffToday = 0;
+
+            if ($isTodayInSession) {
+                $sessId = $currentSession?->id;
+                $studentAttQuery = StudentAttendance::where('school_id', $schoolId)
                     ->whereDate('date', today())
-                    ->where('status', 'half_day')
-                    ->count() * 0.5);
-            $staffAttendancePct = $totalStaffs > 0 
-                ? round(($presentStaffToday / $totalStaffs) * 100) 
-                : 0;
+                    ->when($sessId, function($q) use ($sessId) {
+                        $q->where(function($sub) use ($sessId) {
+                            $sub->where('academic_session_id', $sessId)
+                                ->orWhere(function($sq) use ($sessId) {
+                                    $sq->whereNull('academic_session_id')
+                                       ->whereHas('student', function($stq) use ($sessId) {
+                                           $stq->where('academic_session_id', $sessId)
+                                               ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                                       });
+                                });
+                        });
+                    });
+
+                $presentStudentsToday = (clone $studentAttQuery)
+                    ->whereIn('status', ['present', 'late', 'duty_leave'])
+                    ->count() + ((clone $studentAttQuery)
+                        ->where('status', 'half_day')
+                        ->count() * 0.5);
+
+                $studentAttendancePct = $totalStudents > 0 
+                    ? round(($presentStudentsToday / $totalStudents) * 100) 
+                    : 0;
+
+                $presentStaffToday = StaffAttendance::where('school_id', $schoolId)
+                    ->whereDate('date', today())
+                    ->whereIn('status', ['present', 'late'])
+                    ->count() + (StaffAttendance::where('school_id', $schoolId)
+                        ->whereDate('date', today())
+                        ->where('status', 'half_day')
+                        ->count() * 0.5);
+
+                $staffAttendancePct = $totalStaffs > 0 
+                    ? round(($presentStaffToday / $totalStaffs) * 100) 
+                    : 0;
+            }
 
             $data = [
                 'studentAttendancePct' => $studentAttendancePct,
@@ -1955,7 +2153,7 @@ class SchoolDashboardController extends Controller
     }
 
     /**
-     * Topbar instant search for students and staff within the school.
+     * Topbar instant search for students and staff within the school filtered by academic session.
      */
     public function topbarSearch(Request $request)
     {
@@ -1966,26 +2164,67 @@ class SchoolDashboardController extends Controller
 
         $schoolId = auth()->user()->school_id;
 
-        $studentQuery = Student::where('school_id', $schoolId)
-            ->with(['schoolClass:id,name', 'section:id,name']);
-        SearchHelper::applyStudentSearch($studentQuery, $query);
+        // Resolve selected academic session or fallback to the school's current active session
+        $sessionId = $request->input('academic_session_id');
+        if (!$sessionId) {
+            $currentSession = AcademicSession::where('school_id', $schoolId)
+                ->where('is_current', true)
+                ->first();
+            $sessionId = $currentSession?->id;
+        }
 
-        $students = $studentQuery->limit(5)
-            ->get(['id', 'first_name', 'last_name', 'admission_number', 'roll_number', 'photo', 'phone', 'father_phone', 'mother_phone', 'guardian_phone', 'class_id', 'section_id'])
-            ->map(function ($student) {
-                $className = $student->schoolClass ? $student->schoolClass->name : '';
-                $sectionName = $student->section ? $student->section->name : '';
+        $studentQuery = Student::where('school_id', $schoolId);
+
+        if ($sessionId) {
+            $studentQuery->where(function ($q) use ($sessionId) {
+                $q->where('academic_session_id', $sessionId)
+                  ->orWhereHas('studentSessions', function ($sq) use ($sessionId) {
+                      $sq->where('academic_session_id', $sessionId);
+                  });
+            });
+        }
+
+        $studentQuery->with([
+            'schoolClass:id,name',
+            'section:id,name',
+            'studentSessions' => function ($sq) use ($sessionId) {
+                if ($sessionId) {
+                    $sq->where('academic_session_id', $sessionId)->with(['schoolClass:id,name', 'section:id,name']);
+                }
+            }
+        ]);
+
+        SearchHelper::applyStudentSearch($studentQuery, $query, '', $sessionId ? (int)$sessionId : null);
+
+        $students = $studentQuery->limit(8)
+            ->get([
+                'id', 'first_name', 'last_name', 'admission_number', 'roll_number',
+                'photo', 'phone', 'father_phone', 'mother_phone', 'guardian_phone',
+                'class_id', 'section_id', 'academic_session_id'
+            ])
+            ->map(function ($student) use ($sessionId) {
+                $sessRecord = $sessionId ? $student->studentSessionFor($sessionId) : null;
+                $schoolClass = $sessRecord?->schoolClass ?: $student->schoolClass;
+                $section = $sessRecord?->section ?: $student->section;
+                $rollNumber = $sessRecord?->roll_number ?: $student->roll_number;
+
+                $className = $schoolClass ? $schoolClass->name : '';
+                $sectionName = $section ? $section->name : '';
                 $classDisplay = trim($className . ($sectionName ? ' ' . $sectionName : ''));
 
                 $phone = $student->phone ?: ($student->father_phone ?: ($student->mother_phone ?: $student->guardian_phone));
 
+                $firstName = ($sessRecord && $sessRecord->getProfileAttribute('first_name')) ? $sessRecord->getProfileAttribute('first_name') : $student->first_name;
+                $lastName = ($sessRecord && $sessRecord->getProfileAttribute('last_name') !== null) ? $sessRecord->getProfileAttribute('last_name') : $student->last_name;
+
                 return [
                     'id' => $student->id,
-                    'first_name' => $student->first_name,
-                    'last_name' => $student->last_name,
-                    'roll_number' => $student->roll_number,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'admission_number' => $student->admission_number,
+                    'roll_number' => $rollNumber,
                     'photo' => $student->photo,
-                    'photo_url' => $student->photo_url,
+                    'photo_url' => ($sessRecord && !empty($sessRecord->photo_url)) ? $sessRecord->photo_url : $student->photo_url,
                     'phone' => $phone,
                     'class_name' => $classDisplay,
                 ];
@@ -2001,5 +2240,39 @@ class SchoolDashboardController extends Controller
             'students' => $students,
             'staff' => $staff,
         ]);
+    }
+
+    /**
+     * Determine if a given date falls within the specified academic session.
+     */
+    private function isDateInSession(?AcademicSession $session, Carbon $date): bool
+    {
+        if (!$session) {
+            return false;
+        }
+
+        if ($session->start_date && $session->end_date) {
+            $startDate = Carbon::parse($session->start_date)->startOfDay();
+            $endDate   = Carbon::parse($session->end_date)->endOfDay();
+            return $date->copy()->startOfDay()->between($startDate, $endDate);
+        }
+
+        // Fallback: If dates are not set, attempt to parse years from the session name (e.g. "April-2025-March-2026" or "2025-2026")
+        if (!empty($session->name)) {
+            preg_match_all('/\b(20\d\d)\b/', $session->name, $matches);
+            if (!empty($matches[0])) {
+                $years = array_map('intval', $matches[0]);
+                $startYear = min($years);
+                $endYear = max($years);
+                if (count($years) >= 2 || (count($years) === 1 && str_contains($session->name, '-'))) {
+                    $endYear = (count($years) === 1) ? $startYear + 1 : $endYear;
+                    $calcStart = Carbon::create($startYear, 4, 1)->startOfDay();
+                    $calcEnd   = Carbon::create($endYear, 3, 31)->endOfDay();
+                    return $date->copy()->startOfDay()->between($calcStart, $calcEnd);
+                }
+            }
+        }
+
+        return false;
     }
 }

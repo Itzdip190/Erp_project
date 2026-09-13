@@ -378,7 +378,7 @@
                 <div class="slip-header-text">
                     <h2>{{ $school->name ?? 'VEDANT PUBLIC SCHOOL' }}</h2>
                     <p>{{ $school->address ?? 'Sctor 88A Gurgaon, Hariyana' }}</p>
-                    <p>Email: {{ $school->email ?? 'vedantpublicschool@gmail.com' }} | Phone: {{ $school->phone ?? '9451805575' }}</p>
+                    <p>Email: {{ $school->email ?? 'vedantpublicschool@gmail.com' }} | Phone: {{ $school->phone ?? '9219441716' }}</p>
                 </div>
             </div>
 
@@ -538,7 +538,7 @@
                 <div class="slip-header-text">
                     <h2>{{ $school->name ?? 'VEDANT PUBLIC SCHOOL' }}</h2>
                     <p>{{ $school->address ?? 'Sctor 88A Gurgaon, Hariyana' }}</p>
-                    <p>Email: {{ $school->email ?? 'vedantpublicschool@gmail.com' }} | Phone: {{ $school->phone ?? '9451805575' }}</p>
+                    <p>Email: {{ $school->email ?? 'vedantpublicschool@gmail.com' }} | Phone: {{ $school->phone ?? '9219441716' }}</p>
                 </div>
             </div>
 

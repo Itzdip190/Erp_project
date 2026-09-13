@@ -374,7 +374,7 @@ class MultiSchoolReportCardTest extends TestCase
             'father_name' => 'Anil Kumar Gupta',
             'mother_name' => 'Parent Name',
             'guardian_name' => 'Anil Kumar Gupta',
-            'guardian_phone' => '9451805575',
+            'guardian_phone' => '9219441716',
             'guardian_relationship' => 'father',
             'address' => 'Gurgaon',
             'city' => 'Gurgaon',

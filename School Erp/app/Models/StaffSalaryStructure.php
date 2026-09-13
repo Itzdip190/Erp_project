@@ -16,6 +16,7 @@ class StaffSalaryStructure extends Model
     protected $fillable = [
         'school_id',
         'staff_id',
+        'salary_structure_id',
         'basic_salary',
         'salary_type',
         'hra',
@@ -54,6 +55,11 @@ class StaffSalaryStructure extends Model
     public function staff()
     {
         return $this->belongsTo(Staff::class, 'staff_id');
+    }
+
+    public function salaryStructureMaster()
+    {
+        return $this->belongsTo(SalaryStructure::class, 'salary_structure_id');
     }
 
     public function creator()

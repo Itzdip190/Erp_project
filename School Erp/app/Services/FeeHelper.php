@@ -15,6 +15,51 @@ class FeeHelper
     protected static array $scheduleCache = [];
 
     /**
+     * Cache for session-scoped enrolled students and promoted eligibility to avoid thousands of N+1 queries.
+     */
+    protected static array $requestSessionCache = [];
+
+    /**
+     * Track sessions that have already been purged in the current request lifecycle.
+     */
+    protected static array $purgedSessions = [];
+
+    /**
+     * Resolve academic class order naturally (Pre-Nursery, Nursery, LKG, UKG, 1, 2, ..., 12).
+     */
+    public static function getAcademicClassOrder(?string $className, $sortOrder = null): int
+    {
+        if (is_numeric($sortOrder) && (int)$sortOrder > 0) {
+            return (int)$sortOrder;
+        }
+
+        $name = strtolower(trim((string)$className));
+        if (str_contains($name, 'play') || str_contains($name, 'pre-nursery') || str_contains($name, 'pre nursery')) return 1;
+        if (str_contains($name, 'nursery') || str_contains($name, 'nur')) return 2;
+        if (str_contains($name, 'lkg') || str_contains($name, 'l.k.g') || str_contains($name, 'kg1') || str_contains($name, 'kg 1') || str_contains($name, 'lower')) return 3;
+        if (str_contains($name, 'ukg') || str_contains($name, 'u.k.g') || str_contains($name, 'kg2') || str_contains($name, 'kg 2') || str_contains($name, 'upper')) return 4;
+
+        if (preg_match('/\b(12|xii)\b/i', $name)) return 160;
+        if (preg_match('/\b(11|xi)\b/i', $name)) return 150;
+        if (preg_match('/\b(10|x)\b/i', $name)) return 140;
+        if (preg_match('/\b(9|ix)\b/i', $name)) return 130;
+        if (preg_match('/\b(8|viii)\b/i', $name)) return 120;
+        if (preg_match('/\b(7|vii)\b/i', $name)) return 110;
+        if (preg_match('/\b(6|vi)\b/i', $name)) return 100;
+        if (preg_match('/\b(5|v)\b/i', $name)) return 90;
+        if (preg_match('/\b(4|iv)\b/i', $name)) return 80;
+        if (preg_match('/\b(3|iii)\b/i', $name)) return 70;
+        if (preg_match('/\b(2|ii)\b/i', $name)) return 60;
+        if (preg_match('/\b(1|i)\b/i', $name)) return 50;
+
+        if (preg_match('/\d+/', $name, $matches)) {
+            return 50 + (int)$matches[0];
+        }
+
+        return 999;
+    }
+
+    /**
      * Resolve the dynamic installment name given a StudentFee instance, installment number, or Student model.
      */
     public static function getInstallmentName($studentFeeOrInstNo = null, ?int $instNo = null, ?Student $student = null): string
@@ -241,5 +286,520 @@ class FeeHelper
 
         return static::findApplicableSchedule($schoolId, $targetSessionId, $className, $sectionName);
     }
+
+    /**
+     * Get all academic session IDs in which the student has valid enrollment or active history.
+     */
+    public static function getStudentEnrolledSessionIds(Student $student): array
+    {
+        $sessionIds = collect();
+
+        // 1. Current student record's academic_session_id
+        if (!empty($student->academic_session_id)) {
+            $sessionIds->push((int)$student->academic_session_id);
+        }
+
+        // 2. Student sessions relation
+        if ($student->relationLoaded('studentSessions')) {
+            $sessIds = $student->studentSessions->pluck('academic_session_id')->filter()->map(fn($id) => (int)$id);
+            $sessionIds = $sessionIds->merge($sessIds);
+        } else {
+            $sessIds = $student->studentSessions()->pluck('academic_session_id')->filter()->map(fn($id) => (int)$id);
+            $sessionIds = $sessionIds->merge($sessIds);
+        }
+
+        return $sessionIds->unique()->values()->toArray();
+    }
+
+    /**
+     * Check whether a student was enrolled in any of the specified previous academic sessions.
+     */
+    public static function isStudentEnrolledInPreviousSessions(Student $student, array $previousSessionIds, $selectedSession = null): bool
+    {
+        if (empty($previousSessionIds)) {
+            return false;
+        }
+
+        $enrolledSessionIds = static::getStudentEnrolledSessionIds($student);
+        $hasMatch = !empty(array_intersect($enrolledSessionIds, array_map('intval', $previousSessionIds)));
+        if ($hasMatch) {
+            return true;
+        }
+
+        if ($selectedSession && !empty($selectedSession->start_date) && !empty($student->admission_date)) {
+            try {
+                $admDate = \Carbon\Carbon::parse($student->admission_date)->toDateString();
+                $sessStart = \Carbon\Carbon::parse($selectedSession->start_date)->toDateString();
+                if ($admDate < $sessStart) {
+                    return true;
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        return false;
+    }
+
+    /**
+     * Get or build cached session enrollment and promotion eligibility to eliminate N+1 queries.
+     */
+    public static function getSessionStudentMetadata(int $schoolId, ?\App\Models\AcademicSession $session): array
+    {
+        if (!$session) {
+            return [
+                'enrolledStudents'           => collect(),
+                'enrolledStudentIds'         => [],
+                'previousSessionIds'         => [],
+                'eligiblePromotedStudentIds' => [],
+                'newAdmissionStudentIds'     => [],
+            ];
+        }
+
+        $cacheKey = "sess_{$schoolId}_{$session->id}";
+        if (isset(static::$requestSessionCache[$cacheKey])) {
+            return static::$requestSessionCache[$cacheKey];
+        }
+
+        // 1. All students enrolled in current session
+        $enrolledStudents = Student::where('school_id', $schoolId)
+            ->where(function($q) use ($session) {
+                $q->where('academic_session_id', $session->id)
+                  ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $session->id));
+            })
+            ->with(['studentSessions' => fn($q) => $q->where('school_id', $schoolId)])
+            ->get(['id', 'school_id', 'admission_number', 'admission_date', 'academic_session_id', 'class_id', 'section_id', 'fee_schedule_id']);
+
+        // 2. Identify previous sessions
+        $previousSessions = \App\Models\AcademicSession::where('school_id', $schoolId)
+            ->where('id', '!=', $session->id)
+            ->where(function($q) use ($session) {
+                if ($session->start_date) {
+                    $q->where('end_date', '<=', $session->start_date)
+                      ->orWhere('id', '<', $session->id);
+                } else {
+                    $q->where('id', '<', $session->id);
+                }
+            })
+            ->get(['id', 'start_date', 'end_date']);
+        $previousSessionIds = $previousSessions->pluck('id')->toArray();
+
+        // 3. Preload all admission numbers and student IDs that appeared in previous sessions via single bulk queries (0 N+1 queries!)
+        $prevAdmNumbers = [];
+        $prevSessionStudentIds = [];
+        if (!empty($previousSessionIds)) {
+            $prevAdmNumbers = Student::where('school_id', $schoolId)
+                ->whereIn('academic_session_id', $previousSessionIds)
+                ->whereNotNull('admission_number')
+                ->pluck('admission_number')
+                ->flip()
+                ->toArray();
+
+            $prevSessionStudentIds = \Illuminate\Support\Facades\DB::table('student_sessions')
+                ->whereIn('academic_session_id', $previousSessionIds)
+                ->pluck('student_id')
+                ->flip()
+                ->toArray();
+        }
+
+        $eligiblePromotedStudentIds = [];
+        $newAdmissionStudentIds = [];
+        $sessStart = $session->start_date ? \Carbon\Carbon::parse($session->start_date)->toDateString() : null;
+
+        foreach ($enrolledStudents as $st) {
+            $isPrevious = false;
+            // Check student record's academic_session_id
+            if ($st->academic_session_id && in_array((int)$st->academic_session_id, $previousSessionIds, true)) {
+                $isPrevious = true;
+            }
+            // Check loaded studentSessions relation
+            if (!$isPrevious && $st->studentSessions) {
+                foreach ($st->studentSessions as $ss) {
+                    if (in_array((int)$ss->academic_session_id, $previousSessionIds, true)) {
+                        $isPrevious = true;
+                        break;
+                    }
+                }
+            }
+            // Check preloaded student_sessions table
+            if (!$isPrevious && isset($prevSessionStudentIds[$st->id])) {
+                $isPrevious = true;
+            }
+            // Check admission_number match in previous sessions
+            if (!$isPrevious && !empty($st->admission_number) && isset($prevAdmNumbers[$st->admission_number])) {
+                $isPrevious = true;
+            }
+            // Check admission_date before session start date
+            if (!$isPrevious && $sessStart && !empty($st->admission_date)) {
+                try {
+                    if (\Carbon\Carbon::parse($st->admission_date)->toDateString() < $sessStart) {
+                        $isPrevious = true;
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            if ($isPrevious) {
+                $eligiblePromotedStudentIds[] = $st->id;
+            } else {
+                $newAdmissionStudentIds[] = $st->id;
+            }
+        }
+
+        $data = [
+            'enrolledStudents'           => $enrolledStudents,
+            'enrolledStudentIds'         => $enrolledStudents->pluck('id')->toArray(),
+            'previousSessionIds'         => $previousSessionIds,
+            'eligiblePromotedStudentIds' => $eligiblePromotedStudentIds,
+            'newAdmissionStudentIds'     => $newAdmissionStudentIds,
+        ];
+
+        static::$requestSessionCache[$cacheKey] = $data;
+        return $data;
+    }
+
+    /**
+     * Purge rogue unpaid/unlocked fee records from previous academic sessions that were mistakenly created
+     * for fresh students newly admitted in the specified session. Executed only once per request.
+     */
+    public static function purgeRoguePreviousSessionFees(int $schoolId, ?\App\Models\AcademicSession $currentSession): void
+    {
+        if (!$currentSession) {
+            return;
+        }
+
+        $purgeKey = "purged_{$schoolId}_{$currentSession->id}";
+        if (isset(static::$purgedSessions[$purgeKey])) {
+            return;
+        }
+        static::$purgedSessions[$purgeKey] = true;
+
+        $meta = static::getSessionStudentMetadata($schoolId, $currentSession);
+        $previousSessionIds     = $meta['previousSessionIds'];
+        $newAdmissionStudentIds = $meta['newAdmissionStudentIds'];
+
+        if (empty($previousSessionIds) || empty($newAdmissionStudentIds)) {
+            return;
+        }
+
+        StudentFee::withoutGlobalScope('active')
+            ->where('school_id', $schoolId)
+            ->whereIn('student_id', $newAdmissionStudentIds)
+            ->where('paid_amount', '<=', 0)
+            ->where('instant_discount_amount', '<=', 0)
+            ->where('status', '!=', 'refunded')
+            ->where(function($q) use ($previousSessionIds, $currentSession) {
+                $q->whereHas('feeSchedule', fn($sq) => $sq->whereIn('academic_session_id', $previousSessionIds))
+                  ->orWhereHas('transportFeeSchedule', fn($sq) => $sq->whereIn('academic_session_id', $previousSessionIds))
+                  ->orWhereHas('miscFee', fn($sq) => $sq->whereIn('academic_session_id', $previousSessionIds));
+                if ($currentSession->start_date) {
+                    $q->orWhere(function($sub) use ($currentSession) {
+                        $sub->whereNull('fee_schedule_id')
+                            ->whereNull('transport_fee_schedule_id')
+                            ->whereNull('misc_fee_id')
+                            ->where('due_date', '<', $currentSession->start_date);
+                    });
+                }
+            })
+            ->delete();
+    }
+
+    /**
+     * Auto-sync fees for active enrolled students in this session who have no fees assigned yet.
+     */
+    public static function autoSyncMissingStudentFees(int $schoolId, ?\App\Models\AcademicSession $session): void
+    {
+        if (!$session) return;
+
+        $syncKey = "autosync_{$schoolId}_{$session->id}";
+        if (isset(static::$purgedSessions[$syncKey])) {
+            return;
+        }
+        static::$purgedSessions[$syncKey] = true;
+
+        $studentsWithoutFees = Student::where('school_id', $schoolId)
+            ->where('is_active', true)
+            ->where(function($q) use ($session) {
+                $q->where('academic_session_id', $session->id)
+                  ->orWhereHas('studentSessions', fn($sq) => $sq->where('academic_session_id', $session->id));
+            })
+            ->whereDoesntHave('studentFees', function($fq) use ($session) {
+                $fq->where(function($sq) use ($session) {
+                    $sq->whereHas('feeSchedule', fn($schQ) => $schQ->where('academic_session_id', $session->id))
+                       ->orWhereHas('transportFeeSchedule', fn($schQ) => $schQ->where('academic_session_id', $session->id))
+                       ->orWhereHas('miscFee', fn($schQ) => $schQ->where('academic_session_id', $session->id));
+                    if ($session->start_date && $session->end_date) {
+                        $sq->orWhereBetween('due_date', [
+                            $session->start_date->copy()->startOfDay(),
+                            $session->end_date->copy()->endOfDay()
+                        ]);
+                    }
+                });
+            })
+            ->with(['studentSessions' => fn($q) => $q->where('academic_session_id', $session->id)])
+            ->get(['id', 'school_id', 'class_id', 'section_id', 'category_id', 'boarding_type', 'fee_schedule_id', 'academic_session_id']);
+
+        if ($studentsWithoutFees->isEmpty()) {
+            return;
+        }
+
+        foreach ($studentsWithoutFees as $st) {
+            $sessRec = $st->studentSessions->firstWhere('academic_session_id', $session->id);
+            $classId = $sessRec?->class_id ?? $st->class_id;
+            $sectionId = $sessRec?->section_id ?? $st->section_id;
+
+            if (!$classId) continue;
+
+            $cwFees = \App\Models\ClassWiseFee::where('school_id', $schoolId)
+                ->where('is_active', true)
+                ->where(function($q) use ($session) {
+                    $q->where('academic_session_id', $session->id)
+                      ->orWhereNull('academic_session_id');
+                })
+                ->where('class_id', $classId)
+                ->where(function($q) use ($sectionId) {
+                    $q->whereNull('section_id')
+                      ->orWhere('section_id', $sectionId);
+                })
+                ->get();
+
+            foreach ($cwFees as $cwFee) {
+                try {
+                    \App\Http\Controllers\School\FeeManagementController::syncClassWiseFeeToStudents($schoolId, $cwFee);
+                } catch (\Throwable $e) {}
+            }
+        }
+    }
+
+    /**
+     * Build an Eloquent query for StudentFees that legitimately belong to the given session,
+     * including legitimate carried-forward previous year dues for promoted students.
+     */
+    public static function buildSessionFeeQuery(int $schoolId, ?\App\Models\AcademicSession $session, bool $tillDateOnly = false, bool $strictSessionOnly = false)
+    {
+        $baseQuery = StudentFee::where('school_id', $schoolId);
+
+        if (!$session) {
+            if ($tillDateOnly) {
+                $baseQuery->where('due_date', '<=', today()->toDateString());
+            }
+            return $baseQuery;
+        }
+
+        // 1. Purge any rogue unpaid previous session fees (runs at most once per request)
+        static::purgeRoguePreviousSessionFees($schoolId, $session);
+
+        // 2. Resolve cached student enrollment metadata (0 redundant DB queries)
+        $meta = static::getSessionStudentMetadata($schoolId, $session);
+        $enrolledStudentIds         = $meta['enrolledStudentIds'];
+        $previousSessionIds         = $meta['previousSessionIds'];
+        $eligiblePromotedStudentIds = $meta['eligiblePromotedStudentIds'];
+
+        // 3. Build session-scoped fee query
+        $baseQuery->whereIn('student_id', $enrolledStudentIds)
+            ->where(function($query) use ($session, $previousSessionIds, $eligiblePromotedStudentIds, $tillDateOnly, $strictSessionOnly) {
+                // A) Fees belonging directly to current session
+                $query->where(function($cq) use ($session, $tillDateOnly) {
+                    $cq->where(function($schQ) use ($session) {
+                        $schQ->whereHas('feeSchedule', function($sq) use ($session) {
+                            $sq->where(function($sSub) use ($session) {
+                                $sSub->where('academic_session_id', $session->id)
+                                     ->orWhereNull('academic_session_id');
+                            });
+                        })
+                        ->orWhereHas('transportFeeSchedule', function($sq) use ($session) {
+                            $sq->where(function($sSub) use ($session) {
+                                $sSub->where('academic_session_id', $session->id)
+                                     ->orWhereNull('academic_session_id');
+                            });
+                        })
+                        ->orWhereHas('miscFee', function($sq) use ($session) {
+                            $sq->where(function($sSub) use ($session) {
+                                $sSub->where('academic_session_id', $session->id)
+                                     ->orWhereNull('academic_session_id');
+                            });
+                        });
+
+                        if ($session->start_date && $session->end_date) {
+                            $schQ->orWhereBetween('due_date', [
+                                $session->start_date->copy()->startOfDay(),
+                                $session->end_date->copy()->endOfDay()
+                            ]);
+                        }
+                    });
+
+                    if ($tillDateOnly) {
+                        $cq->where('due_date', '<=', today()->toDateString());
+                    }
+                });
+
+                // B) Legitimate carried-forward previous session dues (strictly for eligible promoted students with UNPAID dues)
+                if (!$strictSessionOnly && !empty($eligiblePromotedStudentIds) && !empty($previousSessionIds)) {
+                    $query->orWhere(function($prevQ) use ($previousSessionIds, $session, $eligiblePromotedStudentIds) {
+                        $prevQ->whereIn('student_id', $eligiblePromotedStudentIds)
+                              ->where(function($unpaidQ) {
+                                  $unpaidQ->where('status', '!=', 'paid')
+                                          ->whereRaw('(amount + COALESCE(fine_amount_applied, 0) - COALESCE(instant_discount_amount, 0)) > COALESCE(paid_amount, 0)');
+                              })
+                              ->where(function($sub) use ($previousSessionIds, $session) {
+                                  $sub->whereHas('feeSchedule', fn($sq) => $sq->whereIn('academic_session_id', $previousSessionIds))
+                                      ->orWhereHas('transportFeeSchedule', fn($sq) => $sq->whereIn('academic_session_id', $previousSessionIds))
+                                      ->orWhereHas('miscFee', fn($sq) => $sq->whereIn('academic_session_id', $previousSessionIds));
+                                  if ($session->start_date) {
+                                      $sub->orWhere(function($ss) use ($session) {
+                                          $ss->whereNull('fee_schedule_id')
+                                             ->whereNull('transport_fee_schedule_id')
+                                             ->whereNull('misc_fee_id')
+                                             ->where('due_date', '<', $session->start_date);
+                                      });
+                                  }
+                              });
+                    });
+                }
+            });
+
+        return $baseQuery;
+    }
+
+    /**
+     * Calculate comprehensive, session-scoped fee collection, dues, and pending metrics.
+     */
+    public static function calculateSessionFeeMetrics(int $schoolId, ?\App\Models\AcademicSession $session): array
+    {
+        // Auto-heal active enrolled students without fees if applicable
+        if ($session) {
+            static::autoSyncMissingStudentFees($schoolId, $session);
+        }
+
+        $meta = static::getSessionStudentMetadata($schoolId, $session);
+        $totalStudentsInSession = count($meta['enrolledStudentIds']);
+
+        $schoolPendingChequesTotal = (float) \App\Models\PendingCheque::where('school_id', $schoolId)
+            ->where('status', 'pending')
+            ->sum('amount');
+
+        // 1. Till Date Query & Metrics
+        $tillDateQuery = static::buildSessionFeeQuery($schoolId, $session, true);
+        $tillDateFees = (clone $tillDateQuery)->get();
+
+        $tillDateAssigned = 0.0;
+        $tillDateDiscount = 0.0;
+        $tillDateFine     = 0.0;
+        $tillDatePaid     = 0.0;
+        $tillDateDue      = 0.0;
+        $pendingStudentIdsTillDate  = [];
+        $assignedStudentIdsTillDate = [];
+
+        foreach ($tillDateFees as $fee) {
+            $amt  = (float) $fee->amount;
+            $disc = (float) ($fee->instant_discount_amount ?? 0);
+            $fn   = (float) ($fee->fine_amount_applied ?? 0);
+            $pd   = (float) ($fee->paid_amount ?? 0);
+            $netDue = max(0.00, $amt + $fn - $disc - $pd);
+
+            $tillDateAssigned += $amt;
+            $tillDateDiscount += $disc;
+            $tillDateFine     += $fn;
+            $tillDatePaid     += $pd;
+            $tillDateDue      += $netDue;
+
+            $assignedStudentIdsTillDate[$fee->student_id] = true;
+            if ($netDue > 0.001) {
+                $pendingStudentIdsTillDate[$fee->student_id] = true;
+            }
+        }
+
+        $tillDateDue = max(0.00, $tillDateDue - $schoolPendingChequesTotal);
+        $tillDateTotalSum = $tillDatePaid + $tillDateDue;
+        $tillDateCollectedPct = $tillDateTotalSum > 0 ? min(100.0, round(($tillDatePaid / $tillDateTotalSum) * 100, 2)) : 0.0;
+        $tillDateDuePct = $tillDateTotalSum > 0 ? min(100.0, round(($tillDateDue / $tillDateTotalSum) * 100, 2)) : 0.0;
+        $tillDatePendingStudentsCount = count($pendingStudentIdsTillDate);
+        $tillDateAssignedStudentsCount = count($assignedStudentIdsTillDate);
+
+        // 2. Annual (Entire Session) Query & Metrics
+        $annualQuery = static::buildSessionFeeQuery($schoolId, $session, false);
+        $annualFees = (clone $annualQuery)->get();
+
+        $annualAssigned = 0.0;
+        $annualDiscount = 0.0;
+        $annualFine     = 0.0;
+        $annualPaid     = 0.0;
+        $annualDue      = 0.0;
+        $pendingStudentIdsAnnual  = [];
+        $assignedStudentIdsAnnual = [];
+
+        foreach ($annualFees as $fee) {
+            $amt  = (float) $fee->amount;
+            $disc = (float) ($fee->instant_discount_amount ?? 0);
+            $fn   = (float) ($fee->fine_amount_applied ?? 0);
+            $pd   = (float) ($fee->paid_amount ?? 0);
+            $netDue = max(0.00, $amt + $fn - $disc - $pd);
+
+            $annualAssigned += $amt;
+            $annualDiscount += $disc;
+            $annualFine     += $fn;
+            $annualPaid     += $pd;
+            $annualDue      += $netDue;
+
+            $assignedStudentIdsAnnual[$fee->student_id] = true;
+            if ($netDue > 0.001) {
+                $pendingStudentIdsAnnual[$fee->student_id] = true;
+            }
+        }
+
+        $annualDue = max(0.00, $annualDue - $schoolPendingChequesTotal);
+        $annualTotalSum = $annualPaid + $annualDue;
+        $annualCollectedPct = $annualTotalSum > 0 ? min(100.0, round(($annualPaid / $annualTotalSum) * 100, 2)) : 0.0;
+        $annualDuePct = $annualTotalSum > 0 ? min(100.0, round(($annualDue / $annualTotalSum) * 100, 2)) : 0.0;
+        $annualPendingStudentsCount = count($pendingStudentIdsAnnual);
+        $annualAssignedStudentsCount = count($assignedStudentIdsAnnual);
+
+        // 3. Today's metrics (Today fee collection & due)
+        $todayCollection = (float) (clone $tillDateQuery)
+            ->whereDate('updated_at', today()->toDateString())
+            ->where('paid_amount', '>', 0)
+            ->sum('paid_amount');
+
+        $todayReceipts = (float) \App\Models\FeeReceipt::where('school_id', $schoolId)
+            ->whereDate('payment_date', today()->toDateString())
+            ->sum('amount_paid');
+        $todayFeeCollection = max($todayCollection, $todayReceipts);
+
+        $todayFeeDue = (float) (clone $tillDateQuery)
+            ->whereDate('due_date', today()->toDateString())
+            ->sum(\Illuminate\Support\Facades\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)'));
+        $todayFeeDue = max(0.00, $todayFeeDue);
+
+        $todayFeeCollectionPct = 0.0;
+        if ($todayFeeCollection > 0) {
+            if ($todayFeeDue > 0) {
+                $todayFeeCollectionPct = min(100.0, round(($todayFeeCollection / $todayFeeDue) * 100));
+            } else {
+                $todayFeeCollectionPct = 100.0;
+            }
+        }
+
+        return [
+            'tillDateCollected'             => $tillDatePaid,
+            'tillDateDue'                   => $tillDateDue,
+            'tillDateTotal'                 => $tillDateTotalSum,
+            'tillDateCollectedPct'          => $tillDateCollectedPct,
+            'tillDateDuePct'                => $tillDateDuePct,
+            'tillDatePendingStudentsCount'  => $tillDatePendingStudentsCount,
+            'tillDateAssignedStudentsCount' => $tillDateAssignedStudentsCount,
+
+            'annualCollected'               => $annualPaid,
+            'annualDue'                     => $annualDue,
+            'annualTotal'                   => $annualTotalSum,
+            'annualCollectedPct'            => $annualCollectedPct,
+            'annualDuePct'                  => $annualDuePct,
+            'annualPendingStudentsCount'    => $annualPendingStudentsCount,
+            'annualAssignedStudentsCount'   => $annualAssignedStudentsCount,
+            'totalStudentsInSession'        => $totalStudentsInSession,
+
+            'todayFeeCollection'            => $todayFeeCollection,
+            'todayFeeDue'                   => $todayFeeDue,
+            'todayFeeCollectionPct'         => $todayFeeCollectionPct,
+            'schoolPendingChequesTotal'     => $schoolPendingChequesTotal,
+        ];
+    }
 }
+
 

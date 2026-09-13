@@ -265,13 +265,18 @@
 
     <!-- Live Preview Interactive Card (Right 2 Spans) -->
     <div class="card" style="grid-column: span 2;">
-        <div class="card-hdr card-hdr-blue" style="display:flex; justify-content:space-between; align-items:center;">
-            <h3>Live Canvas Layout Designer</h3>
-            <span style="font-size:12px; color:var(--t2); font-weight:normal;"><i class="fas fa-arrows-alt"></i> Click & drag elements directly on the certificate to auto-save coordinates!</span>
+        <div class="card-hdr card-hdr-blue" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h3 style="display:inline-block; margin-right:12px;">Live Canvas Layout Designer</h3>
+                <span style="font-size:12px; color:var(--t2); font-weight:normal;"><i class="fas fa-arrows-alt"></i> Click & drag elements to position them</span>
+            </div>
+            <button type="button" class="btn-outline-blue" onclick="printLiveTemplatePreview()" style="padding:6px 14px; font-size:12px; background:#fff;">
+                <i class="fas fa-print"></i> Print A4 Sample
+            </button>
         </div>
         <div class="card-body" style="display:flex; justify-content:center; align-items:center; background:#cbd5e1; padding:30px;">
             <!-- Live CSS Preview Card -->
-            <div id="certPreviewContainer" style="width:100%; max-width:650px; min-height:450px; border:1px solid #cbd5e1; background:#fff; color:#0f172a; padding:45px 35px; box-shadow:var(--shadow-lg); font-family:'Georgia', serif; text-align:center; position:relative; overflow:hidden; box-sizing:border-box;">
+            <div id="certPreviewContainer" style="width:100%; max-width:650px; min-height:450px; border:1px solid #cbd5e1; background:#fff; color:#0f172a; padding:24px 28px; box-shadow:var(--shadow-lg); font-family:'Georgia', serif; text-align:center; position:relative; overflow:hidden; box-sizing:border-box;">
                 
                 <!-- SVG Corner decorations (Visible when no custom background image) -->
                 <div id="previewCertSvgDecorations">
@@ -290,7 +295,7 @@
                         </svg>
                     </div>
                     <!-- Gold Seal Emblem -->
-                    <div style="position: absolute; bottom: 35px; left: 35px; text-align: center;">
+                    <div style="position: absolute; bottom: 25px; left: 25px; text-align: center;">
                         <svg viewBox="0 0 100 100" style="width: 48px; height: 48px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.12));">
                             <path d="M 35,70 L 50,90 L 65,70" fill="#b45309" />
                             <path d="M 40,70 L 50,95 L 60,70" fill="#d97706" />
@@ -301,15 +306,15 @@
                 </div>
 
                 <!-- Inner border (Only visible when no background image) -->
-                <div class="border-inner-decoration" style="border:2px solid #e2e8f0; height:100%; padding:35px 25px; min-height:356px; display:flex; flex-direction:column; justify-content:space-between; position:relative; box-sizing:border-box; z-index: 2;">
+                <div class="border-inner-decoration" style="border:2px solid #e2e8f0; height:100%; padding:16px 20px; min-height:340px; display:flex; flex-direction:column; justify-content:space-between; position:relative; box-sizing:border-box; z-index: 2;">
                     <div>
                         <!-- Dynamic Logo Overlay -->
-                        <div id="previewCertLogoWrap" class="draggable-cert-element" style="margin-bottom: 14px; text-align: center; z-index: 10;">
+                        <div id="previewCertLogoWrap" class="draggable-cert-element" style="margin-bottom: 10px; text-align: center; z-index: 10;">
                             @if(!empty($logoUrl))
                                 <img id="previewCertLogo" src="{{ $logoUrl }}"
-                                    style="max-height: 65px; max-width: 140px; object-fit: contain; display:inline-block;"
+                                    style="max-height: 48px; max-width: 120px; object-fit: contain; display:inline-block;"
                                     onerror="this.style.display='none'; document.getElementById('previewCertLogoSvg').style.display='inline-block';">
-                                <svg id="previewCertLogoSvg" viewBox="0 0 120 120" style="width: 60px; height: 60px; display: none;">
+                                <svg id="previewCertLogoSvg" viewBox="0 0 120 120" style="width: 48px; height: 48px; display: none;">
                                     <defs><linearGradient id="lgFb" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1e3a8a"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient></defs>
                                     <circle cx="60" cy="60" r="55" fill="url(#lgFb)" stroke="#d97706" stroke-width="4"/>
                                     <path d="M60 20 L80 50 L95 48 L75 75 L80 95 L60 82 L40 95 L45 75 L25 48 L40 50 Z" fill="#f59e0b" stroke="#fff" stroke-width="1.5"/>
@@ -317,7 +322,7 @@
                                 </svg>
                             @else
                                 <!-- Premium School Emblem SVG -->
-                                <svg id="previewCertLogoPlaceholder" viewBox="0 0 120 120" style="width: 65px; height: 65px; display: inline-block; filter: drop-shadow(0 2px 6px rgba(30,58,138,0.25));">
+                                <svg id="previewCertLogoPlaceholder" viewBox="0 0 120 120" style="width: 50px; height: 50px; display: inline-block; filter: drop-shadow(0 2px 6px rgba(30,58,138,0.25));">
                                     <defs><linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1e3a8a"/><stop offset="100%" stop-color="#3b82f6"/></linearGradient></defs>
                                     <circle cx="60" cy="60" r="55" fill="url(#lg1)" stroke="#d97706" stroke-width="4"/>
                                     <path d="M60 20 L80 50 L95 48 L75 75 L80 95 L60 82 L40 95 L45 75 L25 48 L40 50 Z" fill="#f59e0b" stroke="#fff" stroke-width="1.5"/>
@@ -328,30 +333,30 @@
                         </div>
 
                         <!-- School Name -->
-                        <h2 style="font-size:16px; font-family:'Cinzel', 'Times New Roman', serif; font-weight: 800; text-transform:uppercase; letter-spacing:2px; margin:0 auto 12px; color:#1e3a8a; z-index: 10;" id="previewCertSchool" class="draggable-cert-element">
+                        <h2 style="font-size:16px; font-family:'Cinzel', 'Times New Roman', serif; font-weight: 800; text-transform:uppercase; letter-spacing:2px; margin:0 auto 10px; color:#1e3a8a; z-index: 10;" id="previewCertSchool" class="draggable-cert-element">
                             {{ $schoolName }}
                         </h2>
                         
-                        <div id="previewCertSchoolDivider" style="width: 80px; height: 2px; background: #d97706; margin: 0 auto 15px;"></div>
+                        <div id="previewCertSchoolDivider" style="width: 80px; height: 2px; background: #d97706; margin: 0 auto 10px;"></div>
 
                         <!-- Title -->
-                        <h1 style="font-size:22px; font-weight:800; text-transform:uppercase; color:#1e3a8a; margin:0 auto 15px; letter-spacing: 1px; z-index: 10;" id="previewCertTitle" class="draggable-cert-element">
+                        <h1 style="font-size:22px; font-weight:800; text-transform:uppercase; color:#1e3a8a; margin:0 auto 10px; letter-spacing: 1px; z-index: 10;" id="previewCertTitle" class="draggable-cert-element">
                             {{ $template->title_text }}
                         </h1>
                         
-                        <p id="previewCertPresentedText" style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 auto 10px;">This is proudly presented to</p>
+                        <p id="previewCertPresentedText" style="font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 auto 8px;">This is proudly presented to</p>
 
                         <!-- Student Name (Elegant Cursive font) -->
-                        <div id="previewCertStudentName" class="draggable-cert-element" style="font-size:32px; font-family:'Great Vibes', 'Brush Script MT', cursive; color:#1d4ed8; margin:5px auto 15px; z-index: 10;">Priya Patel</div>
+                        <div id="previewCertStudentName" class="draggable-cert-element" style="font-size:32px; font-family:'Great Vibes', 'Brush Script MT', cursive; color:#1d4ed8; margin:4px auto 10px; z-index: 10;">Priya Patel</div>
 
                         <!-- Body text -->
-                        <p style="font-size:13px; line-height:1.8; color:#334155; margin:0 auto 20px; max-width: 90%; text-align:justify; text-justify:inter-word; z-index: 10;" id="previewCertBody" class="draggable-cert-element">
+                        <p style="font-size:13px; line-height:1.7; color:#334155; margin:0 auto 12px; max-width: 90%; text-align:justify; text-justify:inter-word; z-index: 10;" id="previewCertBody" class="draggable-cert-element">
                             This is to certify that Priya Patel, bearing Admission ID YIS/2026/00002, has successfully cleared academic grades at this institution.
                         </p>
                     </div>
 
                     <!-- Bottom Signatures Container -->
-                    <div id="previewCertSigContainer" style="display:flex; justify-content:space-between; align-items: flex-end; font-size:11px; margin-top:20px; font-family:'Inter', sans-serif;">
+                    <div id="previewCertSigContainer" style="display:flex; justify-content:space-between; align-items: flex-end; font-size:11px; margin-top:10px; font-family:'Inter', sans-serif;">
                         <div style="text-align:left; line-height: 1.6; z-index: 10;" id="previewCertDateWrap" class="draggable-cert-element">
                             <div>Date of Issue: <strong id="previewCertDate">{{ date('Y-m-d') }}</strong></div>
                             <div id="previewCertNoWrap">Ref ID: <strong id="previewCertNo">CERT-89718</strong></div>
@@ -360,9 +365,9 @@
                         <!-- Principal Signature — only shown when uploaded -->
                         <div id="previewCertSignatureWrap" class="draggable-cert-element" style="text-align: center; margin-right: 20px; z-index: 10; {{ empty($signatureUrl) ? 'display:none;' : '' }}">
                             @if(!empty($signatureUrl))
-                                <img src="{{ $signatureUrl }}" style="max-height: 40px; max-width: 120px; object-fit: contain; display: block; margin: 0 auto 4px;"
+                                <img src="{{ $signatureUrl }}" style="max-height: 38px; max-width: 110px; object-fit: contain; display: block; margin: 0 auto 3px;"
                                     onerror="this.parentElement.style.display='none';">
-                                <span style="font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 600;">{{ $directorName }}</span>
+                                <span style="font-size: 9.5px; text-transform: uppercase; color: #64748b; font-weight: 600;">{{ $directorName }}</span>
                                 <div style="font-size: 9px; color: #94a3b8; text-transform: uppercase;">Authorized Signatory</div>
                             @endif
                         </div>
@@ -684,6 +689,163 @@ function dragEnd(e) {
     document.removeEventListener('mouseup', dragEnd);
     document.removeEventListener('touchmove', dragMove);
     document.removeEventListener('touchend', dragEnd);
+}
+
+function printLiveTemplatePreview() {
+    const previewEl = document.getElementById('certPreviewContainer');
+    if (!previewEl) return;
+    const printArea = previewEl.outerHTML;
+
+    // 2 Certificates on 1 single A4 page (Top slot + Cut guide + Bottom slot)
+    const twoCertPageHtml = `
+        <div class="a4-portrait-sheet">
+            <div class="cert-half-page-slot">
+                <div class="cert-scale-wrapper">
+                    ${printArea}
+                </div>
+            </div>
+            <div class="cert-cut-guide">
+                <span>✂ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ✂</span>
+            </div>
+            <div class="cert-half-page-slot">
+                <div class="cert-scale-wrapper">
+                    ${printArea}
+                </div>
+            </div>
+        </div>
+    `;
+
+    let printFrame = document.getElementById('certPrintIframe');
+    if (!printFrame) {
+        printFrame = document.createElement('iframe');
+        printFrame.id = 'certPrintIframe';
+        printFrame.style.position = 'fixed';
+        printFrame.style.right = '0';
+        printFrame.style.bottom = '0';
+        printFrame.style.width = '0';
+        printFrame.style.height = '0';
+        printFrame.style.border = '0';
+        printFrame.style.visibility = 'hidden';
+        document.body.appendChild(printFrame);
+    }
+
+    const doc = printFrame.contentWindow.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Certificate - A4 Print Sample (2 Per Page)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Great+Vibes&family=Dancing+Script:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 4mm 5mm;
+        }
+        * {
+            box-sizing: border-box !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+        }
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 200mm !important;
+            height: 289mm !important;
+            max-width: 200mm !important;
+            max-height: 289mm !important;
+            background: #ffffff !important;
+            font-family: 'Georgia', serif;
+            overflow: hidden !important;
+        }
+        .a4-portrait-sheet {
+            width: 200mm !important;
+            height: 289mm !important;
+            max-width: 200mm !important;
+            max-height: 289mm !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+        }
+        .cert-half-page-slot {
+            width: 200mm !important;
+            height: 138mm !important;
+            max-height: 138mm !important;
+            position: relative !important;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        .cert-scale-wrapper {
+            width: 650px !important;
+            height: 450px !important;
+            position: absolute !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform-origin: center center !important;
+            transform: translate(-50%, -50%) scale(1.16, 1.15) !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        .cert-scale-wrapper > div {
+            width: 650px !important;
+            height: 450px !important;
+            max-width: 650px !important;
+            max-height: 450px !important;
+            box-shadow: none !important;
+            margin: 0 auto !important;
+        }
+        .cert-cut-guide {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: 100% !important;
+            height: 6mm !important;
+            max-height: 6mm !important;
+            color: #94a3b8 !important;
+            font-size: 8.5px !important;
+            font-family: sans-serif !important;
+            letter-spacing: 2px !important;
+            overflow: hidden !important;
+            user-select: none !important;
+        }
+        .draggable-cert-element {
+            cursor: default !important;
+            outline: none !important;
+        }
+        .draggable-cert-element::after {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    ${twoCertPageHtml}
+</body>
+</html>`);
+    doc.close();
+
+    setTimeout(() => {
+        try {
+            printFrame.contentWindow.focus();
+            printFrame.contentWindow.print();
+        } catch(e) {
+            window.print();
+        }
+    }, 450);
 }
 
 // Initial draw

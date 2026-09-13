@@ -1546,7 +1546,7 @@
 
         const schoolName = sale.school?.name || 'VEDANT PUBLIC SCHOOL';
         const schoolAddress = sale.school?.address || 'Sctor 88A Gurgaon, Hariyana';
-        const schoolPhone = sale.school?.phone || '9451805575';
+        const schoolPhone = sale.school?.phone || '9219441716';
         const schoolEmail = sale.school?.email || 'vedantpublicschool@gmail.com';
         const schoolLogo = sale.school?.logo_url || '';
 

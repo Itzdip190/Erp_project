@@ -523,6 +523,7 @@
                     <span class="var-chip" onclick="insertEditorVar('[School_Name]')">[School_Name]</span>
                     <span class="var-chip" onclick="insertEditorVar('[School_Logo]')">[School_Logo]</span>
                     <span class="var-chip" onclick="insertEditorVar('[School_Address]')">[School_Address]</span>
+                    <span class="var-chip" onclick="insertEditorVar('[School_Email]')">[School_Email]</span>
                     <span class="var-chip" onclick="insertEditorVar('[School_Phone]')">[School_Phone]</span>
                     <span class="var-chip" onclick="insertEditorVar('[Principal_Signature]')">[Principal_Signature]</span>
                 </div>
@@ -593,10 +594,11 @@
 </form>
 
 <script>
-const defaultSchoolLogo = '{{ asset("images/logo.png") }}';
-const defaultSchoolName = 'Yash International School';
-const defaultSchoolAddress = 'Main Campus, Education Zone, City';
-const defaultSchoolPhone = '+91 98765 43210';
+const defaultSchoolLogo = {!! json_encode($schoolLogo ?? asset("images/logo.png")) !!};
+const defaultSchoolName = {!! json_encode($schoolName ?? 'VEDANT PUBLIC SCHOOL') !!};
+const defaultSchoolAddress = {!! json_encode($schoolAddress ?? 'Sector 88A, Main Campus, UP') !!};
+const defaultSchoolPhone = {!! json_encode($schoolPhone ?? '9219441716') !!};
+const defaultSchoolEmail = {!! json_encode($schoolEmail ?? 'vedantpublicschool@gmail.com') !!};
 const sampleStudentPhoto = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='140' viewBox='0 0 120 140' fill='%23e2e8f0'><rect width='120' height='140' rx='6'/><circle cx='60' cy='50' r='28' fill='%2394a3b8'/><path d='M20 130 C20 95, 100 95, 100 130 Z' fill='%2394a3b8'/></svg>";
 
 let currentEditorZoom = 1;
@@ -610,7 +612,7 @@ function parseCardTemplateHtml(rawHtml, tplData) {
     const sClass = 'Class 10 - Section A';
     const sId = 'YIS/2026/00001';
     const cNo = 'CRD-782618';
-    const expDate = '{{ date('Y-m-d', strtotime('+1 year')) }}';
+    const expDate = '{{ date('d-m-Y', strtotime('+1 year')) }}';
     const logoUrl = defaultSchoolLogo;
     const schoolName = defaultSchoolName;
     const photoTag = `<img src="${sampleStudentPhoto}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" alt="Student" />`;
@@ -698,6 +700,7 @@ function parseCardTemplateHtml(rawHtml, tplData) {
                    .replaceAll('[SchoolName]', schoolName)
                    .replaceAll('[School_Address]', defaultSchoolAddress)
                    .replaceAll('[School_Phone]', defaultSchoolPhone)
+                   .replaceAll('[School_Email]', defaultSchoolEmail)
                    .replaceAll('[Exam_Name]', 'FINAL SEMESTER EXAMINATION 2026')
                    .replaceAll('[Exam_Schedule_Table]', timetableHtml)
                    .replaceAll('[Student_Image]', photoTag)

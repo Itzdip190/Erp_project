@@ -436,7 +436,7 @@
                         </div>
                         <div class="phone-list-item">
                             <span class="phone-label">Phone:</span>
-                            <a href="tel:+919451805575" class="phone-number">+91-9451805575</a>
+                            <a href="tel:+919219441716" class="phone-number">+91 92194 41716</a>
                         </div>
                         <div class="phone-list-item">
                             <span class="phone-label">Email:</span>

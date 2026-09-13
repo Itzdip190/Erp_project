@@ -2216,7 +2216,7 @@ class InventoryController extends Controller
                 $school = (object)[
                     'name' => 'VEDANT PUBLIC SCHOOL',
                     'address' => 'Sctor 88A Gurgaon, Hariyana',
-                    'phone' => '9451805575',
+                    'phone' => '9219441716',
                     'email' => 'vedantpublicschool@gmail.com',
                     'logo' => null,
                 ];
@@ -2266,7 +2266,7 @@ class InventoryController extends Controller
                         'school' => [
                             'name' => $school->name ?? 'VEDANT PUBLIC SCHOOL',
                             'address' => $school->address ?? 'Sctor 88A Gurgaon, Hariyana',
-                            'phone' => $school->phone ?? '9451805575',
+                            'phone' => $school->phone ?? '9219441716',
                             'email' => $school->email ?? 'vedantpublicschool@gmail.com',
                             'logo_url' => null,
                         ],
@@ -2342,7 +2342,7 @@ class InventoryController extends Controller
                     'school' => [
                         'name' => $school->name ?? 'VEDANT PUBLIC SCHOOL',
                         'address' => $school->address ?? 'Sctor 88A Gurgaon, Hariyana',
-                        'phone' => $school->phone ?? '9451805575',
+                        'phone' => $school->phone ?? '9219441716',
                         'email' => $school->email ?? 'vedantpublicschool@gmail.com',
                         'logo_url' => null,
                     ],

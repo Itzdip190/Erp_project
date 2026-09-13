@@ -18,6 +18,7 @@ use App\Models\StaffPayroll;
 use App\Models\StaffPayrollDeposit;
 use App\Models\StaffPayrollPayment;
 use App\Models\StaffSalaryStructure;
+use App\Models\SalaryStructure;
 use App\Support\SearchHelper;
 use Carbon\Carbon;
 use Carbon\CarbonPeriod;
@@ -86,86 +87,96 @@ class PayrollController extends Controller
     }
 
     /**
-     * 1. SALARY STRUCTURE MANAGEMENT (Listing Page)
+     * 1. SALARY STRUCTURE MANAGEMENT (Master Structure Listing Page)
      */
     public function salaryStructure(Request $request)
     {
+        SalaryStructure::ensureSchemaExists();
+
         $schoolId = $this->getSchoolId();
-        $search = $request->get('search');
-        $deptId = $request->get('department_id');
+        $search = trim($request->get('search', ''));
+        $typeFilter = $request->get('salary_type');
 
-        $departments = Department::where('school_id', $schoolId)->orderBy('name')->get();
+        $query = SalaryStructure::where('school_id', $schoolId)
+            ->withCount(['staff', 'staffSalaryStructures']);
 
-        $query = StaffSalaryStructure::where('school_id', $schoolId)
-            ->with(['staff.department', 'staff.designation']);
-
-        if ($search) {
-            $query->whereHas('staff', function ($q) use ($search) {
-                SearchHelper::applyStaffSearch($q, $search);
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('salary_type', 'like', "%{$search}%");
             });
         }
-        if ($deptId) {
-            $query->whereHas('staff', function ($q) use ($deptId) {
-                $q->where('department_id', $deptId);
-            });
+
+        if (!empty($typeFilter)) {
+            $query->where('salary_type', $typeFilter);
         }
 
         $salaryStructures = $query->latest('updated_at')->paginate(15)->appends($request->all());
 
-        $totalMonthlyBudget = StaffSalaryStructure::where('school_id', $schoolId)->where('is_active', true)->sum('basic_salary');
-        $configuredCount = StaffSalaryStructure::where('school_id', $schoolId)->where('is_active', true)->count();
-        $avgSalary = $configuredCount > 0 ? round($totalMonthlyBudget / $configuredCount, 2) : 0;
+        // Calculate summary metrics
+        $totalStructuresCount = SalaryStructure::where('school_id', $schoolId)->count();
+        $totalStaffCount = Staff::where('school_id', $schoolId)->where('is_active', true)->count();
+        
+        $assignedStaffCount = Staff::where('school_id', $schoolId)
+            ->where('is_active', true)
+            ->whereNotNull('salary_structure_id')
+            ->count();
+
+        // Total Monthly Budget calculation based on all actively assigned staff
+        $allStructures = SalaryStructure::where('school_id', $schoolId)->withCount('staff')->get();
+        $totalMonthlyBudget = 0;
+        foreach ($allStructures as $st) {
+            $totalMonthlyBudget += ((float)$st->basic_salary + $st->total_allowances) * $st->staff_count;
+        }
+
+        $departments = Department::where('school_id', $schoolId)->orderBy('name')->get();
 
         return view('school.payroll.salary-structure', [
             'salaryStructures' => $salaryStructures,
             'departments' => $departments,
+            'totalStructuresCount' => $totalStructuresCount,
+            'totalStaffCount' => $totalStaffCount,
+            'assignedStaffCount' => $assignedStaffCount,
             'totalMonthlyBudget' => $totalMonthlyBudget,
-            'avgSalary' => $avgSalary,
-            'configuredCount' => $configuredCount,
             'search' => $search,
-            'deptId' => $deptId,
+            'typeFilter' => $typeFilter,
         ]);
     }
 
     /**
-     * CONFIGURE PAYROLL FORM (Create/Edit Page)
+     * CONFIGURE SALARY STRUCTURE FORM (Create/Edit Master Page)
      */
     public function configureSalaryStructure(Request $request)
     {
+        SalaryStructure::ensureSchemaExists();
+
         $schoolId = $this->getSchoolId();
         $id = $request->get('id');
-        $staffId = $request->get('staff_id');
-
-        $activeStaff = Staff::where('school_id', $schoolId)
-            ->where('is_active', true)
-            ->with(['salaryStructure', 'department', 'designation'])
-            ->orderBy('first_name')
-            ->get();
 
         $structure = null;
         if ($id) {
-            $structure = StaffSalaryStructure::where('school_id', $schoolId)->find($id);
-        } elseif ($staffId) {
-            $structure = StaffSalaryStructure::where('school_id', $schoolId)->where('staff_id', $staffId)->first();
+            $structure = SalaryStructure::where('school_id', $schoolId)->find($id);
         }
 
         return view('school.payroll.configure-salary-structure', [
-            'activeStaff' => $activeStaff,
             'structure' => $structure,
-            'selectedStaffId' => $staffId ?? $structure?->staff_id,
         ]);
     }
 
     /**
-     * STORE / UPDATE SALARY STRUCTURE
+     * STORE / UPDATE SALARY STRUCTURE MASTER
      */
     public function storeSalaryStructure(Request $request)
     {
+        SalaryStructure::ensureSchemaExists();
+
         $request->validate([
-            'staff_id' => 'required|exists:staff,id',
+            'id' => 'nullable|integer',
+            'name' => 'required|string|max:150',
             'basic_salary' => 'required|numeric|min:0',
             'salary_type' => 'required|string|in:Monthly,Daily,Hourly,Contract',
-            'effective_from' => 'required|date',
+            'effective_from' => 'nullable|date',
             'hra' => 'nullable|numeric|min:0',
             'da' => 'nullable|numeric|min:0',
             'ta' => 'nullable|numeric|min:0',
@@ -174,41 +185,18 @@ class PayrollController extends Controller
             'esi' => 'nullable|numeric|min:0',
             'tds' => 'nullable|numeric|min:0',
             'prof_tax' => 'nullable|numeric|min:0',
+            'description' => 'nullable|string|max:500',
             'is_active' => 'nullable|boolean',
         ]);
 
         $schoolId = $this->getSchoolId();
-        $staff = Staff::where('school_id', $schoolId)->findOrFail($request->staff_id);
-
+        $id = $request->input('id');
         $isActive = $request->has('is_active') ? (bool)$request->is_active : true;
 
-        $structure = StaffSalaryStructure::updateOrCreate(
-            [
-                'school_id' => $schoolId,
-                'staff_id' => $staff->id,
-            ],
-            [
-                'basic_salary' => (float)$request->basic_salary,
-                'salary_type' => $request->salary_type,
-                'hra' => (float)($request->hra ?: 0),
-                'da' => (float)($request->da ?: 0),
-                'ta' => (float)($request->ta ?: 0),
-                'allowance' => (float)($request->allowance ?: 0),
-                'pf' => (float)($request->pf ?: 0),
-                'esi' => (float)($request->esi ?: 0),
-                'tds' => (float)($request->tds ?: 0),
-                'prof_tax' => (float)($request->prof_tax ?: 0),
-                'effective_from' => $request->effective_from,
-                'is_active' => $isActive,
-                'updated_by' => auth()->id(),
-                'created_by' => auth()->id(),
-            ]
-        );
-
-        // Sync basic_salary and additional_fields on Staff model for backward compatibility
-        $staff->basic_salary = (float)$request->basic_salary;
-        $additional = $staff->additional_fields ?: [];
-        $additional['salary_structure'] = [
+        $data = [
+            'name' => trim($request->name),
+            'description' => $request->description ? trim($request->description) : null,
+            'basic_salary' => (float)$request->basic_salary,
             'salary_type' => $request->salary_type,
             'hra' => (float)($request->hra ?: 0),
             'da' => (float)($request->da ?: 0),
@@ -218,15 +206,686 @@ class PayrollController extends Controller
             'esi' => (float)($request->esi ?: 0),
             'tds' => (float)($request->tds ?: 0),
             'prof_tax' => (float)($request->prof_tax ?: 0),
-            'effective_from' => $request->effective_from,
+            'effective_from' => $request->effective_from ?: now()->toDateString(),
+            'is_active' => $isActive,
+            'updated_by' => auth()->id(),
         ];
-        $staff->additional_fields = $additional;
-        $staff->save();
 
-        return redirect()->route('school.payroll.salary-structure')
-            ->with('success', 'Salary structure configured successfully for ' . $staff->full_name);
+        if ($id) {
+            $structure = SalaryStructure::where('school_id', $schoolId)->findOrFail($id);
+            $structure->update($data);
+            $message = "Salary structure '{$structure->name}' updated successfully.";
+        } else {
+            $data['school_id'] = $schoolId;
+            $data['created_by'] = auth()->id();
+            $structure = SalaryStructure::create($data);
+            $message = "Salary structure '{$structure->name}' created successfully.";
+        }
+
+        // Real-time synchronization for any staff already assigned to this structure
+        $assignedStaff = Staff::where('school_id', $schoolId)
+            ->where('salary_structure_id', $structure->id)
+            ->get();
+
+        foreach ($assignedStaff as $st) {
+            $st->basic_salary = (float)$structure->basic_salary;
+            $additional = $st->additional_fields ?: [];
+            $additional['salary_structure'] = [
+                'salary_type' => $structure->salary_type,
+                'hra' => (float)$structure->hra,
+                'da' => (float)$structure->da,
+                'ta' => (float)$structure->ta,
+                'allowance' => (float)$structure->allowance,
+                'pf' => (float)$structure->pf,
+                'esi' => (float)$structure->esi,
+                'tds' => (float)$structure->tds,
+                'prof_tax' => (float)$structure->prof_tax,
+                'effective_from' => $structure->effective_from ? $structure->effective_from->format('Y-m-d') : null,
+            ];
+            $st->additional_fields = $additional;
+            $st->save();
+
+            StaffSalaryStructure::updateOrCreate(
+                [
+                    'school_id' => $schoolId,
+                    'staff_id' => $st->id,
+                ],
+                [
+                    'salary_structure_id' => $structure->id,
+                    'basic_salary' => (float)$structure->basic_salary,
+                    'salary_type' => $structure->salary_type,
+                    'hra' => (float)$structure->hra,
+                    'da' => (float)$structure->da,
+                    'ta' => (float)$structure->ta,
+                    'allowance' => (float)$structure->allowance,
+                    'pf' => (float)$structure->pf,
+                    'esi' => (float)$structure->esi,
+                    'tds' => (float)$structure->tds,
+                    'prof_tax' => (float)$structure->prof_tax,
+                    'effective_from' => $structure->effective_from,
+                    'is_active' => $structure->is_active,
+                    'updated_by' => auth()->id(),
+                ]
+            );
+        }
+
+        return redirect()->route('school.payroll.salary-structure')->with('success', $message);
     }
 
+    /**
+     * AJAX: GET STAFF LIST WITH ASSIGNMENT STATUS FOR SLIDE-OVER DRAWER
+     */
+    public function getSalaryStructureStaff(Request $request, $id)
+    {
+        SalaryStructure::ensureSchemaExists();
+
+        $schoolId = $this->getSchoolId();
+        $structure = SalaryStructure::where('school_id', $schoolId)->findOrFail($id);
+
+        $allStructures = SalaryStructure::where('school_id', $schoolId)
+            ->pluck('name', 'id')
+            ->toArray();
+
+        $activeStaff = Staff::where('school_id', $schoolId)
+            ->where('is_active', true)
+            ->with(['department', 'designation', 'salaryStructure'])
+            ->orderBy('first_name')
+            ->get();
+
+        $departments = Department::where('school_id', $schoolId)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $staffList = [];
+        $counts = [
+            'total' => $activeStaff->count(),
+            'assigned_this' => 0,
+            'assigned_other' => 0,
+            'unassigned' => 0,
+        ];
+
+        foreach ($activeStaff as $st) {
+            $isAssignedToThis = ((int)$st->salary_structure_id === (int)$structure->id);
+            $assignedStructId = $st->salary_structure_id;
+            
+            // Fallback to StaffSalaryStructure if not set on staff column
+            if (!$assignedStructId && $st->salaryStructure && $st->salaryStructure->salary_structure_id) {
+                $assignedStructId = $st->salaryStructure->salary_structure_id;
+                $isAssignedToThis = ((int)$assignedStructId === (int)$structure->id);
+            }
+
+            $assignedOtherName = null;
+            $status = 'unassigned';
+
+            if ($isAssignedToThis) {
+                $status = 'assigned_this';
+                $counts['assigned_this']++;
+            } elseif ($assignedStructId && isset($allStructures[$assignedStructId])) {
+                $status = 'assigned_other';
+                $assignedOtherName = $allStructures[$assignedStructId];
+                $counts['assigned_other']++;
+            } else {
+                $counts['unassigned']++;
+            }
+
+            $staffList[] = [
+                'id' => $st->id,
+                'name' => $st->full_name,
+                'employee_id' => $st->employee_id ?: 'EMP-' . str_pad($st->id, 4, '0', STR_PAD_LEFT),
+                'department_id' => $st->department_id,
+                'department_name' => $st->department?->name ?: 'General',
+                'designation_name' => $st->designation?->name ?: ($st->staff_type ?: 'Staff'),
+                'gender' => $st->gender ?: 'other',
+                'avatar' => $st->photo_url,
+                'is_assigned_to_this' => $isAssignedToThis,
+                'assigned_structure_id' => $assignedStructId,
+                'assigned_structure_name' => $assignedOtherName,
+                'status' => $status,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'structure' => [
+                'id' => $structure->id,
+                'name' => $structure->name,
+                'salary_type' => $structure->salary_type,
+                'basic_salary' => (float)$structure->basic_salary,
+                'formatted_basic' => '₹' . number_format($structure->basic_salary, 2),
+                'total_allowances' => (float)$structure->total_allowances,
+                'total_deductions' => (float)$structure->total_deductions,
+                'net_salary' => (float)$structure->net_salary,
+                'formatted_net' => '₹' . number_format($structure->net_salary, 2),
+            ],
+            'departments' => $departments,
+            'staff' => $staffList,
+            'counts' => $counts,
+        ]);
+    }
+
+    /**
+     * AJAX: BATCH ASSIGN / UNASSIGN STAFF TO SALARY STRUCTURE
+     */
+    public function assignStaffToSalaryStructure(Request $request, $id)
+    {
+        SalaryStructure::ensureSchemaExists();
+
+        $schoolId = $this->getSchoolId();
+        $structure = SalaryStructure::where('school_id', $schoolId)->findOrFail($id);
+
+        $selectedStaffIds = $request->input('staff_ids', []);
+        if (!is_array($selectedStaffIds)) {
+            $selectedStaffIds = [];
+        }
+        $selectedStaffIds = array_map('intval', $selectedStaffIds);
+
+        DB::beginTransaction();
+        try {
+            // 1. Unassign staff previously assigned to THIS structure who are NO LONGER in selected list
+            $previouslyAssigned = Staff::where('school_id', $schoolId)
+                ->where('salary_structure_id', $structure->id)
+                ->whereNotIn('id', $selectedStaffIds)
+                ->get();
+
+            foreach ($previouslyAssigned as $unassignedStaff) {
+                $unassignedStaff->salary_structure_id = null;
+                $unassignedStaff->save();
+
+                StaffSalaryStructure::where('school_id', $schoolId)
+                    ->where('staff_id', $unassignedStaff->id)
+                    ->where('salary_structure_id', $structure->id)
+                    ->delete();
+            }
+
+            // 2. Assign selected staff to this structure
+            $staffToAssign = Staff::where('school_id', $schoolId)
+                ->whereIn('id', $selectedStaffIds)
+                ->get();
+
+            foreach ($staffToAssign as $st) {
+                $st->salary_structure_id = $structure->id;
+                $st->basic_salary = (float)$structure->basic_salary;
+
+                $additional = $st->additional_fields ?: [];
+                $additional['salary_structure'] = [
+                    'salary_type' => $structure->salary_type,
+                    'hra' => (float)$structure->hra,
+                    'da' => (float)$structure->da,
+                    'ta' => (float)$structure->ta,
+                    'allowance' => (float)$structure->allowance,
+                    'pf' => (float)$structure->pf,
+                    'esi' => (float)$structure->esi,
+                    'tds' => (float)$structure->tds,
+                    'prof_tax' => (float)$structure->prof_tax,
+                    'effective_from' => $structure->effective_from ? $structure->effective_from->format('Y-m-d') : null,
+                ];
+                $st->additional_fields = $additional;
+                $st->save();
+
+                StaffSalaryStructure::updateOrCreate(
+                    [
+                        'school_id' => $schoolId,
+                        'staff_id' => $st->id,
+                    ],
+                    [
+                        'salary_structure_id' => $structure->id,
+                        'basic_salary' => (float)$structure->basic_salary,
+                        'salary_type' => $structure->salary_type,
+                        'hra' => (float)$structure->hra,
+                        'da' => (float)$structure->da,
+                        'ta' => (float)$structure->ta,
+                        'allowance' => (float)$structure->allowance,
+                        'pf' => (float)$structure->pf,
+                        'esi' => (float)$structure->esi,
+                        'tds' => (float)$structure->tds,
+                        'prof_tax' => (float)$structure->prof_tax,
+                        'effective_from' => $structure->effective_from ?: now()->toDateString(),
+                        'is_active' => true,
+                        'created_by' => auth()->id(),
+                        'updated_by' => auth()->id(),
+                    ]
+                );
+            }
+
+            DB::commit();
+
+            $newAssignedCount = count($selectedStaffIds);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully assigned {$newAssignedCount} teacher(s) to '{$structure->name}'.",
+                'structure_id' => $structure->id,
+                'assigned_count' => $newAssignedCount,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to assign teachers: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * DELETE SALARY STRUCTURE MASTER
+     */
+    public function deleteSalaryStructure(Request $request, $id)
+    {
+        SalaryStructure::ensureSchemaExists();
+
+        $schoolId = $this->getSchoolId();
+        $structure = SalaryStructure::where('school_id', $schoolId)->findOrFail($id);
+
+        DB::beginTransaction();
+        try {
+            // Unassign all staff from this structure
+            Staff::where('school_id', $schoolId)
+                ->where('salary_structure_id', $structure->id)
+                ->update(['salary_structure_id' => null]);
+
+            StaffSalaryStructure::where('school_id', $schoolId)
+                ->where('salary_structure_id', $structure->id)
+                ->delete();
+
+            $name = $structure->name;
+            $structure->delete();
+
+            DB::commit();
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => "Salary structure '{$name}' deleted successfully.",
+                ]);
+            }
+
+            return redirect()->route('school.payroll.salary-structure')
+                ->with('success', "Salary structure '{$name}' deleted successfully.");
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('error', 'Error deleting salary structure: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * STAFF SALARY ASSIGNMENT (Excel-like Matrix / Bulk Assignment Page)
+     */
+    public function staffSalaryAssign(Request $request)
+    {
+        SalaryStructure::ensureSchemaExists();
+
+        $schoolId = $this->getSchoolId();
+
+        $departments = Department::where('school_id', $schoolId)->orderBy('name')->get();
+        $designations = Designation::where('school_id', $schoolId)->orderBy('name')->get();
+        $salaryStructures = SalaryStructure::where('school_id', $schoolId)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        $selectedDept = $request->get('department_id');
+        $selectedDesig = $request->get('designation_id');
+        $selectedStructure = $request->get('salary_structure_id');
+        $statusFilter = $request->get('status'); // 'all', 'assigned', 'unassigned'
+        $search = trim($request->get('search', ''));
+
+        $query = Staff::where('school_id', $schoolId)
+            ->where('is_active', true)
+            ->with(['department', 'designation', 'salaryStructure', 'assignedSalaryStructure']);
+
+        if ($selectedDept) {
+            $query->where('department_id', $selectedDept);
+        }
+
+        if ($selectedDesig) {
+            $query->where('designation_id', $selectedDesig);
+        }
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('first_name', 'LIKE', "%{$search}%")
+                    ->orWhere('last_name', 'LIKE', "%{$search}%")
+                    ->orWhere('employee_id', 'LIKE', "%{$search}%")
+                    ->orWhere('phone', 'LIKE', "%{$search}%");
+            });
+        }
+
+        if ($selectedStructure) {
+            $query->where(function ($q) use ($selectedStructure) {
+                $q->where('salary_structure_id', $selectedStructure)
+                    ->orWhereHas('salaryStructure', function ($sq) use ($selectedStructure) {
+                        $sq->where('salary_structure_id', $selectedStructure);
+                    });
+            });
+        }
+
+        if ($statusFilter === 'assigned') {
+            $query->where(function ($q) {
+                $q->whereNotNull('salary_structure_id')
+                    ->orWhereHas('salaryStructure', function ($sq) {
+                        $sq->whereNotNull('salary_structure_id');
+                    });
+            });
+        } elseif ($statusFilter === 'unassigned') {
+            $query->where(function ($q) {
+                $q->whereNull('salary_structure_id')
+                    ->whereDoesntHave('salaryStructure', function ($sq) {
+                        $sq->whereNotNull('salary_structure_id');
+                    });
+            });
+        }
+
+        $allActiveStaff = Staff::where('school_id', $schoolId)->where('is_active', true)->get();
+        $totalStaffCount = $allActiveStaff->count();
+        $totalAssignedCount = Staff::where('school_id', $schoolId)->where('is_active', true)->whereNotNull('salary_structure_id')->count();
+        $totalUnassignedCount = max(0, $totalStaffCount - $totalAssignedCount);
+
+        $staffList = $query->orderBy('first_name')->get();
+
+        // Calculate statistics & pre-format staff rows
+        $totalEstimatedMonthlyPayroll = 0;
+        $totalBasicSum = 0;
+        $totalAllowancesSum = 0;
+        $totalDeductionsSum = 0;
+
+        $formattedStaff = [];
+        foreach ($staffList as $st) {
+            $currentStructId = $st->salary_structure_id ?: ($st->salaryStructure?->salary_structure_id);
+            $matchedStructure = $currentStructId ? $salaryStructures->firstWhere('id', $currentStructId) : null;
+
+            // Values from StaffSalaryStructure or fallback to additional_fields or structure template or basic_salary
+            $salaryType = $st->salaryStructure?->salary_type 
+                ?: ($st->additional_fields['salary_structure']['salary_type'] ?? ($matchedStructure?->salary_type ?? 'Monthly'));
+
+            $basic = (float)($st->salaryStructure?->basic_salary 
+                ?? ($st->basic_salary > 0 ? $st->basic_salary : ($matchedStructure?->basic_salary ?? 0)));
+
+            $hra = (float)($st->salaryStructure?->hra 
+                ?? ($st->additional_fields['salary_structure']['hra'] ?? ($matchedStructure?->hra ?? 0)));
+
+            $da = (float)($st->salaryStructure?->da 
+                ?? ($st->additional_fields['salary_structure']['da'] ?? ($matchedStructure?->da ?? 0)));
+
+            $ta = (float)($st->salaryStructure?->ta 
+                ?? ($st->additional_fields['salary_structure']['ta'] ?? ($matchedStructure?->ta ?? 0)));
+
+            $allowance = (float)($st->salaryStructure?->allowance 
+                ?? ($st->additional_fields['salary_structure']['allowance'] ?? ($matchedStructure?->allowance ?? 0)));
+
+            $pf = (float)($st->salaryStructure?->pf 
+                ?? ($st->additional_fields['salary_structure']['pf'] ?? ($matchedStructure?->pf ?? 0)));
+
+            $esi = (float)($st->salaryStructure?->esi 
+                ?? ($st->additional_fields['salary_structure']['esi'] ?? ($matchedStructure?->esi ?? 0)));
+
+            $tds = (float)($st->salaryStructure?->tds 
+                ?? ($st->additional_fields['salary_structure']['tds'] ?? ($matchedStructure?->tds ?? 0)));
+
+            $profTax = (float)($st->salaryStructure?->prof_tax 
+                ?? ($st->additional_fields['salary_structure']['prof_tax'] ?? ($matchedStructure?->prof_tax ?? 0)));
+
+            $effectiveFrom = $st->salaryStructure?->effective_from 
+                ? $st->salaryStructure->effective_from->format('Y-m-d')
+                : ($st->additional_fields['salary_structure']['effective_from'] ?? ($matchedStructure?->effective_from ? $matchedStructure->effective_from->format('Y-m-d') : now()->format('Y-m-d')));
+
+            $totAllow = $hra + $da + $ta + $allowance;
+            $totDed = $pf + $esi + $tds + $profTax;
+            $net = max(0, $basic + $totAllow - $totDed);
+
+            $totalBasicSum += $basic;
+            $totalAllowancesSum += $totAllow;
+            $totalDeductionsSum += $totDed;
+            $totalEstimatedMonthlyPayroll += $net;
+
+            $formattedStaff[] = [
+                'id' => $st->id,
+                'name' => $st->full_name,
+                'employee_id' => $st->employee_id ?: 'EMP-' . str_pad($st->id, 4, '0', STR_PAD_LEFT),
+                'phone' => $st->phone,
+                'photo_url' => $st->photo_url,
+                'department_id' => $st->department_id,
+                'department_name' => $st->department?->name ?: 'General',
+                'designation_id' => $st->designation_id,
+                'designation_name' => $st->designation?->name ?: ($st->staff_type ?: 'Staff'),
+                'salary_structure_id' => $currentStructId,
+                'structure_name' => $matchedStructure?->name ?: ($st->assignedSalaryStructure?->name ?? 'Custom / Unassigned'),
+                'salary_type' => $salaryType,
+                'basic_salary' => $basic,
+                'hra' => $hra,
+                'da' => $da,
+                'ta' => $ta,
+                'allowance' => $allowance,
+                'total_allowances' => $totAllow,
+                'pf' => $pf,
+                'esi' => $esi,
+                'tds' => $tds,
+                'prof_tax' => $profTax,
+                'total_deductions' => $totDed,
+                'net_salary' => $net,
+                'effective_from' => $effectiveFrom,
+                'is_assigned' => !empty($currentStructId),
+            ];
+        }
+
+        return view('school.payroll.staff-salary-assign', [
+            'staffList' => $formattedStaff,
+            'departments' => $departments,
+            'designations' => $designations,
+            'salaryStructures' => $salaryStructures,
+            'totalStaffCount' => $totalStaffCount,
+            'totalAssignedCount' => $totalAssignedCount,
+            'totalUnassignedCount' => $totalUnassignedCount,
+            'totalEstimatedMonthlyPayroll' => $totalEstimatedMonthlyPayroll,
+            'totalBasicSum' => $totalBasicSum,
+            'totalAllowancesSum' => $totalAllowancesSum,
+            'totalDeductionsSum' => $totalDeductionsSum,
+            'selectedDept' => $selectedDept,
+            'selectedDesig' => $selectedDesig,
+            'selectedStructure' => $selectedStructure,
+            'statusFilter' => $statusFilter,
+            'search' => $search,
+        ]);
+    }
+
+    /**
+     * SAVE / BATCH UPDATE STAFF SALARY ASSIGNMENT & CUSTOM AMOUNTS
+     */
+    public function saveStaffSalaryAssign(Request $request)
+    {
+        SalaryStructure::ensureSchemaExists();
+
+        $schoolId = $this->getSchoolId();
+
+        $assignments = $request->input('assignments', []);
+        if (empty($assignments) && $request->has('staff_id')) {
+            $assignments = [$request->all()];
+        }
+
+        if (empty($assignments)) {
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'No staff salary records provided to save.'], 422);
+            }
+            return redirect()->back()->with('error', 'No staff salary records provided to save.');
+        }
+
+        DB::beginTransaction();
+        try {
+            $updatedCount = 0;
+
+            foreach ($assignments as $item) {
+                $staffId = (int)($item['staff_id'] ?? 0);
+                if (!$staffId) {
+                    continue;
+                }
+
+                $staff = Staff::where('school_id', $schoolId)->find($staffId);
+                if (!$staff) {
+                    continue;
+                }
+
+                $structId = !empty($item['salary_structure_id']) ? (int)$item['salary_structure_id'] : null;
+                $salaryType = !empty($item['salary_type']) ? $item['salary_type'] : 'Monthly';
+                $basicSalary = isset($item['basic_salary']) ? (float)$item['basic_salary'] : 0.0;
+                $hra = isset($item['hra']) ? (float)$item['hra'] : 0.0;
+                $da = isset($item['da']) ? (float)$item['da'] : 0.0;
+                $ta = isset($item['ta']) ? (float)$item['ta'] : 0.0;
+                $allowance = isset($item['allowance']) ? (float)$item['allowance'] : 0.0;
+                $pf = isset($item['pf']) ? (float)$item['pf'] : 0.0;
+                $esi = isset($item['esi']) ? (float)$item['esi'] : 0.0;
+                $tds = isset($item['tds']) ? (float)$item['tds'] : 0.0;
+                $profTax = isset($item['prof_tax']) ? (float)$item['prof_tax'] : 0.0;
+                $effectiveFrom = !empty($item['effective_from']) ? $item['effective_from'] : now()->toDateString();
+                $isActive = isset($item['is_active']) ? (bool)$item['is_active'] : true;
+
+                // 1. Update Staff record
+                $staff->salary_structure_id = $structId;
+                $staff->basic_salary = $basicSalary;
+                $additional = $staff->additional_fields ?: [];
+                $additional['salary_structure'] = [
+                    'salary_type' => $salaryType,
+                    'hra' => $hra,
+                    'da' => $da,
+                    'ta' => $ta,
+                    'allowance' => $allowance,
+                    'pf' => $pf,
+                    'esi' => $esi,
+                    'tds' => $tds,
+                    'prof_tax' => $profTax,
+                    'effective_from' => $effectiveFrom,
+                ];
+                $staff->additional_fields = $additional;
+                $staff->save();
+
+                // 2. Update/Create StaffSalaryStructure record
+                StaffSalaryStructure::updateOrCreate(
+                    [
+                        'school_id' => $schoolId,
+                        'staff_id' => $staff->id,
+                    ],
+                    [
+                        'salary_structure_id' => $structId,
+                        'basic_salary' => $basicSalary,
+                        'salary_type' => $salaryType,
+                        'hra' => $hra,
+                        'da' => $da,
+                        'ta' => $ta,
+                        'allowance' => $allowance,
+                        'pf' => $pf,
+                        'esi' => $esi,
+                        'tds' => $tds,
+                        'prof_tax' => $profTax,
+                        'effective_from' => $effectiveFrom,
+                        'is_active' => $isActive,
+                        'updated_by' => auth()->id(),
+                    ]
+                );
+
+                $updatedCount++;
+            }
+
+            DB::commit();
+
+            $msg = "Successfully updated salary configuration for {$updatedCount} staff member(s).";
+
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $msg,
+                    'updated_count' => $updatedCount,
+                ]);
+            }
+
+            return redirect()->route('school.payroll.staff-assign')->with('success', $msg);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            if ($request->ajax() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('error', 'Error saving staff salary assignment: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * QUICK APPLY SALARY STRUCTURE MASTER TEMPLATE TO SELECTED STAFF
+     */
+    public function quickApplySalaryStructure(Request $request)
+    {
+        SalaryStructure::ensureSchemaExists();
+
+        $request->validate([
+            'salary_structure_id' => 'required|integer',
+            'staff_ids' => 'required|array',
+        ]);
+
+        $schoolId = $this->getSchoolId();
+        $structure = SalaryStructure::where('school_id', $schoolId)->findOrFail($request->salary_structure_id);
+        $staffIds = array_map('intval', $request->staff_ids);
+
+        DB::beginTransaction();
+        try {
+            $staffList = Staff::where('school_id', $schoolId)->whereIn('id', $staffIds)->get();
+
+            foreach ($staffList as $st) {
+                $st->salary_structure_id = $structure->id;
+                $st->basic_salary = (float)$structure->basic_salary;
+
+                $additional = $st->additional_fields ?: [];
+                $additional['salary_structure'] = [
+                    'salary_type' => $structure->salary_type,
+                    'hra' => (float)$structure->hra,
+                    'da' => (float)$structure->da,
+                    'ta' => (float)$structure->ta,
+                    'allowance' => (float)$structure->allowance,
+                    'pf' => (float)$structure->pf,
+                    'esi' => (float)$structure->esi,
+                    'tds' => (float)$structure->tds,
+                    'prof_tax' => (float)$structure->prof_tax,
+                    'effective_from' => $structure->effective_from ? $structure->effective_from->format('Y-m-d') : null,
+                ];
+                $st->additional_fields = $additional;
+                $st->save();
+
+                StaffSalaryStructure::updateOrCreate(
+                    [
+                        'school_id' => $schoolId,
+                        'staff_id' => $st->id,
+                    ],
+                    [
+                        'salary_structure_id' => $structure->id,
+                        'basic_salary' => (float)$structure->basic_salary,
+                        'salary_type' => $structure->salary_type,
+                        'hra' => (float)$structure->hra,
+                        'da' => (float)$structure->da,
+                        'ta' => (float)$structure->ta,
+                        'allowance' => (float)$structure->allowance,
+                        'pf' => (float)$structure->pf,
+                        'esi' => (float)$structure->esi,
+                        'tds' => (float)$structure->tds,
+                        'prof_tax' => (float)$structure->prof_tax,
+                        'effective_from' => $structure->effective_from ?: now()->toDateString(),
+                        'is_active' => true,
+                        'updated_by' => auth()->id(),
+                    ]
+                );
+            }
+
+            DB::commit();
+
+            $count = $staffList->count();
+            return response()->json([
+                'success' => true,
+                'message' => "Successfully applied '{$structure->name}' to {$count} staff member(s).",
+                'structure' => $structure,
+                'applied_count' => $count,
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 
     /**
      * 2. DEPOSIT AMOUNT (EMPLOYEE SEARCH & PAYROLL ACCOUNT DEPOSIT)

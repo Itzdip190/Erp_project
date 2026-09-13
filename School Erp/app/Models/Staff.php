@@ -36,6 +36,7 @@ class Staff extends Model
         'photo',
         'joining_date',
         'basic_salary',
+        'salary_structure_id',
         'bank_account_number',
         'bank_name',
         'ifsc_code',
@@ -81,12 +82,26 @@ class Staff extends Model
         return implode(', ', $parts);
     }
 
-    public function getPhotoUrlAttribute(): string
+    public function getPhotoUrlAttribute(): ?string
     {
-        if ($this->photo) {
-            return Storage::disk('public')->url($this->photo);
+        if (empty($this->photo)) {
+            return null;
         }
-        return asset('images/avatar-staff.png');
+        $photo = $this->photo;
+        if (str_starts_with($photo, 'http://') || str_starts_with($photo, 'https://') || str_starts_with($photo, 'data:image')) {
+            return $photo;
+        }
+        $cleanPhoto = ltrim($photo, '/');
+        if (str_starts_with($cleanPhoto, 'uploads/') || str_starts_with($cleanPhoto, 'storage/')) {
+            return asset($cleanPhoto);
+        }
+        if (file_exists(public_path('uploads/' . $cleanPhoto))) {
+            return asset('uploads/' . $cleanPhoto);
+        }
+        if (file_exists(public_path($cleanPhoto))) {
+            return asset($cleanPhoto);
+        }
+        return Storage::disk('public')->url($cleanPhoto);
     }
 
     public function getStaffTypeAttribute(): string
@@ -160,4 +175,35 @@ class Staff extends Model
     {
         return $this->hasMany(SectionSubjectStaff::class);
     }
+
+    public function salaryStructure()
+    {
+        return $this->hasOne(StaffSalaryStructure::class, 'staff_id');
+    }
+
+    public function assignedSalaryStructure()
+    {
+        return $this->belongsTo(SalaryStructure::class, 'salary_structure_id');
+    }
+
+    public function deposits()
+    {
+        return $this->hasMany(StaffPayrollDeposit::class, 'staff_id');
+    }
+
+    public function getPayrollBalanceAttribute(): float
+    {
+        $lastDeposit = $this->deposits()->latest('id')->first();
+        if ($lastDeposit) {
+            return (float)$lastDeposit->balance_after_transaction;
+        }
+        return 0.00;
+    }
+
+    public function gatePasses()
+    {
+        return $this->hasMany(StaffGatePass::class, 'staff_id');
+    }
 }
+
+

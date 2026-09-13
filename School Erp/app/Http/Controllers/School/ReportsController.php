@@ -22,6 +22,21 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Support\SearchHelper;
+use App\Models\Exam;
+use App\Models\ExamAssessment;
+use App\Models\ExamSubAssessment;
+use App\Models\Subject;
+use App\Models\StudentMark;
+use App\Models\Staff;
+use App\Models\SectionSubjectStaff;
+use App\Models\ClassSubjectTeacher;
+use Illuminate\Support\Facades\Schema;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use App\Services\FeeHelper;
 
 class ReportsController extends Controller
 {
@@ -40,7 +55,9 @@ class ReportsController extends Controller
 
         // Quick stats for the hub
         $totalStudents  = Student::where('school_id', $schoolId)->where('is_active', 1)->count();
-        $totalFeesDue   = StudentFee::where('school_id', $schoolId)->sum(DB::raw('amount - paid_amount - COALESCE(instant_discount_amount, 0)'));
+        $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        $feeMetrics     = \App\Services\FeeHelper::calculateSessionFeeMetrics($schoolId, $currentSession);
+        $totalFeesDue   = $feeMetrics['annualDue'];
         
         $totalIncome    = SchoolIncome::where('school_id', $schoolId)
             ->where('status', '!=', 'cancelled')
@@ -310,6 +327,9 @@ class ReportsController extends Controller
         $sessionObj  = $academicSessions->firstWhere('id', $selectedSessionId) ?? $currentSession;
         $sessionName = $sessionObj ? $sessionObj->name : 'All Sessions';
 
+        // Auto-purge any rogue previous session fees for new admissions
+        FeeHelper::purgeRoguePreviousSessionFees((int) $schoolId, $sessionObj);
+
         $classes  = SchoolClass::where('school_id', $schoolId)->orderBy('name')->get();
         $classId   = $request->get('class_id', '');
         $sectionId = $request->get('section_id', '');
@@ -317,8 +337,14 @@ class ReportsController extends Controller
             ? Section::where('school_id', $schoolId)->where('class_id', $classId)->orderBy('name')->get()
             : Section::where('school_id', $schoolId)->orderBy('name')->get();
 
-        $dateFrom       = $request->get('date_from', now()->startOfMonth()->format('Y-m-d'));
-        $dateTo         = $request->get('date_to', now()->format('Y-m-d'));
+        if ($activeTab === 'daily_fee_collection') {
+            $dateFrom = $request->get('date_from', now()->startOfMonth()->format('Y-m-d'));
+            $dateTo   = $request->get('date_to', now()->format('Y-m-d'));
+        } else {
+            $dateFrom = $request->get('date_from', '');
+            $dateTo   = $request->get('date_to', '');
+        }
+
         $installmentNo  = $request->get('installment_no', '');
         $paymentMode    = $request->get('payment_mode', '');
         $status         = $request->get('status', '');
@@ -331,11 +357,44 @@ class ReportsController extends Controller
         $paymentModes  = FeeReceipt::where('school_id', $schoolId)->whereNotNull('payment_mode')->where('payment_mode', '!=', '')->distinct()->pluck('payment_mode');
         $installments  = StudentFee::where('school_id', $schoolId)->whereNotNull('installment_no')->distinct()->pluck('installment_no')->sort();
 
-        // Student filter Closure
+        // Student filter Closure - strictly isolates enrollment, class, and section to the selected academic session
         $studentFilter = function($q) use ($selectedSessionId, $classId, $sectionId, $searchStudent) {
-            if ($selectedSessionId) $q->where('academic_session_id', $selectedSessionId);
-            if ($classId) $q->where('class_id', $classId);
-            if ($sectionId) $q->where('section_id', $sectionId);
+            if ($selectedSessionId) {
+                $q->where(function($sq) use ($selectedSessionId, $classId, $sectionId) {
+                    $sq->whereHas('studentSessions', function($ssq) use ($selectedSessionId, $classId, $sectionId) {
+                        $ssq->where('academic_session_id', $selectedSessionId);
+                        if ($classId) $ssq->where('class_id', $classId);
+                        if ($sectionId) {
+                            if (is_numeric($sectionId)) {
+                                $ssq->where('section_id', $sectionId);
+                            } else {
+                                $ssq->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                            }
+                        }
+                    })->orWhere(function($ssq) use ($selectedSessionId, $classId, $sectionId) {
+                        $ssq->doesntHave('studentSessions')
+                            ->where('academic_session_id', $selectedSessionId);
+                        if ($classId) $ssq->where('class_id', $classId);
+                        if ($sectionId) {
+                            if (is_numeric($sectionId)) {
+                                $ssq->where('section_id', $sectionId);
+                            } else {
+                                $ssq->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                            }
+                        }
+                    });
+                });
+            } else {
+                if ($classId) $q->where('class_id', $classId);
+                if ($sectionId) {
+                    if (is_numeric($sectionId)) {
+                        $q->where('section_id', $sectionId);
+                    } else {
+                        $q->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                    }
+                }
+            }
+
             if ($searchStudent) {
                 SearchHelper::applyStudentSearch($q, $searchStudent);
             }
@@ -362,15 +421,22 @@ class ReportsController extends Controller
         if ($activeTab === 'student_fee_collection') {
             $reportTitle = 'Student Fee Collection Report';
 
-            $feeQuery = StudentFee::where('school_id', $schoolId)
+            $feeQuery = FeeHelper::buildSessionFeeQuery((int) $schoolId, $sessionObj, false, true)
                 ->whereHas('student', $studentFilter)
-                ->with(['student.class', 'student.section', 'feeSchedule', 'component']);
+                ->with([
+                    'student.class',
+                    'student.section',
+                    'student.studentSessions.schoolClass',
+                    'student.studentSessions.section',
+                    'feeSchedule',
+                    'component'
+                ]);
 
             if ($feeScheduleId) $feeQuery->where('fee_schedule_id', $feeScheduleId);
             if ($feeComponentId) $feeQuery->where('fee_component_id', $feeComponentId);
             if ($installmentNo) $feeQuery->where('installment_no', $installmentNo);
-            if ($dateFrom) $feeQuery->whereDate('due_date', '>=', $dateFrom);
-            if ($dateTo) $feeQuery->whereDate('due_date', '<=', $dateTo);
+            if (!empty($dateFrom)) $feeQuery->whereDate('due_date', '>=', $dateFrom);
+            if (!empty($dateTo)) $feeQuery->whereDate('due_date', '<=', $dateTo);
             if ($status) {
                 if ($status === 'paid') $feeQuery->where('status', 'paid');
                 elseif ($status === 'partial') $feeQuery->where('paid_amount', '>', 0)->where('status', '!=', 'paid');
@@ -396,6 +462,13 @@ class ReportsController extends Controller
                 $st = $f->student;
                 if (!$st) continue;
 
+                $sessionRec = $selectedSessionId ? $st->studentSessionFor($selectedSessionId) : null;
+                $className  = $sessionRec?->schoolClass?->name ?? $st->class?->name ?? '—';
+                $secName    = $sessionRec?->section?->name ?? $st->section?->name ?? '';
+                $classSec   = $className . ($secName ? ' - ' . $secName : '');
+                $stName     = $sessionRec ? ($sessionRec->full_name ?: $st->full_name) : $st->full_name;
+                $rollNo     = $sessionRec?->roll_number ?? $st->roll_number ?? '—';
+
                 $assigned  = (float) $f->amount;
                 $disc      = (float) $f->instant_discount_amount;
                 $fine      = (float) $f->fine_amount_applied;
@@ -409,7 +482,12 @@ class ReportsController extends Controller
                 $totPending  += $due;
 
                 $stReceipts = $receiptsMap->get($f->student_id, collect());
-                $latestReceipt = $stReceipts->sortByDesc('payment_date')->first();
+                if ($sessionObj && $sessionObj->start_date && $sessionObj->end_date) {
+                    $sessionReceipts = $stReceipts->filter(fn($r) => $r->payment_date >= $sessionObj->start_date && $r->payment_date <= $sessionObj->end_date);
+                    $latestReceipt = $sessionReceipts->sortByDesc('payment_date')->first() ?? $stReceipts->sortByDesc('payment_date')->first();
+                } else {
+                    $latestReceipt = $stReceipts->sortByDesc('payment_date')->first();
+                }
 
                 $statusLabel = 'Pending';
                 $statusBadge = 'danger';
@@ -423,10 +501,10 @@ class ReportsController extends Controller
 
                 $row = [
                     'id'               => $f->id,
-                    'student_name'     => $st->full_name,
+                    'student_name'     => $stName,
                     'admission_number' => $st->admission_number,
-                    'class_section'    => ($st->class?->name ?? '—') . ($st->section ? ' - ' . $st->section->name : ''),
-                    'roll_number'      => $st->roll_number ?? '—',
+                    'class_section'    => $classSec,
+                    'roll_number'      => $rollNo,
                     'fee_structure'    => $f->feeSchedule?->name ?? ($f->transport_fee_schedule_id ? 'Transport Fee' : 'General Fee'),
                     'installment'      => $f->installment_name,
                     'component'        => $f->component?->name ?? ($f->transport_fee_schedule_id ? 'Transport' : 'Tuition/General'),
@@ -570,11 +648,18 @@ class ReportsController extends Controller
         elseif ($activeTab === 'installment_wise_dues') {
             $reportTitle = 'Installment Wise Dues Report';
 
-            $feeQuery = StudentFee::where('school_id', $schoolId)
+            $feeQuery = FeeHelper::buildSessionFeeQuery((int) $schoolId, $sessionObj, false, true)
                 ->whereHas('student', $studentFilter)
-                ->with(['student.class', 'student.section']);
+                ->with([
+                    'student.class',
+                    'student.section',
+                    'student.studentSessions.schoolClass',
+                    'student.studentSessions.section',
+                ]);
 
             if ($installmentNo) $feeQuery->where('installment_no', $installmentNo);
+            if (!empty($dateFrom)) $feeQuery->whereDate('due_date', '>=', $dateFrom);
+            if (!empty($dateTo)) $feeQuery->whereDate('due_date', '<=', $dateTo);
             if ($status === 'overdue') {
                 $feeQuery->where('status', '!=', 'paid')->whereDate('due_date', '<', now());
             } elseif ($status === 'pending') {
@@ -588,6 +673,12 @@ class ReportsController extends Controller
             foreach ($rawFees as $f) {
                 $st = $f->student;
                 if (!$st) continue;
+
+                $sessionRec = $selectedSessionId ? $st->studentSessionFor($selectedSessionId) : null;
+                $className  = $sessionRec?->schoolClass?->name ?? $st->class?->name ?? '—';
+                $secName    = $sessionRec?->section?->name ?? $st->section?->name ?? '';
+                $classSec   = $className . ($secName ? ' - ' . $secName : '');
+                $stName     = $sessionRec ? ($sessionRec->full_name ?: $st->full_name) : $st->full_name;
 
                 $assigned  = (float) $f->amount;
                 $disc      = (float) $f->instant_discount_amount;
@@ -619,9 +710,9 @@ class ReportsController extends Controller
                 }
 
                 $exportRows[] = [
-                    'student_name'     => $st->full_name,
+                    'student_name'     => $stName,
                     'admission_number' => $st->admission_number,
-                    'class_section'    => ($st->class?->name ?? '—') . ($st->section ? ' - ' . $st->section->name : ''),
+                    'class_section'    => $classSec,
                     'installment_name' => $f->installment_name,
                     'total_installment'=> '₹' . number_format($assigned, 2),
                     'paid_amount'      => '₹' . number_format($paid, 2),
@@ -669,10 +760,14 @@ class ReportsController extends Controller
         elseif ($activeTab === 'component_wise_report') {
             $reportTitle = 'Component Wise Fee Report';
 
-            $allFees = StudentFee::where('school_id', $schoolId)
+            $feesQuery = FeeHelper::buildSessionFeeQuery((int) $schoolId, $sessionObj, false, true)
                 ->whereHas('student', $studentFilter)
-                ->with(['component'])
-                ->get();
+                ->with(['component']);
+
+            if (!empty($dateFrom)) $feesQuery->whereDate('due_date', '>=', $dateFrom);
+            if (!empty($dateTo)) $feesQuery->whereDate('due_date', '<=', $dateTo);
+
+            $allFees = $feesQuery->get();
 
             $componentsMap = [];
             foreach ($allFees as $fee) {
@@ -700,7 +795,8 @@ class ReportsController extends Controller
                 $fine      = $vals['fine'];
                 $pending   = max(0.00, $assigned + $fine - $discount - $collected);
 
-                $pct = ($assigned - $discount) > 0 ? round(($collected / ($assigned - $discount)) * 100, 1) : 0;
+                $netAssigned = max(0.0, $assigned - $discount);
+                $pct = $netAssigned > 0 ? min(100.0, round(($collected / $netAssigned) * 100, 1)) : 0.0;
 
                 $totAssigned  += $assigned;
                 $totCollected += $collected;
@@ -719,7 +815,8 @@ class ReportsController extends Controller
                 ];
             }
 
-            $overallPct = ($totAssigned - $totDiscount) > 0 ? round(($totCollected / ($totAssigned - $totDiscount)) * 100, 1) : 0;
+            $overallNetAssigned = max(0.0, $totAssigned - $totDiscount);
+            $overallPct = $overallNetAssigned > 0 ? min(100.0, round(($totCollected / $overallNetAssigned) * 100, 1)) : 0.0;
 
             $kpis = [
                 ['label' => 'Total Components',     'value' => count($exportRows)],
@@ -759,26 +856,95 @@ class ReportsController extends Controller
             $totStudents = 0; $totAssigned = 0; $totCollected = 0; $totPending = 0; $totDiscount = 0; $totFine = 0;
 
             foreach ($targetClasses as $cls) {
-                $studentsQuery = Student::where('school_id', $schoolId)->where('class_id', $cls->id);
-                if ($selectedSessionId) $studentsQuery->where('academic_session_id', $selectedSessionId);
-                if ($sectionId) $studentsQuery->where('section_id', $sectionId);
+                $studentsQuery = Student::where('school_id', $schoolId)
+                    ->where(function($q) use ($selectedSessionId, $cls, $sectionId) {
+                        if ($selectedSessionId) {
+                            $q->whereHas('studentSessions', function($sq) use ($selectedSessionId, $cls, $sectionId) {
+                                $sq->where('academic_session_id', $selectedSessionId)
+                                   ->where('class_id', $cls->id);
+                                if ($sectionId) {
+                                    if (is_numeric($sectionId)) {
+                                        $sq->where('section_id', $sectionId);
+                                    } else {
+                                        $sq->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                                    }
+                                }
+                            })->orWhere(function($sq) use ($selectedSessionId, $cls, $sectionId) {
+                                $sq->doesntHave('studentSessions')
+                                   ->where('academic_session_id', $selectedSessionId)
+                                   ->where('class_id', $cls->id);
+                                if ($sectionId) {
+                                    if (is_numeric($sectionId)) {
+                                        $sq->where('section_id', $sectionId);
+                                    } else {
+                                        $sq->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                                    }
+                                }
+                            });
+                        } else {
+                            $q->where('class_id', $cls->id);
+                            if ($sectionId) {
+                                if (is_numeric($sectionId)) {
+                                    $q->where('section_id', $sectionId);
+                                } else {
+                                    $q->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                                }
+                            }
+                        }
+                    });
 
                 $stCount = $studentsQuery->count();
 
-                $classFees = StudentFee::where('school_id', $schoolId)
-                    ->whereHas('student', function($sq) use ($cls, $selectedSessionId, $sectionId) {
-                        $sq->where('class_id', $cls->id);
-                        if ($selectedSessionId) $sq->where('academic_session_id', $selectedSessionId);
-                        if ($sectionId) $sq->where('section_id', $sectionId);
-                    })
-                    ->get();
+                $classFeesQuery = FeeHelper::buildSessionFeeQuery((int) $schoolId, $sessionObj, false, true)
+                    ->whereHas('student', function($q) use ($selectedSessionId, $cls, $sectionId) {
+                        if ($selectedSessionId) {
+                            $q->whereHas('studentSessions', function($sq) use ($selectedSessionId, $cls, $sectionId) {
+                                $sq->where('academic_session_id', $selectedSessionId)
+                                   ->where('class_id', $cls->id);
+                                if ($sectionId) {
+                                    if (is_numeric($sectionId)) {
+                                        $sq->where('section_id', $sectionId);
+                                    } else {
+                                        $sq->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                                    }
+                                }
+                            })->orWhere(function($sq) use ($selectedSessionId, $cls, $sectionId) {
+                                $sq->doesntHave('studentSessions')
+                                   ->where('academic_session_id', $selectedSessionId)
+                                   ->where('class_id', $cls->id);
+                                if ($sectionId) {
+                                    if (is_numeric($sectionId)) {
+                                        $sq->where('section_id', $sectionId);
+                                    } else {
+                                        $sq->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                                    }
+                                }
+                            });
+                        } else {
+                            $q->where('class_id', $cls->id);
+                            if ($sectionId) {
+                                if (is_numeric($sectionId)) {
+                                    $q->where('section_id', $sectionId);
+                                } else {
+                                    $q->whereHas('section', fn($secQ) => $secQ->where('name', $sectionId));
+                                }
+                            }
+                        }
+                    });
+
+                if (!empty($dateFrom)) $classFeesQuery->whereDate('due_date', '>=', $dateFrom);
+                if (!empty($dateTo)) $classFeesQuery->whereDate('due_date', '<=', $dateTo);
+
+                $classFees = $classFeesQuery->get();
 
                 $assigned  = (float) $classFees->sum('amount');
                 $collected = (float) $classFees->sum('paid_amount');
                 $discount  = (float) $classFees->sum('instant_discount_amount');
                 $fine      = (float) $classFees->sum('fine_amount_applied');
                 $pending   = max(0.00, $assigned + $fine - $discount - $collected);
-                $pct       = ($assigned - $discount) > 0 ? round(($collected / ($assigned - $discount)) * 100, 1) : 0;
+
+                $netAssigned = max(0.0, $assigned - $discount);
+                $pct = $netAssigned > 0 ? min(100.0, round(($collected / $netAssigned) * 100, 1)) : 0.0;
 
                 $totStudents  += $stCount;
                 $totAssigned  += $assigned;
@@ -799,7 +965,8 @@ class ReportsController extends Controller
                 ];
             }
 
-            $overallPct = ($totAssigned - $totDiscount) > 0 ? round(($totCollected / ($totAssigned - $totDiscount)) * 100, 1) : 0;
+            $overallNetAssigned = max(0.0, $totAssigned - $totDiscount);
+            $overallPct = $overallNetAssigned > 0 ? min(100.0, round(($totCollected / $overallNetAssigned) * 100, 1)) : 0.0;
 
             $kpis = [
                 ['label' => 'Total Classes',     'value' => count($exportRows)],
@@ -838,7 +1005,12 @@ class ReportsController extends Controller
 
             $chequeQuery = PendingCheque::where('school_id', $schoolId)
                 ->whereHas('student', $studentFilter)
-                ->with(['student.class', 'student.section']);
+                ->with([
+                    'student.class',
+                    'student.section',
+                    'student.studentSessions.schoolClass',
+                    'student.studentSessions.section',
+                ]);
 
             if ($status) $chequeQuery->where('status', $status);
             if ($dateFrom) $chequeQuery->whereDate('cheque_date', '>=', $dateFrom);
@@ -851,6 +1023,9 @@ class ReportsController extends Controller
             foreach ($cheques as $c) {
                 $st = $c->student;
                 if (!$st) continue;
+
+                $sessionRec = $selectedSessionId ? $st->studentSessionFor($selectedSessionId) : null;
+                $stName     = $sessionRec ? ($sessionRec->full_name ?: $st->full_name) : $st->full_name;
 
                 $amt = (float) $c->amount;
                 $totAmt += $amt;
@@ -871,7 +1046,7 @@ class ReportsController extends Controller
                 }
 
                 $exportRows[] = [
-                    'student_name'     => $st->full_name,
+                    'student_name'     => $stName,
                     'admission_number' => $st->admission_number,
                     'receipt_number'   => $c->receipt_number ?? '—',
                     'cheque_number'    => $c->cheque_number,
@@ -2821,5 +2996,995 @@ class ReportsController extends Controller
 
         return $pdf->download($fileName);
     }
+
+    // ─── Teacher Marks Entry Report ──────────────────────────────────────────
+    public function teacherMarksEntryReport(Request $request)
+    {
+        $data = $this->buildTeacherMarksEntryData($request);
+        return view('school.reports.teacher_marks_entry', $data);
+    }
+
+    public function exportTeacherMarksEntryPdf(Request $request)
+    {
+        @ini_set('memory_limit', '512M');
+        @ini_set('max_execution_time', '300');
+        @set_time_limit(300);
+
+        $data = $this->buildTeacherMarksEntryData($request);
+
+        // Safety cap for PDF generation to guarantee lightning fast export (< 2s) and 0 timeout errors
+        $totalStudentRowsCount = $data['studentRows']->count();
+        $pdfLimit = (int) $request->get('limit', 300);
+        $isCapped = $totalStudentRowsCount > $pdfLimit;
+        if ($isCapped) {
+            $data['studentRows'] = $data['studentRows']->take($pdfLimit);
+        }
+        $data['totalStudentRowsCount'] = $totalStudentRowsCount;
+        $data['isCapped'] = $isCapped;
+        $data['pdfLimit'] = $pdfLimit;
+
+        $filterSummaryParts = [];
+        if (!empty($data['selectedExam'])) $filterSummaryParts[] = 'Exam: ' . $data['selectedExam'];
+        if (!empty($data['selectedAssessment'])) $filterSummaryParts[] = 'Assessment: ' . $data['selectedAssessment'];
+        if (!empty($data['classId'])) {
+            $cls = $data['classes']->firstWhere('id', $data['classId']);
+            if ($cls) $filterSummaryParts[] = 'Class: ' . $cls->name;
+        }
+        if (!empty($data['sectionId'])) {
+            $sec = $data['sections']->firstWhere('id', $data['sectionId']);
+            if ($sec) $filterSummaryParts[] = 'Section: ' . $sec->name;
+        }
+        if (!empty($data['subjectId'])) {
+            $sub = $data['subjects']->firstWhere('id', $data['subjectId']);
+            if ($sub) $filterSummaryParts[] = 'Subject: ' . $sub->name;
+        }
+        if (!empty($data['teacherId'])) {
+            $tch = $data['teachers']->firstWhere('id', $data['teacherId']);
+            if ($tch) $filterSummaryParts[] = 'Teacher: ' . trim(($tch->first_name ?? '') . ' ' . ($tch->last_name ?? ''));
+        }
+        if (!empty($data['statusFilter']) && $data['statusFilter'] !== 'all') {
+            $filterSummaryParts[] = 'Status: ' . ucfirst(str_replace('_', ' ', $data['statusFilter']));
+        }
+        $data['filterSummary'] = !empty($filterSummaryParts) ? implode(' | ', $filterSummaryParts) : 'All Records';
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('school.reports.pdf.teacher-marks-entry-report-pdf', $data);
+        $pdf->setPaper('a4', 'landscape');
+        $fileName = 'Teacher_Marks_Entry_Report_' . (!empty($data['selectedExam']) ? (preg_replace('/[^A-Za-z0-9_\-]/', '_', $data['selectedExam']) . '_') : '') . (!empty($data['selectedAssessment']) ? (preg_replace('/[^A-Za-z0-9_\-]/', '_', $data['selectedAssessment']) . '_') : '') . date('Ymd_His') . '.pdf';
+        return $pdf->download($fileName);
+    }
+
+    public function exportTeacherMarksEntryExcel(Request $request)
+    {
+        $data = $this->buildTeacherMarksEntryData($request);
+        $school = $data['school'];
+        $schoolName = $school->name ?? 'School';
+
+        $spreadsheet = new Spreadsheet();
+
+        // ── Sheet 1: Marks Entry Summary ────────────────────────────────────
+        $sheet1 = $spreadsheet->getActiveSheet();
+        $sheet1->setTitle('Marks Entry Summary');
+
+        // Header branding
+        $sheet1->setCellValue('A1', strtoupper($schoolName));
+        $sheet1->mergeCells('A1:P1');
+        $sheet1->getStyle('A1')->getFont()->setSize(16)->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet1->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1E1B4B');
+        $sheet1->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet1->setCellValue('A2', 'TEACHER MARKS ENTRY REPORT - PROGRESS SUMMARY');
+        $sheet1->mergeCells('A2:P2');
+        $sheet1->getStyle('A2')->getFont()->setSize(12)->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet1->getStyle('A2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('4F46E5');
+        $sheet1->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // Metadata
+        $metaText = 'Exam: ' . ($data['selectedExam'] ?: 'All Exams') . ' | Assessment: ' . ($data['selectedAssessment'] ?: 'All Assessments') . ' | Academic Session: ' . $data['sessionName'] . ' | Generated: ' . date('d M Y, h:i A');
+        $sheet1->setCellValue('A3', $metaText);
+        $sheet1->mergeCells('A3:P3');
+        $sheet1->getStyle('A3')->getFont()->setSize(10)->setItalic(true)->getColor()->setRGB('475569');
+        $sheet1->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // KPIs
+        $kpis = $data['kpis'];
+        $sheet1->setCellValue('A5', 'Allocations: ' . $kpis['total_allocations']);
+        $sheet1->setCellValue('C5', 'Completed: ' . $kpis['completed_allocations']);
+        $sheet1->setCellValue('E5', 'In Progress: ' . $kpis['in_progress_allocations']);
+        $sheet1->setCellValue('G5', 'Pending: ' . $kpis['pending_allocations']);
+        $sheet1->setCellValue('I5', 'Enrolled Students: ' . $kpis['total_students']);
+        $sheet1->setCellValue('K5', 'Marks Entered: ' . $kpis['total_entered']);
+        $sheet1->setCellValue('N5', 'Completion Rate: ' . $kpis['completion_rate'] . '%');
+        $sheet1->getStyle('A5:P5')->getFont()->setBold(true)->setSize(10);
+        $sheet1->getStyle('A5:P5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('EEF2FF');
+
+        // Table Headers (16 columns)
+        $headers1 = [
+            '#', 'Teacher Name', 'Role', 'Class', 'Section', 'Subject', 
+            'Exam Name', 'Assessment', 'Total Students', 'Marks Entered', 'Pending Students', 
+            'Completion (%)', 'Status', 'Avg Marks', 'Min Marks', 'Max Marks'
+        ];
+        $colIdx = 'A';
+        foreach ($headers1 as $h) {
+            $sheet1->setCellValue($colIdx . '7', $h);
+            $colIdx++;
+        }
+        $sheet1->getStyle('A7:P7')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet1->getStyle('A7:P7')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('312E81');
+        $sheet1->getStyle('A7:P7')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // Table Rows
+        $rowNum = 8;
+        $i = 1;
+        foreach ($data['allocations'] as $alloc) {
+            $sheet1->setCellValue('A' . $rowNum, $i++);
+            $sheet1->setCellValue('B' . $rowNum, $alloc['teacher_name']);
+            $sheet1->setCellValue('C' . $rowNum, $alloc['teacher_role']);
+            $sheet1->setCellValue('D' . $rowNum, $alloc['class_name']);
+            $sheet1->setCellValue('E' . $rowNum, $alloc['section_name']);
+            $sheet1->setCellValue('F' . $rowNum, $alloc['subject_name']);
+            $sheet1->setCellValue('G' . $rowNum, $alloc['exam_name']);
+            $sheet1->setCellValue('H' . $rowNum, $alloc['assessment_name'] ?? ($data['selectedAssessment'] ?: 'All Assessments'));
+            $sheet1->setCellValue('I' . $rowNum, $alloc['total_students']);
+            $sheet1->setCellValue('J' . $rowNum, $alloc['entered_count']);
+            $sheet1->setCellValue('K' . $rowNum, $alloc['pending_count']);
+            $sheet1->setCellValue('L' . $rowNum, $alloc['completion_pct'] . '%');
+            $sheet1->setCellValue('M' . $rowNum, ucfirst(str_replace('_', ' ', $alloc['status'])));
+            $sheet1->setCellValue('N' . $rowNum, $alloc['avg_marks']);
+            $sheet1->setCellValue('O' . $rowNum, $alloc['min_marks']);
+            $sheet1->setCellValue('P' . $rowNum, $alloc['max_marks']);
+
+            $rowBg = ($rowNum % 2 === 0) ? 'F8FAFC' : 'FFFFFF';
+            $sheet1->getStyle("A{$rowNum}:P{$rowNum}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($rowBg);
+            $sheet1->getStyle("A{$rowNum}:P{$rowNum}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('E2E8F0');
+
+            $sheet1->getStyle("A{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet1->getStyle("D{$rowNum}:E{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet1->getStyle("G{$rowNum}:H{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet1->getStyle("I{$rowNum}:L{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet1->getStyle("M{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet1->getStyle("N{$rowNum}:P{$rowNum}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+            if ($alloc['status'] === 'completed') {
+                $sheet1->getStyle("M{$rowNum}")->getFont()->setBold(true)->getColor()->setRGB('059669');
+            } elseif ($alloc['status'] === 'in_progress') {
+                $sheet1->getStyle("M{$rowNum}")->getFont()->setBold(true)->getColor()->setRGB('D97706');
+            } else {
+                $sheet1->getStyle("M{$rowNum}")->getFont()->setBold(true)->getColor()->setRGB('DC2626');
+            }
+
+            $rowNum++;
+        }
+
+        foreach (range('A', 'P') as $col) {
+            $sheet1->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        // ── Sheet 2: Student Marks Details ──────────────────────────────────
+        $sheet2 = $spreadsheet->createSheet();
+        $sheet2->setTitle('Student Marks Details');
+
+        $sheet2->setCellValue('A1', strtoupper($schoolName));
+        $sheet2->mergeCells('A1:Q1');
+        $sheet2->getStyle('A1')->getFont()->setSize(16)->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet2->getStyle('A1')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('064E3B');
+        $sheet2->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet2Title = 'STUDENT-WISE MARKS ENTERED DETAILS - EXAM: ' . strtoupper($data['selectedExam'] ?: 'ALL EXAMS') . ' | ASSESSMENT: ' . strtoupper($data['selectedAssessment'] ?: 'ALL ASSESSMENTS');
+        $sheet2->setCellValue('A2', $sheet2Title);
+        $sheet2->mergeCells('A2:Q2');
+        $sheet2->getStyle('A2')->getFont()->setSize(12)->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet2->getStyle('A2')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('059669');
+        $sheet2->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sheet2->setCellValue('A3', 'Total Student Entries: ' . $data['studentRows']->count() . ' | Generated: ' . date('d M Y, h:i A'));
+        $sheet2->mergeCells('A3:Q3');
+        $sheet2->getStyle('A3')->getFont()->setSize(10)->setItalic(true)->getColor()->setRGB('475569');
+        $sheet2->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $headers2 = [
+            '#', 'Roll No', 'Admission No', 'Student Name', 'Class', 'Section',
+            'Subject', 'Teacher Name', 'Teacher Role', 'Exam Name', 'Assessment',
+            'Marks Obtained', 'Max Marks', 'Percentage (%)', 'Grade', 'Attendance Status', 'Remarks'
+        ];
+        $colIdx2 = 'A';
+        foreach ($headers2 as $h2) {
+            $sheet2->setCellValue($colIdx2 . '5', $h2);
+            $colIdx2++;
+        }
+        $sheet2->getStyle('A5:Q5')->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet2->getStyle('A5:Q5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('047857');
+        $sheet2->getStyle('A5:Q5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $sRow = 6;
+        $j = 1;
+        foreach ($data['studentRows'] as $st) {
+            $sheet2->setCellValue('A' . $sRow, $j++);
+            $sheet2->setCellValue('B' . $sRow, $st['roll_no']);
+            $sheet2->setCellValue('C' . $sRow, $st['admission_no']);
+            $sheet2->setCellValue('D' . $sRow, $st['student_name']);
+            $sheet2->setCellValue('E' . $sRow, $st['class_name']);
+            $sheet2->setCellValue('F' . $sRow, $st['section_name']);
+            $sheet2->setCellValue('G' . $sRow, $st['subject_name']);
+            $sheet2->setCellValue('H' . $sRow, $st['teacher_name']);
+            $sheet2->setCellValue('I' . $sRow, $st['teacher_role']);
+            $sheet2->setCellValue('J' . $sRow, $st['exam_name']);
+            $sheet2->setCellValue('K' . $sRow, $st['assessment_name'] ?: ($data['selectedAssessment'] ?: 'All Assessments'));
+            $sheet2->setCellValue('L' . $sRow, $st['is_entered'] ? $st['marks_obtained'] : '—');
+            $sheet2->setCellValue('M' . $sRow, $st['max_marks']);
+            $sheet2->setCellValue('N' . $sRow, $st['is_entered'] ? ($st['percentage'] . '%') : '—');
+            $sheet2->setCellValue('O' . $sRow, $st['grade']);
+            $sheet2->setCellValue('P' . $sRow, ucfirst($st['attendance_status']));
+            $sheet2->setCellValue('Q' . $sRow, $st['remarks']);
+
+            $rowBg = ($sRow % 2 === 0) ? 'F8FAFC' : 'FFFFFF';
+            $sheet2->getStyle("A{$sRow}:Q{$sRow}")->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB($rowBg);
+            $sheet2->getStyle("A{$sRow}:Q{$sRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('E2E8F0');
+
+            $sheet2->getStyle("A{$sRow}:C{$sRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet2->getStyle("E{$sRow}:F{$sRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet2->getStyle("J{$sRow}:K{$sRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet2->getStyle("L{$sRow}:N{$sRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+            $sheet2->getStyle("O{$sRow}:P{$sRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $sRow++;
+        }
+
+        foreach (range('A', 'Q') as $col) {
+            $sheet2->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $fileName = 'Teacher_Marks_Entry_Report_' . (!empty($data['selectedExam']) ? (preg_replace('/[^A-Za-z0-9_\-]/', '_', $data['selectedExam']) . '_') : '') . (!empty($data['selectedAssessment']) ? (preg_replace('/[^A-Za-z0-9_\-]/', '_', $data['selectedAssessment']) . '_') : '') . date('Ymd_His') . '.xlsx';
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    private function buildTeacherMarksEntryData(Request $request): array
+    {
+        $schoolId = $this->schoolId();
+        $school   = School::find($schoolId) ?? auth()->user()->school;
+
+        // 1. Academic Sessions
+        $academicSessions = AcademicSession::where('school_id', $schoolId)
+            ->orderByDesc('is_current')
+            ->orderByDesc('start_date')
+            ->get();
+        $currentSession = $academicSessions->where('is_current', true)->first() ?? $academicSessions->first();
+        $selectedSessionId = $request->get('session_id', $currentSession?->id);
+        $selectedSession = $academicSessions->firstWhere('id', $selectedSessionId) ?? $currentSession;
+        $academicYear = $selectedSession?->name;
+
+        // 2. Exam List (Only active, non-deleted exams from exams master for this academic year/session)
+        $examList = [];
+        if (Schema::hasTable('exams')) {
+            $examQuery = Exam::where('school_id', $schoolId);
+            if (!empty($academicYear)) {
+                $examQuery->where(function($q) use ($academicYear) {
+                    $q->where('academic_year', $academicYear)
+                      ->orWhere('academic_year', 'like', '%' . $academicYear . '%');
+                });
+            }
+            $examList = $examQuery->orderByDesc('id')
+                ->pluck('name')
+                ->filter()
+                ->unique()
+                ->values()
+                ->toArray();
+
+            // If no exams found for this specific academic year, try all active exams without an academic year
+            if (empty($examList)) {
+                $examList = Exam::where('school_id', $schoolId)
+                    ->orderByDesc('id')
+                    ->pluck('name')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->toArray();
+            }
+        }
+        if (empty($examList) && Schema::hasTable('student_marks')) {
+            $examList = StudentMark::where('school_id', $schoolId)
+                ->whereNotNull('exam_name')
+                ->where('exam_name', '!=', '')
+                ->pluck('exam_name')
+                ->filter()
+                ->unique()
+                ->values()
+                ->toArray();
+        }
+        $examList = array_values(array_unique(array_filter($examList)));
+
+        $selectedExam = $request->get('exam_name');
+        if ((empty($selectedExam) || !in_array($selectedExam, $examList)) && !empty($examList)) {
+            $selectedExam = $examList[0];
+        }
+
+        // 2b. Assessment List (Strictly scoped to selected Exam)
+        $assessmentList = [];
+        $targetExamIds = [];
+        if (!empty($selectedExam)) {
+            if (Schema::hasTable('exams')) {
+                $examIdsQuery = Exam::where('school_id', $schoolId)->where('name', $selectedExam);
+                if (!empty($academicYear)) {
+                    $examIdsQuery->where(function($q) use ($academicYear) {
+                        $q->where('academic_year', $academicYear)
+                          ->orWhere('academic_year', 'like', '%' . $academicYear . '%');
+                    });
+                }
+                $targetExamIds = $examIdsQuery->pluck('id')->toArray();
+                if (empty($targetExamIds)) {
+                    $targetExamIds = Exam::where('school_id', $schoolId)->where('name', $selectedExam)->pluck('id')->toArray();
+                }
+            }
+
+            if (!empty($targetExamIds) && Schema::hasTable('exam_assessments')) {
+                $eaRecords = ExamAssessment::where('school_id', $schoolId)
+                    ->whereIn('exam_id', $targetExamIds)
+                    ->get(['id', 'name']);
+
+                $assNames = $eaRecords->pluck('name')->filter()->unique()->values()->toArray();
+                $subAssNames = [];
+                if ($eaRecords->isNotEmpty() && Schema::hasTable('exam_sub_assessments')) {
+                    $subAssNames = ExamSubAssessment::where('school_id', $schoolId)
+                        ->whereIn('exam_assessment_id', $eaRecords->pluck('id'))
+                        ->pluck('name')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->toArray();
+                }
+                $assessmentList = array_values(array_unique(array_filter(array_merge($assNames, $subAssNames))));
+            }
+
+            // Fallback ONLY if ExamAssessment has 0 configured assessments for this exam
+            if (empty($assessmentList) && Schema::hasTable('student_marks')) {
+                $assessmentList = StudentMark::where('school_id', $schoolId)
+                    ->where('exam_name', $selectedExam)
+                    ->whereNotNull('assessment_name')
+                    ->where('assessment_name', '!=', '')
+                    ->pluck('assessment_name')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->toArray();
+            }
+        } else {
+            // If no specific exam selected, get all assessments of active exams in current academic year
+            $allExamIds = [];
+            if (Schema::hasTable('exams')) {
+                $allExamsQuery = Exam::where('school_id', $schoolId);
+                if (!empty($academicYear)) {
+                    $allExamsQuery->where(function($q) use ($academicYear) {
+                        $q->where('academic_year', $academicYear)
+                          ->orWhere('academic_year', 'like', '%' . $academicYear . '%');
+                    });
+                }
+                $allExamIds = $allExamsQuery->pluck('id')->toArray();
+            }
+            if (!empty($allExamIds) && Schema::hasTable('exam_assessments')) {
+                $eaRecords = ExamAssessment::where('school_id', $schoolId)
+                    ->whereIn('exam_id', $allExamIds)
+                    ->get(['id', 'name']);
+                $assNames = $eaRecords->pluck('name')->filter()->unique()->values()->toArray();
+                $subAssNames = [];
+                if ($eaRecords->isNotEmpty() && Schema::hasTable('exam_sub_assessments')) {
+                    $subAssNames = ExamSubAssessment::where('school_id', $schoolId)
+                        ->whereIn('exam_assessment_id', $eaRecords->pluck('id'))
+                        ->pluck('name')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->toArray();
+                }
+                $assessmentList = array_values(array_unique(array_filter(array_merge($assNames, $subAssNames))));
+            }
+            if (empty($assessmentList) && Schema::hasTable('student_marks')) {
+                $assessmentList = StudentMark::where('school_id', $schoolId)
+                    ->whereNotNull('assessment_name')
+                    ->where('assessment_name', '!=', '')
+                    ->pluck('assessment_name')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->toArray();
+            }
+        }
+        $assessmentList = array_values(array_unique(array_filter($assessmentList)));
+        
+        $selectedAssessment = $request->get('assessment_name', '');
+        if (!empty($selectedAssessment) && !in_array($selectedAssessment, $assessmentList)) {
+            $selectedAssessment = '';
+        }
+
+        // 3. Dropdown Masters
+        $classes   = SchoolClass::where('school_id', $schoolId)->orderBy('name')->get();
+        $classId   = $request->get('class_id', '');
+
+        // Class-wise Section filtering
+        $sections  = $classId 
+            ? Section::where('school_id', $schoolId)->where('class_id', $classId)->orderBy('name')->get() 
+            : Section::where('school_id', $schoolId)->orderBy('name')->get();
+        $sectionId = $request->get('section_id', '');
+        if (!empty($sectionId) && !$sections->contains('id', (int)$sectionId)) {
+            $sectionId = '';
+        }
+
+        // Class-wise Subject filtering
+        if (!empty($classId)) {
+            $classSubjectIds = [];
+            
+            // Source 1: Direct subjects table class_id
+            $directSubIds = Subject::where('school_id', $schoolId)->where('class_id', $classId)->pluck('id')->toArray();
+            $classSubjectIds = array_merge($classSubjectIds, $directSubIds);
+
+            // Source 2: SectionSubjectStaff
+            if (Schema::hasTable('section_subject_staff')) {
+                $sssSubIds = SectionSubjectStaff::where('school_id', $schoolId)
+                    ->whereHas('section', fn($q) => $q->where('class_id', $classId))
+                    ->pluck('subject_id')
+                    ->toArray();
+                $classSubjectIds = array_merge($classSubjectIds, $sssSubIds);
+            }
+
+            // Source 3: ClassSubjectTeacher
+            if (Schema::hasTable('class_subject_teacher')) {
+                $cstSubIds = ClassSubjectTeacher::where('school_id', $schoolId)
+                    ->where('class_id', $classId)
+                    ->pluck('subject_id')
+                    ->toArray();
+                $classSubjectIds = array_merge($classSubjectIds, $cstSubIds);
+            }
+
+            // Source 4: ExamSubject
+            if (Schema::hasTable('exam_subjects') && Schema::hasColumn('exam_subjects', 'class_id')) {
+                $esSubIds = DB::table('exam_subjects')
+                    ->where('class_id', $classId)
+                    ->pluck('subject_id')
+                    ->toArray();
+                $classSubjectIds = array_merge($classSubjectIds, $esSubIds);
+            }
+
+            // Source 5: ExamAssessment
+            if (Schema::hasTable('exam_assessments') && Schema::hasColumn('exam_assessments', 'class_id')) {
+                $eaSubIds = DB::table('exam_assessments')
+                    ->where('class_id', $classId)
+                    ->whereNotNull('subject_id')
+                    ->pluck('subject_id')
+                    ->toArray();
+                $classSubjectIds = array_merge($classSubjectIds, $eaSubIds);
+            }
+
+            $classSubjectIds = array_unique(array_filter($classSubjectIds));
+
+            if (!empty($classSubjectIds)) {
+                $subjects = Subject::where('school_id', $schoolId)
+                    ->whereIn('id', $classSubjectIds)
+                    ->orderBy('name')
+                    ->get();
+            } else {
+                $subjects = Subject::where('school_id', $schoolId)
+                    ->where(function($q) use ($classId) {
+                        $q->where('class_id', $classId)->orWhereNull('class_id');
+                    })
+                    ->orderBy('name')
+                    ->get();
+            }
+        } else {
+            $subjects = Subject::where('school_id', $schoolId)->orderBy('name')->get();
+        }
+
+        $subjectId = $request->get('subject_id', '');
+        if (!empty($subjectId) && !$subjects->contains('id', (int)$subjectId)) {
+            $subjectId = '';
+        }
+
+        $teachers = Staff::where('school_id', $schoolId)
+            ->with(['user', 'designation'])
+            ->orderBy('first_name')
+            ->get();
+
+        $teacherId   = $request->get('teacher_id', '');
+        $roleFilter  = $request->get('role', 'all'); // 'all', 'class_teacher', 'subject_teacher'
+        $statusFilter= $request->get('status', 'all'); // 'all', 'completed', 'in_progress', 'pending'
+        $search      = trim($request->get('search', ''));
+
+        // 4. Fetch all active marks for this school, exam & assessment
+        $marksQuery = StudentMark::where('school_id', $schoolId);
+        if (!empty($selectedExam)) {
+            $marksQuery->where('exam_name', $selectedExam);
+        }
+        if (!empty($selectedAssessment)) {
+            $matchingAssIds = [];
+            $matchingSubAssIds = [];
+            if (!empty($targetExamIds) && Schema::hasTable('exam_assessments')) {
+                $matchingAssIds = ExamAssessment::where('school_id', $schoolId)
+                    ->whereIn('exam_id', $targetExamIds)
+                    ->where('name', $selectedAssessment)
+                    ->pluck('id')
+                    ->toArray();
+                if (Schema::hasTable('exam_sub_assessments')) {
+                    $matchingSubAssIds = ExamSubAssessment::where('school_id', $schoolId)
+                        ->where('name', $selectedAssessment)
+                        ->pluck('id')
+                        ->toArray();
+                }
+            }
+
+            $marksQuery->where(function($q) use ($selectedAssessment, $matchingAssIds, $matchingSubAssIds) {
+                $q->where('assessment_name', $selectedAssessment);
+                if (!empty($matchingAssIds)) {
+                    $q->orWhereIn('assessment_id', $matchingAssIds);
+                }
+                if (!empty($matchingSubAssIds)) {
+                    $q->orWhereIn('sub_assessment_id', $matchingSubAssIds);
+                }
+            });
+        }
+        $allMarks = $marksQuery->get();
+
+        // 5. Pre-load all teachers lookup [id => name]
+        $teacherMap = [];
+        foreach ($teachers as $t) {
+            $tName = trim(($t->first_name ?? '') . ' ' . ($t->last_name ?? ''));
+            if (empty($tName) && $t->user) {
+                $tName = $t->user->name;
+            }
+            $teacherMap[$t->id] = $tName ?: ('Staff #' . $t->id);
+        }
+
+        // 6. Build Allocations
+        $allocations = [];
+
+        // Source A: section_subject_staff (Subject Teachers)
+        if (Schema::hasTable('section_subject_staff')) {
+            $sssRecords = SectionSubjectStaff::where('school_id', $schoolId)
+                ->with(['section.schoolClass', 'subject', 'staff'])
+                ->get();
+
+            foreach ($sssRecords as $sss) {
+                if (!$sss->section || !$sss->subject) continue;
+                $cId = $sss->section->class_id;
+                $sId = $sss->section_id;
+                $subId = $sss->subject_id;
+                $key = "{$cId}_{$sId}_{$subId}";
+
+                if (!isset($allocations[$key])) {
+                    $allocations[$key] = [
+                        'class_id'             => $cId,
+                        'class_name'           => $sss->section->schoolClass?->name ?? ('Class ' . $cId),
+                        'section_id'           => $sId,
+                        'section_name'         => $sss->section->name,
+                        'class_teacher_id'           => $sss->section->class_teacher_id,
+                        'class_teacher_name'         => $teacherMap[$sss->section->class_teacher_id] ?? 'Not Assigned',
+                        'assistant_class_teacher_id' => $sss->section->assistant_class_teacher_id,
+                        'subject_id'           => $subId,
+                        'subject_name'         => $sss->subject->name,
+                        'subject_code'         => $sss->subject->code ?? '',
+                        'subject_teacher_ids'  => [],
+                        'subject_teacher_names'=> [],
+                    ];
+                }
+                if ($sss->staff_id && !in_array($sss->staff_id, $allocations[$key]['subject_teacher_ids'])) {
+                    $allocations[$key]['subject_teacher_ids'][] = $sss->staff_id;
+                    $allocations[$key]['subject_teacher_names'][] = $teacherMap[$sss->staff_id] ?? ('Staff #' . $sss->staff_id);
+                }
+                if ($sss->substitute_staff_id && !in_array($sss->substitute_staff_id, $allocations[$key]['subject_teacher_ids'])) {
+                    $allocations[$key]['subject_teacher_ids'][] = $sss->substitute_staff_id;
+                    $allocations[$key]['subject_teacher_names'][] = ($teacherMap[$sss->substitute_staff_id] ?? ('Staff #' . $sss->substitute_staff_id)) . ' (Sub)';
+                }
+            }
+        }
+
+        // Source B: class_subject_teacher
+        if (Schema::hasTable('class_subject_teacher')) {
+            $cstRecords = ClassSubjectTeacher::where('school_id', $schoolId)
+                ->with(['schoolClass', 'section', 'subject', 'teacher'])
+                ->get();
+
+            foreach ($cstRecords as $cst) {
+                if (!$cst->schoolClass || !$cst->subject) continue;
+                $cId = $cst->class_id;
+                $sId = $cst->section_id ?: 0;
+                $subId = $cst->subject_id;
+                $key = "{$cId}_{$sId}_{$subId}";
+
+                if (!isset($allocations[$key])) {
+                    $secName = $cst->section?->name ?? ($sId ? 'Section ' . $sId : 'All Sections');
+                    $allocations[$key] = [
+                        'class_id'             => $cId,
+                        'class_name'           => $cst->schoolClass->name,
+                        'section_id'           => $sId,
+                        'section_name'         => $secName,
+                        'class_teacher_id'           => $cst->section?->class_teacher_id,
+                        'class_teacher_name'         => $teacherMap[$cst->section?->class_teacher_id] ?? 'Not Assigned',
+                        'assistant_class_teacher_id' => $cst->section?->assistant_class_teacher_id,
+                        'subject_id'           => $subId,
+                        'subject_name'         => $cst->subject->name,
+                        'subject_code'         => $cst->subject->code ?? '',
+                        'subject_teacher_ids'  => [],
+                        'subject_teacher_names'=> [],
+                    ];
+                }
+                if ($cst->teacher_id && !in_array($cst->teacher_id, $allocations[$key]['subject_teacher_ids'])) {
+                    $allocations[$key]['subject_teacher_ids'][] = $cst->teacher_id;
+                    $allocations[$key]['subject_teacher_names'][] = $teacherMap[$cst->teacher_id] ?? ('Teacher #' . $cst->teacher_id);
+                }
+            }
+        }
+
+        // Source C: Scan student_marks to discover any marks entered
+        foreach ($allMarks as $mk) {
+            $cId = $mk->class_id;
+            $sId = $mk->section_id ?: 0;
+            $subId = $mk->subject_id;
+            if (!$cId || !$subId) continue;
+            $key = "{$cId}_{$sId}_{$subId}";
+
+            if (!isset($allocations[$key])) {
+                $clsObj = $classes->firstWhere('id', $cId);
+                $secObj = $sections->firstWhere('id', $sId);
+                $subObj = $subjects->firstWhere('id', $subId);
+
+                $allocations[$key] = [
+                    'class_id'             => $cId,
+                    'class_name'           => $clsObj?->name ?? ('Class ' . $cId),
+                    'section_id'           => $sId,
+                    'section_name'         => $secObj?->name ?? ($sId ? ('Sec ' . $sId) : 'All Sections'),
+                    'class_teacher_id'           => $secObj?->class_teacher_id,
+                    'class_teacher_name'         => $teacherMap[$secObj?->class_teacher_id] ?? 'Not Assigned',
+                    'assistant_class_teacher_id' => $secObj?->assistant_class_teacher_id,
+                    'subject_id'           => $subId,
+                    'subject_name'         => $subObj?->name ?? ('Subject ' . $subId),
+                    'subject_code'         => $subObj?->code ?? '',
+                    'subject_teacher_ids'  => [],
+                    'subject_teacher_names'=> [],
+                ];
+            }
+        }
+
+        // Source D: If allocations are still empty, populate from all sections & subjects
+        if (empty($allocations)) {
+            foreach ($sections as $sec) {
+                $cId = $sec->class_id;
+                $sId = $sec->id;
+                $clsObj = $classes->firstWhere('id', $cId);
+                foreach ($subjects as $sub) {
+                    $key = "{$cId}_{$sId}_{$sub->id}";
+                    $allocations[$key] = [
+                        'class_id'             => $cId,
+                        'class_name'           => $clsObj?->name ?? ('Class ' . $cId),
+                        'section_id'           => $sId,
+                        'section_name'         => $sec->name,
+                        'class_teacher_id'           => $sec->class_teacher_id,
+                        'class_teacher_name'         => $teacherMap[$sec->class_teacher_id] ?? 'Not Assigned',
+                        'assistant_class_teacher_id' => $sec->assistant_class_teacher_id,
+                        'subject_id'           => $sub->id,
+                        'subject_name'         => $sub->name,
+                        'subject_code'         => $sub->code ?? '',
+                        'subject_teacher_ids'  => [],
+                        'subject_teacher_names'=> [],
+                    ];
+                }
+            }
+        }
+
+        // 7. Calculate marks stats & student details for each allocation
+        $processedAllocations = [];
+        $allStudentRows       = [];
+
+        $studentCols = ['id', 'school_id', 'first_name', 'last_name', 'admission_number', 'roll_number', 'class_id', 'section_id'];
+        if (Schema::hasColumn('students', 'full_name')) {
+            $studentCols[] = 'full_name';
+        }
+        if (Schema::hasColumn('students', 'academic_session_id')) {
+            $studentCols[] = 'academic_session_id';
+        }
+
+        $studentsQuery = Student::where('school_id', $schoolId);
+        $allStudents = $studentsQuery->select($studentCols)->get()->keyBy('id');
+
+        // Map students and roll numbers from student_sessions
+        $sessionStudentMap = []; // "classId_sectionId" => [student_id, ...]
+        $sessionRollMap    = []; // "studentId_classId" => roll_number
+        if (Schema::hasTable('student_sessions')) {
+            $ssQuery = DB::table('student_sessions')->where('school_id', $schoolId);
+            if ($selectedSession) {
+                $ssQuery->where('academic_session_id', $selectedSession->id);
+            }
+            $ssRows = $ssQuery->get(['student_id', 'class_id', 'section_id', 'roll_number']);
+
+            if ($ssRows->isEmpty() && $selectedSession) {
+                $ssRows = DB::table('student_sessions')->where('school_id', $schoolId)->get(['student_id', 'class_id', 'section_id', 'roll_number']);
+            }
+
+            foreach ($ssRows as $ss) {
+                $sIdKey = $ss->section_id ? (int)$ss->section_id : 0;
+                $sessionStudentMap["{$ss->class_id}_{$sIdKey}"][] = (int)$ss->student_id;
+                $sessionStudentMap["{$ss->class_id}_0"][] = (int)$ss->student_id;
+                if (!empty($ss->roll_number)) {
+                    $sessionRollMap["{$ss->student_id}_{$ss->class_id}"] = $ss->roll_number;
+                }
+            }
+        }
+
+        // Map students from student_marks
+        $marksClassStudentMap = [];
+        foreach ($allMarks as $mk) {
+            if (!$mk->class_id || !$mk->student_id) continue;
+            $sIdKey = $mk->section_id ? (int)$mk->section_id : 0;
+            $marksClassStudentMap["{$mk->class_id}_{$sIdKey}"][] = (int)$mk->student_id;
+            $marksClassStudentMap["{$mk->class_id}_0"][] = (int)$mk->student_id;
+        }
+
+        // Preload any missing student master records
+        $allReferencedStudentIds = array_values(array_unique(array_filter(array_merge(
+            $allMarks->pluck('student_id')->map(fn($id) => (int)$id)->toArray(),
+            !empty($sessionStudentMap) ? array_merge(...array_values($sessionStudentMap)) : []
+        ))));
+        $missingStudentIds = array_diff($allReferencedStudentIds, $allStudents->keys()->toArray());
+        if (!empty($missingStudentIds)) {
+            $extraStudents = Student::where('school_id', $schoolId)
+                ->whereIn('id', $missingStudentIds)
+                ->select($studentCols)
+                ->get();
+            foreach ($extraStudents as $es) {
+                $allStudents->put($es->id, $es);
+            }
+        }
+
+        foreach ($allocations as $key => $item) {
+            $cId = (int)$item['class_id'];
+            $sId = (int)$item['section_id'];
+            $subId = (int)$item['subject_id'];
+
+            // Find marks entered for this allocation
+            $marksForAlloc = $allMarks->filter(function ($m) use ($cId, $sId, $subId) {
+                if ($m->class_id && (int)$m->class_id !== $cId) return false;
+                if ($sId && $m->section_id && (int)$m->section_id !== $sId) return false;
+                return (int)$m->subject_id === $subId;
+            });
+
+            $enteredStudentIds = $marksForAlloc->pluck('student_id')->unique()->map(fn($id) => (int)$id)->toArray();
+            $enteredCount = count($enteredStudentIds);
+
+            // Collect all enrolled students for this class & section across all sources
+            $directStudents = $allStudents->filter(function ($s) use ($cId, $sId) {
+                if ((int)$s->class_id !== $cId) return false;
+                if ($sId && $s->section_id && (int)$s->section_id !== $sId) return false;
+                return true;
+            })->pluck('id')->map(fn($id) => (int)$id)->toArray();
+
+            $sessionStudents = $sId ? ($sessionStudentMap["{$cId}_{$sId}"] ?? []) : ($sessionStudentMap["{$cId}_0"] ?? []);
+            $marksStudents   = $sId ? ($marksClassStudentMap["{$cId}_{$sId}"] ?? []) : ($marksClassStudentMap["{$cId}_0"] ?? []);
+
+            $allocStudentIds = array_values(array_unique(array_filter(array_merge(
+                $sessionStudents,
+                $directStudents,
+                $marksStudents,
+                $enteredStudentIds
+            ))));
+
+            $totalStudentsCount = count($allocStudentIds);
+            if ($enteredCount > $totalStudentsCount) {
+                $totalStudentsCount = $enteredCount;
+            }
+
+            $pendingCount = max(0, $totalStudentsCount - $enteredCount);
+
+            $completionPct = $totalStudentsCount > 0 
+                ? min(100.0, round(($enteredCount / $totalStudentsCount) * 100, 1))
+                : ($enteredCount > 0 ? 100.0 : 0.0);
+
+            $status = ($totalStudentsCount > 0 && $enteredCount >= $totalStudentsCount) 
+                ? 'completed' 
+                : ($enteredCount > 0 ? 'in_progress' : 'pending');
+
+            $avgMarks = $enteredCount > 0 ? round($marksForAlloc->avg('marks_obtained'), 2) : 0.0;
+            $minMarks = $enteredCount > 0 ? round($marksForAlloc->min('marks_obtained'), 2) : 0.0;
+            $maxMarks = $enteredCount > 0 ? round($marksForAlloc->max('marks_obtained'), 2) : 0.0;
+            $maxMarksConfigured = $marksForAlloc->first()?->max_marks ?: 100.0;
+
+            $hasSubjectTeacher = !empty($item['subject_teacher_ids']);
+            $hasClassTeacher    = !empty($item['class_teacher_id']);
+            
+            $teacherDisplayNames = [];
+            $roleBadges = [];
+
+            if ($hasSubjectTeacher) {
+                $teacherDisplayNames[] = implode(', ', $item['subject_teacher_names']);
+                $roleBadges[] = 'Subject Teacher';
+            }
+            if ($hasClassTeacher) {
+                if (!$hasSubjectTeacher) {
+                    $teacherDisplayNames[] = $item['class_teacher_name'];
+                    $roleBadges[] = 'Class Teacher';
+                } elseif (in_array($item['class_teacher_id'], $item['subject_teacher_ids'])) {
+                    $roleBadges[] = 'Class & Subject Teacher';
+                }
+            }
+            if (empty($teacherDisplayNames)) {
+                $teacherDisplayNames[] = 'Unassigned / Admin';
+                $roleBadges[] = 'General Entry';
+            }
+
+            $primaryTeacherText = implode(' | ', array_unique($teacherDisplayNames));
+            $primaryRoleText    = implode(' & ', array_unique($roleBadges));
+
+            $allocationStudents = [];
+            foreach ($allocStudentIds as $stuId) {
+                $stu = $allStudents->get($stuId);
+                $stMark = $marksForAlloc->firstWhere('student_id', $stuId);
+                $isEntered = !empty($stMark);
+                $obtained = $isEntered ? (float)$stMark->marks_obtained : null;
+                $maxM = $isEntered ? (float)($stMark->max_marks ?: 100) : (float)$maxMarksConfigured;
+                $pct = ($isEntered && $maxM > 0) ? round(($obtained / $maxM) * 100, 1) : null;
+
+                $stuName = $stu ? ($stu->full_name ?: trim(($stu->first_name ?? '') . ' ' . ($stu->last_name ?? ''))) : ($stMark?->student ? ($stMark->student->full_name ?: trim(($stMark->student->first_name ?? '') . ' ' . ($stMark->student->last_name ?? ''))) : ('Student #' . $stuId));
+                $rollNo = $sessionRollMap["{$stuId}_{$cId}"] ?? ($stu?->roll_number ?: ($stMark?->student?->roll_number ?: '—'));
+                $admNo = $stu?->admission_number ?: ($stMark?->student?->admission_number ?: '—');
+
+                $stuRow = [
+                    'student_id'        => $stuId,
+                    'student_name'      => $stuName ?: ('Student #' . $stuId),
+                    'roll_no'           => $rollNo ?: '—',
+                    'admission_no'      => $admNo ?: '—',
+                    'class_name'        => $item['class_name'],
+                    'section_name'      => $item['section_name'],
+                    'subject_name'      => $item['subject_name'],
+                    'teacher_name'      => $primaryTeacherText,
+                    'teacher_role'      => $primaryRoleText,
+                    'exam_name'         => $selectedExam ?: 'All Exams',
+                    'assessment_name'   => $stMark?->assessment_name ?: ($selectedAssessment ?: 'All Assessments'),
+                    'marks_obtained'    => $obtained,
+                    'max_marks'         => $maxM,
+                    'percentage'        => $pct,
+                    'grade'             => $isEntered ? ($stMark->grade ?: '—') : '—',
+                    'attendance_status' => $isEntered ? ($stMark->attendance_status ?: 'present') : 'Pending',
+                    'remarks'           => $isEntered ? ($stMark->remarks ?: '—') : '—',
+                    'is_entered'        => $isEntered,
+                ];
+
+                $allocationStudents[] = $stuRow;
+                $allStudentRows[]     = $stuRow;
+            }
+
+            $processedAllocations[] = [
+                'key'                  => $key,
+                'class_id'             => $cId,
+                'class_name'           => $item['class_name'],
+                'section_id'           => $sId,
+                'section_name'         => $item['section_name'],
+                'subject_id'           => $subId,
+                'subject_name'         => $item['subject_name'],
+                'subject_code'         => $item['subject_code'],
+                'class_teacher_id'           => $item['class_teacher_id'],
+                'class_teacher_name'         => $item['class_teacher_name'],
+                'assistant_class_teacher_id' => $item['assistant_class_teacher_id'] ?? null,
+                'subject_teacher_ids'  => $item['subject_teacher_ids'],
+                'subject_teacher_names'=> $item['subject_teacher_names'],
+                'teacher_name'         => $primaryTeacherText,
+                'teacher_role'         => $primaryRoleText,
+                'exam_name'            => $selectedExam ?: 'All Exams',
+                'assessment_name'      => $selectedAssessment ?: 'All Assessments',
+                'total_students'       => $totalStudentsCount,
+                'entered_count'        => $enteredCount,
+                'pending_count'        => $pendingCount,
+                'completion_pct'       => $completionPct,
+                'status'               => $status,
+                'avg_marks'            => $avgMarks,
+                'min_marks'            => $minMarks,
+                'max_marks'            => $maxMarks,
+                'max_marks_total'      => $maxMarksConfigured,
+                'students'             => $allocationStudents,
+            ];
+        }
+
+        // 8. Apply Filters
+        $filteredAllocations = collect($processedAllocations);
+
+        if ($classId) {
+            $filteredAllocations = $filteredAllocations->where('class_id', $classId);
+        }
+        if ($sectionId) {
+            $filteredAllocations = $filteredAllocations->where('section_id', $sectionId);
+        }
+        if ($subjectId) {
+            $filteredAllocations = $filteredAllocations->where('subject_id', $subjectId);
+        }
+        if ($statusFilter !== 'all') {
+            $filteredAllocations = $filteredAllocations->where('status', $statusFilter);
+        }
+        if ($teacherId) {
+            $filteredAllocations = $filteredAllocations->filter(function ($item) use ($teacherId) {
+                return $item['class_teacher_id'] == $teacherId || ($item['assistant_class_teacher_id'] ?? null) == $teacherId || in_array($teacherId, $item['subject_teacher_ids']);
+            });
+        }
+        if ($roleFilter === 'class_teacher') {
+            $filteredAllocations = $filteredAllocations->filter(fn($item) => !empty($item['class_teacher_id']) || !empty($item['assistant_class_teacher_id']));
+        } elseif ($roleFilter === 'subject_teacher') {
+            $filteredAllocations = $filteredAllocations->filter(fn($item) => !empty($item['subject_teacher_ids']));
+        }
+        if ($search !== '') {
+            $searchLower = strtolower($search);
+            $filteredAllocations = $filteredAllocations->filter(function ($item) use ($searchLower) {
+                return str_contains(strtolower($item['teacher_name']), $searchLower)
+                    || str_contains(strtolower($item['class_name']), $searchLower)
+                    || str_contains(strtolower($item['section_name']), $searchLower)
+                    || str_contains(strtolower($item['subject_name']), $searchLower);
+            });
+        }
+
+        $filteredAllocations = $filteredAllocations->values();
+
+        $filteredStudentRows = collect();
+        foreach ($filteredAllocations as $alloc) {
+            foreach ($alloc['students'] as $stuRow) {
+                if ($search !== '') {
+                    $searchLower = strtolower($search);
+                    if (!str_contains(strtolower($stuRow['student_name']), $searchLower)
+                        && !str_contains(strtolower($stuRow['roll_no']), $searchLower)
+                        && !str_contains(strtolower($stuRow['admission_no']), $searchLower)
+                        && !str_contains(strtolower($stuRow['teacher_name']), $searchLower)
+                        && !str_contains(strtolower($stuRow['subject_name']), $searchLower)
+                    ) {
+                        continue;
+                    }
+                }
+                $filteredStudentRows->push($stuRow);
+            }
+        }
+
+        // 9. Compute Overall Summary KPIs
+        $totalAllocations = $filteredAllocations->count();
+        $completedAllocations = $filteredAllocations->where('status', 'completed')->count();
+        $inProgressAllocations = $filteredAllocations->where('status', 'in_progress')->count();
+        $pendingAllocations = $filteredAllocations->where('status', 'pending')->count();
+
+        $totalStudentsSum = $filteredAllocations->sum('total_students');
+        $totalEnteredSum  = $filteredAllocations->sum('entered_count');
+        $totalPendingSum  = $filteredAllocations->sum('pending_count');
+        $overallCompletionRate = $totalStudentsSum > 0 ? min(100.0, round(($totalEnteredSum / $totalStudentsSum) * 100, 1)) : 0.0;
+
+        $enteredMarksCollection = $filteredStudentRows->where('is_entered', true)->whereNotNull('marks_obtained');
+        $overallAvgMarks = $enteredMarksCollection->count() > 0 ? round($enteredMarksCollection->avg('marks_obtained'), 1) : 0.0;
+
+        return [
+            'school'                 => $school,
+            'examList'               => $examList,
+            'selectedExam'           => $selectedExam,
+            'assessmentList'         => $assessmentList,
+            'selectedAssessment'     => $selectedAssessment,
+            'classes'                => $classes,
+            'classId'                => $classId,
+            'sections'               => $sections,
+            'sectionId'              => $sectionId,
+            'subjects'               => $subjects,
+            'subjectId'              => $subjectId,
+            'teachers'               => $teachers,
+            'teacherId'              => $teacherId,
+            'roleFilter'             => $roleFilter,
+            'statusFilter'           => $statusFilter,
+            'search'                 => $search,
+            'allocations'            => $filteredAllocations,
+            'studentRows'            => $filteredStudentRows,
+            'kpis'                   => [
+                'total_allocations'      => $totalAllocations,
+                'completed_allocations'  => $completedAllocations,
+                'in_progress_allocations'=> $inProgressAllocations,
+                'pending_allocations'    => $pendingAllocations,
+                'total_students'         => $totalStudentsSum,
+                'total_entered'          => $totalEnteredSum,
+                'total_pending'          => $totalPendingSum,
+                'completion_rate'        => $overallCompletionRate,
+                'overall_avg_marks'      => $overallAvgMarks,
+            ],
+            'sessionName'            => $selectedSession?->name ?? 'Current Session',
+        ];
+    }
 }
+
 
