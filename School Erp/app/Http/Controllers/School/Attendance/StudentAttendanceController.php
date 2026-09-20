@@ -16,13 +16,84 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class StudentAttendanceController extends Controller
 {
+    private function getTeacherStaff()
+    {
+        $user = auth()->user();
+        $isTeacher = $user && ($user->hasRole('teacher') || $user->role === 'teacher' || $user->hasRole('staff'));
+        return $isTeacher ? $user->staff : null;
+    }
+
+    private function getTeacherAssignedSectionIds($staff, $schoolId)
+    {
+        $secIdsFromCt = Section::where('school_id', $schoolId)
+            ->where(function($q) use ($staff) {
+                $q->where('class_teacher_id', $staff->id)
+                  ->orWhere('assistant_class_teacher_id', $staff->id);
+            })
+            ->pluck('id')->toArray();
+        return array_values(array_unique(array_filter($secIdsFromCt)));
+    }
+
+    private function getMonthlyWorkingDays($year, $month): int
+    {
+        $startOfMonth = \Carbon\Carbon::createFromDate((int)$year, (int)$month, 1)->startOfMonth();
+        $endOfMonth = $startOfMonth->copy()->endOfMonth();
+        $daysInMonth = $startOfMonth->daysInMonth;
+        $sundays = 0;
+        $temp = $startOfMonth->copy();
+        while ($temp->lte($endOfMonth)) {
+            if ($temp->dayOfWeek === \Carbon\Carbon::SUNDAY) {
+                $sundays++;
+            }
+            $temp->addDay();
+        }
+        return max(1, $daysInMonth - $sundays);
+    }
+
+    private function calculateMonthlyAttendancePercentage($students, $sessionId, $year, $month, $upToDate = null): void
+    {
+        $monthlyWorkingDays = $this->getMonthlyWorkingDays($year, $month);
+
+        $query = StudentAttendance::where('academic_session_id', $sessionId)
+            ->whereYear('date', (int)$year)
+            ->whereMonth('date', (int)$month)
+            ->whereIn('student_id', $students->pluck('id'));
+
+        if ($upToDate) {
+            $query->whereDate('date', '<=', $upToDate);
+        }
+
+        $attendanceStats = $query->get()->groupBy('student_id');
+
+        foreach ($students as $student) {
+            $studentAtts = $attendanceStats->get($student->id) ?? collect();
+            $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
+                + ($studentAtts->where('status', 'half_day')->count() * 0.5);
+            $student->attendance_percentage = $monthlyWorkingDays > 0 ? round(($presentCount / $monthlyWorkingDays) * 100) : 0;
+        }
+    }
+
     public function index()
     {
-        $classes = SchoolClass::all();
-        $sections = Section::all();
-        $academicSessions = AcademicSession::all();
+        $schoolId = auth()->user()->school_id;
+        $staff = $this->getTeacherStaff();
+        $isOnlySubjectTeacher = false;
 
-        return view('school.attendance.students.index', compact('classes', 'sections', 'academicSessions'));
+        if ($staff) {
+            $assignedSectionIds = $this->getTeacherAssignedSectionIds($staff, $schoolId);
+            $sections = Section::where('school_id', $schoolId)->whereIn('id', $assignedSectionIds)->get();
+            $classes = SchoolClass::where('school_id', $schoolId)->whereIn('id', $sections->pluck('class_id'))->get();
+            if ($sections->isEmpty()) {
+                $isOnlySubjectTeacher = true;
+            }
+        } else {
+            $classes = SchoolClass::where('school_id', $schoolId)->get();
+            $sections = Section::where('school_id', $schoolId)->get();
+        }
+        $academicSessions = AcademicSession::where('school_id', $schoolId)->get();
+        $currentSession = AcademicSession::resolveCurrentSessionForUser(auth()->user(), $schoolId);
+
+        return view('school.attendance.students.index', compact('classes', 'sections', 'academicSessions', 'currentSession', 'isOnlySubjectTeacher'));
     }
 
     public function loadSection(Request $request)
@@ -39,46 +110,57 @@ class StudentAttendanceController extends Controller
         $date = $request->date;
         $sessionId = $request->academic_session_id;
 
-        $students = Student::where('section_id', $sectionId)
-            ->where('is_active', true)
-            ->orderBy('roll_number')
+        $staff = $this->getTeacherStaff();
+        if ($staff) {
+            $assignedSectionIds = $this->getTeacherAssignedSectionIds($staff, $schoolId);
+            $section = Section::where('school_id', $schoolId)->whereIn('id', $assignedSectionIds)->find($sectionId);
+            if (!$section) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized: Only assigned Class Teachers can mark attendance for this class/section.'], 403);
+            }
+        }
+
+        $students = Student::where('school_id', $schoolId)
+            ->activeStudents()
+            ->inAcademicSession($sessionId, null, $sectionId)
+            ->with(['studentSessions' => fn($q) => $q->where('academic_session_id', $sessionId)])
             ->get();
+
+        $students = $students->sortBy(function($st) {
+            $sess = $st->studentSessions->first();
+            $roll = $sess?->roll_number ?? $st->roll_number ?? '999999';
+            return is_numeric($roll) ? (int)$roll : $roll;
+        })->values();
+
+        foreach ($students as $student) {
+            $sess = $student->studentSessions->first();
+            if ($sess) {
+                if (!empty($sess->roll_number)) {
+                    $student->roll_number = $sess->roll_number;
+                }
+                $sessFullName = $sess->full_name;
+                if (!empty($sessFullName)) {
+                    $student->full_name_session = $sessFullName;
+                }
+            }
+        }
 
         $attendances = StudentAttendance::where('section_id', $sectionId)
             ->whereDate('date', $date)
             ->get()
             ->keyBy('student_id');
 
-        $attendanceStats = StudentAttendance::where('academic_session_id', $sessionId)
-            ->whereIn('student_id', $students->pluck('id'))
-            ->get()
-            ->groupBy('student_id');
+        $carbonDate = \Carbon\Carbon::parse($date);
+        $this->calculateMonthlyAttendancePercentage($students, $sessionId, $carbonDate->year, $carbonDate->month, $carbonDate->format('Y-m-d'));
 
-        $session = AcademicSession::find($sessionId);
-        $totalWorkingDays = 0;
-        if ($session) {
-            $start = \Carbon\Carbon::parse($session->start_date);
-            $end = \Carbon\Carbon::parse($session->end_date);
-            $days = $start->diffInDays($end) + 1;
-            $sundays = 0;
-            $temp = $start->copy();
-            while ($temp->dayOfWeek !== \Carbon\Carbon::SUNDAY && $temp->lte($end)) {
-                $temp->addDay();
-            }
-            if ($temp->lte($end)) {
-                $sundays = 1 + floor($temp->diffInDays($end) / 7);
-            }
-            $totalWorkingDays = $days - $sundays;
-        }
+        $isSunday = ($carbonDate->dayOfWeek === 0);
+        $isHolidayEvent = \App\Models\Event::where('school_id', $schoolId)
+            ->where('is_holiday', true)
+            ->whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
+            ->exists();
+        $isHolidayDate = ($isSunday || $isHolidayEvent);
 
-        foreach ($students as $student) {
-            $studentAtts = $attendanceStats->get($student->id) ?? collect();
-            $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
-                + ($studentAtts->where('status', 'half_day')->count() * 0.5);
-            $student->attendance_percentage = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
-        }
-
-        $html = view('school.attendance.students.load-table', compact('students', 'attendances'))->render();
+        $html = view('school.attendance.students.load-table', compact('students', 'attendances', 'isHolidayDate'))->render();
 
         return response()->json([
             'success' => true,
@@ -96,19 +178,21 @@ class StudentAttendanceController extends Controller
         $sectionId = $data['section_id'];
         $sessionId = $data['academic_session_id'];
 
-        $section = Section::findOrFail($sectionId);
+        $staff = $this->getTeacherStaff();
+        if ($staff) {
+            $assignedSectionIds = $this->getTeacherAssignedSectionIds($staff, $schoolId);
+            $section = Section::where('school_id', $schoolId)->whereIn('id', $assignedSectionIds)->find($sectionId);
+            if (!$section) {
+                abort(403, 'Unauthorized: Only assigned Class Teachers can mark attendance for this class/section.');
+            }
+        } else {
+            $section = Section::findOrFail($sectionId);
+        }
 
         DB::transaction(function () use ($schoolId, $data, $date, $sectionId, $sessionId, $markedBy, $section) {
             foreach ($data['attendance'] as $item) {
-                $status = isset($item['status']) ? $item['status'] : 'not_marked';
-
-                if (empty($status) || $status === 'not_marked') {
-                    StudentAttendance::where('school_id', $schoolId)
-                        ->where('student_id', $item['student_id'])
-                        ->whereDate('date', $date)
-                        ->delete();
-                    continue;
-                }
+                $rawStatus = $item['status'] ?? null;
+                $status = (!empty($rawStatus) && $rawStatus !== 'not_marked') ? $rawStatus : 'present';
 
                 $attendance = StudentAttendance::where('school_id', $schoolId)
                     ->where('student_id', $item['student_id'])
@@ -142,6 +226,25 @@ class StudentAttendanceController extends Controller
             }
         });
 
+        $secName = $section->name ?? 'Section';
+        $clsName = $section->schoolClass?->name ?? $section->class?->name ?? 'Class';
+        \App\Services\NotificationService::send([
+            'school_id'      => $schoolId,
+            'recipient_role' => 'school_admin',
+            'title'          => 'Student Attendance Submitted',
+            'message'        => "Attendance submitted for {$clsName} - {$secName} on {$date}.",
+            'module'         => 'attendance',
+            'type'           => 'attendance_submitted',
+            'icon'           => 'fa-user-clock',
+            'color'          => '#d97706',
+            'action_url'     => route('school.attendance.students.index', [
+                'class_id'            => $section->class_id,
+                'section_id'          => $sectionId,
+                'date'                => $date,
+                'academic_session_id' => $sessionId,
+            ]),
+        ]);
+
         return redirect()->route('school.attendance.students.index', [
             'class_id' => $section->class_id,
             'section_id' => $sectionId,
@@ -150,15 +253,38 @@ class StudentAttendanceController extends Controller
         ])->with('success', 'Attendance marked successfully.');
     }
 
+
     public function report(Request $request)
     {
         $schoolId = auth()->user()->school_id;
-        $classes = SchoolClass::all();
-        $sections = Section::all();
-        $academicSessions = AcademicSession::all();
+        $staff = $this->getTeacherStaff();
 
         $classId = $request->get('class_id');
         $sectionId = $request->get('section_id');
+
+        if ($staff) {
+            $assignedSectionIds = $this->getTeacherAssignedSectionIds($staff, $schoolId);
+            $sections = Section::where('school_id', $schoolId)->whereIn('id', $assignedSectionIds)->get();
+            $classes = SchoolClass::where('school_id', $schoolId)->whereIn('id', $sections->pluck('class_id'))->get();
+            if ($sectionId) {
+                $checkSection = Section::where('school_id', $schoolId)->whereIn('id', $assignedSectionIds)->find($sectionId);
+                if (!$checkSection) {
+                    abort(403, 'Unauthorized.');
+                }
+            }
+        } else {
+            $classes = SchoolClass::where('school_id', $schoolId)->get();
+            $sections = Section::where('school_id', $schoolId)->get();
+        }
+        $academicSessions = AcademicSession::where('school_id', $schoolId)->get();
+
+        $sessionId = $request->get('academic_session_id');
+        if (!$sessionId) {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $sessionId = $currentSession?->id;
+        }
+
         $month = $request->get('month', date('m'));
         $year = $request->get('year', date('Y'));
 
@@ -167,10 +293,30 @@ class StudentAttendanceController extends Controller
         $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $month, $year);
 
         if ($classId && $sectionId) {
-            $students = Student::where('section_id', $sectionId)
-                ->where('is_active', true)
-                ->orderBy('roll_number')
+            $students = Student::where('school_id', $schoolId)
+                ->activeStudents()
+                ->inAcademicSession($sessionId, $classId, $sectionId)
+                ->with(['studentSessions' => fn($q) => $q->where('academic_session_id', $sessionId)])
                 ->get();
+
+            $students = $students->sortBy(function($st) {
+                $sess = $st->studentSessions->first();
+                $roll = $sess?->roll_number ?? $st->roll_number ?? '999999';
+                return is_numeric($roll) ? (int)$roll : $roll;
+            })->values();
+
+            foreach ($students as $student) {
+                $sess = $student->studentSessions->first();
+                if ($sess) {
+                    if (!empty($sess->roll_number)) {
+                        $student->roll_number = $sess->roll_number;
+                    }
+                    $sessFullName = $sess->full_name;
+                    if (!empty($sessFullName)) {
+                        $student->full_name_session = $sessFullName;
+                    }
+                }
+            }
 
             $records = StudentAttendance::where('section_id', $sectionId)
                 ->whereYear('date', $year)
@@ -218,9 +364,22 @@ class StudentAttendanceController extends Controller
     {
         $schoolId = auth()->user()->school_id;
         $date = $request->get('date', date('Y-m-d'));
+        $staff = $this->getTeacherStaff();
+
+        $sessionId = $request->get('academic_session_id');
+        if (!$sessionId) {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
+                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $sessionId = $currentSession?->id;
+        }
 
         // Load summaries per class/section
-        $sections = Section::with(['schoolClass'])->get();
+        if ($staff) {
+            $assignedSectionIds = $this->getTeacherAssignedSectionIds($staff, $schoolId);
+            $sections = Section::with(['schoolClass'])->where('school_id', $schoolId)->whereIn('id', $assignedSectionIds)->get();
+        } else {
+            $sections = Section::with(['schoolClass'])->where('school_id', $schoolId)->get();
+        }
         $reportData = [];
 
         $totalPresent = 0;
@@ -229,30 +388,41 @@ class StudentAttendanceController extends Controller
         $totalLeave = 0;
 
         foreach ($sections as $section) {
-            $studentCount = Student::where('section_id', $section->id)->where('is_active', true)->count();
+            $studentCount = Student::where('school_id', $schoolId)
+                ->activeStudents()
+                ->inAcademicSession($sessionId, null, $section->id)
+                ->count();
             
             $present = StudentAttendance::where('section_id', $section->id)->whereDate('date', $date)->whereIn('status', ['present', 'late', 'duty_leave'])->count();
             $absent = StudentAttendance::where('section_id', $section->id)->whereDate('date', $date)->where('status', 'absent')->count();
+            $late = StudentAttendance::where('section_id', $section->id)->whereDate('date', $date)->where('status', 'late')->count();
             $leave = StudentAttendance::where('section_id', $section->id)->whereDate('date', $date)->whereIn('status', ['leave', 'holiday'])->count();
 
             $totalPresent += $present;
             $totalAbsent += $absent;
+            $totalLate += $late;
             $totalLeave += $leave;
 
+            $isMarked = StudentAttendance::where('section_id', $section->id)->whereDate('date', $date)->exists();
+
             $reportData[] = [
+                'section' => $section,
                 'class_name' => $section->schoolClass?->name ?? 'N/A',
                 'section_name' => $section->name,
                 'total_students' => $studentCount,
                 'present' => $present,
                 'absent' => $absent,
+                'late' => $late,
                 'leave' => $leave,
-                'percentage' => $studentCount > 0 ? round(($present / $studentCount) * 100, 1) : 0,
+                'is_marked' => $isMarked,
+                'percentage' => $studentCount > 0 ? round(($present / $studentCount) * 100) : 0,
             ];
         }
 
         $summary = [
             'present' => $totalPresent,
             'absent' => $totalAbsent,
+            'late' => $totalLate,
             'leave' => $totalLeave,
             'total' => $totalPresent + $totalAbsent + $totalLeave,
         ];
@@ -263,12 +433,18 @@ class StudentAttendanceController extends Controller
     public function stats(Request $request)
     {
         $schoolId = auth()->user()->school_id;
+        $staff = $this->getTeacherStaff();
         
-        // Return analytical page for student attendance
-        $topAbsentees = StudentAttendance::select('student_id', DB::raw('count(*) as absent_count'))
+        $query = StudentAttendance::select('student_id', DB::raw('count(*) as absent_count'))
             ->where('school_id', $schoolId)
-            ->where('status', 'absent')
-            ->groupBy('student_id')
+            ->where('status', 'absent');
+
+        if ($staff) {
+            $assignedSectionIds = $this->getTeacherAssignedSectionIds($staff, $schoolId);
+            $query->whereIn('section_id', $assignedSectionIds);
+        }
+        
+        $topAbsentees = $query->groupBy('student_id')
             ->orderBy('absent_count', 'desc')
             ->with('student')
             ->limit(10)
@@ -331,25 +507,36 @@ class StudentAttendanceController extends Controller
         // Query active staff for filters
         $teachers = \App\Models\Staff::where('school_id', $schoolId)->where('is_active', true)->get();
 
+        $staff = $this->getTeacherStaff();
+
         // Query active sections
         $sectionsQuery = Section::with(['schoolClass', 'classTeacher'])
             ->where('school_id', $schoolId);
 
-        // Filter by staff if provided
-        $staffId = $request->get('staff_id');
-        if ($staffId) {
-            $sectionsQuery->where('class_teacher_id', $staffId);
+        if ($staff) {
+            $assignedSectionIds = $this->getTeacherAssignedSectionIds($staff, $schoolId);
+            $sectionsQuery->whereIn('id', $assignedSectionIds);
+        } else {
+            // Filter by staff if provided
+            $staffId = $request->get('staff_id');
+            if ($staffId) {
+                $sectionsQuery->where(function($q) use ($staffId) {
+                    $q->where('class_teacher_id', $staffId)
+                      ->orWhere('assistant_class_teacher_id', $staffId);
+                });
+            }
         }
 
         $sections = $sectionsQuery->get();
 
-        // Query active student count per section
-        $studentCounts = Student::where('school_id', $schoolId)
-            ->where('is_active', true)
-            ->select('section_id', DB::raw('count(*) as total_students'))
-            ->groupBy('section_id')
-            ->pluck('total_students', 'section_id')
-            ->toArray();
+        // Query active student count per section in the selected academic session
+        $studentCounts = [];
+        foreach ($sections as $sectionItem) {
+            $studentCounts[$sectionItem->id] = Student::where('school_id', $schoolId)
+                ->activeStudents()
+                ->inAcademicSession($sessionId, null, $sectionItem->id)
+                ->count();
+        }
 
         // Fetch student attendance records in date range
         $attendanceRecords = StudentAttendance::where('school_id', $schoolId)
@@ -430,29 +617,46 @@ class StudentAttendanceController extends Controller
         if (!$classId || !$sectionId || !$sessionId) {
             return back()->with('error', 'Please select Class, Section and Academic Year.');
         }
+
+        $staff = $this->getTeacherStaff();
+        if ($staff) {
+            $assignedSectionIds = $this->getTeacherAssignedSectionIds($staff, $schoolId);
+            $section = Section::where('school_id', $schoolId)->whereIn('id', $assignedSectionIds)->find($sectionId);
+            if (!$section) {
+                abort(403, 'Unauthorized.');
+            }
+        } else {
+            $section = Section::findOrFail($sectionId);
+        }
         
         $class = SchoolClass::findOrFail($classId);
-        $section = Section::findOrFail($sectionId);
         $session = AcademicSession::findOrFail($sessionId);
         
-        // Calculate academic year total working days (excluding Sundays)
-        $start = \Carbon\Carbon::parse($session->start_date);
-        $end = \Carbon\Carbon::parse($session->end_date);
-        $days = $start->diffInDays($end) + 1;
-        $sundays = 0;
-        $temp = $start->copy();
-        while ($temp->dayOfWeek !== \Carbon\Carbon::SUNDAY && $temp->lte($end)) {
-            $temp->addDay();
-        }
-        if ($temp->lte($end)) {
-            $sundays = 1 + floor($temp->diffInDays($end) / 7);
-        }
-        $totalWorkingDays = $days - $sundays;
         
-        $students = Student::where('section_id', $sectionId)
-            ->where('is_active', true)
-            ->orderBy('roll_number')
+        $students = Student::where('school_id', $schoolId)
+            ->activeStudents()
+            ->inAcademicSession($sessionId, $classId, $sectionId)
+            ->with(['studentSessions' => fn($q) => $q->where('academic_session_id', $sessionId)])
             ->get();
+
+        $students = $students->sortBy(function($st) {
+            $sess = $st->studentSessions->first();
+            $roll = $sess?->roll_number ?? $st->roll_number ?? '999999';
+            return is_numeric($roll) ? (int)$roll : $roll;
+        })->values();
+
+        foreach ($students as $student) {
+            $sess = $student->studentSessions->first();
+            if ($sess) {
+                if (!empty($sess->roll_number)) {
+                    $student->roll_number = $sess->roll_number;
+                }
+                $sessFullName = $sess->full_name;
+                if (!empty($sessFullName)) {
+                    $student->full_name_session = $sessFullName;
+                }
+            }
+        }
 
         $titleStyle = [
             'font' => ['bold' => true, 'size' => 14, 'color' => ['argb' => 'FFFFFFFF']],
@@ -503,17 +707,8 @@ class StudentAttendanceController extends Controller
                 ->get()
                 ->keyBy('student_id');
                 
-            $attendanceStats = StudentAttendance::where('academic_session_id', $sessionId)
-                ->whereIn('student_id', $students->pluck('id'))
-                ->get()
-                ->groupBy('student_id');
-
-            foreach ($students as $student) {
-                $studentAtts = $attendanceStats->get($student->id) ?? collect();
-                $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
-                    + ($studentAtts->where('status', 'half_day')->count() * 0.5);
-                $student->attendance_percentage = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
-            }
+            $carbonDate = \Carbon\Carbon::parse($date);
+            $this->calculateMonthlyAttendancePercentage($students, $sessionId, $carbonDate->year, $carbonDate->month, $carbonDate->format('Y-m-d'));
             
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
@@ -578,17 +773,7 @@ class StudentAttendanceController extends Controller
                 ->get()
                 ->groupBy('student_id');
                 
-            $attendanceStats = StudentAttendance::where('academic_session_id', $sessionId)
-                ->whereIn('student_id', $students->pluck('id'))
-                ->get()
-                ->groupBy('student_id');
-
-            foreach ($students as $student) {
-                $studentAtts = $attendanceStats->get($student->id) ?? collect();
-                $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
-                    + ($studentAtts->where('status', 'half_day')->count() * 0.5);
-                $student->attendance_percentage = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
-            }
+            $this->calculateMonthlyAttendancePercentage($students, $sessionId, (int)$year, (int)$month);
             
             $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
@@ -692,26 +877,48 @@ class StudentAttendanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Missing filters.']);
         }
 
+        $staff = $this->getTeacherStaff();
+        if ($staff) {
+            $section = Section::where('school_id', $schoolId)
+                ->where(function($q) use ($staff) {
+                    $q->where('class_teacher_id', $staff->id)
+                      ->orWhere('assistant_class_teacher_id', $staff->id);
+                })
+                ->find($sectionId);
+            if (!$section) {
+                return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
+            }
+        } else {
+            $section = Section::findOrFail($sectionId);
+        }
+
         $session = AcademicSession::findOrFail($sessionId);
         
-        // Calculate academic year total working days (excluding Sundays)
-        $start = \Carbon\Carbon::parse($session->start_date);
-        $end = \Carbon\Carbon::parse($session->end_date);
-        $days = $start->diffInDays($end) + 1;
-        $sundays = 0;
-        $temp = $start->copy();
-        while ($temp->dayOfWeek !== \Carbon\Carbon::SUNDAY && $temp->lte($end)) {
-            $temp->addDay();
-        }
-        if ($temp->lte($end)) {
-            $sundays = 1 + floor($temp->diffInDays($end) / 7);
-        }
-        $totalWorkingDays = $days - $sundays;
 
-        $students = Student::where('section_id', $sectionId)
-            ->where('is_active', true)
-            ->orderBy('roll_number')
+        $students = Student::where('school_id', $schoolId)
+            ->activeStudents()
+            ->inAcademicSession($sessionId, $classId, $sectionId)
+            ->with(['studentSessions' => fn($q) => $q->where('academic_session_id', $sessionId)])
             ->get();
+
+        $students = $students->sortBy(function($st) {
+            $sess = $st->studentSessions->first();
+            $roll = $sess?->roll_number ?? $st->roll_number ?? '999999';
+            return is_numeric($roll) ? (int)$roll : $roll;
+        })->values();
+
+        foreach ($students as $student) {
+            $sess = $student->studentSessions->first();
+            if ($sess) {
+                if (!empty($sess->roll_number)) {
+                    $student->roll_number = $sess->roll_number;
+                }
+                $sessFullName = $sess->full_name;
+                if (!empty($sessFullName)) {
+                    $student->full_name_session = $sessFullName;
+                }
+            }
+        }
 
         if ($type === 'daily') {
             $attendances = StudentAttendance::where('section_id', $sectionId)
@@ -719,10 +926,8 @@ class StudentAttendanceController extends Controller
                 ->get()
                 ->keyBy('student_id');
 
-            $attendanceStats = StudentAttendance::where('academic_session_id', $sessionId)
-                ->whereIn('student_id', $students->pluck('id'))
-                ->get()
-                ->groupBy('student_id');
+            $carbonDate = \Carbon\Carbon::parse($date);
+            $this->calculateMonthlyAttendancePercentage($students, $sessionId, $carbonDate->year, $carbonDate->month, $carbonDate->format('Y-m-d'));
 
             $columns = ['Roll No', 'Admission No', 'Student Name', 'Status', 'Remarks', 'Attendance %'];
             $rows = [];
@@ -730,11 +935,7 @@ class StudentAttendanceController extends Controller
                 $att = $attendances->get($st->id);
                 $status = $att ? ucfirst(str_replace('_', ' ', $att->status)) : 'Not Marked';
                 $remark = $att ? $att->remark : '';
-                
-                $studentAtts = $attendanceStats->get($st->id) ?? collect();
-                $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
-                    + ($studentAtts->where('status', 'half_day')->count() * 0.5);
-                $pct = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
+                $pct = $st->attendance_percentage ?? 0;
 
                 $rows[] = [
                     $st->roll_number ?? '—',
@@ -756,10 +957,7 @@ class StudentAttendanceController extends Controller
                 ->get()
                 ->groupBy('student_id');
 
-            $attendanceStats = StudentAttendance::where('academic_session_id', $sessionId)
-                ->whereIn('student_id', $students->pluck('id'))
-                ->get()
-                ->groupBy('student_id');
+            $this->calculateMonthlyAttendancePercentage($students, $sessionId, (int)$year, (int)$month);
 
             $columns = ['Roll No', 'Admission No', 'Student Name'];
             for ($d = 1; $d <= $daysInMonth; $d++) {
@@ -805,10 +1003,7 @@ class StudentAttendanceController extends Controller
                     $row[] = $statusText;
                 }
 
-                $studentAtts = $attendanceStats->get($st->id) ?? collect();
-                $presentCount = $studentAtts->whereIn('status', ['present', 'late', 'duty_leave'])->count() 
-                    + ($studentAtts->where('status', 'half_day')->count() * 0.5);
-                $pct = $totalWorkingDays > 0 ? round(($presentCount / $totalWorkingDays) * 100) : 0;
+                $pct = $st->attendance_percentage ?? 0;
 
                 $row[] = (string)$presentCountVal;
                 $row[] = (string)$absentCountVal;

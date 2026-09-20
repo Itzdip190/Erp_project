@@ -63,7 +63,7 @@
                     <tr>
                         <th>Admission ID</th>
                         <th>Student Name</th>
-                        <th>Academic Session</th>
+                        <th style="display: none;">Academic Session</th>
                         <th>Class & Sec</th>
                         <th>Requested By</th>
                         <th>Requested Time</th>
@@ -82,7 +82,7 @@
                                 <div style="font-size:11px;color:var(--t3);">Student ID: #{{ $req->student_id }}</div>
                             @endif
                         </td>
-                        <td>
+                        <td style="display: none;">
                             <span class="badge badge-blue" style="font-size:11px; padding:3px 8px; border-radius:6px;">
                                 <i class="fas fa-calendar-alt" style="margin-right:4px;"></i>{{ $req->academicSession?->name ?? 'All / Default' }}
                             </span>
@@ -156,7 +156,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="9" style="text-align:center; padding:48px; color:var(--t3);">
+                        <td colspan="8" style="text-align:center; padding:48px; color:var(--t3);">
                             <i class="fas fa-shield-alt" style="font-size:36px; display:block; margin-bottom:12px; color:var(--border);"></i>
                             <div>No student deletion requests found.</div>
                         </td>

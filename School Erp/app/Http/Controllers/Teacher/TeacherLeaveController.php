@@ -34,10 +34,7 @@ class TeacherLeaveController extends Controller
 
         $currentSession = null;
         if (Schema::hasTable('academic_sessions')) {
-            $currentSession = AcademicSession::where('school_id', $schoolId)
-                ->where('is_current', true)
-                ->first()
-                ?? AcademicSession::where('school_id', $schoolId)->first();
+            $currentSession = AcademicSession::resolveCurrentSessionForUser($user, $schoolId);
         }
         $academicYear = $currentSession?->name ?? '2026-2027';
 
@@ -275,9 +272,7 @@ class TeacherLeaveController extends Controller
             return redirect()->back()->withErrors(['msg' => 'Staff record not found for your user account.']);
         }
 
-        $currentSession = AcademicSession::where('school_id', $schoolId)
-            ->where('is_current', true)
-            ->first();
+        $currentSession = AcademicSession::resolveCurrentSessionForUser($user, $schoolId);
         $academicYear = $currentSession?->name ?? '2026-2027';
 
         $leaveType = LeaveType::where('school_id', $schoolId)->findOrFail($request->leave_type_id);

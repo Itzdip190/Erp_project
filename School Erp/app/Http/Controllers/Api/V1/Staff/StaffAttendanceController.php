@@ -33,23 +33,41 @@ class StaffAttendanceController extends Controller
                 ], 403);
             }
 
-            // Verify teacher assignment to section
-            $isAssigned = SectionSubjectStaff::where('staff_id', $staff->id)
-                ->where('section_id', $sectionId)
+            // Verify teacher is Class Teacher or Assistant Class Teacher for section
+            $isAssigned = Section::where('id', $sectionId)
+                ->where('school_id', $user->school_id)
+                ->where(function($q) use ($staff) {
+                    $q->where('class_teacher_id', $staff->id)
+                      ->orWhere('assistant_class_teacher_id', $staff->id);
+                })
                 ->exists();
 
             if (!$isAssigned) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Unauthorized. You are not assigned to this section.',
+                    'message' => 'Unauthorized. Only class teachers can mark attendance for this section.',
                 ], 403);
             }
         }
 
-        $students = Student::where('section_id', $sectionId)
-            ->where('is_active', true)
-            ->orderBy('roll_number')
+        $schoolId = $user->school_id ?? 1;
+        $sessionId = $request->get('academic_session_id');
+        if (!$sessionId) {
+            $currentSession = \App\Models\AcademicSession::resolveCurrentSessionForUser($user, $schoolId);
+            $sessionId = $currentSession?->id;
+        }
+
+        $students = Student::where('school_id', $schoolId)
+            ->activeStudents()
+            ->inAcademicSession($sessionId, null, $sectionId)
+            ->with(['studentSessions' => fn($q) => $q->where('academic_session_id', $sessionId)])
             ->get();
+
+        $students = $students->sortBy(function($st) {
+            $sess = $st->studentSessions->first();
+            $roll = $sess?->roll_number ?? $st->roll_number ?? '999999';
+            return is_numeric($roll) ? (int)$roll : $roll;
+        })->values();
 
         $records = StudentAttendance::where('section_id', $sectionId)
             ->where('date', $date)
@@ -57,11 +75,14 @@ class StaffAttendanceController extends Controller
             ->keyBy('student_id');
 
         $data = $students->map(function ($student) use ($records) {
+            $sess = $student->studentSessions->first();
+            $roll = $sess?->roll_number ?? $student->roll_number;
+            $name = $sess?->full_name ?: ($student->full_name ?: trim($student->first_name . ' ' . $student->last_name));
             $record = $records->get($student->id);
             return [
                 'student_id' => $student->id,
-                'roll_number' => $student->roll_number,
-                'full_name' => $student->full_name,
+                'roll_number' => $roll,
+                'full_name' => $name,
                 'status' => $record ? $record->status : 'none',
                 'remark' => $record?->remark,
             ];
@@ -97,14 +118,18 @@ class StaffAttendanceController extends Controller
                 ], 403);
             }
 
-            $isAssigned = SectionSubjectStaff::where('staff_id', $staff->id)
-                ->where('section_id', $request->section_id)
+            $isAssigned = Section::where('id', $request->section_id)
+                ->where('school_id', $schoolId)
+                ->where(function($q) use ($staff) {
+                    $q->where('class_teacher_id', $staff->id)
+                      ->orWhere('assistant_class_teacher_id', $staff->id);
+                })
                 ->exists();
 
             if (!$isAssigned) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Unauthorized. You are not assigned to this section.',
+                    'message' => 'Unauthorized. Only class teachers can mark attendance for this section.',
                 ], 403);
             }
         }
@@ -131,6 +156,29 @@ class StaffAttendanceController extends Controller
                 );
             }
         });
+
+        $secName = $section->name ?? 'Section';
+        $clsName = $section->schoolClass?->name ?? $section->class?->name ?? 'Class';
+        if (class_exists(\App\Services\NotificationService::class)) {
+            try {
+                \App\Services\NotificationService::send([
+                    'school_id'      => $schoolId,
+                    'recipient_role' => 'school_admin',
+                    'title'          => 'Student Attendance Submitted',
+                    'message'        => "Attendance submitted for {$clsName} - {$secName} on {$request->date}.",
+                    'module'         => 'attendance',
+                    'type'           => 'attendance_submitted',
+                    'icon'           => 'fa-user-clock',
+                    'color'          => '#d97706',
+                    'action_url'     => route('school.attendance.students.index', [
+                        'class_id'            => $section->class_id,
+                        'section_id'          => $section->id,
+                        'date'                => $request->date,
+                        'academic_session_id' => $request->academic_session_id,
+                    ]),
+                ]);
+            } catch (\Throwable $e) {}
+        }
 
         return response()->json([
             'success' => true,

@@ -1061,8 +1061,22 @@
 
                         <!-- Purpose -->
                         <td>
-                            <div style="display: flex; flex-direction: column; gap: 2px;">
-                                <div style="font-weight: 700; color: #1e293b; font-size: 12.5px;">{{ $req->visit_purpose }}</div>
+                            <div style="display: flex; flex-direction: column; gap: 3px;">
+                                <div style="font-weight: 700; color: #1e293b; font-size: 12.5px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                                    <span>{{ $req->visit_purpose }}</span>
+                                    @if(stripos($req->visit_purpose, 'interview') !== false || $req->is_interview || $req->cv_url)
+                                        <span class="badge bg-danger text-white" style="font-size: 10px; padding: 2px 6px; border-radius: 4px;">
+                                            <i class="fas fa-user-tie me-1"></i> Interview
+                                        </span>
+                                    @endif
+                                </div>
+                                @if($req->cv_url)
+                                <div class="mt-1">
+                                    <a href="{{ $req->cv_url }}" target="_blank" download class="btn btn-xs btn-outline-danger py-0 px-2 fw-bold" style="font-size: 11px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; border-width: 1.5px;">
+                                        <i class="fas fa-file-pdf"></i> Download CV (PDF)
+                                    </a>
+                                </div>
+                                @endif
                                 @if($req->detailed_purpose_remarks)
                                 <div style="color: #64748b; font-size: 11.5px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ $req->detailed_purpose_remarks }}">
                                     {{ $req->detailed_purpose_remarks }}
@@ -1346,6 +1360,17 @@
                 <span class="field-title-label" style="color: #92400e;"><i class="fas fa-comment-dots"></i> Detailed Remarks</span>
                 <span class="field-value-text" id="detailRemarks" style="color: #78350f;"></span>
             </div>
+
+            <!-- Attached Candidate CV (PDF) -->
+            <div class="profile-field-box full-span" id="detailCvContainer" style="display: none; background: #eff6ff; border: 1.5px solid #bfdbfe;">
+                <span class="field-title-label" style="color: #1d4ed8;"><i class="fas fa-file-pdf text-danger"></i> Candidate CV / Resume</span>
+                <div class="d-flex align-items-center justify-content-between mt-1">
+                    <span class="field-value-text" id="detailCvName" style="color: #0f172a; font-weight: 700; font-size: 12.5px;">Candidate_CV.pdf</span>
+                    <a href="#" id="detailCvDownloadBtn" target="_blank" download class="btn btn-sm btn-danger fw-bold" style="border-radius: 6px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; text-decoration: none;">
+                        <i class="fas fa-download"></i> Download CV (PDF)
+                    </a>
+                </div>
+            </div>
         </div>
 
         <!-- Footer -->
@@ -1490,7 +1515,7 @@
                     <p class="scan-subtext">Fill in your visit details on your mobile. Once approved, your Digital Visitor Pass will be delivered directly to your email!</p>
 
                     <div class="poster-footer">
-                        Powered by SchoolCloud ERP • Front Desk Visitor Security System
+                        Powered by Educorerp • Front Desk Visitor Security System
                     </div>
                 </div>
                 <script>
@@ -1587,6 +1612,20 @@
             document.getElementById('detailRemarksContainer').style.display = 'flex';
         } else {
             document.getElementById('detailRemarksContainer').style.display = 'none';
+        }
+
+        // Candidate CV Handling in Details Modal
+        const cvContainer = document.getElementById('detailCvContainer');
+        const cvBtn = document.getElementById('detailCvDownloadBtn');
+        const cvName = document.getElementById('detailCvName');
+        const cvUrl = v.cv_url || (v.meta_data && v.meta_data.cv_url) || (v.cv_path ? ('/storage/' + v.cv_path) : null);
+
+        if (cvUrl) {
+            cvBtn.href = cvUrl;
+            cvName.textContent = v.cv_name || (v.full_name ? (v.full_name.replace(/\s+/g, '_') + '_CV.pdf') : 'Candidate_CV.pdf');
+            cvContainer.style.display = 'block';
+        } else {
+            cvContainer.style.display = 'none';
         }
 
         const photoImg = document.getElementById('detailVisitorPhoto');

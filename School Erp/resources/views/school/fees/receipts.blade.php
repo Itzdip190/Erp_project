@@ -93,13 +93,13 @@
         background: #ffffff;
     }
     .total-amt-pill {
+        display: none !important;
         background: #059669;
         color: #ffffff;
         font-size: 14px;
         font-weight: 800;
         padding: 8px 18px;
         border-radius: 20px;
-        display: flex;
         align-items: center;
         gap: 6px;
         box-shadow: 0 2px 4px rgba(5, 150, 105, 0.2);
@@ -289,13 +289,15 @@
 </div>
 
 <form method="GET" action="{{ route('school.fees.receipts') }}" id="receiptFilterForm">
+    <input type="hidden" name="academic_session_id" value="{{ $selectedSessionId ?? request('academic_session_id') }}">
     <div class="filter-section-card">
         <div class="filter-row-top">
-            <div class="floating-field">
+            <div class="floating-field" style="display:none;">
                 <label>Academic Year *</label>
-                <select name="academic_year" class="floating-control" onchange="this.form.submit()">
-                    <option value="2025-2026">Apr 2025 - Mar 2026</option>
-                    <option value="2026-2027">Apr 2026 - Mar 2027</option>
+                <select name="academic_session_id" class="floating-control" onchange="this.form.submit()">
+                    @foreach($sessions as $sess)
+                        <option value="{{ $sess->id }}" {{ ($selectedSessionId ?? '') == $sess->id ? 'selected' : '' }}>{{ $sess->name }}</option>
+                    @endforeach
                 </select>
             </div>
             <div class="floating-field">
@@ -325,7 +327,7 @@
                     <i class="fas fa-search"></i>
                     <input type="text" name="search" placeholder="Search by receipt number/student name/admission ID" value="{{ request('search') }}" onkeyup="if(event.key==='Enter') this.form.submit()">
                 </div>
-                <div class="total-amt-pill">
+                <div class="total-amt-pill" style="display: none !important;">
                     Total Amount ₹ {{ number_format($totalAmount) }}
                 </div>
             </div>
@@ -374,7 +376,7 @@
                     <td style="font-weight:600;">{{ optional($receipt->student)->admission_id ?? optional($receipt->student)->admission_number ?? '150B' }}</td>
                     <td style="font-weight:700; color:#1e293b;">{{ optional($receipt->student)->full_name ?? 'Raghav' }}</td>
                     <td style="color:#475569;">{{ optional($receipt->student)->father_name ?? 'Raghvinder' }}</td>
-                    <td>{{ optional(optional($receipt->student)->class)->name ?? 'NUR' }} {{ optional(optional($receipt->student)->section)->name ?? 'A' }}</td>
+                    <td>{{ $receipt->display_class ?? (optional(optional($receipt->student)->class)->name ?? 'NUR') }} {{ $receipt->display_section ?? (optional(optional($receipt->student)->section)->name ?? '') }}</td>
                     <td style="font-weight:700;">₹ {{ number_format($receipt->amount_paid) }}</td>
                     <td style="font-family:monospace; font-size:11px; color:#475569;">{{ $receipt->transaction_id ?? 'TESTPRODMPESAPAY7' }}</td>
                     <td style="font-family:monospace; font-size:11px; color:#475569;">{{ $receipt->transaction_id ?? 'TESTPRODMPESAPAY7' }}</td>
@@ -387,7 +389,7 @@
                                 '{{ $receipt->payment_mode }}',
                                 '{{ $receipt->payment_date }}',
                                 '{{ optional($receipt->student)->admission_id ?? '150B' }}',
-                                '{{ optional(optional($receipt->student)->class)->name ?? 'NUR' }} - {{ optional(optional($receipt->student)->section)->name ?? 'A' }}',
+                                '{{ ($receipt->display_class ?? (optional(optional($receipt->student)->class)->name ?? 'NUR')) }} - {{ ($receipt->display_section ?? (optional(optional($receipt->student)->section)->name ?? 'A')) }}',
                                 '{{ optional($receipt->student)->father_name ?? 'Raghvinder' }}',
                                 '{{ optional($receipt->student)->mother_name ?? 'N/A' }}',
                                 '{{ optional($receipt->student)->address ?? 'N/A' }}',
@@ -456,7 +458,7 @@ function downloadCSV(filename, text) {
 function generateFeeReceiptReport() {
     let csv = "Receipt No,Date,Admission ID,Student Name,Father Name,Class,Total Amount,Order ID,Payment ID\n";
     @foreach($receipts as $r)
-        csv += `"{{ $r->receipt_number }}","{{ $r->payment_date }}","{{ optional($r->student)->admission_id ?? '150B' }}","{{ optional($r->student)->full_name ?? 'Raghav' }}","{{ optional($r->student)->father_name ?? 'Raghvinder' }}","{{ optional(optional($r->student)->class)->name ?? 'NUR' }} {{ optional(optional($r->student)->section)->name ?? 'A' }}","{{ $r->amount_paid }}","{{ $r->transaction_id }}","{{ $r->transaction_id }}"\n`;
+        csv += `"{{ $r->receipt_number }}","{{ $r->payment_date }}","{{ optional($r->student)->admission_id ?? '150B' }}","{{ optional($r->student)->full_name ?? 'Raghav' }}","{{ optional($r->student)->father_name ?? 'Raghvinder' }}","{{ ($r->display_class ?? (optional(optional($r->student)->class)->name ?? 'NUR')) }} {{ ($r->display_section ?? (optional(optional($r->student)->section)->name ?? '')) }}","{{ $r->amount_paid }}","{{ $r->transaction_id }}","{{ $r->transaction_id }}"\n`;
     @endforeach
     downloadCSV("Fee_Receipt_Report_2026.csv", csv);
 }

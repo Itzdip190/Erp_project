@@ -51,7 +51,14 @@ class StudentController extends Controller
                 })
                 ->pluck('id')->toArray();
             $secIdsFromSss = \App\Models\SectionSubjectStaff::where('school_id', $schoolId)->where('staff_id', $staff->id)->pluck('section_id')->toArray();
-            $secIdsFromCells = \App\Models\ClassTimetableCell::where('school_id', $schoolId)->where('teacher_id', $staff->id)->pluck('section_id')->toArray();
+            $secIdsFromCells = \App\Models\ClassTimetableCell::where('school_id', $schoolId)
+                ->where(function($q) use ($staff) {
+                    $q->where('teacher_id', $staff->id);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('class_timetable_cells', 'secondary_teacher_id')) {
+                        $q->orWhere('secondary_teacher_id', $staff->id);
+                    }
+                })
+                ->pluck('section_id')->toArray();
             $assignedSectionIds = array_unique(array_filter(array_merge($secIdsFromCt, $secIdsFromSss, $secIdsFromCells)));
             $assignedClassIds = Section::whereIn('id', $assignedSectionIds)->pluck('class_id')->unique()->filter()->toArray();
         }
@@ -621,7 +628,14 @@ class StudentController extends Controller
                 })
                 ->pluck('id')->toArray();
             $secIdsFromSss = \App\Models\SectionSubjectStaff::where('school_id', $schoolId)->where('staff_id', $staff->id)->pluck('section_id')->toArray();
-            $secIdsFromCells = \App\Models\ClassTimetableCell::where('school_id', $schoolId)->where('teacher_id', $staff->id)->pluck('section_id')->toArray();
+            $secIdsFromCells = \App\Models\ClassTimetableCell::where('school_id', $schoolId)
+                ->where(function($q) use ($staff) {
+                    $q->where('teacher_id', $staff->id);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('class_timetable_cells', 'secondary_teacher_id')) {
+                        $q->orWhere('secondary_teacher_id', $staff->id);
+                    }
+                })
+                ->pluck('section_id')->toArray();
             $assignedSectionIds = array_unique(array_filter(array_merge($secIdsFromCt, $secIdsFromSss, $secIdsFromCells)));
             if (!in_array($student->section_id, $assignedSectionIds)) {
                 abort(403, 'Unauthorized: You are not assigned to this student\'s section.');
@@ -1417,7 +1431,14 @@ class StudentController extends Controller
                 })
                 ->pluck('id')->toArray();
             $secIdsFromSss = \App\Models\SectionSubjectStaff::where('school_id', $schoolId)->where('staff_id', $staff->id)->pluck('section_id')->toArray();
-            $secIdsFromCells = \App\Models\ClassTimetableCell::where('school_id', $schoolId)->where('teacher_id', $staff->id)->pluck('section_id')->toArray();
+            $secIdsFromCells = \App\Models\ClassTimetableCell::where('school_id', $schoolId)
+                ->where(function($q) use ($staff) {
+                    $q->where('teacher_id', $staff->id);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('class_timetable_cells', 'secondary_teacher_id')) {
+                        $q->orWhere('secondary_teacher_id', $staff->id);
+                    }
+                })
+                ->pluck('section_id')->toArray();
             $assignedSectionIds = array_unique(array_filter(array_merge($secIdsFromCt, $secIdsFromSss, $secIdsFromCells)));
         }
 

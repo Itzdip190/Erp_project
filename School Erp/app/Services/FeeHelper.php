@@ -293,6 +293,7 @@ class FeeHelper
     public static function getStudentEnrolledSessionIds(Student $student): array
     {
         $sessionIds = collect();
+        $schoolId = $student->school_id;
 
         // 1. Current student record's academic_session_id
         if (!empty($student->academic_session_id)) {
@@ -306,6 +307,83 @@ class FeeHelper
         } else {
             $sessIds = $student->studentSessions()->pluck('academic_session_id')->filter()->map(fn($id) => (int)$id);
             $sessionIds = $sessionIds->merge($sessIds);
+        }
+
+        // 3. Linked student records by admission_number (cross-session promotions / multiple year records)
+        $linkedStudentIds = [$student->id];
+        if (!empty($student->admission_number)) {
+            $linkedStudents = Student::where('school_id', $schoolId)
+                ->where('admission_number', $student->admission_number)
+                ->get(['id', 'academic_session_id']);
+            
+            $linkedSessionIds = $linkedStudents->pluck('academic_session_id')->filter()->map(fn($id) => (int)$id);
+            $sessionIds = $sessionIds->merge($linkedSessionIds);
+
+            $linkedIds = $linkedStudents->pluck('id')->toArray();
+            if (!empty($linkedIds)) {
+                $linkedStudentIds = array_unique(array_merge($linkedStudentIds, $linkedIds));
+                $linkedSessionRecs = \Illuminate\Support\Facades\DB::table('student_sessions')
+                    ->whereIn('student_id', $linkedIds)
+                    ->pluck('academic_session_id')
+                    ->filter()
+                    ->map(fn($id) => (int)$id);
+                $sessionIds = $sessionIds->merge($linkedSessionRecs);
+            }
+        }
+
+        // 4. Any academic session where the student (or linked student) has existing fees or fee schedules
+        $feeSessionIds = FeeSchedule::where('school_id', $schoolId)
+            ->whereIn('id', function($q) use ($schoolId, $linkedStudentIds) {
+                $q->select('fee_schedule_id')
+                  ->from('student_fees')
+                  ->where('school_id', $schoolId)
+                  ->whereIn('student_id', $linkedStudentIds)
+                  ->whereNotNull('fee_schedule_id');
+            })
+            ->pluck('academic_session_id')
+            ->filter()
+            ->map(fn($id) => (int)$id);
+        $sessionIds = $sessionIds->merge($feeSessionIds);
+
+        $transportSessionIds = TransportFeeSchedule::where('school_id', $schoolId)
+            ->whereIn('id', function($q) use ($schoolId, $linkedStudentIds) {
+                $q->select('transport_fee_schedule_id')
+                  ->from('student_fees')
+                  ->where('school_id', $schoolId)
+                  ->whereIn('student_id', $linkedStudentIds)
+                  ->whereNotNull('transport_fee_schedule_id');
+            })
+            ->pluck('academic_session_id')
+            ->filter()
+            ->map(fn($id) => (int)$id);
+        $sessionIds = $sessionIds->merge($transportSessionIds);
+
+        $miscSessionIds = \App\Models\MiscFee::where('school_id', $schoolId)
+            ->whereIn('id', function($q) use ($schoolId, $linkedStudentIds) {
+                $q->select('misc_fee_id')
+                  ->from('student_fees')
+                  ->where('school_id', $schoolId)
+                  ->whereIn('student_id', $linkedStudentIds)
+                  ->whereNotNull('misc_fee_id');
+            })
+            ->pluck('academic_session_id')
+            ->filter()
+            ->map(fn($id) => (int)$id);
+        $sessionIds = $sessionIds->merge($miscSessionIds);
+
+        // 5. Academic sessions covered by student's admission_date
+        if (!empty($student->admission_date)) {
+            try {
+                $admDate = \Carbon\Carbon::parse($student->admission_date)->toDateString();
+                $coveredSessions = \App\Models\AcademicSession::where('school_id', $schoolId)
+                    ->where(function($q) use ($admDate) {
+                        $q->where('end_date', '>=', $admDate)
+                          ->orWhere('start_date', '>=', $admDate);
+                    })
+                    ->pluck('id')
+                    ->map(fn($id) => (int)$id);
+                $sessionIds = $sessionIds->merge($coveredSessions);
+            } catch (\Throwable $e) {}
         }
 
         return $sessionIds->unique()->values()->toArray();
@@ -751,19 +829,150 @@ class FeeHelper
         $annualPendingStudentsCount = count($pendingStudentIdsAnnual);
         $annualAssignedStudentsCount = count($assignedStudentIdsAnnual);
 
-        // 3. Today's metrics (Today fee collection & due)
-        $todayCollection = (float) (clone $tillDateQuery)
-            ->whereDate('updated_at', today()->toDateString())
-            ->where('paid_amount', '>', 0)
-            ->sum('paid_amount');
+        // 3. Today's metrics (Today fee collection & due strictly scoped to session)
+        $todayFeeCollection = 0.0;
+        $countedInvoiceNumbers = [];
 
-        $todayReceipts = (float) \App\Models\FeeReceipt::where('school_id', $schoolId)
-            ->whereDate('payment_date', today()->toDateString())
-            ->sum('amount_paid');
-        $todayFeeCollection = max($todayCollection, $todayReceipts);
+        $sessionFeeIdMap = $annualFees->pluck('id')->flip()->all();
+        $enrolledStudentIdMap = array_flip($meta['enrolledStudentIds'] ?? []);
+        $todayStr = today()->toDateString();
+
+        // Query active, non-cancelled fee payments whose payment date is TODAY
+        $todayInvoices = \App\Models\FeeInvoice::where('school_id', $schoolId)
+            ->where('type', 'payment')
+            ->where('status', 'paid')
+            ->whereDate('payment_date', $todayStr)
+            ->get();
+
+        foreach ($todayInvoices as $inv) {
+            $invAmount = (float) $inv->amount;
+            if ($invAmount <= 0) {
+                continue;
+            }
+
+            $hasSessionMatch = false;
+            $matchedAmount = 0.0;
+
+            if (!empty($inv->payment_details)) {
+                $details = is_string($inv->payment_details) ? json_decode($inv->payment_details, true) : $inv->payment_details;
+                if (is_array($details)) {
+                    $components = $details['components'] ?? (isset($details[0]['student_fee_id']) ? $details : []);
+                    if (!empty($components) && is_array($components)) {
+                        $hasComponentWithFeeId = false;
+                        foreach ($components as $comp) {
+                            if (!is_array($comp)) continue;
+                            $sfId = $comp['student_fee_id'] ?? null;
+                            if ($sfId) {
+                                $hasComponentWithFeeId = true;
+                                if (isset($sessionFeeIdMap[$sfId])) {
+                                    $hasSessionMatch = true;
+                                    $matchedAmount += (float) ($comp['amount_paid'] ?? 0);
+                                }
+                            }
+                        }
+
+                        // If components had student_fee_ids and we found matches, use the matched component amount
+                        if ($hasComponentWithFeeId && $hasSessionMatch) {
+                            $todayFeeCollection += $matchedAmount;
+                            $countedInvoiceNumbers[$inv->invoice_number] = true;
+                            if (!empty($inv->receipt_number)) {
+                                $countedInvoiceNumbers[$inv->receipt_number] = true;
+                            }
+                            continue;
+                        } elseif ($hasComponentWithFeeId && !$hasSessionMatch) {
+                            // Components belonged explicitly to another session
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            // Fallback for payments without explicit component student_fee_ids:
+            // Check student enrollment in this session
+            if (isset($enrolledStudentIdMap[$inv->student_id])) {
+                $todayFeeCollection += $invAmount;
+                $countedInvoiceNumbers[$inv->invoice_number] = true;
+                if (!empty($inv->receipt_number)) {
+                    $countedInvoiceNumbers[$inv->receipt_number] = true;
+                }
+            }
+        }
+
+        // Support any standalone FeeReceipts created today without a corresponding FeeInvoice (ensuring no double-counting or cancelled receipts)
+        $todayReceipts = \App\Models\FeeReceipt::withoutGlobalScope('active')
+            ->where('school_id', $schoolId)
+            ->where(function($q) {
+                $q->where('status', '!=', 'cancelled')
+                  ->orWhereNull('status');
+            })
+            ->whereDate('payment_date', $todayStr)
+            ->get();
+
+        foreach ($todayReceipts as $rec) {
+            // Skip if this receipt number or matching invoice was already counted
+            if (isset($countedInvoiceNumbers[$rec->receipt_number])) {
+                continue;
+            }
+
+            // Verify receipt has not been cancelled via FeeInvoice
+            $isCancelledInInvoice = \App\Models\FeeInvoice::where('school_id', $schoolId)
+                ->where('status', 'cancelled')
+                ->where(function($q) use ($rec) {
+                    $q->where('invoice_number', $rec->receipt_number)
+                      ->orWhere('related_invoice_number', $rec->receipt_number)
+                      ->orWhere('payment_details', 'like', '%' . $rec->receipt_number . '%');
+                })
+                ->exists();
+
+            if ($isCancelledInInvoice) {
+                continue;
+            }
+
+            $recAmount = (float) $rec->amount_paid;
+            if ($recAmount <= 0) {
+                continue;
+            }
+
+            $hasSessionMatch = false;
+            $matchedAmount = 0.0;
+
+            if (!empty($rec->payment_details)) {
+                $details = is_string($rec->payment_details) ? json_decode($rec->payment_details, true) : $rec->payment_details;
+                if (is_array($details)) {
+                    $components = $details['components'] ?? (isset($details[0]['student_fee_id']) ? $details : []);
+                    if (!empty($components) && is_array($components)) {
+                        $hasComponentWithFeeId = false;
+                        foreach ($components as $comp) {
+                            if (!is_array($comp)) continue;
+                            $sfId = $comp['student_fee_id'] ?? null;
+                            if ($sfId) {
+                                $hasComponentWithFeeId = true;
+                                if (isset($sessionFeeIdMap[$sfId])) {
+                                    $hasSessionMatch = true;
+                                    $matchedAmount += (float) ($comp['amount_paid'] ?? 0);
+                                }
+                            }
+                        }
+
+                        if ($hasComponentWithFeeId && $hasSessionMatch) {
+                            $todayFeeCollection += $matchedAmount;
+                            $countedInvoiceNumbers[$rec->receipt_number] = true;
+                            continue;
+                        } elseif ($hasComponentWithFeeId && !$hasSessionMatch) {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            if (isset($enrolledStudentIdMap[$rec->student_id])) {
+                $todayFeeCollection += $recAmount;
+                $countedInvoiceNumbers[$rec->receipt_number] = true;
+            }
+        }
 
         $todayFeeDue = (float) (clone $tillDateQuery)
-            ->whereDate('due_date', today()->toDateString())
+            ->whereDate('due_date', $todayStr)
             ->sum(\Illuminate\Support\Facades\DB::raw('amount + COALESCE(fine_amount_applied, 0) - paid_amount - COALESCE(instant_discount_amount, 0)'));
         $todayFeeDue = max(0.00, $todayFeeDue);
 

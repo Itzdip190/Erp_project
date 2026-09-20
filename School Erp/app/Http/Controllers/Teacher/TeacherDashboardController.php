@@ -56,8 +56,7 @@ class TeacherDashboardController extends Controller
 
             $currentSession = null;
             if (Schema::hasTable('academic_sessions')) {
-                $currentSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first()
-                    ?? AcademicSession::where('school_id', $schoolId)->first();
+                $currentSession = AcademicSession::resolveCurrentSessionForUser($user, $schoolId);
             }
 
             // Get Staff profile details
@@ -283,9 +282,14 @@ class TeacherDashboardController extends Controller
             $todaysSchedule = collect();
             if ($staff && Schema::hasTable('class_timetable_cells')) {
                 $todaysSchedule = ClassTimetableCell::where('school_id', $schoolId)
-                    ->where('teacher_id', $staff->id)
+                    ->where(function($q) use ($staff) {
+                        $q->where('teacher_id', $staff->id);
+                        if (Schema::hasColumn('class_timetable_cells', 'secondary_teacher_id')) {
+                            $q->orWhere('secondary_teacher_id', $staff->id);
+                        }
+                    })
                     ->where('day_of_week', $todayDay)
-                    ->with(['schoolClass', 'section', 'subject', 'period'])
+                    ->with(['schoolClass', 'section', 'subject', 'secondarySubject', 'period'])
                     ->get();
             }
 

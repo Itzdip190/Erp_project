@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Api\V1\Staff;
 
 use App\Http\Controllers\Controller;
+use App\Models\Section;
 use App\Models\Staff;
 use App\Models\Student;
 use App\Models\SectionSubjectStaff;
+use App\Support\SearchHelper;
 use Illuminate\Http\Request;
 
 class StaffStudentController extends Controller
@@ -13,7 +15,16 @@ class StaffStudentController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $query = Student::with(['class', 'section']);
+        $schoolId = $user->school_id ?? 1;
+        $sessionId = $request->get('academic_session_id');
+        if (!$sessionId) {
+            $currentSession = \App\Models\AcademicSession::resolveCurrentSessionForUser($user, $schoolId);
+            $sessionId = $currentSession?->id;
+        }
+
+        $query = Student::where('school_id', $schoolId)
+            ->activeStudents()
+            ->with(['class', 'section', 'studentSessions' => fn($q) => $q->where('academic_session_id', $sessionId)]);
 
         if ($user->hasRole('teacher')) {
             $staff = Staff::where('user_id', $user->id)->first();
@@ -24,39 +35,40 @@ class StaffStudentController extends Controller
                 ], 403);
             }
 
-            // Get section IDs assigned to this teacher in SectionSubjectStaff mapping
-            $assignedSectionIds = SectionSubjectStaff::where('staff_id', $staff->id)
-                ->pluck('section_id')
-                ->unique()
-                ->toArray();
+            // Get section IDs assigned to this teacher (both Class Teacher and Subject Teacher)
+            $secIdsFromCt = Section::where('school_id', $schoolId)
+                ->where(function($q) use ($staff) {
+                    $q->where('class_teacher_id', $staff->id)
+                      ->orWhere('assistant_class_teacher_id', $staff->id);
+                })
+                ->pluck('id')->toArray();
+            $secIdsFromSss = SectionSubjectStaff::where('staff_id', $staff->id)->pluck('section_id')->toArray();
+            $assignedSectionIds = array_values(array_unique(array_filter(array_merge($secIdsFromCt, $secIdsFromSss))));
 
-            $query->whereIn('section_id', $assignedSectionIds);
-
-            // If a specific section is requested, ensure teacher is assigned to it
-            if ($request->get('section_id')) {
-                if (!in_array((int)$request->section_id, $assignedSectionIds)) {
+            $targetSectionId = $request->get('section_id');
+            if ($targetSectionId) {
+                if (!in_array((int)$targetSectionId, $assignedSectionIds)) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Unauthorized access to this section.',
                     ], 403);
                 }
-                $query->where('section_id', $request->section_id);
+                $query->inAcademicSession($sessionId, null, (int)$targetSectionId);
+            } else {
+                $query->inAcademicSession($sessionId, null, $assignedSectionIds);
             }
         } else {
             // For admins or other roles, allow filtering directly
-            if ($request->get('section_id')) {
-                $query->where('section_id', $request->section_id);
+            $targetSectionId = $request->get('section_id');
+            if ($targetSectionId) {
+                $query->inAcademicSession($sessionId, null, (int)$targetSectionId);
+            } else {
+                $query->inAcademicSession($sessionId);
             }
         }
 
         if ($request->get('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('admission_number', 'like', "%{$search}%")
-                  ->orWhere('roll_number', 'like', "%{$search}%");
-            });
+            SearchHelper::applyStudentSearch($query, $request->search);
         }
 
         $students = $query->paginate(20);

@@ -165,7 +165,7 @@
                         <span class="text-white">Educorerp</span>
                     </a>
                     <p class="text-slate-400 mt-2 mb-4 leading-relaxed" style="color: #94a3b8;">
-                        Educorerp provides a complete suite of solutions for admissions, billing, student apps, library management, HR, LMS, and transport—all in one powerful platform.
+                        Educorerp, a venture of Global Tech Solutions, provides a complete suite of solutions for admissions, billing, student apps, library management, HR, LMS, and transport—all in one powerful platform.
                     </p>
                     <div class="d-flex gap-3">
                         <a href="#" class="btn btn-outline-light btn-sm rounded-circle" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;"><i class="fab fa-facebook-f"></i></a>
@@ -211,7 +211,7 @@
             <div class="footer-bottom">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-2">
                     <div>
-                        &copy; {{ date('Y') }} Educorerp Software. All rights reserved.
+                        &copy; {{ date('Y') }} Educorerp. All rights reserved. A venture of Global Tech Solutions
                     </div>
                     <div class="d-flex gap-3">
                         <a href="#" class="text-slate-400 text-decoration-none">Privacy Policy</a>

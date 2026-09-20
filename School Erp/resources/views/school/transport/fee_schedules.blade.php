@@ -311,7 +311,7 @@
         </div>
         
         <div class="academic-filter-wrap">
-            <div class="session-selector-box" onclick="this.querySelector('select').focus()">
+            <div class="session-selector-box" onclick="this.querySelector('select').focus()" style="display:none;">
                 <label>Academic Year *</label>
                 <form id="sessionFilterForm" method="GET" action="{{ route('school.transport.fee-schedules') }}">
                     <select name="academic_session_id" onchange="document.getElementById('sessionFilterForm').submit()">

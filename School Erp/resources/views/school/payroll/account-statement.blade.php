@@ -901,7 +901,7 @@
                             </a>
                             <!-- Dynamic Academic Session Preset -->
                             <a href="{{ route('school.payroll.account-statement', array_merge(request()->except('preset'), ['preset' => 'academic_year', 'submit_search' => 1])) }}" 
-                               class="preset-pill {{ $preset === 'academic_year' || $preset === 'current_fy' ? 'active' : '' }}">
+                               class="preset-pill {{ $preset === 'academic_year' || $preset === 'current_fy' ? 'active' : '' }}" style="display: none;">
                                 <i class="fas fa-graduation-cap me-1"></i> Academic Session ({{ $sessionName }})
                             </a>
                         </div>

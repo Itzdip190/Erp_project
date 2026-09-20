@@ -193,11 +193,18 @@
                         @else
                             @php
                                 $cell = $grid[$day][$key] ?? null;
+                                $isSecondaryTeacher = $cell && $cell->secondary_teacher_id && $cell->secondary_teacher_id == $teacher->id;
+                                $displaySubject = ($isSecondaryTeacher && $cell->secondarySubject) ? $cell->secondarySubject : $cell?->subject;
                             @endphp
                             <td>
-                                @if($cell)
-                                    <div class="slot-card" style="border-left-color: {{ $cell->subject?->color ?? '#2563eb' }}; background-color: {{ $cell->subject?->color ? $cell->subject->color . '10' : '#f0f9ff' }};">
-                                        <span class="slot-subject">{{ $cell->subject?->name ?? 'Subject' }}</span>
+                                @if($cell && $displaySubject)
+                                    <div class="slot-card" style="border-left-color: {{ $displaySubject->color ?? '#2563eb' }}; background-color: {{ $displaySubject->color ? $displaySubject->color . '10' : '#f0f9ff' }};">
+                                        <span class="slot-subject">
+                                            {{ $displaySubject->name ?? 'Subject' }}
+                                            @if($isSecondaryTeacher)
+                                                (Co-teaching)
+                                            @endif
+                                        </span>
                                         <span class="slot-class">
                                             {{ $cell->schoolClass?->name }} - {{ $cell->section?->name ? (str_starts_with($cell->section->name, 'Sec') ? $cell->section->name : 'Sec ' . $cell->section->name) : '' }}
                                         </span>

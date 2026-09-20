@@ -501,7 +501,7 @@
     <!-- Filters Row -->
     <div class="filter-grid">
         <!-- Academic Year -->
-        <div class="filter-card">
+        <div class="filter-card" style="display: none;">
             <label class="filter-label">Academic Year *</label>
             <i class="filter-icon far fa-calendar-days"></i>
             <select id="filter_academic_year">

@@ -1,65 +1,48 @@
 @php
     $navNotifications = collect();
     if (auth()->check()) {
-        $schoolId = auth()->user()->school_id;
+        $schoolId = auth()->user()->school_id ?: (request()->route('school')?->id ?: (request()->attributes->get('school')?->id ?: (\Illuminate\Support\Facades\App::resolved('currentSchool') ? app('currentSchool')?->id : null)));
         if ($schoolId) {
-            $today = \Carbon\Carbon::today();
-            $now = \Carbon\Carbon::now();
-
-            // Query today's notices (timezone safe)
-            $todayNotices = \App\Models\Notice::where('school_id', $schoolId)
-                ->whereBetween('created_at', [$now->copy()->startOfDay(), $now->copy()->endOfDay()])
-                ->get()
-                ->map(function ($n) use ($now) {
-                    return (object) [
-                        'title' => $n->title,
-                        'content' => $n->content,
-                        'time' => $n->created_at->diffForHumans(),
-                        'icon' => 'fa-bullhorn',
-                        'color' => '#8b5cf6',
-                        'type' => 'Notice',
-                        'created_at' => $n->created_at,
-                        'is_today' => $n->created_at->between($now->copy()->startOfDay(), $now->copy()->endOfDay())
-                    ];
-                });
-
-            // Query today's events/holidays (timezone safe)
-            $todayEvents = \App\Models\Event::where('school_id', $schoolId)
-                ->whereDate('start_date', '<=', $today->toDateString())
-                ->whereDate('end_date', '>=', $today->toDateString())
-                ->get()
-                ->map(function ($e) use ($today) {
-                    $isHoliday = (bool) $e->is_holiday;
-                    $isToday = ($today->toDateString() >= $e->start_date && $today->toDateString() <= $e->end_date);
-                    return (object) [
-                        'title' => $e->title,
-                        'content' => $e->description ?? ($isHoliday ? 'Official School Holiday' : 'Event'),
-                        'time' => 'Today',
-                        'icon' => $isHoliday ? 'fa-calendar-xmark' : 'fa-calendar-check',
-                        'color' => $isHoliday ? '#ef4444' : '#10b981',
-                        'type' => $isHoliday ? 'Holiday' : 'Event',
-                        'created_at' => $e->created_at ?? \Carbon\Carbon::parse($e->start_date),
-                        'is_today' => $isToday
-                    ];
-                });
-
-            // Combine
-            $typePriority = ['Holiday' => 3, 'Notice' => 2, 'Event' => 1];
-            $navNotifications = $todayNotices->concat($todayEvents)->sort(function ($a, $b) use ($typePriority) {
-                // 1. is_today first
-                if ($a->is_today && !$b->is_today) return -1;
-                if (!$a->is_today && $b->is_today) return 1;
-
-                // 2. type priority
-                $pA = $typePriority[$a->type] ?? 0;
-                $pB = $typePriority[$b->type] ?? 0;
-                if ($pA !== $pB) {
-                    return $pB <=> $pA; // Descending
+            $centralNotifs = \App\Services\NotificationService::getNotifications(auth()->user(), 30, true)->map(function ($n) {
+                $user = auth()->user();
+                $role = $user->hasRole('school_admin') ? 'school_admin' : ($user->hasRole('teacher') ? 'teacher' : ($user->hasRole('student') ? 'student' : ($user->hasRole('parent') ? 'parent' : null)));
+                $actionUrl = $n->action_url;
+                if (empty($actionUrl) || $actionUrl === '#') {
+                    $actionUrl = \App\Services\NotificationService::getDefaultActionUrl($n->module, $role);
                 }
-
-                // 3. created_at desc
-                return $b->created_at <=> $a->created_at;
+                return (object) [
+                    'id' => $n->id,
+                    'title' => $n->title,
+                    'content' => $n->message,
+                    'time' => $n->created_at ? $n->created_at->diffForHumans() : 'Just now',
+                    'icon' => $n->icon ?: \App\Services\NotificationService::getDefaultIcon($n->module),
+                    'color' => $n->color ?: \App\Services\NotificationService::getDefaultColor($n->module),
+                    'type' => ucfirst($n->module),
+                    'created_at' => $n->created_at,
+                    'is_today' => true,
+                    'action_url' => $actionUrl ?? '#'
+                ];
             });
+
+            // Query pending fee structure deletions
+            $pendingDeletions = \App\Models\PendingDeletion::where('school_id', $schoolId)
+                ->get()
+                ->map(function ($pd) {
+                    return (object) [
+                        'id' => $pd->id,
+                        'title' => 'Delete Request: ' . $pd->item_name,
+                        'content' => 'Requested by: ' . $pd->requested_by . ' (' . ucfirst($pd->type) . ')',
+                        'time' => $pd->created_at->diffForHumans(),
+                        'icon' => 'fa-trash-can',
+                        'color' => '#ef4444',
+                        'type' => 'Delete Request',
+                        'created_at' => $pd->created_at,
+                        'is_today' => true,
+                        'action_url' => '#' // Handled via inline modal action
+                    ];
+                });
+
+            $navNotifications = $pendingDeletions->concat($centralNotifs);
         }
     }
 @endphp
@@ -67,9 +50,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'SchoolCloud ERP') — SchoolCloud ERP</title>
+    <title>@yield('title', 'EducorERP') — EducorERP</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -288,6 +271,13 @@ body.dark-mode .sb-school-logo {
     word-break: break-word;
     font-family: 'Plus Jakarta Sans', sans-serif;
 }
+@media (min-width: 769px) {
+    .sb-school-sub,
+    .sb-logo-text span,
+    .sb-notif-btn {
+        display: none !important;
+    }
+}
 .sb-school-meta-row {
     display: flex;
     align-items: center;
@@ -333,9 +323,10 @@ body.dark-mode .sb-school-header .sb-plan-badge i {
     color: #a78bfa !important;
 }
 .sb-school-header .sb-close-btn {
-    position: absolute;
-    top: 12px;
-    right: 12px;
+    position: relative;
+    top: auto;
+    right: auto;
+    margin: 0;
 }
 .avatar img{
     width:100%;height:100%;object-fit:cover;border-radius:9px;
@@ -843,10 +834,10 @@ body:not(.dark-mode) .sb-drawer-btn:hover {
     bottom: calc(100% + 8px);
     left: 50%;
     transform: translateX(-50%);
-    width: 170px;
+    width: 195px;
     background: var(--page);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     box-shadow: var(--shadow-lg);
     z-index: 1000;
     padding: 6px 0;
@@ -855,39 +846,128 @@ body:not(.dark-mode) .sb-drawer-btn:hover {
 .sb-profile-menu.open {
     display: block;
 }
-.sb-profile-menu a {
+.sb-menu-parent-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--t1);
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s ease;
+}
+.sb-menu-parent-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sb-menu-parent-left i {
+    font-size: 13px;
+    width: 16px;
+    text-align: center;
+}
+.sb-menu-parent-item:hover,
+.sb-menu-item-has-submenu.open .sb-menu-parent-item {
+    background: var(--border);
+}
+.sb-submenu-arrow {
+    font-size: 11px;
+    color: var(--t2);
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+.sb-menu-item-has-submenu:hover .sb-submenu-arrow,
+.sb-menu-item-has-submenu.open .sb-submenu-arrow {
+    transform: rotate(90deg);
+    color: var(--purple);
+}
+.sb-profile-submenu {
+    display: none;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.03);
+    border-left: 2px solid var(--purple);
+    margin: 2px 8px 6px 14px;
+    border-radius: 0 6px 6px 0;
+    padding: 3px 0;
+}
+.sb-menu-item-has-submenu:hover .sb-profile-submenu,
+.sb-menu-item-has-submenu.open .sb-profile-submenu {
+    display: flex;
+}
+.sb-submenu-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 12.5px;
+    color: var(--t1);
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 0.15s ease, color 0.15s ease;
+    border-radius: 4px;
+}
+.sb-submenu-link i {
+    font-size: 12px;
+    width: 16px;
+    text-align: center;
+}
+.sb-submenu-link:hover {
+    background: rgba(124, 58, 237, 0.08);
+    color: var(--purple);
+}
+.sb-submenu-link.active {
+    background: rgba(124, 58, 237, 0.12);
+    color: var(--purple);
+    font-weight: 700;
+}
+.sb-logout-link {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 10px 14px;
     font-size: 13px;
-    color: var(--t1);
+    color: #ef4444 !important;
     text-decoration: none;
-    font-weight: 500;
-    transition: background 0.15s;
+    font-weight: 600;
+    transition: background 0.15s ease;
 }
-.sb-profile-menu a:hover {
-    background: var(--border);
-}
-.sb-profile-menu a i {
+.sb-logout-link i {
     font-size: 13px;
-    color: var(--t2);
     width: 16px;
     text-align: center;
+}
+.sb-logout-link:hover {
+    background: rgba(239, 68, 68, 0.08);
 }
 body.dark-mode .sb-profile-menu {
     background: #1f2937;
     border-color: #374151;
 }
-body.dark-mode .sb-profile-menu a {
+body.dark-mode .sb-profile-submenu {
+    background: rgba(255, 255, 255, 0.05);
+}
+body.dark-mode .sb-menu-parent-item {
     color: #f8fafc;
 }
-body.dark-mode .sb-profile-menu a:hover {
+body.dark-mode .sb-menu-parent-item:hover,
+body.dark-mode .sb-menu-item-has-submenu.open .sb-menu-parent-item {
     background: #374151;
+}
+body.dark-mode .sb-submenu-link {
+    color: #e2e8f0;
+}
+body.dark-mode .sb-submenu-link:hover {
+    background: rgba(167, 139, 250, 0.15);
+    color: #c084fc;
+}
+body.dark-mode .sb-submenu-link.active {
+    background: rgba(167, 139, 250, 0.22);
+    color: #c084fc;
 }
 
 /* ─── PAGE CONTENT ─────────────────────────────────────────── */
-.pg{padding:22px 24px;flex:1;min-width:0;}
+.pg{padding:22px 24px 60px 24px;flex:1;min-width:0;}
 
 /* ─── PAGE HEADER BAR ──────────────────────────────────────── */
 .page-hdr{
@@ -993,15 +1073,26 @@ table.tbl tr:last-child td{border-bottom:none;}
 }
 #appToast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
-/* ─── RESPONSIVE ───────────────────────────────────────────── */
-/* Overlay backdrop for mobile sidebar */
+/* ─── RESPONSIVE & MOBILE NAVIGATION DRAWER ─────────────────── */
 .sidebar-overlay {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px);
-    z-index: 1000; display: none; opacity: 0; transition: opacity .3s ease;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100vw; height: 100vh; height: 100dvh;
+    background: rgba(15, 23, 42, 0.62);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    z-index: 1004;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.32s ease;
     cursor: pointer;
 }
-.sidebar-overlay.active { display: block; opacity: 1; }
+.sidebar-overlay.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
 
 @media(min-width:769px) and (max-width:1024px){
     .sidebar{width:54px;}
@@ -1011,48 +1102,850 @@ table.tbl tr:last-child td{border-bottom:none;}
     .main{margin-left:54px !important;}
     .hamburger{display:flex;}
 }
-@media(max-width:768px){
-    .sidebar{transform:translateX(-100%);width:240px;z-index:1002;}
-    .sidebar.open{transform:translateX(0);box-shadow:4px 0 32px rgba(0,0,0,.3);}
-    .sidebar-overlay{z-index:1001;}
-    .sb-close-btn{display:flex!important;}
-    .sb-logo-text,.sb-school,.sb-hdr-title,.sb-bottom{display:block!important;}
-    
-    .sb-submenu {
-        display: block !important;
-        max-height: 0;
-        opacity: 0;
-        overflow: hidden;
-        transform: translateY(-4px);
-        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, transform 0.25s ease;
-        pointer-events: none;
-        padding: 0 6px 0 20px !important;
-    }
-    .sb-submenu.open {
-        max-height: 800px !important;
-        opacity: 1 !important;
-        transform: translateY(0) !important;
-        pointer-events: auto !important;
-        padding: 4px 6px 6px 20px !important;
-    }
-    .sb-hdr-arrow {
-        display: block !important;
-        transition: transform 0.2s;
-    }
-    .sb-hdr.open .sb-hdr-arrow {
-        transform: rotate(180deg) !important;
-        color: #ff9800 !important;
-    }
-    
-    .sb-hdr{justify-content:space-between!important;padding:8px 10px!important;margin:0 6px!important;}
-    .sb-hdr-icon{width:22px!important;height:22px!important;font-size:9.5px!important;}
-    .main{margin-left:0!important;}
-    .topbar{padding:0 12px;height:56px;}
-    .hamburger{display:flex!important;}
-    .page-heading{font-size:13.5px;}
-    /* Hide tooltip popups on mobile (full sidebar shown) */
-    .sb-tooltip-popup{display:none!important;}
+
+.sb-mobile-user-footer {
+    display: none !important;
 }
+.mobile-welcome-card {
+    display: none !important;
+}
+
+@media(max-width:768px){
+    /* Full-screen Mobile Application Grid Drawer */
+    .sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        bottom: 0 !important;
+        width: 100vw !important;
+        max-width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        z-index: 1005 !important;
+        transform: translateX(-100%) !important;
+        box-shadow: none !important;
+        transition: transform 0.36s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        display: flex !important;
+        flex-direction: column !important;
+        background: linear-gradient(180deg, #f0f4fd 0%, #f8fafc 100%) !important;
+        will-change: transform;
+    }
+    body.dark-mode .sidebar {
+        background: #0f172a !important;
+    }
+    .sidebar.open {
+        transform: translateX(0) !important;
+    }
+
+    /* Mobile Flagship Header Bar (PREMIUM BLUE & WHITE GLASS THEME) */
+    .sb-school-header {
+        padding: 18px 18px 16px 18px !important;
+        position: relative !important;
+        background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #3b82f6 100%) !important;
+        color: #ffffff !important;
+        border-bottom-left-radius: 26px !important;
+        border-bottom-right-radius: 26px !important;
+        box-shadow: 0 12px 32px rgba(37,99,235,0.3), inset 0 1px 0 rgba(255,255,255,0.25) !important;
+        flex-shrink: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 14px !important;
+    }
+    body.dark-mode .sb-school-header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%) !important;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1) !important;
+    }
+
+    .sb-school-header-top {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        gap: 10px !important;
+    }
+    .sb-school-logo {
+        width: 44px !important;
+        height: 44px !important;
+        border-radius: 14px !important;
+        background: rgba(255, 255, 255, 0.22) !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.45) !important;
+        box-shadow: 0 6px 16px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.3) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+        overflow: hidden !important;
+    }
+    .sb-school-logo img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+    .sb-school-logo i { color: #ffffff !important; font-size: 20px !important; }
+    
+    .sb-school-name-wrapper {
+        flex: 1 !important;
+        margin: 0 !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+    .sb-school-name {
+        font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif !important;
+        font-size: 15px !important;
+        font-weight: 800 !important;
+        line-height: 1.25 !important;
+        letter-spacing: -0.3px !important;
+        color: #ffffff !important;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        width: 100% !important;
+    }
+    .sb-school-sub,
+    .sb-logo-text span {
+        display: block !important;
+    }
+
+    .sb-header-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        flex-shrink: 0 !important;
+    }
+    .sb-notif-btn {
+        width: 38px !important;
+        height: 38px !important;
+        border-radius: 50% !important;
+        background: rgba(255, 255, 255, 0.22) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.38) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+        position: relative !important;
+        transition: all 0.2s ease !important;
+    }
+    .sb-notif-btn:active {
+        transform: scale(0.92) !important;
+        background: rgba(255, 255, 255, 0.38) !important;
+    }
+    .sb-notif-badge {
+        position: absolute !important;
+        top: -3px !important;
+        right: -3px !important;
+        background: #ef4444 !important;
+        color: #ffffff !important;
+        font-size: 9px !important;
+        font-weight: 800 !important;
+        width: 17px !important;
+        height: 17px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border: 2px solid #2563eb !important;
+        box-shadow: 0 2px 4px rgba(239,68,68,0.4) !important;
+    }
+
+    /* Close Button on Mobile Drawer */
+    .sb-school-header .sb-close-btn,
+    .sb-close-btn {
+        display: inline-flex !important;
+        width: 38px !important;
+        height: 38px !important;
+        border-radius: 50% !important;
+        background: rgba(255, 255, 255, 0.22) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.38) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        font-size: 14px !important;
+        position: relative !important;
+        top: auto !important;
+        right: auto !important;
+        margin: 0 !important;
+        transition: all 0.2s ease !important;
+    }
+    .sb-school-header .sb-close-btn:active,
+    .sb-close-btn:active {
+        transform: scale(0.92) !important;
+        background: rgba(255, 255, 255, 0.38) !important;
+    }
+
+    .sb-school-meta-row {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        width: 100% !important;
+        gap: 8px !important;
+    }
+    .sb-school-session {
+        font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif !important;
+        font-size: 11.5px !important;
+        font-weight: 700 !important;
+        background: rgba(255, 255, 255, 0.22) !important;
+        color: #ffffff !important;
+        padding: 5px 14px !important;
+        border-radius: 20px !important;
+        border: 1px solid rgba(255, 255, 255, 0.4) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+    }
+    .sb-school-session span,
+    .sb-school-session i {
+        color: #ffffff !important;
+        font-size: 11px !important;
+        opacity: 1 !important;
+    }
+    
+    .sb-plan-badge {
+        font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif !important;
+        font-size: 11.5px !important;
+        font-weight: 800 !important;
+        padding: 5px 14px !important;
+        border-radius: 20px !important;
+        background: #ffffff !important;
+        color: #1d4ed8 !important;
+        border: 1px solid rgba(255, 255, 255, 0.9) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        letter-spacing: 0.2px !important;
+    }
+    .sb-plan-badge span {
+        color: #1d4ed8 !important;
+        font-weight: 800 !important;
+    }
+    .sb-status-dot {
+        width: 8px !important;
+        height: 8px !important;
+        border-radius: 50% !important;
+        background: #10b981 !important;
+        box-shadow: 0 0 8px #10b981, 0 0 2px #059669 !important;
+    }
+
+    /* Mobile Welcome Card Banner */
+    .mobile-welcome-card {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        margin: 14px 14px 4px 14px !important;
+        padding: 16px 18px !important;
+        background: #ffffff !important;
+        border-radius: 20px !important;
+        border: 1px solid rgba(37,99,235,0.08) !important;
+        box-shadow: 0 8px 24px rgba(37,99,235,0.05), 0 2px 6px rgba(0,0,0,0.02) !important;
+        gap: 12px !important;
+        flex-shrink: 0 !important;
+    }
+    body.dark-mode .mobile-welcome-card {
+        background: #1e293b !important;
+        border-color: rgba(255,255,255,0.08) !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
+    }
+    .mwc-content {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+    .mwc-title {
+        font-size: 15px !important;
+        font-weight: 800 !important;
+        color: #1e293b !important;
+        margin: 0 !important;
+        line-height: 1.3 !important;
+        letter-spacing: -0.2px !important;
+    }
+    body.dark-mode .mwc-title { color: #f8fafc !important; }
+    .mwc-subtitle {
+        font-size: 11.5px !important;
+        font-weight: 500 !important;
+        color: #64748b !important;
+        margin: 4px 0 0 0 !important;
+        line-height: 1.35 !important;
+    }
+    body.dark-mode .mwc-subtitle { color: #94a3b8 !important; }
+    .mwc-illustration {
+        width: 86px !important;
+        height: 64px !important;
+        flex-shrink: 0 !important;
+    }
+    .mwc-illustration svg {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Hide Search Bar on Mobile Drawer */
+    .sb-search-wrapper {
+        display: none !important;
+    }
+
+    /* Scrollable Application Grid Nav Container (3 items per row) */
+    .sb-nav {
+        padding: 10px 12px calc(40px + env(safe-area-inset-bottom, 20px)) 12px !important;
+        flex: 1 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        display: grid !important;
+        grid-template-columns: repeat(3, 1fr) !important;
+        gap: 10px 8px !important;
+        align-content: start !important;
+    }
+
+    /* App Grid Card Container (.sb-group) */
+    .sb-group {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        text-align: center !important;
+        margin: 0 !important;
+        padding: 10px 6px 10px 6px !important;
+        position: relative !important;
+        background: #ffffff !important;
+        border-radius: 16px !important;
+        border: 1px solid rgba(0,0,0,0.04) !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03), 0 1px 2px rgba(0,0,0,0.02) !important;
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease !important;
+        cursor: pointer !important;
+    }
+    body.dark-mode .sb-group {
+        background: #1e293b !important;
+        border-color: rgba(255,255,255,0.06) !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.25) !important;
+    }
+    .sb-group:active {
+        transform: translateY(-1px) scale(0.96) !important;
+        box-shadow: 0 4px 14px rgba(37,99,235,0.12) !important;
+    }
+
+    /* App Tile Header (.sb-hdr) */
+    .sb-hdr {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        text-align: center !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        min-height: unset !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+        width: 100% !important;
+        cursor: pointer !important;
+    }
+    .sb-hdr-left {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 5px !important;
+        width: 100% !important;
+    }
+
+    /* App Card Squircle Icon Box (.sb-hdr-icon) - Visual Focal Point for 3D SVG Icons */
+    .sb-hdr-icon {
+        width: 58px !important;
+        height: 58px !important;
+        min-width: 58px !important;
+        min-height: 58px !important;
+        border-radius: 16px !important;
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+        filter: drop-shadow(0 6px 12px rgba(0,0,0,0.12)) !important;
+    }
+    .sb-hdr-icon i,
+    .sb-hdr-icon svg,
+    .sb-hdr-icon .m3d-icon {
+        width: 58px !important;
+        height: 58px !important;
+        line-height: 58px !important;
+        display: block !important;
+    }
+    .sb-group:hover .sb-hdr-icon,
+    .sb-group:active .sb-hdr-icon {
+        transform: translateY(-2px) scale(1.06) !important;
+    }
+
+    /* App Card Title Label (.sb-hdr-title) */
+    .sb-hdr-title {
+        font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif !important;
+        font-size: 11.5px !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        text-align: center !important;
+        line-height: 1.25 !important;
+        margin-top: 6px !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        display: -webkit-box !important;
+        -webkit-line-clamp: 2 !important;
+        -webkit-box-orient: vertical !important;
+        letter-spacing: -0.2px !important;
+    }
+    body.dark-mode .sb-hdr-title {
+        color: #f1f5f9 !important;
+    }
+    .sb-hdr-arrow { display: none !important; }
+
+    /* Active App Card Animations & Unique Glowing Design */
+    @keyframes activeGroupPulse {
+        0%, 100% {
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35), 0 0 0 2px rgba(59, 130, 246, 0.4) !important;
+            transform: translateY(-2px) !important;
+        }
+        50% {
+            box-shadow: 0 12px 30px rgba(79, 70, 229, 0.48), 0 0 0 3.5px rgba(99, 102, 241, 0.65) !important;
+            transform: translateY(-4px) scale(1.02) !important;
+        }
+    }
+    @keyframes activeIconFloat {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-2px) scale(1.08); }
+    }
+    @keyframes activeBadgeGlow {
+        0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px #10b981; }
+        50% { opacity: 0.6; transform: scale(0.85); box-shadow: 0 0 4px #10b981; }
+    }
+
+    .sb-group.active-group {
+        border-color: rgba(37, 99, 235, 0.6) !important;
+        background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%) !important;
+        animation: activeGroupPulse 3s infinite ease-in-out !important;
+    }
+    body.dark-mode .sb-group.active-group {
+        background: linear-gradient(180deg, #1e1b4b 0%, #0f172a 100%) !important;
+        border-color: rgba(96, 165, 250, 0.6) !important;
+    }
+    .sb-group.active-group::after {
+        content: '';
+        position: absolute;
+        top: 7px;
+        right: 7px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981;
+        animation: activeBadgeGlow 2s infinite ease-in-out;
+    }
+    .sb-group.active-group .sb-hdr-icon {
+        background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 50%, #1d4ed8 100%) !important;
+        color: #ffffff !important;
+        box-shadow: 0 8px 22px rgba(37,99,235,0.45) !important;
+    }
+    .sb-group.active-group .sb-hdr-icon i,
+    .sb-group.active-group .sb-hdr-icon svg {
+        color: #ffffff !important;
+        animation: activeIconFloat 2.5s infinite ease-in-out !important;
+    }
+    .sb-group.active-group .sb-hdr-title {
+        color: #1d4ed8 !important;
+        font-weight: 800 !important;
+    }
+    body.dark-mode .sb-group.active-group .sb-hdr-title {
+        color: #60a5fa !important;
+    }
+
+    /* Sub-Menu Override */
+    .sb-nav .sb-submenu,
+    .sb-nav .sb-submenu.open,
+    .sidebar .sb-submenu,
+    .sidebar .sb-submenu.open,
+    .sb-submenu,
+    .sb-submenu.open {
+        display: none !important;
+        height: 0 !important;
+        max-height: 0 !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
+    /* Flagship Floating Glassmorphic Bottom Navigation Bar (<768px) */
+    .sb-bottom { display: none !important; }
+    .sb-mobile-user-footer { display: none !important; }
+
+    .sb-muf-item {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 3px !important;
+        color: #64748b !important;
+        text-decoration: none !important;
+        font-size: 10px !important;
+        font-weight: 700 !important;
+        background: transparent !important;
+        border: none !important;
+        outline: none !important;
+        cursor: pointer !important;
+        padding: 4px 10px !important;
+        border-radius: 14px !important;
+        transition: all 0.2s ease !important;
+    }
+    body.dark-mode .sb-muf-item { color: #94a3b8 !important; }
+    .sb-muf-item.active {
+        color: #2563eb !important;
+    }
+    body.dark-mode .sb-muf-item.active { color: #60a5fa !important; }
+
+    .sb-muf-icon {
+        font-size: 18px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 28px !important;
+        height: 24px !important;
+        transition: transform 0.2s ease !important;
+    }
+    .sb-muf-item.active .sb-muf-icon {
+        transform: translateY(-2px) !important;
+    }
+
+    .sb-muf-badge {
+        position: absolute !important;
+        top: -3px !important;
+        right: -6px !important;
+        background: #ef4444 !important;
+        color: #ffffff !important;
+        font-size: 8.5px !important;
+        font-weight: 800 !important;
+        padding: 1px 4px !important;
+        border-radius: 10px !important;
+        border: 1.5px solid #ffffff !important;
+    }
+
+    .sb-muf-avatar-btn {
+        width: 24px !important;
+        height: 24px !important;
+        border-radius: 50% !important;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+        color: #ffffff !important;
+        font-size: 11px !important;
+        font-weight: 800 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .main { margin-left: 0 !important; max-width: 100vw !important; overflow-x: hidden !important; }
+    .topbar { padding: 0 14px; height: 56px; max-width: 100vw !important; }
+    .hamburger { display: flex !important; }
+    .page-heading { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sb-tooltip-popup { display: none !important; }
+
+    /* Hide internal page duplicate topbar when opened in drawer view or on mobile sub-pages */
+    .drawer-open .main > .topbar,
+    body.in-drawer-view .main > .topbar,
+    .is-drawer-page .topbar {
+        display: none !important;
+    }
+}
+
+/* Ensure no horizontal scroll or cropping on small phones (under 360px) */
+@media (max-width: 360px) {
+    .sb-nav {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 8px 4px !important;
+        padding: 8px 6px 90px 6px !important;
+    }
+    .sb-group {
+        padding: 8px 4px !important;
+    }
+    .sb-hdr-icon {
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        min-height: 38px !important;
+        font-size: 16px !important;
+    }
+    .sb-hdr-icon i, .sb-hdr-icon svg {
+        font-size: 16px !important;
+    }
+    .sb-hdr-title {
+        font-size: 10px !important;
+    }
+    .mobile-welcome-card {
+        padding: 12px 14px !important;
+        margin: 10px 10px 4px 10px !important;
+    }
+    .mwc-title {
+        font-size: 13.5px !important;
+    }
+    .mwc-subtitle {
+        font-size: 10.5px !important;
+    }
+}
+
+/* Sub-Module Mobile Popup Modal Styles */
+.sb-module-popup-modal {
+    position: fixed !important;
+    top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    width: 100vw !important; height: 100vh !important; height: 100dvh !important;
+    background: rgba(15, 23, 42, 0.65) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    backdrop-filter: blur(6px) !important;
+    z-index: 100050 !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s ease !important;
+}
+.sb-module-popup-modal.active {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+.sb-mpm-card {
+    width: 100% !important;
+    max-width: 450px !important;
+    background: var(--card) !important;
+    border-top-left-radius: 24px !important;
+    border-top-right-radius: 24px !important;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3) !important;
+    padding: 20px 18px 28px 18px !important;
+    transform: translateY(100%) !important;
+    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    max-height: calc(100vh - 80px) !important;
+    max-height: calc(100dvh - 80px) !important;
+    margin-bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+.sb-module-popup-modal.active .sb-mpm-card {
+    transform: translateY(0) !important;
+}
+.sb-mpm-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding-bottom: 14px !important;
+    border-bottom: 1px solid var(--border) !important;
+    margin-bottom: 14px !important;
+}
+.sb-mpm-header-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+.sb-mpm-icon {
+    width: 42px !important;
+    height: 42px !important;
+    border-radius: 12px !important;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 18px !important;
+}
+.sb-mpm-title {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    color: var(--t1) !important;
+}
+.sb-mpm-close {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 50% !important;
+    background: rgba(0, 0, 0, 0.06) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--t1) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    font-size: 14px !important;
+}
+.sb-mpm-close:active {
+    transform: scale(0.92) !important;
+}
+.sb-mpm-body {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding-bottom: 20px !important;
+}
+.sb-mpm-item {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 12px 14px !important;
+    border-radius: 14px !important;
+    background: rgba(37, 99, 235, 0.05) !important;
+    border: 1px solid rgba(37, 99, 235, 0.12) !important;
+    color: var(--t1) !important;
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    text-decoration: none !important;
+    transition: all 0.18s ease !important;
+}
+.sb-mpm-item:active, .sb-mpm-item.active {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.3) !important;
+}
+/* Dedicated Mobile Notifications Full Sheet Modal (<768px) */
+.sb-notif-full-modal {
+    position: fixed !important;
+    top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    width: 100vw !important; height: 100vh !important; height: 100dvh !important;
+    background: rgba(15, 23, 42, 0.55) !important;
+    -webkit-backdrop-filter: blur(5px) !important;
+    backdrop-filter: blur(5px) !important;
+    z-index: 100050 !important;
+    display: flex !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition: opacity 0.28s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.28s ease !important;
+}
+.sb-notif-full-modal.active {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+.sb-nfm-card {
+    width: 100% !important;
+    max-width: 480px !important;
+    max-height: calc(100vh - 80px) !important;
+    max-height: calc(100dvh - 80px) !important;
+    margin-bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    background: #ffffff !important;
+    border-top-left-radius: 24px !important;
+    border-top-right-radius: 24px !important;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.25) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    transform: translateY(100%) !important;
+    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    overflow: hidden !important;
+}
+.sb-notif-full-modal.active .sb-nfm-card {
+    transform: translateY(0) !important;
+}
+body.dark-mode .sb-nfm-card {
+    background: #1e293b !important;
+    color: #f8fafc !important;
+}
+.sb-nfm-header {
+    padding: 16px 18px !important;
+    border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    background: #f8fafc !important;
+}
+body.dark-mode .sb-nfm-header {
+    background: #0f172a !important;
+    border-bottom-color: rgba(255,255,255,0.06) !important;
+}
+.sb-nfm-header-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+.sb-nfm-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 10px !important;
+    background: #dbeafe !important;
+    color: #2563eb !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+}
+.sb-nfm-title {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+}
+body.dark-mode .sb-nfm-title { color: #f8fafc !important; }
+.sb-nfm-badge {
+    font-size: 10.5px !important;
+    font-weight: 800 !important;
+    background: #ef4444 !important;
+    color: #ffffff !important;
+    padding: 2px 8px !important;
+    border-radius: 12px !important;
+}
+.sb-nfm-markall {
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #2563eb !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    padding: 4px 8px !important;
+    border-radius: 6px !important;
+}
+body.dark-mode .sb-nfm-markall { color: #60a5fa !important; }
+.sb-nfm-markall:hover { background: rgba(37,99,235,0.08) !important; }
+.sb-nfm-close {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50% !important;
+    border: none !important;
+    background: rgba(0,0,0,0.06) !important;
+    color: #64748b !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+}
+body.dark-mode .sb-nfm-close {
+    background: rgba(255,255,255,0.1) !important;
+    color: #cbd5e1 !important;
+}
+.sb-nfm-body {
+    flex: 1 !important;
+    overflow-y: auto !important;
+    padding: 12px 14px 28px 14px !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
 @media(max-width:576px){
     .topbar-school-name .ts-text{display:none;}
     .user-info{display:none!important;}
@@ -1667,6 +2560,298 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
     border-color: #6366f1 !important;
     color: #ffffff !important;
 }
+
+/* ─── ERP PORTAL FOOTER ────────────────────────────────────── */
+.erp-footer {
+    background: #ffffff;
+    border-top: 1px solid var(--border);
+    padding: 10px 24px;
+    font-size: 12px;
+    color: var(--t2);
+    transition: left 0.3s ease, background 0.2s ease, border-top-color 0.2s ease;
+    position: fixed;
+    bottom: 0;
+    left: 240px;
+    right: 0;
+    z-index: 95;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
+}
+body.sidebar-closed .erp-footer {
+    left: 0 !important;
+}
+.erp-footer-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.erp-footer-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+}
+.erp-footer-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.erp-footer-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--t2);
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.15s ease;
+}
+.erp-footer-item:hover {
+    color: #2563eb;
+}
+.erp-footer-item i {
+    font-size: 13px;
+}
+.erp-footer-ultraviewer {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: rgba(37, 99, 235, 0.08);
+    color: #2563eb !important;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+.erp-footer-ultraviewer:hover {
+    background: rgba(37, 99, 235, 0.16);
+    color: #1d4ed8 !important;
+    transform: translateY(-1px);
+}
+.erp-footer-divider {
+    color: var(--border);
+    font-weight: 300;
+}
+
+body.dark-mode .erp-footer {
+    background: #111827 !important;
+    border-top-color: #1e293b !important;
+    color: #94a3b8 !important;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.25);
+}
+body.dark-mode .erp-footer-item {
+    color: #cbd5e1 !important;
+}
+body.dark-mode .erp-footer-item:hover {
+    color: #60a5fa !important;
+}
+body.dark-mode .erp-footer-ultraviewer {
+    background: rgba(96, 165, 250, 0.15);
+    color: #93c5fd !important;
+}
+body.dark-mode .erp-footer-ultraviewer:hover {
+    background: rgba(96, 165, 250, 0.25);
+    color: #bfdbfe !important;
+}
+body.dark-mode .erp-footer-divider {
+    color: #374151 !important;
+}
+
+@media (max-width: 768px) {
+    .erp-footer {
+        left: 0 !important;
+        padding: 10px 16px;
+        text-align: center;
+    }
+    .erp-footer-content {
+        flex-direction: column;
+        justify-content: center;
+        gap: 6px;
+    }
+    .erp-footer-right {
+        justify-content: center;
+        gap: 10px;
+    }
+}
+
+@media print {
+    .erp-footer {
+        display: none !important;
+    }
+}
+
+/* ─── BRANCH SWITCHER & BRAND HEADER (Image 2) ────────────── */
+.topbar-brand-section {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    margin-left: 8px;
+    padding: 2px 0;
+}
+.topbar-school-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--t1);
+    line-height: 1.25;
+    white-space: nowrap;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.topbar-school-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    line-height: 1.2;
+    margin-top: 2px;
+    flex-wrap: nowrap;
+}
+.topbar-account-id {
+    font-weight: 800;
+    color: #10b981;
+    letter-spacing: 0.3px;
+}
+.btn-change-school {
+    color: #f59e0b !important;
+    font-weight: 700;
+    font-size: 11px;
+    text-decoration: none !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    padding: 0;
+    transition: all 0.15s ease;
+}
+.btn-change-school:hover {
+    color: #fbbf24 !important;
+    text-decoration: underline !important;
+}
+.branch-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 320px;
+    max-width: 380px;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18), 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e2e8f0;
+    z-index: 9999;
+    overflow: hidden;
+    display: none;
+    animation: branchDropFade 0.15s ease-out;
+}
+@keyframes branchDropFade {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.branch-dropdown-header {
+    padding: 12px 16px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    border-bottom: 1px solid #f1f5f9;
+}
+.branch-dropdown-list {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+.branch-item-btn {
+    width: 100%;
+    border: none;
+    background: transparent;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    color: #1e1b4b;
+}
+.branch-item-btn:hover {
+    background: #f8fafc;
+}
+.branch-item-btn.active-branch {
+    background: #dcfce7 !important;
+    color: #15803d !important;
+}
+.branch-item-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.branch-item-btn.active-branch .branch-item-logo {
+    border-color: #86efac;
+}
+.branch-item-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: inherit;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.branch-item-code {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: 1px;
+}
+.branch-item-btn.active-branch .branch-item-code {
+    color: #16a34a;
+}
+body.dark-mode .branch-dropdown-menu {
+    background: #111827 !important;
+    border-color: #374151 !important;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5) !important;
+}
+body.dark-mode .branch-dropdown-header {
+    color: #94a3b8 !important;
+    border-bottom-color: #1e293b !important;
+}
+body.dark-mode .branch-item-btn {
+    color: #f1f5f9 !important;
+}
+body.dark-mode .branch-item-btn:hover {
+    background: #1f2937 !important;
+}
+body.dark-mode .branch-item-btn.active-branch {
+    background: rgba(22, 163, 74, 0.22) !important;
+    color: #4ade80 !important;
+}
+body.dark-mode .branch-item-logo {
+    background: #1f2937 !important;
+    border-color: #374151 !important;
+}
+
+/* Hide in-page Academic Year selectors/filters across all ERP pages while preserving topbar header selector */
+body .academic-year-box,
+body .academic-filter-wrap .session-selector-box,
+body .sw-topbar-session,
+body .tt-academic-year-wrapper,
+body select.select-academic-year,
+body div.select-academic-year {
+    display: none !important;
+}
 </style>
 @yield('styles')
 </head>
@@ -1691,7 +2876,7 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
     try {
         $currentSchool  = app()->bound('currentSchool') ? app('currentSchool') : null;
         $currentSession = $currentSchool
-            ? \App\Models\AcademicSession::where('school_id',$currentSchool->id)->where('is_current',true)->first()
+            ? \App\Models\AcademicSession::resolveCurrentSessionForUser($authUser, $currentSchool->id)
             : null;
         $planName = $currentSchool ? ucfirst($currentSchool->status ?? 'Basic') : 'Basic';
         $layoutAcademicSessions = $currentSchool
@@ -1705,6 +2890,15 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
     }
 @endphp
 
+@php
+    $canManageSession = $authUser && (
+        (method_exists($authUser, 'isSchoolAdmin') && $authUser->isSchoolAdmin()) ||
+        $authUser->hasRole('school_admin') || 
+        $authUser->hasRole('superadmin') || 
+        in_array(strtolower($authUser->role ?? ''), ['school_admin', 'superadmin', 'admin'], true)
+    );
+    $isSchoolDashboard = request()->routeIs('school.dashboard') || request()->is('school/dashboard');
+@endphp
 @include('layouts.sidebar')
 
 <!-- ══════════ MAIN ══════════ -->
@@ -1724,26 +2918,101 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
 
     <!-- TOPBAR -->
     <nav class="topbar">
-        <div class="topbar-left">
+        <div class="topbar-left" style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
             <button type="button" class="hamburger" onclick="toggleSidebar()" aria-label="Toggle sidebar">
                 <i class="fas fa-bars"></i>
             </button>
-            <div class="page-heading">@yield('page-title', 'Dashboard')</div>
+
             @if($currentSchool)
-            <div class="topbar-search-wrap" style="position: relative; margin-left: 20px; display: flex; align-items: center; gap: 8px; flex: 1; max-width: 560px;">
+                @php
+                    $accessibleBranches = method_exists($currentSchool, 'getAccessibleBranches')
+                        ? $currentSchool->getAccessibleBranches()
+                        : collect([$currentSchool]);
+                    $hasMultipleBranches = $accessibleBranches->count() > 1;
+                @endphp
+                <!-- School Brand Info & Branch Switcher (Image 2) -->
+                <div class="topbar-brand-section">
+                    <div class="topbar-school-title" title="{{ $currentSchool->name }}">
+                        {{ $currentSchool->name }}
+                    </div>
+                    <div class="topbar-school-meta">
+                        <span class="topbar-account-id">
+                            ACCOUNT ID:{{ $currentSchool->code ?? 'N/A' }}
+                        </span>
+                        @if($hasMultipleBranches)
+                        <div style="position: relative; display: inline-block;">
+                            <button type="button" class="btn-change-school" id="btnChangeSchool" onclick="toggleBranchDropdown(event)" title="Change School Branch">
+                                <span>Change School</span>
+                                <i class="fas fa-caret-down" style="font-size: 10px;"></i>
+                            </button>
+
+                            <!-- Branch Dropdown (Image 2) -->
+                            <div class="branch-dropdown-menu" id="branchDropdownMenu">
+                                <div class="branch-dropdown-header">Choose a school</div>
+                                <div class="branch-dropdown-list">
+                                    @foreach($accessibleBranches as $branch)
+                                        @php
+                                            $isCurrent = ($branch->id === $currentSchool->id);
+                                        @endphp
+                                        <form method="POST" action="{{ route('school.switch-branch') }}" style="margin: 0;">
+                                            @csrf
+                                            <input type="hidden" name="school_id" value="{{ $branch->id }}">
+                                            <button type="submit" class="branch-item-btn {{ $isCurrent ? 'active-branch' : '' }}">
+                                                <div class="branch-item-logo">
+                                                    @if($branch->logo_url)
+                                                        <img src="{{ $branch->logo_url }}" alt="{{ $branch->name }}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                                                    @else
+                                                        <i class="fas fa-school" style="color: {{ $isCurrent ? '#16a34a' : '#6366f1' }}; font-size: 14px;"></i>
+                                                    @endif
+                                                </div>
+                                                <div style="flex: 1; min-width: 0;">
+                                                    <div class="branch-item-name">{{ $branch->name }}</div>
+                                                    <div class="branch-item-code">ID: {{ $branch->code }}</div>
+                                                </div>
+                                                @if($isCurrent)
+                                                    <i class="fas fa-check-circle" style="color: #16a34a; font-size: 14px; margin-left: auto;"></i>
+                                                @endif
+                                            </button>
+                                        </form>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+                    </div>
+                </div>
+            @else
+                <div class="page-heading">@yield('page-title', 'Dashboard')</div>
+            @endif
+
+            @if($currentSchool)
+            <div class="topbar-search-wrap" style="position: relative; margin-left: 12px; display: flex; align-items: center; gap: 8px; flex: 1; max-width: 560px;">
                 <div style="position: relative; flex: 1;">
                     <i class="fas fa-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--t2); font-size: 13px; pointer-events: none;"></i>
                     <input type="text" id="topbarSearchInput" placeholder="Search by name, mobile, adm no..." style="width: 100%; height: 34px; padding: 0 10px 0 28px; border: 1px solid var(--border); border-radius: 8px; font-size: 12.5px; font-weight: 500; background: var(--page); color: var(--t1); outline: none; transition: all 0.2s;" autocomplete="off">
                     <div id="topbarSearchResults" style="display: none; position: absolute; top: 40px; left: 0; background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); max-height: 300px; overflow-y: auto; z-index: 1000; width: 340px;"></div>
                 </div>
                 @if(isset($layoutAcademicSessions) && $layoutAcademicSessions->isNotEmpty())
-                <select id="topbarAcademicYear" onchange="switchAcademicYear(this.value)" style="height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-weight: 700; background: var(--page); color: var(--t1); outline: none; cursor: pointer; min-width: 130px; white-space: nowrap; flex-shrink: 0; transition: all 0.2s;" title="Switch Academic Year">
-                    @foreach($layoutAcademicSessions as $ses)
-                        <option value="{{ $ses->id }}" {{ ($layoutCurrentSessionId == $ses->id) ? 'selected' : '' }}>
-                            {{ $ses->name }}{{ $ses->is_current ? ' ★' : '' }}
-                        </option>
-                    @endforeach
-                </select>
+                    @if($canManageSession && $isSchoolDashboard)
+                    <select id="topbarAcademicYear" onchange="switchAcademicYear(this.value)" style="height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-weight: 700; background: var(--page); color: var(--t1); outline: none; cursor: pointer; min-width: 130px; white-space: nowrap; flex-shrink: 0; transition: all 0.2s;" title="Switch Academic Year">
+                        @foreach($layoutAcademicSessions as $ses)
+                            <option value="{{ $ses->id }}" {{ ($layoutCurrentSessionId == $ses->id) ? 'selected' : '' }}>
+                                {{ $ses->name }}{{ $ses->is_current ? ' ★' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @elseif($canManageSession)
+                    <div class="topbar-session-badge topbar-session-locked" onclick="if(typeof showToast === 'function') { showToast('Academic Year is locked. It can only be changed from Dashboard.', 'info'); }" style="height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-weight: 700; background: var(--page); color: var(--t1); display: inline-flex; align-items: center; gap: 6px; min-width: 130px; white-space: nowrap; flex-shrink: 0; cursor: not-allowed; user-select: none;" title="Academic Year is locked on this page. Can only be changed from Dashboard.">
+                        <span>{{ $currentSession?->name ?? ($layoutAcademicSessions->firstWhere('is_current', true)?->name ?? $layoutAcademicSessions->first()?->name ?? 'Academic Year') }}{{ ($currentSession && $currentSession->is_current) ? ' ★' : '' }}</span>
+                        <i class="fas fa-lock" style="color: var(--t2); font-size: 10px; margin-left: auto;" title="Locked: Can only be changed from Dashboard"></i>
+                    </div>
+                    <input type="hidden" id="topbarAcademicYear" value="{{ $layoutCurrentSessionId ?? '' }}">
+                    @else
+                    <div class="topbar-session-badge" style="height: 34px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-weight: 700; background: var(--page); color: var(--t1); display: inline-flex; align-items: center; gap: 6px; min-width: 110px; white-space: nowrap; flex-shrink: 0;" title="Default Academic Year (Set by School Admin)">
+                        <i class="fas fa-calendar-check" style="color: #10b981; font-size: 12px;"></i>
+                        <span>{{ $currentSession?->name ?? ($layoutAcademicSessions->firstWhere('is_current', true)?->name ?? $layoutAcademicSessions->first()?->name ?? 'Academic Year') }}</span>
+                    </div>
+                    @endif
                 @endif
             </div>
             @endif
@@ -1757,18 +3026,47 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
             <div class="notif-wrap">
                 <div class="notif-btn" onclick="toggleNotifDrop(event)" title="Notifications" style="cursor:pointer;">
                     <i class="fas fa-bell"></i>
-                    @if($navNotifications->count() > 0)
-                        <span class="notif-badge">{{ $navNotifications->count() }}</span>
-                    @endif
+                    @php
+                        $appUnreadCount = $navNotifications->count();
+                    @endphp
+                    <span class="notif-badge" id="notifBadgeCount" style="{{ $appUnreadCount > 0 ? '' : 'display:none;' }}">{{ $appUnreadCount }}</span>
                 </div>
                 <div class="notif-drop" id="notifDrop">
-                    <div class="nd-hdr">
-                        <strong>Notifications ({{ $navNotifications->count() }})</strong>
-                        <span class="nd-mark" onclick="toggleNotifDrop(event)">Dismiss</span>
+                    <div class="nd-hdr" style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong>Notifications</strong>
+                        <span class="nd-mark" onclick="if(typeof markAllNotifsAsRead==='function') markAllNotifsAsRead();" style="cursor:pointer; font-size:11px; color:#2563eb; font-weight:600; padding:2px 6px; border-radius:4px; transition:background 0.2s;" onmouseover="this.style.background='rgba(37,99,235,0.08)'" onmouseout="this.style.background='transparent'"><i class="fas fa-check-double" style="margin-right:3px;"></i>Mark All as Read</span>
                     </div>
-                    <div style="max-height: 250px; overflow-y: auto;">
+                    <div id="notifListContainer" style="max-height: 250px; overflow-y: auto;">
                         @forelse($navNotifications as $notif)
-                        <a href="{{ route('school.communication.notice') }}" class="nd-item">
+                        @if($notif->type === 'Delete Request')
+                        <div class="nd-item" style="cursor: default; background: #fffefe; border-left: 3px solid #ef4444;">
+                            <div class="nd-ico" style="background: {{ $notif->color }}20; color: {{ $notif->color }};">
+                                <i class="fas {{ $notif->icon }}"></i>
+                            </div>
+                            <div class="nd-body" style="width: 100%;">
+                                <div class="nd-title" style="font-weight: 700;">{{ $notif->title }} <span style="font-size: 8.5px; opacity: 0.75; font-weight: 500;">(Approval Required)</span></div>
+                                <div class="nd-desc" style="margin-top: 2px; color: #475569;">{{ $notif->content }}</div>
+                                <div style="display: flex; gap: 6px; margin-top: 8px;">
+                                    <form method="POST" action="{{ route('school.fees.basics') }}" style="display: inline;">
+                                        @csrf
+                                        <input type="hidden" name="action" value="approve_deletion">
+                                        <input type="hidden" name="deletion_id" value="{{ $notif->id }}">
+                                        <input type="hidden" name="status" value="approve">
+                                        <button type="submit" style="background: #16a34a; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1">Approve (Yes)</button>
+                                    </form>
+                                    <form method="POST" action="{{ route('school.fees.basics') }}" style="display: inline;">
+                                        @csrf
+                                        <input type="hidden" name="action" value="approve_deletion">
+                                        <input type="hidden" name="deletion_id" value="{{ $notif->id }}">
+                                        <input type="hidden" name="status" value="reject">
+                                        <button type="submit" style="background: #ef4444; color: #fff; border: none; padding: 4px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1">Reject (No)</button>
+                                    </form>
+                                </div>
+                                <div class="nd-time" style="margin-top: 4px;">{{ $notif->time }}</div>
+                            </div>
+                        </div>
+                        @else
+                        <a href="{{ $notif->action_url && $notif->action_url !== '#' ? $notif->action_url : 'javascript:void(0);' }}" class="nd-item" onclick="if(typeof markNotificationRead==='function') markNotificationRead({{ $notif->id }});">
                             <div class="nd-ico" style="background: {{ $notif->color }}20; color: {{ $notif->color }};">
                                 <i class="fas {{ $notif->icon }}"></i>
                             </div>
@@ -1778,6 +3076,7 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
                                 <div class="nd-time">{{ $notif->time }}</div>
                             </div>
                         </a>
+                        @endif
                         @empty
                         <div class="nd-empty">No new notifications today</div>
                         @endforelse
@@ -1802,6 +3101,31 @@ body.dark-mode nav[role="navigation"] span.shadow-sm span[aria-current="page"] {
         @endif
         @yield('content')
     </div>
+
+    <!-- ERP PORTAL FOOTER -->
+    <footer class="erp-footer">
+        <div class="erp-footer-content">
+            <div class="erp-footer-left">
+                <span>&copy; {{ date('Y') }} Educorerp. All rights reserved.</span>
+            </div>
+            <div class="erp-footer-right">
+                <a href="mailto:info@educorerp.com" class="erp-footer-item" title="Support Email">
+                    <i class="fas fa-envelope text-primary"></i>
+                    <span>info@educorerp.com</span>
+                </a>
+                <span class="erp-footer-divider">|</span>
+                <a href="tel:+919219441716" class="erp-footer-item" title="Helpline Number">
+                    <i class="fas fa-phone-alt fa-flip-horizontal text-primary"></i>
+                    <span>+91 92194 41716</span>
+                </a>
+                <span class="erp-footer-divider">|</span>
+                <a href="https://www.ultraviewer.net/en/download.html" target="_blank" rel="noopener noreferrer" class="erp-footer-item erp-footer-ultraviewer" title="Download UltraViewer Remote Support">
+                    <i class="fas fa-desktop text-primary"></i>
+                    <span>UltraViewer</span>
+                </a>
+            </div>
+        </div>
+    </footer>
 </div>
 
 <!-- TOAST -->
@@ -1817,7 +3141,8 @@ function showToast(msg){
     setTimeout(()=>t.classList.remove('show'),3000);
 }
 
-function toggleSidebar() {
+function toggleSidebar(e) {
+    if (e && e.preventDefault) { e.preventDefault(); e.stopPropagation(); }
     const sidebar = document.getElementById('appSidebar') || document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
     if (!sidebar) return;
@@ -1830,10 +3155,15 @@ function toggleSidebar() {
         const isOpen = sidebar.classList.toggle('open');
         if (overlay) overlay.classList.toggle('active', isOpen);
         document.body.style.overflow = (isOpen && window.innerWidth <= 768) ? 'hidden' : '';
+        if (isOpen) {
+            const sbNav = sidebar.querySelector('.sb-nav');
+            if (sbNav) sbNav.scrollTop = 0;
+        }
     }
 }
 
-function closeSidebar() {
+function closeSidebar(e) {
+    if (e && e.preventDefault) { e.preventDefault(); e.stopPropagation(); }
     const sidebar = document.getElementById('appSidebar') || document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
     if (sidebar) sidebar.classList.remove('open');
@@ -1970,17 +3300,70 @@ function buildSidebarTooltips() {
     });
 }
 
+function openModulePopupModal(iconHtml, titleText, itemsHtml) {
+    const modal = document.getElementById('sbModulePopupModal');
+    const iconEl = document.getElementById('sbMpmIcon');
+    const titleEl = document.getElementById('sbMpmTitle');
+    const bodyEl = document.getElementById('sbMpmBody');
+    if (!modal) return;
+    if (iconEl) iconEl.innerHTML = iconHtml;
+    if (titleEl) titleEl.textContent = titleText;
+    if (bodyEl) bodyEl.innerHTML = itemsHtml;
+    modal.classList.add('active');
+}
+
+function closeModulePopupModal(e) {
+    if (e && e.preventDefault) { e.preventDefault(); e.stopPropagation(); }
+    const modal = document.getElementById('sbModulePopupModal');
+    if (modal) modal.classList.remove('active');
+}
+
 function setupSidebarAccordion() {
-    document.querySelectorAll('.sb-hdr').forEach(hdr => {
-        hdr.addEventListener('click', function(e) {
+    document.querySelectorAll('.sb-group').forEach(group => {
+        group.addEventListener('click', function(e) {
+            // Do not block clicks on actual submenu links or modal items
+            if (e.target.closest('a') || e.target.closest('.sb-submenu li') || e.target.closest('#sbModulePopupModal')) {
+                return;
+            }
             if (window.innerWidth <= 768) {
                 e.preventDefault();
-                const submenu = this.nextElementSibling;
+                e.stopPropagation();
+
+                const submenu = this.querySelector('.sb-submenu');
+                const iconEl = this.querySelector('.sb-hdr-icon');
+                const titleEl = this.querySelector('.sb-hdr-title');
+                const iconHtml = iconEl ? iconEl.innerHTML : '<i class="fas fa-cubes"></i>';
+                const titleText = titleEl ? titleEl.textContent.trim() : 'Module Pages';
+
                 if (submenu && submenu.classList.contains('sb-submenu')) {
-                    const isOpen = submenu.classList.toggle('open');
-                    this.classList.toggle('open', isOpen);
+                    const links = submenu.querySelectorAll('li a');
+                    if (links.length > 0) {
+                        let itemsHtml = '';
+                        links.forEach(link => {
+                            const href = link.getAttribute('href');
+                            const labelEl = link.querySelector('.sb-submenu-label');
+                            const label = labelEl ? labelEl.textContent.trim() : link.textContent.trim();
+                            const iconElSub = link.querySelector('.sb-submenu-icon');
+                            const icon = iconElSub ? iconElSub.outerHTML : '<i class="fas fa-chevron-right" style="color:#2563eb;"></i>';
+                            const isActive = link.closest('li')?.classList.contains('active') ? 'active' : '';
+                            itemsHtml += `
+                                <a href="${href}" class="sb-mpm-item ${isActive}" onclick="closeSidebar(); closeModulePopupModal();">
+                                    <span>${label}</span>
+                                    ${icon}
+                                </a>
+                            `;
+                        });
+                        openModulePopupModal(iconHtml, titleText, itemsHtml);
+                        return;
+                    }
                 }
-            } else {
+            }
+        });
+    });
+
+    document.querySelectorAll('.sb-hdr').forEach(hdr => {
+        hdr.addEventListener('click', function(e) {
+            if (window.innerWidth > 768) {
                 e.preventDefault();
                 if (this._sbTip) {
                     const rect = this.getBoundingClientRect();
@@ -2067,11 +3450,14 @@ document.addEventListener('DOMContentLoaded', () => {
                        document.querySelector('.sb-nav .active-link') || 
                        document.querySelector('.sb-nav li.active');
     
-    if (activeItem) {
+    if (window.innerWidth > 768 && activeItem) {
         activeItem.scrollIntoView({ block: 'center', behavior: 'instant' });
         setTimeout(() => {
             activeItem.scrollIntoView({ block: 'center', behavior: 'smooth' });
         }, 450);
+    } else {
+        const sbNav = document.querySelector('.sb-nav');
+        if (sbNav) sbNav.scrollTop = 0;
     }
 
     // Topbar Search Event Listeners
@@ -2089,8 +3475,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
+            const currentAcademicSessionId = $('#topbarAcademicYear').val() || '{{ $layoutCurrentSessionId ?? "" }}';
+
             searchTimeout = setTimeout(function() {
-                $.get('{{ route("school.topbar-search") }}', { query: query })
+                $.get('{{ route("school.topbar-search") }}', { 
+                    query: query,
+                    academic_session_id: currentAcademicSessionId
+                })
                     .done(function(data) {
                         resultsContainer.empty();
                         let html = '';
@@ -2098,12 +3489,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (data.students && data.students.length > 0) {
                             html += '<div style="padding: 6px 12px; font-size: 10px; font-weight: 700; color: var(--gold); text-transform: uppercase; background: var(--page); border-bottom: 1px solid var(--border);">Students</div>';
                             data.students.forEach(student => {
-                                const name = student.first_name + ' ' + (student.last_name || '');
-                                const roll = student.roll_number ? 'Roll: ' + student.roll_number : '';
+                                const name = (student.first_name || '') + ' ' + (student.last_name || '');
                                 const adm = student.admission_number ? 'Adm: ' + student.admission_number : '';
+                                const cls = student.class_name ? 'Class: ' + student.class_name : '';
+                                const roll = student.roll_number ? 'Roll: ' + student.roll_number : '';
                                 const phone = student.phone ? '📞 ' + student.phone : '';
-                                const details = [adm, roll, phone].filter(Boolean).join(' | ');
-                                const photo = student.photo ? `/storage/${student.photo}` : null;
+                                const details = [adm, cls, roll, phone].filter(Boolean).join(' | ');
+                                const photo = student.photo_url || null;
                                 
                                 html += `
                                     <a href="/school/students/${student.id}" class="search-result-item">
@@ -2111,7 +3503,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                             ${photo ? `<img src="${photo}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user" style="color: #9ca3af; font-size: 11px;"></i>`}
                                         </div>
                                         <div style="min-width: 0;">
-                                            <div style="font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</div>
+                                            <div style="font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name.trim()}</div>
                                             <div style="font-size: 10.5px; color: var(--t2);">${details}</div>
                                         </div>
                                     </a>
@@ -2122,11 +3514,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (data.staff && data.staff.length > 0) {
                             html += '<div style="padding: 6px 12px; font-size: 10px; font-weight: 700; color: var(--gold); text-transform: uppercase; background: var(--page); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">Staff</div>';
                             data.staff.forEach(member => {
-                                const name = member.first_name + ' ' + (member.last_name || '');
+                                const name = (member.first_name || '') + ' ' + (member.last_name || '');
                                 const empId = member.employee_id ? 'ID: ' + member.employee_id : '';
                                 const phone = member.phone ? '📞 ' + member.phone : '';
                                 const details = [empId, phone].filter(Boolean).join(' | ');
-                                const photo = member.photo ? `/storage/${member.photo}` : null;
+                                const photo = member.photo ? member.photo_url : null;
                                 
                                 html += `
                                     <a href="/school/staff/${member.id}/edit" class="search-result-item">
@@ -2134,7 +3526,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                             ${photo ? `<img src="${photo}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fas fa-user-tie" style="color: #9ca3af; font-size: 11px;"></i>`}
                                         </div>
                                         <div style="min-width: 0;">
-                                            <div style="font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</div>
+                                            <div style="font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name.trim()}</div>
                                             <div style="font-size: 10.5px; color: var(--t2);">${details}</div>
                                         </div>
                                     </a>
@@ -2152,6 +3544,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         resultsContainer.hide().empty();
                     });
             }, 300);
+        });
+
+        // Navigate on Enter if result exists
+        searchInput.on('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const firstResult = resultsContainer.find('a.search-result-item').first();
+                if (firstResult.length) {
+                    window.location.href = firstResult.attr('href');
+                }
+            }
         });
 
         // Close results when clicking outside
@@ -2208,6 +3610,43 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    // Auto-close mobile navigation drawer when tapping any menu item link
+    document.querySelectorAll('.sb-nav a').forEach(a => {
+        a.addEventListener('click', function() {
+            if (window.innerWidth <= 768) {
+                const href = this.getAttribute('href');
+                if (href && !href.startsWith('javascript:')) {
+                    closeSidebar();
+                }
+            }
+        });
+    });
+
+    // Touch gesture support: Swipe left on mobile drawer to close
+    let touchStartX = 0;
+    let touchStartY = 0;
+    document.addEventListener('touchstart', e => {
+        if (window.innerWidth <= 768 && e.touches && e.touches.length > 0) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }
+    }, { passive: true });
+
+    document.addEventListener('touchend', e => {
+        if (window.innerWidth <= 768 && e.changedTouches && e.changedTouches.length > 0) {
+            const sidebar = document.getElementById('appSidebar') || document.getElementById('sidebar');
+            if (sidebar && sidebar.classList.contains('open')) {
+                const touchEndX = e.changedTouches[0].clientX;
+                const touchEndY = e.changedTouches[0].clientY;
+                const diffX = touchStartX - touchEndX;
+                const diffY = Math.abs(touchStartY - touchEndY);
+                if (diffX > 50 && diffY < 60) {
+                    closeSidebar();
+                }
+            }
+        }
+    }, { passive: true });
 });
 
 window.addEventListener('resize', () => {
@@ -2228,12 +3667,93 @@ document.addEventListener('click', e => {
     if (!e.target.closest('.sb-bottom')) {
         const m = document.getElementById('sbProfileMenu');
         if (m) m.classList.remove('open');
+        const s = document.getElementById('sbSettingsSubmenuParent');
+        if (s && !s.classList.contains('active-parent')) s.classList.remove('open');
+    }
+    // Close branch switcher dropdown when clicking outside
+    if (!e.target.closest('.branch-dropdown-menu') && !e.target.closest('#btnChangeSchool')) {
+        const bd = document.getElementById('branchDropdownMenu');
+        if (bd) bd.style.display = 'none';
     }
     // Close tooltips when clicking outside sidebar
     if (!e.target.closest('.sb-group') && !e.target.closest('.sb-tooltip-popup')) {
         document.querySelectorAll('.sb-tooltip-popup').forEach(t => { t.style.display = 'none'; });
     }
 });
+
+function toggleBranchDropdown(e) {
+    if (e) e.stopPropagation();
+    const bd = document.getElementById('branchDropdownMenu');
+    if (bd) {
+        bd.style.display = (bd.style.display === 'none' || bd.style.display === '') ? 'block' : 'none';
+    }
+}
+
+function updateDynamicGreeting() {
+    const titleEl = document.getElementById('mwcTitle');
+    const subtitleEl = document.getElementById('mwcSubtitle');
+    if (!titleEl && !subtitleEl) return;
+
+    const userName = titleEl ? (titleEl.getAttribute('data-user-name') || 'User') : 'User';
+    const now = new Date();
+    const hour = now.getHours();
+
+    let greeting = '';
+    let emoji = '';
+    let subtitle = '';
+
+    if (hour >= 5 && hour < 12) {
+        greeting = 'Good Morning';
+        emoji = '👋';
+        subtitle = 'Manage your school operations efficiently today.';
+    } else if (hour >= 12 && hour < 17) {
+        greeting = 'Good Afternoon';
+        emoji = '☀';
+        subtitle = 'Hope your day is going great. Stay productive.';
+    } else if (hour >= 17 && hour < 21) {
+        greeting = 'Good Evening';
+        emoji = '🌇';
+        subtitle = 'Review today\'s activities and stay organized.';
+    } else {
+        greeting = 'Good Night';
+        emoji = '🌙';
+        subtitle = 'Everything is under control. Have a peaceful evening.';
+    }
+
+    if (titleEl) {
+        titleEl.textContent = `${greeting}, ${userName} ${emoji}`;
+    }
+    if (subtitleEl) {
+        subtitleEl.textContent = subtitle;
+    }
+}
+
+function openMobileNotifModal(event) {
+    if (event) {
+        event.stopPropagation();
+        if (event.preventDefault) event.preventDefault();
+    }
+    const modal = document.getElementById('sbNotifFullModal');
+    if (modal) {
+        modal.classList.add('active');
+        if (typeof fetchLatestNotifications === 'function') {
+            fetchLatestNotifications();
+        }
+    } else {
+        toggleNotifDrop(event);
+    }
+}
+
+function closeMobileNotifModal(event) {
+    if (event) {
+        event.stopPropagation();
+        if (event.preventDefault) event.preventDefault();
+    }
+    const modal = document.getElementById('sbNotifFullModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+}
 
 function toggleNotifDrop(event) {
     if (event) event.stopPropagation();
@@ -2242,10 +3762,18 @@ function toggleNotifDrop(event) {
 }
 
 function toggleSbProfileMenu(event) {
-    event.stopPropagation();
+    if (event) event.stopPropagation();
     const menu = document.getElementById('sbProfileMenu');
     if (menu) {
         menu.classList.toggle('open');
+    }
+}
+
+function toggleSbSubmenu(event) {
+    if (event) event.stopPropagation();
+    const parentItem = document.getElementById('sbSettingsSubmenuParent') || (event && event.currentTarget ? event.currentTarget.closest('.sb-menu-item-has-submenu') : null);
+    if (parentItem) {
+        parentItem.classList.toggle('open');
     }
 }
 
@@ -2265,9 +3793,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.body.classList.contains('dark-mode')) {
         updateThemeIcon(true);
     }
+
+    // Dynamic Time-Based Greeting Initialization & Interval
+    updateDynamicGreeting();
+    setInterval(updateDynamicGreeting, 60000);
+
+    // Ensure mobile navigation drawer menu remains closed by default on page load
+
 });
 
 function switchAcademicYear(sessionId) {
+    @if(!$isSchoolDashboard)
+        if (typeof showToast === 'function') {
+            showToast('Academic year can only be changed from the Dashboard.', 'warning');
+        }
+        return;
+    @endif
     if (!sessionId) return;
     $.post('{{ route("school.dashboard.change-session") }}', {
         academic_session_id: sessionId
@@ -2286,6 +3827,8 @@ function switchAcademicYear(sessionId) {
 }
 </script>
 @include('layouts.ai_chatbot')
+@include('partials.realtime_notifications')
+@include('partials.android_bottom_nav')
 @yield('scripts')
 </body>
 </html>

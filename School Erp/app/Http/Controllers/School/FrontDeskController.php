@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -166,6 +167,7 @@ class FrontDeskController extends Controller
             'security_notes'           => 'nullable|string|max:1000',
             'photo'                    => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
             'webcam_photo'             => 'nullable|string',
+            'cv'                       => 'nullable|file|mimes:pdf|max:10240',
         ]);
 
         // Process photo (file upload or webcam base64 snapshot)
@@ -193,6 +195,14 @@ class FrontDeskController extends Controller
             }
         }
 
+        // Process CV document upload if uploaded (strictly PDF)
+        $cvPath = null;
+        if ($request->hasFile('cv')) {
+            $cvFile = $request->file('cv');
+            $cvFilename = 'cv_' . uniqid() . '.' . $cvFile->getClientOriginalExtension();
+            $cvPath = $cvFile->storeAs("visitors/{$schoolId}/cvs", $cvFilename, 'public');
+        }
+
         // Generate unique pass number
         $passNumber = Visitor::generatePassNumber($schoolId);
 
@@ -204,7 +214,7 @@ class FrontDeskController extends Controller
         }
 
         $metaData = [
-            'school_name'        => $school?->name ?? config('app.name', 'SchoolCloud ERP'),
+            'school_name'        => $school?->name ?? config('app.name', 'Educorerp'),
             'school_code'        => $school?->code ? strtoupper($school->code) : 'EDUZEN',
             'school_phone'       => $school?->phone ?? '',
             'school_address'     => $school?->address ?? '',
@@ -212,10 +222,15 @@ class FrontDeskController extends Controller
             'registered_by_name' => Auth::user()?->name ?? 'Front Desk Staff',
         ];
 
+        if ($cvPath) {
+            $metaData['cv_path'] = $cvPath;
+            $metaData['cv_name'] = $request->file('cv')->getClientOriginalName();
+        }
+
         // Active Academic Session if present
         $sessionId = session('current_session_id') ?? Auth::user()?->academic_session_id;
 
-        $visitor = Visitor::create([
+        $visitorPayload = [
             'school_id'                => $schoolId,
             'academic_session_id'      => $sessionId,
             'registered_by'            => Auth::id(),
@@ -245,7 +260,13 @@ class FrontDeskController extends Controller
             'status'                   => 'checked_in',
             'check_in_at'              => now(),
             'meta_data'                => $metaData,
-        ]);
+        ];
+
+        if ($cvPath && Schema::hasColumn('visitors', 'cv_path')) {
+            $visitorPayload['cv_path'] = $cvPath;
+        }
+
+        $visitor = Visitor::create($visitorPayload);
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
@@ -813,6 +834,10 @@ class FrontDeskController extends Controller
                 'photo_url'                => $visitor->photo_url,
                 'security_notes'           => $visitor->security_notes,
                 'status'                   => $visitor->status,
+                'cv_url'                   => $visitor->cv_url,
+                'cv_name'                  => $visitor->cv_name,
+                'id_proof_url'             => $visitor->id_proof_url,
+                'has_document'             => $visitor->has_document,
                 'check_in_at'              => $visitor->check_in_at ? $visitor->check_in_at->format('d-M-Y h:i A') : null,
                 'check_out_at'             => $visitor->check_out_at ? $visitor->check_out_at->format('d-M-Y h:i A') : null,
                 'print_url'                => route('school.front-desk.visitor.print', $visitor->id),
@@ -852,6 +877,8 @@ class FrontDeskController extends Controller
             'security_notes'           => 'nullable|string|max:1000',
             'status'                   => 'nullable|string|in:checked_in,checked_out,expected,cancelled',
             'photo'                    => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'document'                 => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:10240',
+            'cv'                       => 'nullable|file|mimes:pdf|max:10240',
             'webcam_photo'             => 'nullable|string',
         ]);
 
@@ -879,6 +906,27 @@ class FrontDeskController extends Controller
             }
         }
 
+        // Handle optional CV / Document upload (strictly PDF)
+        $cvPath = $visitor->cv_path ?: ($visitor->meta_data['cv_path'] ?? null);
+        $metaData = is_array($visitor->meta_data) ? $visitor->meta_data : [];
+
+        if ($request->hasFile('cv')) {
+            $cvFile = $request->file('cv');
+            $cvFilename = 'cv_' . uniqid() . '.' . $cvFile->getClientOriginalExtension();
+            $cvPath = $cvFile->storeAs("visitors/{$schoolId}/cvs", $cvFilename, 'public');
+            $metaData['cv_path'] = $cvPath;
+            $metaData['cv_name'] = $cvFile->getClientOriginalName();
+        }
+
+        // Handle optional general document / ID Proof upload
+        if ($request->hasFile('document')) {
+            $docFile = $request->file('document');
+            $docFilename = 'doc_' . uniqid() . '.' . $docFile->getClientOriginalExtension();
+            $docPath = $docFile->storeAs("visitors/{$schoolId}/documents", $docFilename, 'public');
+            $metaData['id_proof_path'] = $docPath;
+            $metaData['id_proof_name'] = $docFile->getClientOriginalName();
+        }
+
         // Update visitor record
         $updateData = [
             'full_name'                => $validated['full_name'],
@@ -898,12 +946,17 @@ class FrontDeskController extends Controller
             'entourage_count'          => $validated['entourage_count'] ?? $visitor->entourage_count,
             'visit_purpose'            => $validated['visit_purpose'] ?? $visitor->visit_purpose,
             'detailed_purpose_remarks' => $validated['detailed_purpose_remarks'] ?? $visitor->detailed_purpose_remarks,
-            'id_proof_type'            => $validated['id_proof_type'] ?? $visitor->id_proof_type,
-            'id_proof_number'          => $validated['id_proof_number'] ?? $visitor->id_proof_number,
+            'id_proof_type'            => !empty($metaData['id_proof_path']) ? 'Uploaded Document' : ($validated['id_proof_type'] ?? $visitor->id_proof_type),
+            'id_proof_number'          => !empty($metaData['id_proof_name']) ? $metaData['id_proof_name'] : ($validated['id_proof_number'] ?? $visitor->id_proof_number),
             'vehicle_number'           => $validated['vehicle_number'] ?? $visitor->vehicle_number,
             'security_notes'           => $validated['security_notes'] ?? $visitor->security_notes,
             'photo_path'               => $photoPath,
+            'meta_data'                => $metaData,
         ];
+
+        if ($cvPath && Schema::hasColumn('visitors', 'cv_path')) {
+            $updateData['cv_path'] = $cvPath;
+        }
 
         if (!empty($validated['status'])) {
             $updateData['status'] = $validated['status'];
@@ -916,11 +969,13 @@ class FrontDeskController extends Controller
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
-                'success'     => true,
-                'message'     => 'Visitor details updated successfully! Updated pass is ready.',
-                'visitor'     => $visitor->fresh(),
-                'photo_url'   => $visitor->photo_url,
-                'print_url'   => route('school.front-desk.visitor.print', $visitor->id),
+                'success'      => true,
+                'message'      => 'Visitor details updated successfully! Updated pass is ready.',
+                'visitor'      => $visitor->fresh(),
+                'photo_url'    => $visitor->photo_url,
+                'cv_url'       => $visitor->cv_url,
+                'id_proof_url' => $visitor->id_proof_url,
+                'print_url'    => route('school.front-desk.visitor.print', $visitor->id),
             ]);
         }
 
@@ -1271,6 +1326,66 @@ class FrontDeskController extends Controller
             ->limit(100)
             ->get();
 
+        // Academic Sessions
+        $academicSessions = \App\Models\AcademicSession::where('school_id', $schoolId)
+            ->orderBy('name', 'desc')
+            ->get();
+        if ($academicSessions->isEmpty()) {
+            $academicSessions = collect([
+                (object)['id' => 1, 'name' => '2026-27', 'is_current' => true],
+                (object)['id' => 2, 'name' => '2027-28', 'is_current' => false],
+            ]);
+        }
+
+        // Classes for admission
+        $schoolClasses = \App\Models\SchoolClass::where('school_id', $schoolId)
+            ->orderBy('id')
+            ->get();
+        if ($schoolClasses->isEmpty()) {
+            $defaultClassNames = [
+                'Playgroup', 'Nursery', 'LKG', 'UKG',
+                'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5',
+                'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10',
+                'Class 11', 'Class 12'
+            ];
+            $schoolClasses = collect($defaultClassNames)->map(function ($name, $idx) {
+                return (object)['id' => $idx + 1, 'name' => $name];
+            });
+        }
+
+        $vendorPurposes = [
+            'Vendor Delivery / Supply',
+            'Maintenance & Repair',
+            'Product Demo / Quotation',
+            'Billing / Payment Enquiry',
+            'Courier / Parcel Drop',
+            'Other Commercial Work',
+        ];
+
+        $generalPurposes = [
+            'Interview',
+            'Job Interview',
+            'Parent-Teacher Interaction',
+            'Fee Payment / Accounts Enquiry',
+            'Official Meeting / Management',
+            'Document Submission / Verification',
+            'Student Pickup / Early Departure',
+            'Personal / Casual Visit',
+            'Alumni Visit',
+            'Other',
+        ];
+
+        $sourceOfInformation = [
+            'Word of Mouth / Referral',
+            'Social Media (Facebook / Instagram)',
+            'Newspaper / Print Ad',
+            'School Website / Online Search',
+            'Hoarding / Outdoor Banner',
+            'Walk-in / Campus Proximity',
+            'Existing Student / Parent',
+            'Other',
+        ];
+
         $visitorTypes = [
             'Parent / Guardian',
             'Vendor / Supplier',
@@ -1325,14 +1440,25 @@ class FrontDeskController extends Controller
             'Reception Entry',
         ];
 
+        $activeCategory = strtolower($request->query('category', 'general'));
+        if (!in_array($activeCategory, ['general', 'admission', 'vendor'])) {
+            $activeCategory = 'general';
+        }
+
         return view('public.visitor_self_registration', compact(
             'school',
             'staffMembers',
+            'academicSessions',
+            'schoolClasses',
+            'vendorPurposes',
+            'generalPurposes',
+            'sourceOfInformation',
             'visitorTypes',
             'whomToMeetTypes',
             'visitPurposes',
             'idProofTypes',
-            'securityGates'
+            'securityGates',
+            'activeCategory'
         ));
     }
 
@@ -1346,34 +1472,205 @@ class FrontDeskController extends Controller
             ->firstOrFail();
 
         $schoolId = $school->id;
+        $categoryMode = $request->input('category_mode');
 
-        $validated = $request->validate([
-            'visitor_type'             => 'required|string|max:100',
-            'full_name'                => 'required|string|max:150',
-            'gender'                   => 'nullable|string|in:Male,Female,Other',
-            'dob'                      => 'nullable|date',
-            'mobile_number'            => ['required', 'string', 'max:25'],
-            'alternate_mobile'         => 'nullable|string|max:25',
-            'email'                    => 'required|email|max:150',
-            'street_address'           => 'nullable|string|max:500',
-            'state'                    => 'nullable|string|max:100',
-            'city'                     => 'nullable|string|max:100',
-            'pincode'                  => 'nullable|string|max:20',
-            'whom_to_meet_type'        => 'required|string|max:100',
-            'host_name'                => 'nullable|string|max:150',
-            'security_gate'            => 'nullable|string|max:100',
-            'entourage_count'          => 'required|integer|min:1|max:100',
-            'visit_purpose'            => 'required|string|max:150',
-            'detailed_purpose_remarks' => 'nullable|string|max:1000',
-            'id_proof_type'            => 'nullable|string|max:100',
-            'id_proof_number'          => 'nullable|string|max:100',
-            'vehicle_number'           => 'nullable|string|max:50',
-            'security_notes'           => 'nullable|string|max:1000',
-            'photo'                    => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
-            'webcam_photo'             => 'nullable|string',
-        ]);
+        if ($categoryMode === 'vendor') {
+            $request->merge([
+                'visitor_name'      => $request->input('visitor_name') ?: $request->input('vendor_visitor_name'),
+                'meeting_purpose'   => $request->input('meeting_purpose') ?: $request->input('vendor_meeting_purpose'),
+                'email'             => $request->input('email') ?: $request->input('vendor_email'),
+                'organisation_name' => $request->input('organisation_name') ?: $request->input('vendor_organisation_name'),
+                'description'       => $request->input('description') ?: $request->input('vendor_description'),
+                'no_of_visitors'    => $request->input('no_of_visitors') !== null ? $request->input('no_of_visitors') : $request->input('vendor_no_of_visitors'),
+            ]);
 
-        // Process photo
+            $validated = $request->validate([
+                'visitor_name'      => 'required|string|max:150',
+                'meeting_purpose'   => 'required|string|max:150',
+                'email'             => 'nullable|email|max:150',
+                'organisation_name' => 'required|string|max:150',
+                'description'       => 'nullable|string|max:1000',
+                'no_of_visitors'    => 'nullable|integer|min:0|max:100',
+                'mobile_number'     => 'nullable|string|max:25',
+                'id_proof'          => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
+                'photo'             => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+                'webcam_photo'      => 'nullable|string',
+            ]);
+
+            $fullName = $validated['visitor_name'];
+            $visitorType = 'Vendor / Supplier';
+            $visitPurpose = $validated['meeting_purpose'];
+            $whomToMeet = 'Administration / Front Desk';
+            $streetAddress = null;
+            $entourageCount = max(1, intval($validated['no_of_visitors'] ?? 1));
+            $remarks = $validated['description'] ?? null;
+            $dob = null;
+            $gender = null;
+
+            $categoryMeta = [
+                'category_mode'     => 'vendor',
+                'organisation_name' => $validated['organisation_name'],
+                'description'       => $validated['description'] ?? null,
+            ];
+        } elseif ($categoryMode === 'admission') {
+            $request->merge([
+                'parent_name'            => $request->input('parent_name') ?: $request->input('admission_parent_name'),
+                'child_name'             => $request->input('child_name') ?: $request->input('admission_child_name'),
+                'dob'                    => $request->input('dob') ?: $request->input('admission_dob'),
+                'gender'                 => $request->input('gender') ?: $request->input('admission_gender'),
+                'source_of_information'  => $request->input('source_of_information') ?: $request->input('admission_source_of_information'),
+                'address'                => $request->input('address') ?: $request->input('admission_address'),
+                'admission_sought_class' => $request->input('admission_sought_class') ?: $request->input('admission_sought_class'),
+                'academic_year'          => $request->input('academic_year') ?: $request->input('admission_academic_year'),
+                'email'                  => $request->input('email') ?: $request->input('admission_email'),
+                'no_of_visitors'         => $request->input('no_of_visitors') !== null ? $request->input('no_of_visitors') : $request->input('admission_no_of_visitors'),
+            ]);
+
+            $validated = $request->validate([
+                'academic_year'          => 'nullable|string|max:50',
+                'parent_name'            => 'required|string|max:150',
+                'child_name'             => 'required|string|max:150',
+                'dob'                    => 'required|date',
+                'gender'                 => 'required|string|in:Male,Female,Other',
+                'source_of_information'  => 'required|string|max:150',
+                'address'                => 'required|string|max:500',
+                'admission_sought_class' => 'required|string|max:100',
+                'email'                  => 'nullable|email|max:150',
+                'no_of_visitors'         => 'nullable|integer|min:0|max:100',
+                'mobile_number'          => 'nullable|string|max:25',
+                'id_proof'               => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
+                'photo'                  => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+                'webcam_photo'           => 'nullable|string',
+            ]);
+
+            $fullName = $validated['parent_name'];
+            $visitorType = 'Parent / Guardian';
+            $visitPurpose = 'New Admission Enquiry';
+            $whomToMeet = 'Principal / Management';
+            $streetAddress = $validated['address'];
+            $entourageCount = max(1, intval($validated['no_of_visitors'] ?? 1));
+            $remarks = "Admission Enquiry for {$validated['child_name']} into {$validated['admission_sought_class']} (Source: {$validated['source_of_information']})";
+            $dob = $validated['dob'];
+            $gender = $validated['gender'];
+
+            $categoryMeta = [
+                'category_mode'          => 'admission',
+                'academic_year'          => $validated['academic_year'] ?? null,
+                'parent_name'            => $validated['parent_name'],
+                'child_name'             => $validated['child_name'],
+                'dob'                    => $validated['dob'],
+                'gender'                 => $validated['gender'],
+                'source_of_information'  => $validated['source_of_information'],
+                'admission_sought_class' => $validated['admission_sought_class'],
+                'address'                => $validated['address'],
+            ];
+        } elseif ($categoryMode === 'general') {
+            $request->merge([
+                'visitor_name'    => $request->input('visitor_name') ?: $request->input('general_visitor_name'),
+                'meeting_purpose' => $request->input('meeting_purpose') ?: $request->input('general_meeting_purpose'),
+                'email'           => $request->input('email') ?: $request->input('general_email'),
+                'address'         => $request->input('address') ?: $request->input('general_address'),
+                'description'     => $request->input('description') ?: $request->input('general_description'),
+                'no_of_visitors'  => $request->input('no_of_visitors') !== null ? $request->input('no_of_visitors') : $request->input('general_no_of_visitors'),
+            ]);
+
+            $validated = $request->validate([
+                'visitor_name'    => 'required|string|max:150',
+                'meeting_purpose' => 'required|string|max:150',
+                'email'           => 'nullable|email|max:150',
+                'address'         => 'required|string|max:500',
+                'description'     => 'nullable|string|max:1000',
+                'no_of_visitors'  => 'nullable|integer|min:0|max:100',
+                'mobile_number'   => 'nullable|string|max:25',
+                'id_proof'        => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
+                'cv'              => 'nullable|file|mimes:pdf|max:10240',
+                'photo'           => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+                'webcam_photo'    => 'nullable|string',
+            ]);
+
+            $fullName = $validated['visitor_name'];
+            $isInterview = str_contains(strtolower($validated['meeting_purpose']), 'interview');
+            $visitorType = $isInterview ? 'Job Applicant' : 'General Visitor';
+            $visitPurpose = $validated['meeting_purpose'];
+            $whomToMeet = $isInterview ? 'Principal / Management' : 'Administration / Front Desk';
+            $streetAddress = $validated['address'];
+            $entourageCount = max(1, intval($validated['no_of_visitors'] ?? 1));
+            $remarks = $validated['description'] ?? null;
+            $dob = null;
+            $gender = null;
+
+            $categoryMeta = [
+                'category_mode' => 'general',
+                'address'       => $validated['address'],
+                'description'   => $validated['description'] ?? null,
+                'is_interview'  => $isInterview,
+            ];
+        } else {
+            // Legacy submission fallback for backwards-compatibility with tests
+            $validated = $request->validate([
+                'visitor_type'             => 'required|string|max:100',
+                'full_name'                => 'required|string|max:150',
+                'gender'                   => 'nullable|string|in:Male,Female,Other',
+                'dob'                      => 'nullable|date',
+                'mobile_number'            => ['required', 'string', 'max:25'],
+                'alternate_mobile'         => 'nullable|string|max:25',
+                'email'                    => 'required|email|max:150',
+                'street_address'           => 'nullable|string|max:500',
+                'state'                    => 'nullable|string|max:100',
+                'city'                     => 'nullable|string|max:100',
+                'pincode'                  => 'nullable|string|max:20',
+                'whom_to_meet_type'        => 'required|string|max:100',
+                'host_name'                => 'nullable|string|max:150',
+                'security_gate'            => 'nullable|string|max:100',
+                'entourage_count'          => 'required|integer|min:1|max:100',
+                'visit_purpose'            => 'required|string|max:150',
+                'detailed_purpose_remarks' => 'nullable|string|max:1000',
+                'id_proof_type'            => 'nullable|string|max:100',
+                'id_proof_number'          => 'nullable|string|max:100',
+                'vehicle_number'           => 'nullable|string|max:50',
+                'security_notes'           => 'nullable|string|max:1000',
+                'cv'                       => 'nullable|file|mimes:pdf|max:10240',
+                'photo'                    => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+                'webcam_photo'             => 'nullable|string',
+            ]);
+
+            $fullName = $validated['full_name'];
+            $visitorType = $validated['visitor_type'];
+            $visitPurpose = $validated['visit_purpose'];
+            $whomToMeet = $validated['whom_to_meet_type'];
+            $streetAddress = $validated['street_address'] ?? null;
+            $entourageCount = $validated['entourage_count'];
+            $remarks = $validated['detailed_purpose_remarks'] ?? null;
+            $dob = $validated['dob'] ?? null;
+            $gender = $validated['gender'] ?? null;
+            $categoryMeta = [];
+        }
+
+        // Process ID proof document upload
+        $idProofPath = null;
+        $idProofOriginalName = null;
+        if ($request->hasFile('id_proof')) {
+            $idFile = $request->file('id_proof');
+            $idFilename = 'visitor_id_' . uniqid() . '.' . $idFile->getClientOriginalExtension();
+            $idProofPath = $idFile->storeAs("visitors/{$schoolId}", $idFilename, 'public');
+            $idProofOriginalName = $idFile->getClientOriginalName();
+            $categoryMeta['id_proof_path'] = $idProofPath;
+            $categoryMeta['id_proof_name'] = $idProofOriginalName;
+        }
+
+        // Process CV document upload if uploaded (strictly PDF)
+        $cvPath = null;
+        $cvOriginalName = null;
+        if ($request->hasFile('cv')) {
+            $cvFile = $request->file('cv');
+            $cvFilename = 'cv_' . uniqid() . '.' . $cvFile->getClientOriginalExtension();
+            $cvPath = $cvFile->storeAs("visitors/{$schoolId}/cvs", $cvFilename, 'public');
+            $cvOriginalName = $cvFile->getClientOriginalName();
+            $categoryMeta['cv_path'] = $cvPath;
+            $categoryMeta['cv_name'] = $cvOriginalName;
+        }
+
+        // Process photo / webcam
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $file = $request->file('photo');
@@ -1404,46 +1701,58 @@ class FrontDeskController extends Controller
             $schoolLogo = str_starts_with($school->logo, 'http') ? $school->logo : asset('storage/' . ltrim($school->logo, '/'));
         }
 
-        $metaData = [
+        $metaData = array_merge([
             'school_name'        => $school->name ?? 'School ERP',
             'school_code'        => $school->code ? strtoupper($school->code) : 'EDUZEN',
             'school_phone'       => $school->phone ?? '',
             'school_address'     => $school->address ?? '',
             'school_logo'        => $schoolLogo,
             'registered_by_name' => 'Self Registration (QR Scan)',
-        ];
+        ], $categoryMeta);
 
-        $visitor = Visitor::create([
+        $mobileNumber = $validated['mobile_number'] ?? ($request->input('mobile_number') ?: 'N/A');
+        $email = $validated['email'] ?? $request->input('email');
+        if (empty($email)) {
+            $email = 'visitor-' . strtolower($passNumber) . '@visitor.local';
+        }
+
+        $visitorPayload = [
             'school_id'                => $schoolId,
             'academic_session_id'      => null,
             'registered_by'            => null,
             'pass_number'              => $passNumber,
-            'visitor_type'             => $validated['visitor_type'],
-            'full_name'                => $validated['full_name'],
-            'gender'                   => $validated['gender'] ?? null,
-            'dob'                      => $validated['dob'] ?? null,
-            'mobile_number'            => $validated['mobile_number'],
+            'visitor_type'             => $visitorType,
+            'full_name'                => $fullName,
+            'gender'                   => $gender,
+            'dob'                      => $dob,
+            'mobile_number'            => $mobileNumber,
             'alternate_mobile'         => $validated['alternate_mobile'] ?? null,
-            'email'                    => $validated['email'],
-            'street_address'           => $validated['street_address'] ?? null,
+            'email'                    => $email,
+            'street_address'           => $streetAddress,
             'state'                    => $validated['state'] ?? null,
             'city'                     => $validated['city'] ?? null,
             'pincode'                  => $validated['pincode'] ?? null,
-            'whom_to_meet_type'        => $validated['whom_to_meet_type'],
+            'whom_to_meet_type'        => $whomToMeet,
             'host_name'                => $validated['host_name'] ?? null,
             'security_gate'            => $validated['security_gate'] ?? 'Main Gate 1',
-            'entourage_count'          => $validated['entourage_count'] ?? 1,
-            'visit_purpose'            => $validated['visit_purpose'],
-            'detailed_purpose_remarks' => $validated['detailed_purpose_remarks'] ?? null,
-            'id_proof_type'            => $validated['id_proof_type'] ?? null,
-            'id_proof_number'          => $validated['id_proof_number'] ?? null,
+            'entourage_count'          => $entourageCount,
+            'visit_purpose'            => $visitPurpose,
+            'detailed_purpose_remarks' => $remarks,
+            'id_proof_type'            => $idProofPath ? 'Uploaded Document' : ($validated['id_proof_type'] ?? null),
+            'id_proof_number'          => $idProofOriginalName ?? ($validated['id_proof_number'] ?? null),
             'vehicle_number'           => $validated['vehicle_number'] ?? null,
             'photo_path'               => $photoPath,
             'security_notes'           => $validated['security_notes'] ?? null,
             'status'                   => 'pending',
             'is_self_registered'       => true,
             'meta_data'                => $metaData,
-        ]);
+        ];
+
+        if ($cvPath && Schema::hasColumn('visitors', 'cv_path')) {
+            $visitorPayload['cv_path'] = $cvPath;
+        }
+
+        $visitor = Visitor::create($visitorPayload);
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([

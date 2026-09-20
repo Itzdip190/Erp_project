@@ -60,6 +60,12 @@
                     <td>{{ $schoolRequest->address }}</td>
                 </tr>
                 <tr>
+                    <th>State</th>
+                    <td>
+                        <strong>{{ $schoolRequest->state ? (\App\Models\School::getStatesList()[$schoolRequest->state] ?? $schoolRequest->state) . ' (' . $schoolRequest->state . ')' : 'N/A' }}</strong>
+                    </td>
+                </tr>
+                <tr>
                     <th>Request Code</th>
                     <td><code>{{ $schoolRequest->code }}</code></td>
                 </tr>

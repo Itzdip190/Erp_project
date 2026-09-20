@@ -116,13 +116,26 @@
             word-wrap: break-word;
         }
         .break-cell {
-            background-color: #f1f5f9;
+            background-color: #f8fafc;
             text-align: center;
-            color: #64748b;
-            font-weight: 700;
-            font-size: 9px;
+            color: #475569;
+            font-weight: 800;
+            font-size: 10px;
             vertical-align: middle;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            padding: 6px 4px;
+        }
+        .break-badge {
+            display: inline-block;
+            padding: 3px 14px;
+            background-color: #e2e8f0;
+            color: #334155;
+            border-radius: 9999px;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            border: 1px solid #cbd5e1;
         }
         .pdf-footer {
             margin-top: 6px;
@@ -164,7 +177,7 @@
                 @foreach($periods as $period)
                     @php
                         $pNameLower = strtolower($period->period_name);
-                        $isBreak = str_contains($pNameLower, 'break') || str_contains($pNameLower, 'interval');
+                        $isBreak = str_contains($pNameLower, 'break') || str_contains($pNameLower, 'interval') || str_contains($pNameLower, 'recess') || str_contains($pNameLower, 'lunch') || str_contains($pNameLower, 'tiffin');
                     @endphp
                     <tr>
                         <td class="period-td">
@@ -174,37 +187,74 @@
                             </div>
                         </td>
 
-                        @foreach($days as $day)
-                            @php
-                                $isActive = is_array($group->applicable_days) && in_array($day, $group->applicable_days);
-                                $cell = $gridData[$period->id][$day] ?? null;
-                            @endphp
-
-                            @if($isBreak)
-                                <td class="break-cell">RECESS / BREAK</td>
-                            @elseif($cell && $cell->subject)
+                        @if($isBreak)
+                            <td colspan="{{ count($days) }}" class="break-cell">
+                                <span class="break-badge">{{ strtoupper($period->period_name) }}</span>
+                            </td>
+                        @else
+                            @foreach($days as $day)
                                 @php
-                                    $colorHex = $cell->subject->effective_color ?? $cell->subject->color ?? '#3B82F6';
-                                    $cStyle = \App\Http\Controllers\School\ClassTimetableController::getSubjectColorStyles($colorHex);
+                                    $isActive = is_array($group->applicable_days) && in_array($day, $group->applicable_days);
+                                    $cell = $gridData[$period->id][$day] ?? null;
                                 @endphp
-                                <td style="background-color: {{ $cStyle['bg'] }}; padding: 2px;">
-                                    <div class="subject-card-box" style="border-left-color: {{ $cStyle['border'] }}; background-color: {{ $cStyle['bg'] }};">
-                                        <div class="card-subject-name" style="color: {{ $cStyle['text'] }};">
-                                            {{ $cell->subject->name }}
-                                        </div>
-                                        @if($cell->teacher)
-                                            <div class="card-teacher-name" style="color: {{ $cStyle['text'] }};">
-                                                {{ $cell->teacher->full_name }}
+
+                                @php
+                                    $primSub = $cell ? ($cell->subject ?? ($cell->subject_id ? \App\Models\Subject::withoutGlobalScopes()->find($cell->subject_id) : null)) : null;
+                                    $primTeacher = $cell ? ($cell->teacher ?? ($cell->teacher_id ? \App\Models\Staff::withoutGlobalScopes()->find($cell->teacher_id) : null)) : null;
+
+                                    $secSub = $cell ? ($cell->secondarySubject ?? ($cell->secondary_subject_id ? \App\Models\Subject::withoutGlobalScopes()->find($cell->secondary_subject_id) : null)) : null;
+                                    $secTeacher = $cell ? ($cell->secondaryTeacher ?? ($cell->secondary_teacher_id ? \App\Models\Staff::withoutGlobalScopes()->find($cell->secondary_teacher_id) : null)) : null;
+
+                                    $hasSec = $cell && !empty($cell->secondary_subject_id);
+                                    $hasPrim = $cell && !empty($cell->subject_id);
+
+                                    $primSubName = $primSub ? $primSub->name : ($cell && $cell->subject_id ? ('Subject #' . $cell->subject_id) : '');
+                                    $secSubName = $secSub ? $secSub->name : ($cell && $cell->secondary_subject_id ? ('Subject #' . $cell->secondary_subject_id) : '');
+                                @endphp
+
+                                @if($hasPrim || $hasSec)
+                                    <td style="background-color: #ffffff; padding: 2px; vertical-align: top;">
+                                        @if($hasPrim)
+                                            @php
+                                                $colorHex1 = $primSub ? ($primSub->effective_color ?? $primSub->color ?? '#3B82F6') : '#3B82F6';
+                                                $cStyle1 = \App\Http\Controllers\School\ClassTimetableController::getSubjectColorStyles($colorHex1);
+                                            @endphp
+                                            <div class="subject-card-box" style="border-left-color: {{ $cStyle1['border'] }}; background-color: {{ $cStyle1['bg'] }}; margin-bottom: {{ $hasSec ? '2px' : '0' }};">
+                                                <div class="card-subject-name" style="color: {{ $cStyle1['text'] }};">
+                                                    {{ $primSubName }}
+                                                </div>
+                                                @if($primTeacher)
+                                                    <div class="card-teacher-name" style="color: {{ $cStyle1['text'] }};">
+                                                        {{ $primTeacher->full_name }}
+                                                    </div>
+                                                @endif
                                             </div>
                                         @endif
-                                    </div>
-                                </td>
-                            @elseif($isActive)
-                                <td style="background-color: #ffffff;"></td>
-                            @else
-                                <td style="background-color: #f8fafc;"></td>
-                            @endif
-                        @endforeach
+
+                                        @if($hasSec)
+                                            @php
+                                                $colorHex2 = $secSub ? ($secSub->effective_color ?? $secSub->color ?? '#10B981') : '#10B981';
+                                                $cStyle2 = \App\Http\Controllers\School\ClassTimetableController::getSubjectColorStyles($colorHex2);
+                                            @endphp
+                                            <div class="subject-card-box" style="border-left-color: {{ $cStyle2['border'] }}; background-color: {{ $cStyle2['bg'] }};">
+                                                <div class="card-subject-name" style="color: {{ $cStyle2['text'] }};">
+                                                    {{ $secSubName }}
+                                                </div>
+                                                @if($secTeacher)
+                                                    <div class="card-teacher-name" style="color: {{ $cStyle2['text'] }};">
+                                                        {{ $secTeacher->full_name }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </td>
+                                @elseif($isActive)
+                                    <td style="background-color: #ffffff;"></td>
+                                @else
+                                    <td style="background-color: #f8fafc;"></td>
+                                @endif
+                            @endforeach
+                        @endif
                     </tr>
                 @endforeach
             </tbody>

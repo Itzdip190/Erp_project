@@ -60,6 +60,14 @@ class Visitor extends Model
         'entourage_count' => 'integer',
     ];
 
+    protected $appends = [
+        'photo_url',
+        'cv_url',
+        'cv_name',
+        'id_proof_url',
+        'has_document',
+    ];
+
     /**
      * Scope for pending visitor self-registration requests.
      */
@@ -118,6 +126,66 @@ class Visitor extends Model
             return asset('storage/' . ltrim($this->photo_path, '/'));
         }
         return null;
+    }
+
+    /**
+     * Get CV storage path from database column or meta_data fallback.
+     */
+    public function getCvPathAttribute(): ?string
+    {
+        return $this->attributes['cv_path'] ?? ($this->meta_data['cv_path'] ?? null);
+    }
+
+    /**
+     * Get CV document URL (from cv_path column or meta_data->cv_path).
+     */
+    public function getCvUrlAttribute(): ?string
+    {
+        $path = $this->cv_path;
+        if ($path) {
+            if (str_starts_with($path, 'http')) {
+                return $path;
+            }
+            if (Storage::disk('public')->exists($path)) {
+                return Storage::disk('public')->url($path);
+            }
+            return asset('storage/' . ltrim($path, '/'));
+        }
+        return null;
+    }
+
+    /**
+     * Get CV original filename.
+     */
+    public function getCvNameAttribute(): ?string
+    {
+        return $this->meta_data['cv_name'] ?? 'Interview_Candidate_CV.pdf';
+    }
+
+    /**
+     * Get ID Proof document URL.
+     */
+    public function getIdProofUrlAttribute(): ?string
+    {
+        $path = $this->meta_data['id_proof_path'] ?? null;
+        if ($path) {
+            if (str_starts_with($path, 'http')) {
+                return $path;
+            }
+            if (Storage::disk('public')->exists($path)) {
+                return Storage::disk('public')->url($path);
+            }
+            return asset('storage/' . ltrim($path, '/'));
+        }
+        return null;
+    }
+
+    /**
+     * Check if visitor has any attached document (CV or ID Proof).
+     */
+    public function getHasDocumentAttribute(): bool
+    {
+        return !empty($this->cv_url) || !empty($this->id_proof_url);
     }
 
     /**

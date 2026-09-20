@@ -21,7 +21,7 @@
     </div>
 
     <!-- Academic Session Bounds Display -->
-    <div class="ib-session-info">
+    <div class="ib-session-info" style="display: none;">
         <div class="ib-info-title">Academic Session Bound</div>
         <div class="ib-info-dates">
             <i class="fas fa-calendar-alt"></i> 
@@ -41,7 +41,7 @@
                 <label class="ib-label">Late Fine Rule</label>
                 <select name="fine_id" id="ibFineId" class="ib-select">
                     <option value="">None (No auto-fine)</option>
-                    @foreach($fines as $fine)
+                    @foreach($fines ?? [] as $fine)
                         <option value="{{ $fine->id }}">{{ $fine->name }} (₹{{ $fine->fine_amount }} - {{ $fine->fine_type }})</option>
                     @endforeach
                 </select>

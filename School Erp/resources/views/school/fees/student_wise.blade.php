@@ -1289,7 +1289,7 @@ body.dark-mode #feeComponentSectionContainer {
     @endif
     <div style="font-size:.85rem;font-weight:700;color:var(--sw-dark);">{{ $viewStudent->full_name }}</div>
 
-    <div class="sw-topbar-session">
+    <div class="sw-topbar-session" style="display:none;">
         <i class="fas fa-calendar-alt" style="color:var(--sw-blue2);"></i>
         Academic Year:
         <select onchange="location.href='{{ route('school.fees.student-wise') }}?view_student={{ $viewStudent->id }}&academic_session_id='+this.value">
@@ -1342,7 +1342,7 @@ body.dark-mode #feeComponentSectionContainer {
             </div>
         </div>
         <div class="sw-info-col">
-            <div class="sw-info-row">
+            <div class="sw-info-row" style="display:none;">
                 <span class="sw-info-label">Academic Year</span>
                 <span class="sw-info-value" style="text-transform:uppercase;">{{ strtoupper($selectedSession->name ?? 'APR 2025 - MAR 2026') }}</span>
             </div>
@@ -3201,7 +3201,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <form method="GET" action="{{ route('school.fees.student-wise') }}" id="filterForm">
 <div class="sw-filters">
     {{-- Academic Year --}}
-    <div class="sw-filter-group">
+    <div class="sw-filter-group" style="display:none;">
         <label><i class="fas fa-calendar"></i> Academic Year</label>
         <select name="academic_session_id" onchange="document.getElementById('filterForm').submit()">
             @foreach($academicSessions as $sess)

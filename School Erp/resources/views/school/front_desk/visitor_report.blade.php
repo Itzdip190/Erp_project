@@ -421,9 +421,15 @@
         font-weight: 700;
     }
 
+    .col-document {
+        min-width: 130px;
+        text-align: center;
+        white-space: nowrap;
+    }
+
     /* Actions Column Buttons */
     .col-action {
-        min-width: 150px;
+        min-width: 180px;
         text-align: center;
         white-space: nowrap;
     }
@@ -432,6 +438,34 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
+    }
+
+    /* Direct CV Action Button */
+    .btn-action-cv {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+        border-radius: 5px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.15s ease;
+    }
+
+    .btn-action-cv:hover {
+        background: #dc2626;
+        border-color: #dc2626;
+        color: #ffffff;
+        transform: translateY(-1px);
+    }
+
+    .btn-action-cv:hover i {
+        color: #ffffff !important;
     }
 
     /* Edit Button (Pencil Icon) */
@@ -1062,6 +1096,7 @@
                         <th class="col-city">CITY</th>
                         <th class="col-address">ADDRESS</th>
                         <th class="col-pincode">PINCODE</th>
+                        <th class="col-document text-center">DOCUMENT</th>
                         <th class="col-action text-center">ACTION</th>
                     </tr>
                 </thead>
@@ -1097,6 +1132,10 @@
                                 'photo_url'                => $visitor->photo_url,
                                 'security_notes'           => $visitor->security_notes,
                                 'status'                   => $visitor->status,
+                                'cv_url'                   => $visitor->cv_url,
+                                'cv_name'                  => $visitor->cv_name,
+                                'id_proof_url'             => $visitor->id_proof_url,
+                                'has_document'             => $visitor->has_document,
                                 'print_url'                => route('school.front-desk.visitor.print', $visitor->id),
                             ];
                         @endphp
@@ -1106,7 +1145,14 @@
 
                             <!-- VISITOR NAME -->
                             <td class="col-name" id="v-name-{{ $visitor->id }}">
-                                {{ $visitor->full_name }}
+                                <div style="font-weight: 800; color: #0f172a;">{{ $visitor->full_name }}</div>
+                                @if($visitor->cv_url || str_contains(strtolower($visitor->visit_purpose ?? ''), 'interview'))
+                                    <div style="margin-top: 3px;">
+                                        <span class="badge" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                                            <i class="fas fa-briefcase"></i> Interview
+                                        </span>
+                                    </div>
+                                @endif
                             </td>
 
                             <!-- GENDER -->
@@ -1149,9 +1195,38 @@
                                 {{ $visitor->pincode ?: '---' }}
                             </td>
 
+                            <!-- DOCUMENT -->
+                            <td class="col-document text-center" id="v-doc-{{ $visitor->id }}">
+                                @if($visitor->cv_url)
+                                    <a href="{{ $visitor->cv_url }}" target="_blank" download class="badge bg-danger text-white text-decoration-none px-2 py-1 d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 11px; font-weight: 700; border-radius: 6px;" title="Download Candidate CV (PDF)">
+                                        <i class="fas fa-file-pdf"></i> CV (PDF)
+                                    </a>
+                                @elseif($visitor->id_proof_url)
+                                    <a href="{{ $visitor->id_proof_url }}" target="_blank" class="badge bg-primary text-white text-decoration-none px-2 py-1 d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 11px; font-weight: 700; border-radius: 6px;" title="View Attached ID Proof Document">
+                                        <i class="fas fa-file-lines"></i> ID Proof
+                                    </a>
+                                @else
+                                    <span class="badge bg-light text-muted border px-2 py-1" style="font-size: 10.5px;">No Doc</span>
+                                @endif
+                            </td>
+
                             <!-- ACTION -->
                             <td class="col-action text-center">
                                 <div class="action-btn-group">
+                                    <!-- CV Direct Download (PDF) -->
+                                    <span id="v-action-cv-{{ $visitor->id }}">
+                                        @if($visitor->cv_url)
+                                            <a href="{{ $visitor->cv_url }}" 
+                                               target="_blank" 
+                                               download 
+                                               class="btn-action-cv" 
+                                               title="Download Candidate CV (PDF)">
+                                                <i class="fas fa-file-pdf"></i>
+                                                <span>CV</span>
+                                            </a>
+                                        @endif
+                                    </span>
+
                                     <!-- Edit Button (Opens Side Slider Drawer) -->
                                     <button type="button" 
                                             class="btn-action-edit" 
@@ -1183,7 +1258,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="11">
+                            <td colspan="12">
                                 <div style="text-align: center; padding: 50px 20px;">
                                     <div style="width: 60px; height: 60px; border-radius: 50%; background: #eff6ff; color: #0038b8; display: inline-flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 12px; border: 1.5px solid #bfdbfe;">
                                         <i class="fas fa-users-slash"></i>
@@ -1454,6 +1529,38 @@
                 </div>
             </div>
 
+            <!-- Section 5: Attached Documents / Candidate CV (For Future Reference) -->
+            <div class="slider-section-card">
+                <div class="slider-section-heading">
+                    <i class="fas fa-file-invoice"></i>
+                    <span>5. Attached Documents & Candidate CV</span>
+                </div>
+                
+                <!-- Current Attached Document Preview -->
+                <div id="sliderCurrentDocBox" style="display: none; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 12px 16px; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-file-pdf text-danger" style="font-size: 24px;"></i>
+                            <div>
+                                <div class="fw-bold text-dark" id="sliderDocTitle" style="font-size: 13px;">Candidate CV (PDF)</div>
+                                <div class="text-muted" style="font-size: 11px;">Attached document for future reference</div>
+                            </div>
+                        </div>
+                        <a href="#" id="sliderDocDownloadLink" target="_blank" download class="btn btn-sm btn-primary fw-bold px-3" style="border-radius: 6px; font-size: 12px; background: #0038b8; border-color: #0038b8; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-download"></i> Download Document
+                        </a>
+                    </div>
+                </div>
+
+                <div class="form-group-item">
+                    <label for="edit_slider_cv">Upload / Replace Document or CV (PDF Only)</label>
+                    <input type="file" id="edit_slider_cv" name="cv" accept=".pdf,application/pdf" style="padding: 6px 8px; font-size: 12px;">
+                    <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                        Attach candidate CV or verification document (.pdf up to 10MB) for future reference. Leaving blank preserves current document.
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <!-- Drawer Sticky Footer Bar -->
@@ -1562,6 +1669,22 @@ function populateDrawerFields(v) {
         previewImg.src = `https://ui-avatars.com/api/?name=${fallbackName}&background=0038b8&color=fff&size=128&bold=true`;
     }
 
+    // Document / CV Attachment Handling
+    const docBox = document.getElementById('sliderCurrentDocBox');
+    const docLink = document.getElementById('sliderDocDownloadLink');
+    const docTitle = document.getElementById('sliderDocTitle');
+    const docInput = document.getElementById('edit_slider_cv');
+    if (docInput) docInput.value = '';
+
+    const docUrl = v.cv_url || v.id_proof_url || (v.meta_data && (v.meta_data.cv_url || v.meta_data.id_proof_url));
+    if (docUrl && docBox) {
+        docLink.href = docUrl;
+        docTitle.textContent = v.cv_url ? (v.cv_name || 'Candidate CV (PDF)') : 'Govt ID Proof Document';
+        docBox.style.display = 'block';
+    } else if (docBox) {
+        docBox.style.display = 'none';
+    }
+
     // Set up pass print direct button
     const printBtn = document.getElementById('btnSliderPrintCard');
     if (v.print_url) {
@@ -1583,6 +1706,8 @@ function openEditVisitorDrawer(visitorId, triggerEl = null) {
     // Reset file input
     const fileInput = document.getElementById('edit_slider_photo');
     if (fileInput) fileInput.value = '';
+    const cvFileInput = document.getElementById('edit_slider_cv');
+    if (cvFileInput) cvFileInput.value = '';
 
     // Open Slider with Smooth Animation
     backdrop.classList.add('active');
@@ -1708,6 +1833,49 @@ document.getElementById('editVisitorSliderForm').addEventListener('submit', func
                     document.getElementById(`v-pincode-${v.id}`).innerText = v.pincode || '---';
                 }
 
+                // Update Name & Candidate badge in row
+                const nameCell = document.getElementById(`v-name-${v.id}`);
+                if (nameCell) {
+                    let badgeHtml = '';
+                    const isInterview = (v.cv_url || (v.visit_purpose && v.visit_purpose.toLowerCase().includes('interview')));
+                    if (isInterview) {
+                        badgeHtml = `<div style="margin-top: 3px;"><span class="badge" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;"><i class="fas fa-briefcase"></i> Interview</span></div>`;
+                    }
+                    nameCell.innerHTML = `<div style="font-weight: 800; color: #0f172a;">${v.full_name}</div>${badgeHtml}`;
+                }
+
+                // Update Document column in row
+                const docCell = document.getElementById(`v-doc-${v.id}`);
+                if (docCell) {
+                    if (v.cv_url) {
+                        docCell.innerHTML = `
+                            <a href="${v.cv_url}" target="_blank" download class="badge bg-danger text-white text-decoration-none px-2 py-1 d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 11px; font-weight: 700; border-radius: 6px;" title="Download Candidate CV (PDF)">
+                                <i class="fas fa-file-pdf"></i> CV (PDF)
+                            </a>`;
+                    } else if (v.id_proof_url) {
+                        docCell.innerHTML = `
+                            <a href="${v.id_proof_url}" target="_blank" class="badge bg-primary text-white text-decoration-none px-2 py-1 d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 11px; font-weight: 700; border-radius: 6px;" title="View Attached ID Proof Document">
+                                <i class="fas fa-file-lines"></i> ID Proof
+                            </a>`;
+                    } else {
+                        docCell.innerHTML = `<span class="badge bg-light text-muted border px-2 py-1" style="font-size: 10.5px;">No Doc</span>`;
+                    }
+                }
+
+                // Update direct CV button in action column
+                const cvActionCell = document.getElementById(`v-action-cv-${v.id}`);
+                if (cvActionCell) {
+                    if (v.cv_url) {
+                        cvActionCell.innerHTML = `
+                            <a href="${v.cv_url}" target="_blank" download class="btn-action-cv" title="Download Candidate CV (PDF)">
+                                <i class="fas fa-file-pdf"></i>
+                                <span>CV</span>
+                            </a>`;
+                    } else {
+                        cvActionCell.innerHTML = '';
+                    }
+                }
+
                 // Update cached data-visitor attribute on row's edit button
                 const rowEditBtn = document.querySelector(`#visitor-row-${v.id} .btn-action-edit`);
                 if (rowEditBtn) {
@@ -1806,7 +1974,7 @@ function exportVisitorTableToCSV(filename) {
         var row = [], cols = rows[i].querySelectorAll("td, th");
         if (cols.length === 1 && cols[0].getAttribute("colspan")) continue;
 
-        var colLimit = cols.length === 11 ? 10 : cols.length;
+        var colLimit = (cols.length >= 12) ? 11 : cols.length;
         for (var j = 0; j < colLimit; j++) {
             var data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, " ").trim();
             data = data.replace(/"/g, '""');

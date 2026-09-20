@@ -38,9 +38,115 @@
     @media (max-width: 768px) {
         .stats-container {
             grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .stats-container .stat-card:last-child {
+            grid-column: span 2;
+        }
+        .stat-card-left {
+            min-width: 40px;
+            font-size: 16px;
+        }
+        .stat-card-right {
+            padding: 10px 12px;
+        }
+        .stat-card-count {
+            font-size: 20px;
+        }
+        .stat-card-label {
+            font-size: 10px;
         }
     }
     
+    /* Filter Section Responsive Layout */
+    .filter-grid-main {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 12px;
+        align-items: end;
+    }
+    
+    .grid-item-class { grid-column: span 1; }
+    .grid-item-section { grid-column: span 1; }
+    .grid-item-search { grid-column: span 2; }
+    .grid-item-status { grid-column: span 1; }
+    .grid-item-logs { grid-column: span 1; }
+    
+    @media (max-width: 992px) {
+        .filter-grid-main {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .grid-item-class { grid-column: span 1; }
+        .grid-item-section { grid-column: span 1; }
+        .grid-item-search { grid-column: span 2; }
+        .grid-item-status { grid-column: span 1; }
+        .grid-item-logs { grid-column: span 1; display: flex; align-items: flex-end; }
+    }
+    
+    @media (max-width: 640px) {
+        .filter-card {
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .filter-dates-group {
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+        .filter-field-item {
+            width: 100%;
+            min-width: 100% !important;
+        }
+        .filter-actions-group {
+            width: 100%;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        .filter-action-btn {
+            flex: 1 1 calc(50% - 25px);
+        }
+        .filter-grid-main {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .grid-item-class { grid-column: span 1; }
+        .grid-item-section { grid-column: span 1; }
+        .grid-item-search { grid-column: span 2; }
+        .grid-item-status { grid-column: span 2; }
+        .grid-item-logs { grid-column: span 2; margin-top: 4px; }
+        
+        #attendanceTableContainer {
+            padding: 12px 6px !important;
+        }
+        #form-buttons-container {
+            padding: 12px 16px !important;
+            flex-direction: column-reverse;
+            gap: 10px;
+        }
+        #btn-mark-attendance, #btn-cancel-edit, #btn-save-attendance {
+            width: 100% !important;
+            margin-right: 0 !important;
+            text-align: center;
+            justify-content: center;
+        }
+    }
+    
+    @media (max-width: 420px) {
+        .filter-grid-main {
+            grid-template-columns: 1fr;
+        }
+        .grid-item-class, .grid-item-section, .grid-item-search, .grid-item-status, .grid-item-logs {
+            grid-column: span 1;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .excel-slider-drawer {
+            width: 100%;
+            right: -100%;
+        }
+    }
+
     .stat-card {
         display: flex;
         border-radius: 8px;
@@ -100,11 +206,11 @@
     .stat-leave { background-color: #d97706; }
     .stat-leave .stat-card-left { background-color: #9a3412; }
     
-    .stat-duty-leave { background-color: #ec4899; }
-    .stat-duty-leave .stat-card-left { background-color: #be185d; }
-    
     .stat-not-marked { background-color: #9ca3af; }
     .stat-not-marked .stat-card-left { background-color: #4b5563; }
+    
+    .stat-holiday { background-color: #6b7280; }
+    .stat-holiday .stat-card-left { background-color: #4b5563; }
     
     /* Edit mode toggle rules */
     .in-edit-mode .view-only-block { display: none !important; }
@@ -115,14 +221,14 @@
     
     /* Styling elements */
     .btn-outline-gold {
-        border: 1px solid #b45309;
-        color: #b45309;
+        border: 1px solid #1d4ed8;
+        color: #1d4ed8;
         background: transparent;
         font-weight: 700;
         transition: all 0.2s;
     }
     .btn-outline-gold:hover {
-        background: rgba(180, 83, 9, 0.05);
+        background: rgba(29, 78, 216, 0.05);
     }
 
     /* ── Student Daily Attendance Dark Mode Overrides ── */
@@ -131,6 +237,13 @@
     }
     body.dark-mode .page-hdr p {
         color: #cbd5e1 !important;
+    }
+    body.dark-mode .btn-outline-gold {
+        border-color: #60a5fa !important;
+        color: #60a5fa !important;
+    }
+    body.dark-mode .btn-outline-gold:hover {
+        background: rgba(96, 165, 250, 0.15) !important;
     }
     body.dark-mode .filter-card {
         background-color: #111827 !important;
@@ -410,24 +523,37 @@
     </div>
 @endif
 
+@if(isset($isOnlySubjectTeacher) && $isOnlySubjectTeacher)
+    <div class="alert alert-warning" style="margin-bottom:20px; padding:16px 20px; border-radius:10px; background:#fffbeb; border:1px solid #fde68a; color:#92400e; font-size:13.5px; font-weight:600; display:flex; align-items:center; gap:12px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+        <i class="fas fa-exclamation-triangle" style="font-size:22px; color:#d97706; flex-shrink:0;"></i>
+        <div>
+            <div><strong>Attendance Marking Restricted:</strong> You are currently assigned as a Subject Teacher. Attendance can only be added or marked by the designated Class Teacher.</div>
+            <div style="margin-top:4px; font-size:12.5px; font-weight:500; color:#b45309;">You can view and manage students of your assigned classes in the <a href="{{ route('school.students.index') }}" style="color:#b45309; text-decoration:underline; font-weight:700;">Student Directory</a>.</div>
+        </div>
+    </div>
+@endif
+
 <!-- Filter Section -->
 <div class="filter-card">
     <!-- Row 1: Academic Session, Date, Export Actions -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px; flex-wrap: wrap; gap: 16px;">
-        <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-            <div class="form-group" style="margin-bottom: 0; min-width: 220px;">
+    <div class="filter-row-top" style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px; flex-wrap: wrap; gap: 16px;">
+        <div class="filter-dates-group" style="display: flex; gap: 16px; flex-wrap: wrap; flex: 1 1 300px;">
+            <div class="form-group filter-field-item" style="margin-bottom: 0; min-width: 200px; flex: 1; display:none;">
                 <label class="form-label" style="font-weight: 700; font-size: 12px; color: var(--t2); margin-bottom: 6px;">Academic Year *</label>
                 <div style="position: relative;">
                     <i class="far fa-calendar-alt" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--t3);"></i>
                     <select id="academic_session_id" class="form-control" style="padding-left: 36px; height: 42px; border-radius: 8px; font-size: 13.5px; color: var(--t1); border: 1px solid #cbd5e1;" required>
+                        @php
+                            $activeSessId = isset($currentSession) && $currentSession ? $currentSession->id : ($academicSessions->firstWhere('is_current', true)?->id ?? $academicSessions->first()?->id);
+                        @endphp
                         @foreach($academicSessions as $ses)
-                            <option value="{{ $ses->id }}" {{ $ses->is_current ? 'selected' : '' }}>{{ $ses->name }}</option>
+                            <option value="{{ $ses->id }}" {{ $ses->id == $activeSessId ? 'selected' : '' }}>{{ $ses->name }}</option>
                         @endforeach
                     </select>
                 </div>
             </div>
             
-            <div class="form-group" style="margin-bottom: 0; min-width: 220px;">
+            <div class="form-group filter-field-item" style="margin-bottom: 0; min-width: 200px; flex: 1;">
                 <label class="form-label" style="font-weight: 700; font-size: 12px; color: var(--t2); margin-bottom: 6px;">Pick Date</label>
                 <div style="position: relative;">
                     <i class="far fa-calendar" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--t3); pointer-events: none;"></i>
@@ -436,25 +562,25 @@
             </div>
         </div>
         
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <button type="button" id="btn-view-excel-slider" class="btn btn-outline-gold" style="height: 42px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 12px; padding: 0 16px;">
-                <i class="far fa-file-excel"></i> VIEW EXCEL
+        <div class="filter-actions-group" style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" id="btn-view-excel-slider" class="btn btn-outline-gold filter-action-btn" style="height: 42px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 12px; padding: 0 16px;">
+                <i class="far fa-file-excel"></i> <span>VIEW EXCEL</span>
             </button>
-            <button type="button" id="btn-download-register" class="btn btn-outline-gold" style="height: 42px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 12px; padding: 0 16px;">
-                <i class="fas fa-download"></i> DOWNLOAD
+            <button type="button" id="btn-download-register" class="btn btn-outline-gold filter-action-btn" style="height: 42px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 12px; padding: 0 16px;">
+                <i class="fas fa-download"></i> <span>DOWNLOAD</span>
             </button>
-            <button type="button" class="btn-icon" style="height: 42px; width: 42px; border-radius: 8px; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #64748b; font-size: 14px;">
+            <button type="button" class="btn-icon" style="height: 42px; width: 42px; min-width: 42px; border-radius: 8px; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #64748b; font-size: 14px;">
                 <i class="far fa-comment-alt"></i>
             </button>
-            <button type="button" class="btn-icon" style="height: 42px; width: 42px; border-radius: 8px; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #64748b; font-size: 14px;">
+            <button type="button" class="btn-icon" style="height: 42px; width: 42px; min-width: 42px; border-radius: 8px; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #64748b; font-size: 14px;">
                 <i class="fas fa-cog"></i>
             </button>
         </div>
     </div>
     
     <!-- Row 2: Select Class, Section, Search, Status filter -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; align-items: end;">
-        <div class="form-group" style="margin-bottom: 0;">
+    <div class="filter-grid-main">
+        <div class="form-group grid-item-class" style="margin-bottom: 0;">
             <label class="form-label" style="font-weight: 700; font-size: 12px; color: var(--t2); margin-bottom: 6px;">Select Class</label>
             <div style="position: relative;">
                 <i class="fas fa-book" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--t3);"></i>
@@ -467,7 +593,7 @@
             </div>
         </div>
         
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="form-group grid-item-section" style="margin-bottom: 0;">
             <label class="form-label" style="font-weight: 700; font-size: 12px; color: var(--t2); margin-bottom: 6px;">Select Section</label>
             <div style="position: relative;">
                 <i class="fas fa-book" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--t3);"></i>
@@ -477,7 +603,7 @@
             </div>
         </div>
         
-        <div class="form-group" style="margin-bottom: 0; grid-column: span 2;">
+        <div class="form-group grid-item-search" style="margin-bottom: 0;">
             <label class="form-label" style="font-weight: 700; font-size: 12px; color: var(--t2); margin-bottom: 6px;">Search</label>
             <div style="position: relative;">
                 <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--t3);"></i>
@@ -485,7 +611,7 @@
             </div>
         </div>
         
-        <div class="form-group" style="margin-bottom: 0;">
+        <div class="form-group grid-item-status" style="margin-bottom: 0;">
             <label class="form-label" style="font-weight: 700; font-size: 12px; color: var(--t2); margin-bottom: 6px;">Select Status</label>
             <div style="position: relative;">
                 <i class="fas fa-folder" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--t3);"></i>
@@ -495,13 +621,12 @@
                     <option value="half_day">Half Day</option>
                     <option value="absent">Absent</option>
                     <option value="leave">Leave</option>
-                    <option value="duty_leave">Duty Leave</option>
                     <option value="not_marked">Not Marked</option>
                 </select>
             </div>
         </div>
         
-        <div>
+        <div class="grid-item-logs">
             <button type="button" id="show_logs_btn" class="btn" style="height: 42px; border-radius: 8px; border: 1px solid #b45309; color: #b45309; background: transparent; font-weight: 700; font-size: 12px; width: 100%;">
                 SHOW LOGS
             </button>
@@ -547,12 +672,12 @@
         </div>
     </div>
     
-    <!-- Duty Leave -->
-    <div class="stat-card stat-duty-leave">
-        <div class="stat-card-left"><i class="fas fa-check" style="font-size: 16px;"></i></div>
+    <!-- Holiday -->
+    <div class="stat-card stat-holiday">
+        <div class="stat-card-left"><i class="fas fa-calendar-check" style="font-size: 16px;"></i></div>
         <div class="stat-card-right">
-            <div class="stat-card-count" id="count-duty-leave">0</div>
-            <div class="stat-card-label">Duty Leave</div>
+            <div class="stat-card-count" id="count-holiday">0</div>
+            <div class="stat-card-label">Holiday</div>
         </div>
     </div>
     
@@ -716,7 +841,6 @@ function updateDateInputBoundaries() {
 // Initial boundaries setup
 updateDateInputBoundaries();
 
-// Initialize filters from URL query parameters (useful after save redirects)
 $(document).ready(function() {
     let urlParams = new URLSearchParams(window.location.search);
     let classId = urlParams.get('class_id');
@@ -734,9 +858,24 @@ $(document).ready(function() {
     if (classId) {
         $('#class_id').val(classId).trigger('change');
         if (sectionId) {
-            // Wait for section dropdown to populate on class change
+            $('#section_id').val(sectionId).trigger('change');
             setTimeout(function() {
-                $('#section_id').val(sectionId).trigger('change');
+                if ($('#section_id').val() != sectionId) {
+                    $('#section_id').val(sectionId).trigger('change');
+                }
+            }, 100);
+        }
+    } else {
+        // Auto-select first class & section if available for teacher
+        let availableClasses = $('#class_id option').filter(function() { return $(this).val() !== ''; });
+        if (availableClasses.length > 0) {
+            let firstClassId = availableClasses.first().val();
+            $('#class_id').val(firstClassId).trigger('change');
+            setTimeout(function() {
+                let availableSections = $('#section_id option').filter(function() { return $(this).val() !== ''; });
+                if (availableSections.length > 0) {
+                    $('#section_id').val(availableSections.first().val()).trigger('change');
+                }
             }, 150);
         }
     }
@@ -810,7 +949,7 @@ function exitEditMode() {
 
 // Set All status in header (toggle style)
 function setAllStatus(status) {
-    let className = `.status-btn.btn-${status === 'half_day' ? 'hd' : (status === 'duty_leave' ? 'dl' : status.charAt(0))} input`;
+    let className = `.status-btn.btn-${status === 'half_day' ? 'hd' : status.charAt(0)} input`;
     let radios = $(className);
     let allChecked = true;
     radios.each(function() {
@@ -839,7 +978,7 @@ function updateCounts() {
     let absent = 0;
     let halfday = 0;
     let leave = 0;
-    let duty_leave = 0;
+    let holiday = 0;
     let not_marked = 0;
 
     let isEditMode = $('#attendanceSaveForm').hasClass('in-edit-mode');
@@ -861,7 +1000,7 @@ function updateCounts() {
         else if (status === 'absent') absent++;
         else if (status === 'half_day') halfday++;
         else if (status === 'leave') leave++;
-        else if (status === 'duty_leave') duty_leave++;
+        else if (status === 'holiday') holiday++;
         else not_marked++;
     });
 
@@ -870,7 +1009,7 @@ function updateCounts() {
     $('#count-absent').text(absent);
     $('#count-halfday').text(halfday);
     $('#count-leave').text(leave);
-    $('#count-duty-leave').text(duty_leave);
+    $('#count-holiday').text(holiday);
     $('#count-not-marked').text(not_marked);
 }
 
@@ -898,9 +1037,10 @@ function filterTable() {
         let row = $(this);
         let name = row.find('.student-name').text().toLowerCase();
         let roll = row.find('.student-roll').text().toLowerCase();
+        let adm = (row.attr('data-admission') || '').toLowerCase();
         let status = row.attr('data-status') || 'not_marked';
         
-        let matchesSearch = name.includes(searchText) || roll.includes(searchText);
+        let matchesSearch = name.includes(searchText) || roll.includes(searchText) || adm.includes(searchText);
         let matchesStatus = !statusFilter || (statusFilter === 'not_marked' && status === 'not_marked') || (status === statusFilter);
         
         if (matchesSearch && matchesStatus) {

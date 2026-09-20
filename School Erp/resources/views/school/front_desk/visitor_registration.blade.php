@@ -1329,7 +1329,7 @@
                                     <label class="custom-label" for="visit_purpose">
                                         Visit Purpose Designation <span class="required-star">*</span>
                                     </label>
-                                    <select name="visit_purpose" id="visit_purpose" class="custom-select" required>
+                                    <select name="visit_purpose" id="visit_purpose" class="custom-select" required onchange="handleVisitPurposeChange(this.value)">
                                         <option value="">-- Select Purpose --</option>
                                         @foreach($visitPurposes as $purpose)
                                             <option value="{{ $purpose }}" {{ old('visit_purpose') == $purpose ? 'selected' : '' }}>
@@ -1341,6 +1341,26 @@
                                 <div class="col-md-6 col-sm-12">
                                     <label class="custom-label" for="detailed_purpose_remarks">Detailed Purpose Remarks</label>
                                     <input type="text" name="detailed_purpose_remarks" id="detailed_purpose_remarks" class="custom-input" placeholder="Enter Purpose Remarks" value="{{ old('detailed_purpose_remarks') }}">
+                                </div>
+                            </div>
+
+                            <!-- Candidate CV Upload (PDF Only) when Interview is selected -->
+                            <div class="row g-3 mb-3" id="cvUploadRow" style="display: {{ stripos(old('visit_purpose', ''), 'interview') !== false ? 'flex' : 'none' }};">
+                                <div class="col-12">
+                                    <div class="p-3" style="background: #eff6ff; border: 1.5px dashed #2563eb; border-radius: 10px;">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="custom-label mb-0" for="cvInput" style="color: #1e40af;">
+                                                <i class="fas fa-file-pdf text-danger me-1"></i> Candidate CV / Resume (PDF Only) <span class="required-star">*</span>
+                                            </label>
+                                            <span class="badge bg-danger text-white px-2 py-1" style="font-size: 10px;">Interview Candidate</span>
+                                        </div>
+                                        <div class="input-group input-group-sm">
+                                            <input type="file" name="cv" id="cvInput" class="form-control" accept=".pdf,application/pdf" onchange="validateCvFile(this)" style="border-radius: 8px; font-size: 12.5px; background: #fff;">
+                                        </div>
+                                        <div class="small text-muted mt-1" style="font-size: 11px;">
+                                            <i class="fas fa-info-circle me-1"></i> Strictly PDF format (Max 10MB). Automatically accessible by Teachers & HR.
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1373,28 +1393,28 @@
                                 </div>
                             </div>
 
-                            <!-- Photo & Security Notes -->
+                            <!-- Photo (Live Camera Only) & Security Notes -->
                             <div class="row g-3">
                                 <div class="col-md-6 col-sm-12">
-                                    <label class="custom-label" for="photo">Capture / Upload Photo</label>
+                                    <label class="custom-label">Capture Visitor Photo (Live Camera Only)</label>
                                     <div class="d-flex align-items-center gap-2 mb-2">
-                                        <input type="file" name="photo" id="photoInput" class="form-control form-control-sm" accept="image/*" style="border-radius: 8px; font-size: 12px; border: 1.5px solid #cbd5e1;">
-                                        <button type="button" class="btn-camera-toggle" id="openWebcamBtn" onclick="openWebcamModal()">
-                                            <i class="fas fa-camera"></i> Live
+                                        <button type="button" class="btn-camera-toggle" id="openWebcamBtn" onclick="openWebcamModal()" style="flex: 1; padding: 9px 16px; border-radius: 8px; font-weight: 700; background: var(--theme-blue); color: #fff; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(29, 78, 216, 0.25);">
+                                            <i class="fas fa-camera"></i> Take Live Camera Photo
                                         </button>
                                     </div>
 
                                     <input type="hidden" name="webcam_photo" id="webcamPhotoInput">
 
                                     <div class="photo-preview-wrapper">
-                                        <div class="photo-preview-box" id="photoPreviewBox" onclick="document.getElementById('photoInput').click()" title="Click to upload / change photo">
-                                            <i class="fas fa-image placeholder-icon" id="photoPlaceholderIcon"></i>
+                                        <div class="photo-preview-box" id="photoPreviewBox" onclick="openWebcamModal()" title="Click to take live photo with webcam" style="cursor: pointer;">
+                                            <i class="fas fa-camera placeholder-icon" id="photoPlaceholderIcon"></i>
                                             <img src="" id="photoPreviewImg" alt="Preview" style="display: none;">
                                         </div>
                                         <div class="small text-muted" style="font-size: 11px; line-height: 1.4;">
-                                            <div>JPG / PNG / Webcam</div>
+                                            <div class="fw-bold text-dark"><i class="fas fa-shield-alt text-primary me-1"></i> Live Camera Only</div>
+                                            <div>Direct gate verification</div>
                                             <button type="button" id="clearPhotoBtn" class="btn btn-link btn-sm text-danger p-0 mt-1 fw-bold" style="font-size: 11px; text-decoration: none; display: none;" onclick="clearVisitorPhoto()">
-                                                <i class="fas fa-trash-alt me-1"></i> Remove
+                                                <i class="fas fa-trash-alt me-1"></i> Retake / Remove
                                             </button>
                                         </div>
                                     </div>
@@ -1635,10 +1655,48 @@
 <script>
     let currentPrintUrl = '#';
 
+    // Purpose & Interview CV Handling
+    function handleVisitPurposeChange(val) {
+        const row = document.getElementById('cvUploadRow');
+        if (!row) return;
+        if (val && val.toLowerCase().includes('interview')) {
+            row.style.setProperty('display', 'flex', 'important');
+        } else {
+            row.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    function validateCvFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const fname = file.name.toLowerCase();
+        if (!fname.endsWith('.pdf') && file.type !== 'application/pdf') {
+            alert("Only PDF files (.pdf) are allowed for candidate CV / Resume upload.");
+            input.value = '';
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            alert("Candidate CV file size must not exceed 10 MB.");
+            input.value = '';
+            return;
+        }
+    }
+
     // Submit form via AJAX to instantly show the Scan Card popup
     function submitRegistrationForm() {
         const form = document.getElementById('visitorRegistrationForm');
         if (!form.reportValidity()) return;
+
+        // Check Interview CV requirement
+        const purposeVal = document.getElementById('visit_purpose')?.value || '';
+        if (purposeVal.toLowerCase().includes('interview')) {
+            const cvInput = document.getElementById('cvInput');
+            if (!cvInput || !cvInput.files || cvInput.files.length === 0) {
+                alert("Candidate CV / Resume (PDF Only) is mandatory for Interview visitors. Please attach the CV.");
+                if (cvInput) cvInput.focus();
+                return;
+            }
+        }
 
         const btn = document.getElementById('floatingSubmitBtn');
         btn.disabled = true;
@@ -1663,6 +1721,8 @@
                 showScanCardModal(data);
                 form.reset();
                 clearVisitorPhoto();
+                const cvRow = document.getElementById('cvUploadRow');
+                if (cvRow) cvRow.style.display = 'none';
                 document.getElementById('entourage_count').value = '1';
                 document.getElementById('security_gate').value = 'Main Gate 1';
             } else {
@@ -1766,27 +1826,12 @@
     });
     @endif
 
-    // File Input Photo Preview
-    const photoInput = document.getElementById('photoInput');
+    // Live Camera Photo Handling ONLY (No Gallery Upload)
     const photoPreviewBox = document.getElementById('photoPreviewBox');
     const photoPreviewImg = document.getElementById('photoPreviewImg');
     const photoPlaceholderIcon = document.getElementById('photoPlaceholderIcon');
     const clearPhotoBtn = document.getElementById('clearPhotoBtn');
     const webcamPhotoInput = document.getElementById('webcamPhotoInput');
-
-    if (photoInput) {
-        photoInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    setPhotoPreview(event.target.result);
-                    webcamPhotoInput.value = '';
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-    }
 
     function setPhotoPreview(src) {
         photoPreviewImg.src = src;
@@ -1796,7 +1841,6 @@
     }
 
     function clearVisitorPhoto() {
-        photoInput.value = '';
         webcamPhotoInput.value = '';
         photoPreviewImg.src = '';
         photoPreviewImg.style.display = 'none';
@@ -1827,11 +1871,11 @@
                 })
                 .catch(function(err) {
                     console.error("Camera access error:", err);
-                    cameraErrorMsg.textContent = "Unable to access webcam. Please check browser permissions or upload an image file.";
+                    cameraErrorMsg.textContent = "Unable to access webcam. Please allow camera permissions in your browser.";
                     cameraErrorMsg.style.display = 'block';
                 });
         } else {
-            cameraErrorMsg.textContent = "Webcam capture is not supported on this browser. Please upload an image file.";
+            cameraErrorMsg.textContent = "Live webcam capture is not supported on this browser or connection is not secure (HTTPS required).";
             cameraErrorMsg.style.display = 'block';
         }
     }
@@ -1846,7 +1890,6 @@
 
         const dataUrl = webcamCanvas.toDataURL('image/jpeg', 0.9);
         webcamPhotoInput.value = dataUrl;
-        photoInput.value = '';
         setPhotoPreview(dataUrl);
 
         closeWebcamModal();
@@ -2116,7 +2159,7 @@
                     <p class="scan-subtext">Fill in your visit details on your mobile. Once approved, your Digital Visitor Pass will be delivered directly to your email!</p>
 
                     <div class="poster-footer">
-                        Powered by SchoolCloud ERP • Front Desk Visitor Security System
+                        Powered by Educorerp • Front Desk Visitor Security System
                     </div>
                 </div>
                 <script>

@@ -320,7 +320,7 @@ body.dark-mode .tb-badge-status {
             <form id="ledgerFilterForm" action="{{ route('school.account-books.ledger-report') }}" method="GET">
                 <div class="tb-filter-grid">
                     <!-- Session Select -->
-                    <div class="tb-filter-item">
+                    <div class="tb-filter-item" style="display: none;">
                         <label class="tb-filter-label">Session</label>
                         <select name="session_id" class="tb-form-control form-select" onchange="document.getElementById('ledgerFilterForm').submit();">
                             @foreach($academicSessions as $session)

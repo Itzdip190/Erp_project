@@ -1,0 +1,29 @@
+node_modules/
+.expo/
+.expo-shared/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Android build outputs and caches
+android/app/build/
+android/.gradle/
+android/build/
+android/app/src/main/assets/index.android.bundle
+*.apk
+*.aab
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db

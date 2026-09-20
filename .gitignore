@@ -40,4 +40,26 @@ hs_err_pid*.log
 *.log
 School Erp/u219184746_erp1
 
+# Ignore large archives and compressed bundles
+*.zip
+*.tar.gz
+*.rar
+*.7z
 
+# Ignore Node and Mobile dependencies
+node_modules/
+**/node_modules/
+.expo/
+**/.expo/
+.expo-shared/
+**/.expo-shared/
+
+# Ignore Android / Mobile build outputs & binaries
+*.apk
+*.aab
+**/android/app/build/
+**/android/.gradle/
+**/android/build/
+
+# Ignore temporary test and browser profiles
+edge_pdf_profile_*/

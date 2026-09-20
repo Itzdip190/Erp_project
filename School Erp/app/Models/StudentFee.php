@@ -253,15 +253,37 @@ class StudentFee extends Model
         $transportCat = \App\Models\StudentCategory::where('school_id', $schoolId)->where('name', 'Transport')->first();
         $transportComp = \App\Models\FeeComponent::where('school_id', $schoolId)
             ->where('component_name', 'Transport Fee')
-            ->where('academic_session_id', $currentSession->id)
+            ->where(function($q) use ($currentSession) {
+                $q->where('academic_session_id', $currentSession->id)
+                  ->orWhereNull('academic_session_id');
+            })
             ->first();
             
         if ($transportCat && $transportComp) {
+            $reqClassId = request()->get('class_id');
+            $reqSectionId = request()->get('section_id');
+            $effectiveClassId = $reqClassId ?? $student->active_school_class?->id ?? $student->class_id;
+            $effectiveSectionId = $reqSectionId ?? $student->active_section?->id ?? $student->section_id;
+
             $isTransportActive = \App\Models\ClassWiseFee::where('school_id', $schoolId)
-                ->where('class_id', $student->class_id)
-                ->where(function($q) use ($student) {
+                ->where(function($q) use ($effectiveClassId, $student, $reqClassId) {
+                    $q->where('class_id', $effectiveClassId);
+                    if ($student->class_id && $student->class_id != $effectiveClassId) {
+                        $q->orWhere('class_id', $student->class_id);
+                    }
+                    if ($reqClassId && $reqClassId != $effectiveClassId) {
+                        $q->orWhere('class_id', $reqClassId);
+                    }
+                })
+                ->where(function($q) use ($effectiveSectionId, $student, $reqSectionId) {
                     $q->whereNull('section_id')
-                      ->orWhere('section_id', $student->section_id);
+                      ->orWhere('section_id', $effectiveSectionId);
+                    if ($student->section_id && $student->section_id != $effectiveSectionId) {
+                        $q->orWhere('section_id', $student->section_id);
+                    }
+                    if ($reqSectionId && $reqSectionId != $effectiveSectionId) {
+                        $q->orWhere('section_id', $reqSectionId);
+                    }
                 })
                 ->where('student_category_id', $transportCat->id)
                 ->where('fee_component_id', $transportComp->id)
@@ -359,9 +381,20 @@ class StudentFee extends Model
             $component->update(['fee_category_id' => $category->id]);
         }
 
-        // Calculate start month from transport_calendar_start (fallback to now)
-        $startMonthStr = $student->transport_calendar_start ?: now()->toDateString();
-        $startMonth = \Carbon\Carbon::parse($startMonthStr)->startOfMonth();
+        // Calculate start month from transport_calendar_start (fallback to session start)
+        $sessionStart = $currentSession->start_date ? \Carbon\Carbon::parse($currentSession->start_date)->startOfMonth() : now()->startOfMonth();
+        $sessionEnd   = $currentSession->end_date   ? \Carbon\Carbon::parse($currentSession->end_date)->endOfMonth()     : null;
+
+        if (!empty($student->transport_calendar_start)) {
+            $startMonth = \Carbon\Carbon::parse($student->transport_calendar_start)->startOfMonth();
+            if ($sessionEnd && $startMonth->gt($sessionEnd)) {
+                $startMonth = $sessionStart;
+            } elseif ($startMonth->lt($sessionStart)) {
+                $startMonth = $sessionStart;
+            }
+        } else {
+            $startMonth = $sessionStart;
+        }
 
         // Clear future unprotected installments
         $pendingChequeFeeIds = [];
@@ -377,31 +410,53 @@ class StudentFee extends Model
         }
         $pendingChequeFeeIds = array_unique(array_filter(array_map('intval', $pendingChequeFeeIds)));
 
-        $delQuery = self::withoutGlobalScope('active')
-            ->where('school_id', $schoolId)
-            ->where('student_id', $student->id)
-            ->where('fee_component_id', $component->id)
-            ->where('paid_amount', '<=', 0)
-            ->whereNull('invoice_no')
-            ->where('due_date', '>=', $startMonth->toDateString());
-        if (!empty($pendingChequeFeeIds)) {
-            $delQuery->whereNotIn('id', $pendingChequeFeeIds);
-        }
-        $delQuery->delete();
-
         // Generate installments
         $pickFare = (float)($student->transport_pick_fare ?? 0);
         $dropFare = (float)($student->transport_drop_fare ?? 0);
         $totalFare = $pickFare + $dropFare;
 
+        if ($totalFare <= 0 && $student->transport_route_id) {
+            $route = \App\Models\TransportRoute::where('school_id', $schoolId)->find($student->transport_route_id);
+            if ($route) {
+                $sessPickFare = $route->getPickFareForSession($currentSession->id);
+                $sessDropFare = $route->getDropFareForSession($currentSession->id);
+                $sessTotal = $sessPickFare + $sessDropFare;
+                if ($sessTotal > 0) {
+                    $totalFare = $sessTotal;
+                } else {
+                    $totalFare = (float)($route->pick_fare ?? 0) + (float)($route->drop_fare ?? 0);
+                }
+            }
+        }
+
         $instList = $schedule->installments ?? [];
+
+        // Check if any installment falls on or after startMonth
+        $hasFutureInstallments = collect($instList)->contains(function($item) use ($startMonth) {
+            $d = !empty($item['due_date']) ? \Carbon\Carbon::parse($item['due_date']) : null;
+            return $d && !$d->copy()->startOfMonth()->lt($startMonth);
+        });
+
+        $delQuery = self::withoutGlobalScope('active')
+            ->where('school_id', $schoolId)
+            ->where('student_id', $student->id)
+            ->where('fee_component_id', $component->id)
+            ->where('paid_amount', '<=', 0)
+            ->whereNull('invoice_no');
+        if ($hasFutureInstallments) {
+            $delQuery->where('due_date', '>=', $startMonth->toDateString());
+        }
+        if (!empty($pendingChequeFeeIds)) {
+            $delQuery->whereNotIn('id', $pendingChequeFeeIds);
+        }
+        $delQuery->delete();
 
         foreach ($instList as $index => $instData) {
             $installmentNo = $instData['installment_no'] ?? ($index + 1);
-            $dueDate = \Carbon\Carbon::parse($instData['due_date']);
+            $dueDate = !empty($instData['due_date']) ? \Carbon\Carbon::parse($instData['due_date']) : now();
             
-            // Mid-session opt-in: skip if month is before startMonth
-            if ($dueDate->copy()->startOfMonth()->lt($startMonth)) {
+            // Mid-session opt-in: skip only if there are other future installments remaining
+            if ($hasFutureInstallments && $dueDate->copy()->startOfMonth()->lt($startMonth)) {
                 continue;
             }
 

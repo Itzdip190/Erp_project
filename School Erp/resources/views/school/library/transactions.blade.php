@@ -973,7 +973,7 @@
 
             <div class="filter-grid-layout {{ $tab === 'students' ? 'students-grid' : 'staffs-grid' }}">
                 <!-- Academic Year -->
-                <div class="param-group">
+                <div class="param-group" style="display:none;">
                     <label class="param-label">Academic Year <span class="text-danger">*</span></label>
                     <select name="academic_year" class="param-control">
                         @foreach($academicSessions as $ses)

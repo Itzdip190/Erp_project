@@ -38,9 +38,8 @@ class SchoolDashboardController extends Controller
 
         // ── ACADEMIC SESSIONS ────────────────────────────────────────────────
         $sessions = AcademicSession::where('school_id', $schoolId)->get();
-        $currentSession = AcademicSession::where('school_id', $schoolId)
-            ->where('is_current', true)
-            ->first();
+        $currentSession = AcademicSession::resolveCurrentSessionForUser($user, $schoolId)
+            ?? AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
 
         // ── 1. TOP CARDS (HEADCOUNT, ACCOUNTS, FEE, ATTENDANCE) ───────────────
         $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
@@ -1456,24 +1455,112 @@ class SchoolDashboardController extends Controller
 
             case 'today_collection':
                 $title = "Today's Fee Collection";
-                $selectedSession = AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
-                $feesQuery = StudentFee::where('school_id', $schoolId)->whereDate('updated_at', today())->where('paid_amount', '>', 0)->with('student');
-                if ($selectedSession) {
-                    $sessId = $selectedSession->id;
-                    $feesQuery->whereHas('student', function($sq) use ($sessId) {
-                        $sq->where('academic_session_id', $sessId)
-                          ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
-                    });
+                $selectedSessionId = $request->get('session_id') ?? session('admin_selected_session_id');
+                $selectedSession = null;
+                if ($selectedSessionId) {
+                    $selectedSession = AcademicSession::where('school_id', $schoolId)->find($selectedSessionId);
                 }
-                $fees = $feesQuery->get();
-                foreach ($fees as $fee) {
-                    $data[] = [
-                        'receipt_id' => 'REC-' . $fee->id,
-                        'student' => ($fee->student?->full_name ?? '—') . ' (' . ($fee->student?->class?->name ?? '—') . ')',
-                        'amount' => '₹ ' . number_format($fee->paid_amount, 2),
-                        'date' => $fee->updated_at->format('Y-m-d'),
-                        'status' => ucfirst($fee->status ?? 'Paid')
-                    ];
+                if (!$selectedSession) {
+                    $selectedSession = AcademicSession::resolveCurrentSessionForUser(auth()->user(), $schoolId)
+                        ?? AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+                }
+
+                $todayStr = today()->toDateString();
+                $sessionFeeIds = [];
+                $enrolledStudentIds = [];
+                if ($selectedSession) {
+                    $sessionFeeIds = StudentFee::where('school_id', $schoolId)
+                        ->where(function($q) use ($selectedSession) {
+                            $sessId = $selectedSession->id;
+                            $q->where('academic_session_id', $sessId)
+                              ->orWhereHas('student', function($sq) use ($sessId) {
+                                  $sq->where('academic_session_id', $sessId)
+                                     ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                              });
+                        })
+                        ->pluck('id')
+                        ->flip()
+                        ->all();
+
+                    $enrolledStudentIds = Student::where('school_id', $schoolId)
+                        ->where(function($q) use ($selectedSession) {
+                            $sessId = $selectedSession->id;
+                            $q->where('academic_session_id', $sessId)
+                              ->orWhereHas('studentSessions', fn($ssq) => $ssq->where('academic_session_id', $sessId));
+                        })
+                        ->pluck('id')
+                        ->flip()
+                        ->all();
+                }
+
+                $todayInvoices = \App\Models\FeeInvoice::where('school_id', $schoolId)
+                    ->where('type', 'payment')
+                    ->where('status', 'paid')
+                    ->whereDate('payment_date', $todayStr)
+                    ->with(['student.class', 'student.section'])
+                    ->latest('id')
+                    ->get();
+
+                $countedInvoiceNumbers = [];
+                foreach ($todayInvoices as $inv) {
+                    $invAmount = (float) $inv->amount;
+                    if ($invAmount <= 0) {
+                        continue;
+                    }
+
+                    $hasSessionMatch = false;
+                    $matchedAmount = 0.0;
+
+                    if (!empty($inv->payment_details)) {
+                        $details = is_string($inv->payment_details) ? json_decode($inv->payment_details, true) : $inv->payment_details;
+                        if (is_array($details)) {
+                            $components = $details['components'] ?? (isset($details[0]['student_fee_id']) ? $details : []);
+                            if (!empty($components) && is_array($components)) {
+                                $hasComponentWithFeeId = false;
+                                foreach ($components as $comp) {
+                                    if (!is_array($comp)) continue;
+                                    $sfId = $comp['student_fee_id'] ?? null;
+                                    if ($sfId) {
+                                        $hasComponentWithFeeId = true;
+                                        if (isset($sessionFeeIds[$sfId])) {
+                                            $hasSessionMatch = true;
+                                            $matchedAmount += (float) ($comp['amount_paid'] ?? 0);
+                                        }
+                                    }
+                                }
+                                if ($hasComponentWithFeeId && $hasSessionMatch) {
+                                    $data[] = [
+                                        'receipt_id' => $inv->receipt_number ?? $inv->invoice_number,
+                                        'student' => ($inv->student?->full_name ?? '—') . ' (' . ($inv->student?->class?->name ?? '—') . ')',
+                                        'amount' => '₹ ' . number_format($matchedAmount, 2),
+                                        'date' => $inv->payment_date ? Carbon::parse($inv->payment_date)->format('Y-m-d') : $inv->created_at->format('Y-m-d'),
+                                        'status' => 'Paid'
+                                    ];
+                                    $countedInvoiceNumbers[$inv->invoice_number] = true;
+                                    if (!empty($inv->receipt_number)) {
+                                        $countedInvoiceNumbers[$inv->receipt_number] = true;
+                                    }
+                                    continue;
+                                } elseif ($hasComponentWithFeeId && !$hasSessionMatch) {
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+
+                    if (isset($enrolledStudentIds[$inv->student_id])) {
+                        $data[] = [
+                            'receipt_id' => $inv->receipt_number ?? $inv->invoice_number,
+                            'student' => ($inv->student?->full_name ?? '—') . ' (' . ($inv->student?->class?->name ?? '—') . ')',
+                            'amount' => '₹ ' . number_format($invAmount, 2),
+                            'date' => $inv->payment_date ? Carbon::parse($inv->payment_date)->format('Y-m-d') : $inv->created_at->format('Y-m-d'),
+                            'status' => 'Paid'
+                        ];
+                        $countedInvoiceNumbers[$inv->invoice_number] = true;
+                        if (!empty($inv->receipt_number)) {
+                            $countedInvoiceNumbers[$inv->receipt_number] = true;
+                        }
+                    }
                 }
                 break;
 
@@ -1778,9 +1865,15 @@ class SchoolDashboardController extends Controller
 
         $data = [];
 
-        $currentSession = AcademicSession::where('school_id', $schoolId)
-            ->where('is_current', true)
-            ->first();
+        $sessionId = $request->input('academic_session_id') ?? session('admin_selected_session_id');
+        $currentSession = null;
+        if ($sessionId) {
+            $currentSession = AcademicSession::where('school_id', $schoolId)->where('id', $sessionId)->first();
+        }
+        if (!$currentSession) {
+            $currentSession = AcademicSession::resolveCurrentSessionForUser(auth()->user(), $schoolId)
+                ?? AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first();
+        }
 
         if ($box === 'overview') {
             $totalStudentsQuery = Student::where('school_id', $schoolId)->where('is_active', true);
@@ -2139,6 +2232,9 @@ class SchoolDashboardController extends Controller
         $session = AcademicSession::where('school_id', $schoolId)
             ->findOrFail($request->academic_session_id);
 
+        // Set in admin browser session for instant scoped persistence
+        session(['admin_selected_session_id' => $session->id]);
+
         // Set all other sessions is_current to false
         AcademicSession::where('school_id', $schoolId)->update(['is_current' => false]);
 
@@ -2164,12 +2260,10 @@ class SchoolDashboardController extends Controller
 
         $schoolId = auth()->user()->school_id;
 
-        // Resolve selected academic session or fallback to the school's current active session
+        // Resolve selected academic session or fallback to the user's role-based current session
         $sessionId = $request->input('academic_session_id');
         if (!$sessionId) {
-            $currentSession = AcademicSession::where('school_id', $schoolId)
-                ->where('is_current', true)
-                ->first();
+            $currentSession = AcademicSession::resolveCurrentSessionForUser(auth()->user(), $schoolId);
             $sessionId = $currentSession?->id;
         }
 
