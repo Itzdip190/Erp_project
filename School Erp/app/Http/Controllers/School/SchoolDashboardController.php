@@ -30,9 +30,16 @@ use Carbon\Carbon;
 
 class SchoolDashboardController extends Controller
 {
-    public function index(Request $request): View
+    public function index(Request $request): mixed
     {
-        $user     = auth()->user();
+        $user = auth()->user();
+        if ($user && ($user->hasRole('staff') || $user->role === 'staff') && !$user->hasRole('school_admin') && !$user->hasRole('superadmin')) {
+            return redirect()->route('school.staff.dashboard');
+        }
+        if ($user && ($user->hasRole('driver') || $user->role === 'driver') && !$user->hasRole('school_admin') && !$user->hasRole('superadmin')) {
+            return redirect()->route('school.transport.bus-attendance');
+        }
+
         $schoolId = $user->school_id;
         $school   = $user->school;
 
@@ -2222,29 +2229,47 @@ class SchoolDashboardController extends Controller
             ], 403);
         }
 
+        if (method_exists($user, 'hasRestrictedAcademicSession') && $user->hasRestrictedAcademicSession()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized. Academic year is locked for your role by Main Admin.',
+            ], 403);
+        }
+
         $request->validate([
             'academic_session_id' => 'required|exists:academic_sessions,id',
         ]);
 
-        $schoolId = $user->school_id;
+        $currentSchool = app()->bound('currentSchool') ? app('currentSchool') : null;
+        $schoolId = (int) ($user->school_id ?: ($currentSchool?->id ?: 0));
 
-        // Ensure the session belongs to the school
-        $session = AcademicSession::where('school_id', $schoolId)
-            ->findOrFail($request->academic_session_id);
+        // Find the target session safely (supporting School Admin, Impersonating SuperAdmin, Branch Switch)
+        if ($schoolId > 0) {
+            $session = AcademicSession::where('school_id', $schoolId)
+                ->findOrFail($request->academic_session_id);
+        } else {
+            $session = AcademicSession::findOrFail($request->academic_session_id);
+            $schoolId = (int) $session->school_id;
+        }
 
-        // Set in admin browser session for instant scoped persistence
-        session(['admin_selected_session_id' => $session->id]);
-
-        // Set all other sessions is_current to false
+        // Set all other sessions for this school is_current to false
         AcademicSession::where('school_id', $schoolId)->update(['is_current' => false]);
 
         // Set selected session is_current to true
         $session->is_current = true;
         $session->save();
 
+        // Set in admin browser session for instant scoped persistence
+        session(['admin_selected_session_id' => $session->id]);
+
+        // Invalidate school academic session cache for instant cross-device sync
+        \Illuminate\Support\Facades\Cache::forget("school_{$schoolId}_current_academic_session");
+
         return response()->json([
-            'success' => true,
-            'message' => 'Academic session changed successfully!',
+            'success'               => true,
+            'message'               => 'Academic session changed successfully to ' . $session->name . '!',
+            'academic_session_id'   => $session->id,
+            'academic_session_name' => $session->name,
         ]);
     }
 

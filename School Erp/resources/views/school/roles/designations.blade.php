@@ -570,6 +570,19 @@ body.dark-mode .dg-tab-btn.active {
                                 No Role / Basic Staff
                             @endif
                         </span>
+                        @if($desg->system_role == 'school_admin')
+                            <div style="margin-top: 6px;">
+                                @if(!empty($desg->academic_session_id) && $desg->academicSession)
+                                    <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; padding: 2px 8px; border-radius: 6px;" title="Locked: This admin role is restricted to {{ $desg->academicSession->name }} only">
+                                        <i class="fas fa-lock" style="font-size: 10px;"></i> {{ $desg->academicSession->name }} Only
+                                    </span>
+                                @else
+                                    <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #047857; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 2px 8px; border-radius: 6px;" title="Full Access: All Academic Years">
+                                        <i class="fas fa-globe" style="font-size: 10px;"></i> All Academic Years
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
                     </td>
                     <td>
                         <span class="staff-count-badge">
@@ -585,7 +598,8 @@ body.dark-mode .dg-tab-btn.active {
                                     data-name="{{ $desg->name }}"
                                     data-dept="{{ $desg->department_id }}"
                                     data-desc="{{ $desg->description }}"
-                                    data-role="{{ $desg->system_role ?: 'none' }}">
+                                    data-role="{{ $desg->system_role ?: 'none' }}"
+                                    data-session="{{ $desg->academic_session_id ?? '' }}">
                                 <i class="fas fa-edit"></i> Edit
                             </button>
                             <button type="button"
@@ -698,15 +712,35 @@ body.dark-mode .dg-tab-btn.active {
 
             <div class="form-group">
                 <label for="desgRole">System Role / Privilege Mapping <span>*</span></label>
-                <select id="desgRole" name="system_role" class="form-control" required>
-                    <option value="none">None / Basic Staff (No admin privilege)</option>
-                    <option value="teacher">Teacher (Access teacher dashboard & classes)</option>
-                    <option value="school_admin">School Admin (Full administrative access)</option>
-                    <option value="accountant">Accountant (Access fee & expense modules)</option>
-                    <option value="driver">Driver (Access transport dashboard)</option>
+                <select id="desgRole" name="system_role" class="form-control" onchange="toggleAcademicSessionVisibility(this.value)" required>
+                    <option value="none">None / Basic Staff (Profile, attendance, leave & gatepass — 0 admin privileges)</option>
+                    <option value="teacher">Teacher (Access teacher dashboard, timetable, attendance & marks)</option>
+                    <option value="accountant">Accountant (Access fees, expenses, incomes, account books & payroll)</option>
+                    <option value="driver">Driver (Access bus attendance, vehicle & route details)</option>
+                    <option value="school_admin">School Admin (Full administrative access across all modules)</option>
                 </select>
                 <div style="margin-top: 8px; font-size: 11px; color: var(--dg-text-muted); line-height: 1.4;">
-                    Selecting a system role automatically assigns that dashboard's privileges to anyone assigned this designation.
+                    Selecting a system role automatically assigns that role's dashboard and default module permissions to staff members with this designation.
+                </div>
+            </div>
+
+            <div class="form-group" id="academicSessionGroup" style="display: none; background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: 10px; padding: 14px; margin-top: 14px; transition: all .3s;">
+                <label for="desgAcademicSession" style="color: #1e3a5f; display: flex; align-items: center; justify-content: space-between; font-weight: 700; margin-bottom: 6px;">
+                    <span>Allowed Academic Year <small style="color: #6366f1; font-weight: 600;">(Admin Role Restriction)</small></span>
+                    <i class="fas fa-calendar-alt" style="color: #6366f1;"></i>
+                </label>
+                <select id="desgAcademicSession" name="academic_session_id" class="form-control" style="background: #fff; border-color: #cbd5e1; font-weight: 600;">
+                    <option value="">All Academic Years (Full Access - No Session Restriction)</option>
+                    @if(isset($academicSessions))
+                        @foreach($academicSessions as $ses)
+                            <option value="{{ $ses->id }}">
+                                {{ $ses->name }}{{ $ses->is_current ? ' ★ (Current Active Session)' : '' }}
+                            </option>
+                        @endforeach
+                    @endif
+                </select>
+                <div style="margin-top: 8px; font-size: 11.5px; color: #64748b; line-height: 1.45;">
+                    <i class="fas fa-lock" style="color: #ef4444; margin-right: 3px;"></i> Agar aap specific academic year chunte hain, to is designation wale admin ke liye wahi session lock ho jayega aur wo session change nahi kar payenge. <strong>Main Admin par koi restriction nahi aayega</strong>.
                 </div>
             </div>
         </form>
@@ -780,6 +814,17 @@ function switchTab(tab) {
     }
 }
 
+function toggleAcademicSessionVisibility(role) {
+    const sessionGroup = document.getElementById('academicSessionGroup');
+    if (!sessionGroup) return;
+    if (role === 'school_admin') {
+        sessionGroup.style.display = 'block';
+    } else {
+        sessionGroup.style.display = 'none';
+        document.getElementById('desgAcademicSession').value = '';
+    }
+}
+
 function openCreatePanel() {
     isEditMode = false;
     document.getElementById('desgId').value = '';
@@ -787,6 +832,8 @@ function openCreatePanel() {
     document.getElementById('desgDept').value = '';
     document.getElementById('desgDesc').value = '';
     document.getElementById('desgRole').value = 'none';
+    document.getElementById('desgAcademicSession').value = '';
+    toggleAcademicSessionVisibility('none');
 
     document.getElementById('panelTitle').textContent = 'Add Designation';
     document.getElementById('panelSubtitle').textContent = 'Define a new designation & privilege mapping';
@@ -802,12 +849,15 @@ function openEditPanel(btnEl) {
     const dept = btnEl.getAttribute('data-dept');
     const desc = btnEl.getAttribute('data-desc');
     const role = btnEl.getAttribute('data-role');
+    const session = btnEl.getAttribute('data-session');
 
     document.getElementById('desgId').value = id;
     document.getElementById('desgName').value = name;
     document.getElementById('desgDept').value = dept === 'null' || !dept ? '' : dept;
     document.getElementById('desgDesc').value = desc === 'null' || !desc ? '' : desc;
     document.getElementById('desgRole').value = role;
+    document.getElementById('desgAcademicSession').value = session === 'null' || !session ? '' : session;
+    toggleAcademicSessionVisibility(role);
 
     document.getElementById('panelTitle').textContent = 'Edit Designation';
     document.getElementById('panelSubtitle').textContent = `Modify attributes for designation: ${name}`;
@@ -826,6 +876,7 @@ function saveDesignation() {
     const dept = document.getElementById('desgDept').value;
     const desc = document.getElementById('desgDesc').value.trim();
     const role = document.getElementById('desgRole').value;
+    const sessionId = (role === 'school_admin') ? (document.getElementById('desgAcademicSession').value || null) : null;
     const id = document.getElementById('desgId').value;
 
     if (!name) {
@@ -855,7 +906,8 @@ function saveDesignation() {
             name: name,
             department_id: dept,
             description: desc,
-            system_role: role
+            system_role: role,
+            academic_session_id: sessionId
         })
     })
     .then(r => r.json())

@@ -66,14 +66,23 @@ class ChangePasswordController extends Controller
      */
     protected function getDashboardRouteForUser($user): string
     {
-        if ($user->hasRole('superadmin')) {
+        if ($user->hasRole('superadmin') || $user->role === 'superadmin') {
             return '/superadmin/dashboard';
         }
         if ($user->hasRole('school_admin') || $user->hasRole('admin') || in_array($user->role, ['admin', 'school_admin'], true)) {
             return '/school/dashboard';
         }
-        if ($user->hasRole('teacher') || $user->hasRole('staff') || $user->hasRole('accountant') || in_array($user->role, ['teacher', 'staff'], true)) {
+        if ($user->hasRole('accountant') || $user->role === 'accountant') {
+            return '/school/fees/collection-followup';
+        }
+        if ($user->hasRole('driver') || $user->role === 'driver') {
+            return '/school/transport/bus-attendance';
+        }
+        if ($user->hasRole('teacher') || $user->role === 'teacher') {
             return '/teacher/dashboard';
+        }
+        if ($user->hasRole('staff') || $user->role === 'staff') {
+            return '/school/staff-dashboard';
         }
         if ($user->hasRole('student') || $user->role === 'student') {
             return '/student/dashboard';
@@ -82,6 +91,6 @@ class ChangePasswordController extends Controller
             return '/parent/dashboard';
         }
 
-        return '/school/dashboard';
+        return '/school/staff-dashboard';
     }
 }

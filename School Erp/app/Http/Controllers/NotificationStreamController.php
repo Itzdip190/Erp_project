@@ -30,74 +30,72 @@ class NotificationStreamController extends Controller
         session_write_close();
 
         $response = new StreamedResponse(function () use ($user) {
-            $lastCheckTime = Carbon::now()->subSeconds(5);
+            // Instruct client EventSource to wait 15 seconds before reconnecting
+            echo "retry: 15000\n\n";
 
             // Send initial connection event
             echo "event: connected\ndata: " . json_encode(['status' => 'connected', 'timestamp' => time()]) . "\n\n";
             @ob_flush();
             @flush();
 
-            $iterations = 0;
-            // Run loop for maximum 25 seconds before graceful reconnect
-            while ($iterations < 12) {
-                if (connection_aborted()) {
-                    break;
-                }
+            $unreadCount = NotificationService::getUnreadCount($user);
 
-                $user->refresh();
-                $unreadCount = NotificationService::getUnreadCount($user);
+            $role = $user->hasRole('school_admin') ? 'school_admin' : ($user->hasRole('teacher') ? 'teacher' : ($user->hasRole('student') ? 'student' : ($user->hasRole('parent') ? 'parent' : null)));
+            $schoolId = $user->school_id ?: (app()->bound('currentSchool') ? app('currentSchool')?->id : null);
 
-                // Fetch new notifications since last check
-                $role = $user->hasRole('school_admin') ? 'school_admin' : ($user->hasRole('teacher') ? 'teacher' : ($user->hasRole('student') ? 'student' : ($user->hasRole('parent') ? 'parent' : null)));
-                $schoolId = $user->school_id ?: (app()->bound('currentSchool') ? app('currentSchool')?->id : null);
+            // Active academic session for real-time cross-device sync
+            $currentActiveSession = $schoolId ? \App\Models\AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first() : null;
+            $activeSessionId = $currentActiveSession?->id;
+            $activeSessionName = $currentActiveSession?->name;
 
-                $newNotifsQuery = Notification::where('created_at', '>=', $lastCheckTime);
-                if ($schoolId) {
-                    $newNotifsQuery->where('school_id', $schoolId);
-                }
-                $newNotifs = $newNotifsQuery->forRecipient($user, $role)->orderByDesc('id')->get();
-
-                if ($newNotifs->count() > 0) {
-                    $lastCheckTime = Carbon::now();
-                    $payload = [
-                        'type'         => 'new_notifications',
-                        'unread_count' => $unreadCount,
-                        'items'        => $newNotifs->map(function ($n) use ($user, $role) {
-                            $actionUrl = $n->action_url;
-                            if (empty($actionUrl) || $actionUrl === '#') {
-                                $actionUrl = NotificationService::getDefaultActionUrl($n->module, $role);
-                            }
-                            return [
-                                'id'         => $n->id,
-                                'title'      => $n->title,
-                                'message'    => $n->message,
-                                'module'     => $n->module,
-                                'type'       => $n->type,
-                                'icon'       => $n->icon,
-                                'color'      => $n->color,
-                                'time'       => $n->created_at->diffForHumans(),
-                                'action_url' => $actionUrl,
-                            ];
-                        }),
-                    ];
-                    echo "event: notification\ndata: " . json_encode($payload) . "\n\n";
-                    @ob_flush();
-                    @flush();
-                } else {
-                    // Send heartbeat ping every 5 seconds to keep connection alive
-                    echo "event: ping\ndata: " . json_encode(['unread_count' => $unreadCount, 'timestamp' => time()]) . "\n\n";
-                    @ob_flush();
-                    @flush();
-                }
-
-                sleep(2);
-                $iterations++;
+            // Fetch recent unread notifications
+            $newNotifsQuery = Notification::where('is_read', false);
+            if ($schoolId) {
+                $newNotifsQuery->where('school_id', $schoolId);
             }
+            $newNotifs = $newNotifsQuery->forRecipient($user, $role)->orderByDesc('id')->limit(5)->get();
+
+            if ($newNotifs->count() > 0) {
+                $payload = [
+                    'type'                => 'new_notifications',
+                    'unread_count'        => $unreadCount,
+                    'active_session_id'   => $activeSessionId,
+                    'active_session_name' => $activeSessionName,
+                    'items'               => $newNotifs->map(function ($n) use ($role) {
+                        $actionUrl = $n->action_url;
+                        if (empty($actionUrl) || $actionUrl === '#') {
+                            $actionUrl = NotificationService::getDefaultActionUrl($n->module, $role);
+                        }
+                        return [
+                            'id'         => $n->id,
+                            'title'      => $n->title,
+                            'message'    => $n->message,
+                            'module'     => $n->module,
+                            'type'       => $n->type,
+                            'icon'       => $n->icon,
+                            'color'      => $n->color,
+                            'time'       => $n->created_at ? $n->created_at->diffForHumans() : 'Just now',
+                            'action_url' => $actionUrl,
+                        ];
+                    }),
+                ];
+                echo "event: notification\ndata: " . json_encode($payload) . "\n\n";
+            } else {
+                // Heartbeat ping with active academic session and unread count
+                echo "event: ping\ndata: " . json_encode([
+                    'unread_count'        => $unreadCount,
+                    'active_session_id'   => $activeSessionId,
+                    'active_session_name' => $activeSessionName,
+                    'timestamp'           => time(),
+                ]) . "\n\n";
+            }
+            @ob_flush();
+            @flush();
         });
 
         $response->headers->set('Content-Type', 'text/event-stream');
         $response->headers->set('Cache-Control', 'no-cache, no-store, must-revalidate');
-        $response->headers->set('Connection', 'keep-alive');
+        $response->headers->set('Connection', 'close');
         $response->headers->set('X-Accel-Buffering', 'no');
 
         return $response;
@@ -119,8 +117,10 @@ class NotificationStreamController extends Controller
         }
 
         $role = $user->hasRole('school_admin') ? 'school_admin' : ($user->hasRole('teacher') ? 'teacher' : ($user->hasRole('student') ? 'student' : ($user->hasRole('parent') ? 'parent' : null)));
+        $schoolId = $user->school_id ?: (app()->bound('currentSchool') ? app('currentSchool')?->id : null);
         $unreadCount = NotificationService::getUnreadCount($user);
         $notifications = NotificationService::getNotifications($user, 25, $unreadOnly);
+        $currentActiveSession = $schoolId ? \App\Models\AcademicSession::where('school_id', $schoolId)->where('is_current', true)->first() : null;
 
         $items = $notifications->map(function ($n) use ($role) {
             $actionUrl = $n->action_url;
@@ -144,8 +144,10 @@ class NotificationStreamController extends Controller
         });
 
         return response()->json([
-            'unread_count'  => $unreadCount,
-            'notifications' => $items,
+            'unread_count'        => $unreadCount,
+            'notifications'       => $items,
+            'active_session_id'   => $currentActiveSession?->id,
+            'active_session_name' => $currentActiveSession?->name,
         ]);
     }
 
@@ -379,18 +381,22 @@ class NotificationStreamController extends Controller
         }
 
         if ($schoolId) {
-            \App\Models\FcmDeviceToken::updateOrCreate(
-                [
-                    'school_id' => $schoolId,
-                    'user_id'   => $user?->id,
-                    'token'     => $token,
-                ],
-                [
-                    'device_name' => $deviceName,
-                    'platform'    => $platform,
-                    'updated_at'  => now(),
-                ]
-            );
+            try {
+                \App\Models\FcmDeviceToken::updateOrCreate(
+                    [
+                        'school_id' => $schoolId,
+                        'user_id'   => $user?->id,
+                        'token'     => $token,
+                    ],
+                    [
+                        'device_name' => $deviceName,
+                        'platform'    => $platform,
+                        'updated_at'  => now(),
+                    ]
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('FCM device registration warning: ' . $e->getMessage());
+            }
         }
 
         return response()->json([

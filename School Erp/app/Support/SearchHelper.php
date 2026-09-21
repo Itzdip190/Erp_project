@@ -180,12 +180,16 @@ class SearchHelper
                 if ($parentUser->role !== 'parent') {
                     $parentUser->update(['role' => 'parent']);
                 }
-                if ($parentUser->hasRole('student')) {
-                    $parentUser->removeRole('student');
-                }
-                if (!$parentUser->hasRole('parent')) {
-                    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'parent', 'guard_name' => 'web']);
-                    $parentUser->assignRole('parent');
+                try {
+                    if ($parentUser->hasRole('student')) {
+                        $parentUser->removeRole('student');
+                    }
+                    if (!$parentUser->hasRole('parent')) {
+                        \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'parent', 'guard_name' => 'web']);
+                        $parentUser->assignRole('parent');
+                    }
+                } catch (\Throwable $e) {
+                    // Safe against duplicate pivot key
                 }
             }
         }
@@ -204,6 +208,10 @@ class SearchHelper
         foreach ($mislinkedStudents as $mislinked) {
             $mislinked->update(['user_id' => null]);
         }
+
+        // Pre-compute bcrypt password hashes once outside the loop to eliminate CPU lock
+        $defaultStudentHash = \Illuminate\Support\Facades\Hash::make('Student@2026!');
+        $defaultStaffHash   = \Illuminate\Support\Facades\Hash::make('Staff@2026!');
 
         // 1. Sync unlinked students
         $unlinkedStudents = Student::where('school_id', $schoolId)
@@ -266,12 +274,16 @@ class SearchHelper
                         'name'      => trim($student->first_name . ' ' . ($student->last_name ?? '')),
                         'email'     => $targetEmail,
                         'phone'     => $student->phone ?: null,
-                        'password'  => \Illuminate\Support\Facades\Hash::make('Student@2026!'),
+                        'password'  => $defaultStudentHash,
                         'role'      => 'student',
                         'is_active' => true,
                     ]);
-                    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'student', 'guard_name' => 'web']);
-                    $user->assignRole('student');
+                    try {
+                        \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'student', 'guard_name' => 'web']);
+                        $user->assignRole('student');
+                    } catch (\Throwable $re) {
+                        // Role already assigned
+                    }
                 } catch (\Exception $e) {
                     $user = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
                         ->where('school_id', $studentSchoolId)
@@ -321,12 +333,16 @@ class SearchHelper
                         'name'      => trim($staff->first_name . ' ' . ($staff->last_name ?? '')),
                         'email'     => $targetEmail,
                         'phone'     => $staff->phone ?? null,
-                        'password'  => \Illuminate\Support\Facades\Hash::make('Staff@2026!'),
+                        'password'  => $defaultStaffHash,
                         'role'      => 'teacher',
                         'is_active' => true,
                     ]);
-                    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'teacher', 'guard_name' => 'web']);
-                    $user->assignRole('teacher');
+                    try {
+                        \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'teacher', 'guard_name' => 'web']);
+                        $user->assignRole('teacher');
+                    } catch (\Throwable $re) {
+                        // Role already assigned
+                    }
                 } catch (\Exception $e) {
                     $user = User::withoutGlobalScope(\App\Models\Scopes\SchoolScope::class)
                         ->where('school_id', $staffSchoolId)

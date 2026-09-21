@@ -24,23 +24,26 @@
                 ];
             });
 
-            // Query pending fee structure deletions
-            $pendingDeletions = \App\Models\PendingDeletion::where('school_id', $schoolId)
-                ->get()
-                ->map(function ($pd) {
-                    return (object) [
-                        'id' => $pd->id,
-                        'title' => 'Delete Request: ' . $pd->item_name,
-                        'content' => 'Requested by: ' . $pd->requested_by . ' (' . ucfirst($pd->type) . ')',
-                        'time' => $pd->created_at->diffForHumans(),
-                        'icon' => 'fa-trash-can',
-                        'color' => '#ef4444',
-                        'type' => 'Delete Request',
-                        'created_at' => $pd->created_at,
-                        'is_today' => true,
-                        'action_url' => '#' // Handled via inline modal action
-                    ];
-                });
+            // Query pending fee structure deletions (admin only)
+            $pendingDeletions = collect();
+            if (auth()->user()->hasRole('school_admin') || auth()->user()->hasRole('admin')) {
+                $pendingDeletions = \App\Models\PendingDeletion::where('school_id', $schoolId)
+                    ->get()
+                    ->map(function ($pd) {
+                        return (object) [
+                            'id' => $pd->id,
+                            'title' => 'Delete Request: ' . $pd->item_name,
+                            'content' => 'Requested by: ' . $pd->requested_by . ' (' . ucfirst($pd->type) . ')',
+                            'time' => $pd->created_at ? $pd->created_at->diffForHumans() : 'Just now',
+                            'icon' => 'fa-trash-can',
+                            'color' => '#ef4444',
+                            'type' => 'Delete Request',
+                            'created_at' => $pd->created_at,
+                            'is_today' => true,
+                            'action_url' => '#' // Handled via inline modal action
+                        ];
+                    });
+            }
 
             $navNotifications = $pendingDeletions->concat($centralNotifs);
         }
@@ -2891,7 +2894,8 @@ body div.select-academic-year {
 @endphp
 
 @php
-    $canManageSession = $authUser && (
+    $isSessionRestricted = $authUser && method_exists($authUser, 'hasRestrictedAcademicSession') && $authUser->hasRestrictedAcademicSession();
+    $canManageSession = !$isSessionRestricted && $authUser && (
         (method_exists($authUser, 'isSchoolAdmin') && $authUser->isSchoolAdmin()) ||
         $authUser->hasRole('school_admin') || 
         $authUser->hasRole('superadmin') || 
@@ -3001,6 +3005,12 @@ body div.select-academic-year {
                             </option>
                         @endforeach
                     </select>
+                    @elseif($isSessionRestricted)
+                    <div class="topbar-session-badge topbar-session-locked" onclick="if(typeof showToast === 'function') { showToast('Academic Year is locked for your account by Main Admin.', 'info'); }" style="height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-weight: 700; background: var(--page); color: var(--t1); display: inline-flex; align-items: center; gap: 6px; min-width: 130px; white-space: nowrap; flex-shrink: 0; cursor: not-allowed; user-select: none;" title="Academic Year is locked for your account by Main Admin">
+                        <span>{{ $currentSession?->name ?? ($layoutAcademicSessions->firstWhere('id', $layoutCurrentSessionId)?->name ?? 'Academic Year') }}</span>
+                        <i class="fas fa-lock" style="color: #ef4444; font-size: 11px; margin-left: auto;" title="Locked: Assigned by Main Admin"></i>
+                    </div>
+                    <input type="hidden" id="topbarAcademicYear" value="{{ $layoutCurrentSessionId ?? '' }}">
                     @elseif($canManageSession)
                     <div class="topbar-session-badge topbar-session-locked" onclick="if(typeof showToast === 'function') { showToast('Academic Year is locked. It can only be changed from Dashboard.', 'info'); }" style="height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-weight: 700; background: var(--page); color: var(--t1); display: inline-flex; align-items: center; gap: 6px; min-width: 130px; white-space: nowrap; flex-shrink: 0; cursor: not-allowed; user-select: none;" title="Academic Year is locked on this page. Can only be changed from Dashboard.">
                         <span>{{ $currentSession?->name ?? ($layoutAcademicSessions->firstWhere('is_current', true)?->name ?? $layoutAcademicSessions->first()?->name ?? 'Academic Year') }}{{ ($currentSession && $currentSession->is_current) ? ' ★' : '' }}</span>
@@ -3802,7 +3812,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 
+window.currentAcademicSessionId = {{ (int) ($layoutCurrentSessionId ?? 0) }};
+window.canManageAcademicSession = {{ !empty($canManageSession) ? 'true' : 'false' }};
+window.isSessionRestricted = {{ !empty($isSessionRestricted) ? 'true' : 'false' }};
+
 function switchAcademicYear(sessionId) {
+    @if(!empty($isSessionRestricted))
+        if (typeof showToast === 'function') {
+            showToast('Academic year is locked for your account by Main Admin.', 'error');
+        }
+        return;
+    @endif
     @if(!$isSchoolDashboard)
         if (typeof showToast === 'function') {
             showToast('Academic year can only be changed from the Dashboard.', 'warning');
@@ -3810,19 +3830,37 @@ function switchAcademicYear(sessionId) {
         return;
     @endif
     if (!sessionId) return;
-    $.post('{{ route("school.dashboard.change-session") }}', {
-        academic_session_id: sessionId
+
+    // Record local switch timestamp to prevent duplicate reload echo
+    sessionStorage.setItem('last_academic_session_switch_time', Date.now().toString());
+
+    $.ajax({
+        url: '{{ route("school.dashboard.change-session") }}',
+        type: 'POST',
+        data: {
+            _token: '{{ csrf_token() }}',
+            academic_session_id: sessionId
+        },
+        dataType: 'json'
     }).done(function(res) {
         if (res.success) {
-            showToast(res.message || 'Academic session changed successfully!');
+            window.currentAcademicSessionId = parseInt(sessionId, 10);
+            if (typeof showToast === 'function') {
+                showToast(res.message || 'Academic session changed successfully!');
+            }
             setTimeout(() => {
                 location.reload();
-            }, 800);
+            }, 700);
         } else {
-            showToast('Failed to switch academic session.');
+            if (typeof showToast === 'function') {
+                showToast(res.message || 'Failed to switch academic session.', 'error');
+            }
         }
-    }).fail(function() {
-        showToast('Error switching academic session.');
+    }).fail(function(xhr) {
+        const errorMsg = xhr.responseJSON?.message || 'Error switching academic session.';
+        if (typeof showToast === 'function') {
+            showToast(errorMsg, 'error');
+        }
     });
 }
 </script>

@@ -1,6 +1,6 @@
 <!-- Firebase Web Push SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 
 <script>
 /**
@@ -266,6 +266,9 @@
                         handleIncomingNotifications(data.items, data.unread_count);
                         triggerDynamicUISync();
                     }
+                    if (data.active_session_id) {
+                        checkAcademicSessionSync(data.active_session_id, data.active_session_name);
+                    }
                 } catch (err) {
                     console.error('Realtime notification parse error:', err);
                 }
@@ -276,6 +279,9 @@
                     const data = JSON.parse(e.data);
                     if (typeof data.unread_count !== 'undefined') {
                         updateBadgeOnly(data.unread_count);
+                    }
+                    if (data.active_session_id) {
+                        checkAcademicSessionSync(data.active_session_id, data.active_session_name);
                     }
                 } catch (err) {}
             });
@@ -294,7 +300,61 @@
     function startPollingFallback() {
         if (fallbackInterval) return;
         fetchLatestNotifications();
-        fallbackInterval = setInterval(fetchLatestNotifications, 8000);
+        fallbackInterval = setInterval(function() {
+            if (!document.hidden) {
+                fetchLatestNotifications();
+            }
+        }, 15000);
+    }
+
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            fetchLatestNotifications();
+        }
+    });
+
+    window.addEventListener('focus', function() {
+        fetchLatestNotifications();
+    });
+
+    let isSyncingAcademicSession = false;
+
+    function checkAcademicSessionSync(serverSessionId, serverSessionName) {
+        if (!serverSessionId || isSyncingAcademicSession) return;
+
+        // Strictly ignore role-restricted admins, teachers, students, parents - their sessions are protected
+        if (window.isSessionRestricted || (typeof window.canManageAcademicSession !== 'undefined' && !window.canManageAcademicSession)) {
+            return;
+        }
+
+        const selectEl = document.getElementById('topbarAcademicYear');
+        const currentSessionVal = (typeof window.currentAcademicSessionId !== 'undefined' && window.currentAcademicSessionId) 
+            ? window.currentAcademicSessionId 
+            : (selectEl ? (selectEl.value || selectEl.getAttribute('value')) : null);
+
+        if (!currentSessionVal) return;
+
+        const currentSessId = parseInt(currentSessionVal, 10);
+        const serverSessId = parseInt(serverSessionId, 10);
+
+        if (serverSessId && currentSessId && serverSessId !== currentSessId) {
+            // Check if recently switched locally in this tab (within last 3.5 seconds) to avoid redundant reload
+            const lastSwitchTime = sessionStorage.getItem('last_academic_session_switch_time');
+            if (lastSwitchTime && (Date.now() - parseInt(lastSwitchTime, 10) < 3500)) {
+                return;
+            }
+
+            isSyncingAcademicSession = true;
+            const displayName = serverSessionName || 'active session';
+
+            if (typeof showToast === 'function') {
+                showToast('Academic Year changed to ' + displayName + ' on another device. Syncing...', 'info');
+            }
+
+            setTimeout(function() {
+                window.location.reload();
+            }, 900);
+        }
     }
 
     function fetchLatestNotifications() {
@@ -310,6 +370,9 @@
             if (data && typeof data.unread_count !== 'undefined') {
                 handleIncomingNotifications(data.notifications, data.unread_count);
                 triggerDynamicUISync();
+            }
+            if (data && data.active_session_id) {
+                checkAcademicSessionSync(data.active_session_id, data.active_session_name);
             }
         })
         .catch(err => console.error('Fetch notifications error:', err));

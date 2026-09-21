@@ -3364,20 +3364,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 $initials    = strtoupper(substr($student->first_name, 0, 1));
 
-                // Fee schedule: Show only if explicitly assigned for this session or student
-                $assignedSched = ($student->feeSchedule && $student->feeSchedule->academic_session_id == $selectedSession->id)
-                    ? $student->feeSchedule
-                    : null;
-                if (!$assignedSched && $student->fee_schedule_id) {
-                    $sch = $schedules->firstWhere('id', $student->fee_schedule_id);
-                    if ($sch && $sch->academic_session_id == $selectedSession->id) {
-                        $assignedSched = $sch;
+                // Fee schedule: Prioritize schedule under which fees were actually paid in this session
+                $paidSchedFee = $sessionFees->first(fn($f) => ($f->paid_amount > 0 || $f->instant_discount_amount > 0) && !empty($f->fee_schedule_id) && $f->feeSchedule && optional($f->feeSchedule)->academic_session_id == $selectedSession->id);
+
+                if ($paidSchedFee) {
+                    $schedName = $paidSchedFee->feeSchedule->name;
+                } else {
+                    $assignedSched = ($student->feeSchedule && $student->feeSchedule->academic_session_id == $selectedSession->id)
+                        ? $student->feeSchedule
+                        : null;
+                    if (!$assignedSched && $student->fee_schedule_id) {
+                        $sch = $schedules->firstWhere('id', $student->fee_schedule_id);
+                        if ($sch && $sch->academic_session_id == $selectedSession->id) {
+                            $assignedSched = $sch;
+                        }
                     }
-                }
-                $schedName = $assignedSched ? $assignedSched->name : null;
-                if (!$schedName) {
-                    $schedFee = $sessionFees->first(fn($f) => !empty($f->fee_schedule_id) && $f->feeSchedule && optional($f->feeSchedule)->academic_session_id == $selectedSession->id);
-                    $schedName = $schedFee ? $schedFee->feeSchedule->name : ($student->feeSchedule && optional($student->feeSchedule)->academic_session_id == $selectedSession->id ? $student->feeSchedule->name : null);
+                    $schedName = $assignedSched ? $assignedSched->name : null;
+                    if (!$schedName) {
+                        $schedFee = $sessionFees->first(fn($f) => !empty($f->fee_schedule_id) && $f->feeSchedule && optional($f->feeSchedule)->academic_session_id == $selectedSession->id);
+                        $schedName = $schedFee ? $schedFee->feeSchedule->name : ($student->feeSchedule && optional($student->feeSchedule)->academic_session_id == $selectedSession->id ? $student->feeSchedule->name : null);
+                    }
                 }
 
                 $sessionRec = $student->studentSessionFor($selectedSession->id);
