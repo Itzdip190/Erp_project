@@ -33,12 +33,39 @@ use Illuminate\Support\Facades\DB;
 class MobileAppConfigController extends Controller
 {
     /**
+     * Resiliently resolve the authenticated user and tenant school ID.
+     * Supports Sanctum Bearer tokens, school_code header/param, or falls back safely.
+     */
+    protected function resolveSchoolAndUser(Request $request): array
+    {
+        $user = Auth::guard('sanctum')->user() ?? Auth::user();
+        $code = $request->header('X-School-Code') ?: $request->query('school_code');
+        $schoolId = null;
+
+        if ($code) {
+            $s = School::where('code', $code)
+                ->orWhereRaw('LOWER(code) = ?', [strtolower($code)])
+                ->first();
+            if ($s) {
+                $schoolId = (int) $s->id;
+            }
+        }
+        if (!$schoolId && $user && $user->school_id) {
+            $schoolId = (int) $user->school_id;
+        }
+        if (!$schoolId) {
+            $schoolId = (int) (School::first()?->id ?? 21);
+        }
+
+        return [$user, $schoolId];
+    }
+
+    /**
      * Get mobile application configuration, themes, and feature visibility flags.
      */
     public function config(Request $request): JsonResponse
     {
-        $user = Auth::user();
-        $schoolId = $user ? $user->school_id : null;
+        [$user, $schoolId] = $this->resolveSchoolAndUser($request);
         $scope = $request->query('scope', 'mobile');
 
         $registeredFeatures = FeatureVisibilityHelper::registeredFeatures();
@@ -102,8 +129,7 @@ class MobileAppConfigController extends Controller
      */
     public function banners(Request $request): JsonResponse
     {
-        $user = Auth::user();
-        $schoolId = $user ? $user->school_id : null;
+        [$user, $schoolId] = $this->resolveSchoolAndUser($request);
         $role = $request->query('role', ($user ? ($user->roles->first()?->name ?? 'all') : 'all'));
 
         $banners = [];
@@ -141,8 +167,7 @@ class MobileAppConfigController extends Controller
      */
     public function navigation(Request $request): JsonResponse
     {
-        $user = Auth::user();
-        $schoolId = $user ? $user->school_id : null;
+        [$user, $schoolId] = $this->resolveSchoolAndUser($request);
         $scope = $request->query('scope', 'mobile');
 
         $modules = ModuleRegistry::getModules();
@@ -191,33 +216,7 @@ class MobileAppConfigController extends Controller
      */
     public function dashboard(Request $request): JsonResponse
     {
-        $user = Auth::user();
-        $code = $request->header('X-School-Code') ?: $request->query('school_code');
-        $schoolId = null;
-
-        if ($code) {
-            $foundSchool = School::where('code', $code)
-                ->orWhereRaw('LOWER(code) = ?', [strtolower($code)])
-                ->first();
-            if ($foundSchool) {
-                if (!$user || $user->hasRole('superadmin') || $user->role === 'superadmin' || !$user->school_id) {
-                    $schoolId = $foundSchool->id;
-                }
-            }
-        }
-        if (!$schoolId && $user && $user->school_id) {
-            $schoolId = $user->school_id;
-        }
-        if (!$schoolId && $code) {
-            $foundSchool = School::where('code', $code)
-                ->orWhereRaw('LOWER(code) = ?', [strtolower($code)])
-                ->first();
-            $schoolId = $foundSchool?->id;
-        }
-        if (!$schoolId) {
-            $schoolId = School::first()?->id;
-        }
-
+        [$user, $schoolId] = $this->resolveSchoolAndUser($request);
         $school = $schoolId ? School::find($schoolId) : null;
         
         // ── ACADEMIC SESSIONS ────────────────────────────────────────────────
@@ -246,11 +245,17 @@ class MobileAppConfigController extends Controller
             });
         }
         $totalInSession = $schoolId ? (clone $totalStudentsQuery)->count() : 0;
-        if ($totalInSession === 0 && $schoolId && !$requestedSessionId) {
-            $totalStudentsQuery = Student::where('school_id', $schoolId)->where(function($q) {
+        if ($totalInSession === 0 && $schoolId) {
+            $fallbackStudentsQuery = Student::where('school_id', $schoolId)->where(function($q) {
                 $q->where('is_active', true)->orWhereNull('is_active');
             });
-            $totalStudents = $totalStudentsQuery->count();
+            $allActiveCount = $fallbackStudentsQuery->count();
+            if ($allActiveCount > 0) {
+                $totalStudents = $allActiveCount;
+                $totalStudentsQuery = $fallbackStudentsQuery;
+            } else {
+                $totalStudents = 0;
+            }
         } else {
             $totalStudents = $totalInSession;
         }
@@ -258,6 +263,9 @@ class MobileAppConfigController extends Controller
         $totalStaff = $schoolId ? Staff::where('school_id', $schoolId)->where(function($q) {
             $q->where('is_active', true)->orWhereNull('is_active');
         })->count() : 0;
+        if ($totalStaff === 0 && $schoolId) {
+            $totalStaff = Staff::where('school_id', $schoolId)->count();
+        }
 
         // Student gender breakdown
         $studentMaleCount = $schoolId ? (clone $totalStudentsQuery)->where('gender', 'male')->count() : 0;

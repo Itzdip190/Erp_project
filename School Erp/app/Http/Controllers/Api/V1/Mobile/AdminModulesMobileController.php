@@ -34,26 +34,20 @@ class AdminModulesMobileController extends Controller
 {
     protected function resolveSchoolId(Request $request): ?int
     {
-        $user = Auth::user();
+        $user = Auth::guard('sanctum')->user() ?? Auth::user();
         $code = $request->header('X-School-Code') ?: $request->query('school_code');
         if ($code) {
             $s = School::where('code', $code)
                 ->orWhereRaw('LOWER(code) = ?', [strtolower($code)])
                 ->first();
             if ($s) {
-                if (!$user || $user->hasRole('superadmin') || $user->role === 'superadmin' || !$user->school_id) {
-                    return (int) $s->id;
-                }
+                return (int) $s->id;
             }
         }
         if ($user && $user->school_id) {
             return (int) $user->school_id;
         }
-        if ($code) {
-            $s = School::where('code', $code)->first();
-            if ($s) return (int) $s->id;
-        }
-        return School::first()?->id;
+        return (int) (School::first()?->id ?? 21);
     }
 
     /**
